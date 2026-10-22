@@ -133,8 +133,8 @@
   }
 
   Ludus.register({
-    id: 'wallrun', name: 'Quoridor', aka: 'Wall Run', tag: 'Duel', tint: GREEN,
-    hint: 'Reach the top row first. Click a dot or use <kbd>←</kbd><kbd>↑</kbd><kbd>→</kbd><kbd>↓</kbd> to step. Click a groove to place a wall (6 each), <kbd>R</kbd> or right-click turns it',
+    id: 'wallrun', name: 'Quoridor', aka: 'Wall Run', tag: 'Duel', tint: GREEN, versus: true,
+    hint: 'Reach the top row first. Click a dot or use <kbd>←</kbd><kbd>↑</kbd><kbd>→</kbd><kbd>↓</kbd> to step. Click a groove to place a wall (6 each), <kbd>R</kbd> or right-click turns it. vs Friend: take turns, Player 2 races to the bottom',
     _rules: { blank, clone, legalMoves, dist, wallOk, apply, rankWalls, chooseAction, S, G },
     art(ctx, w, h) {
       const n = 5, cell = h * 0.13, gap = cell * 0.3, size = n * cell + (n - 1) * gap, ox = (w - size) / 2, oy = (h - size) / 2;
@@ -151,6 +151,7 @@
       const D = Ludus.draw;
       const view = api.canvas();
       const { ctx } = view;
+      const friend = api.friend, nameOf = who => (who === 'a' ? 'Player 1' : 'Player 2');
       let clock = 0, matches = 0, starter = 'a';
       let st, turn, winner, thinking, last, anim, wallT, hover = null, flip = false, flipKey = '', banner = null, parts = [];
       api.score(0);
@@ -159,7 +160,7 @@
         st = blank(); turn = starter; winner = ''; thinking = false; last = null; hover = null;
         anim = { a: { from: st.p.a.slice(), t: -9 }, b: { from: st.p.b.slice(), t: -9 } };
         wallT = {};
-        if (turn === 'b' && !quiet) cpuTurn();
+        if (turn === 'b' && !quiet && !friend) cpuTurn();
       }
       function act(who, a) {
         if (a.type === 'move') { anim[who] = { from: st.p[who].slice(), t: clock }; api.sfx(who === 'a' ? 'move' : 'click'); }
@@ -167,7 +168,7 @@
         st = apply(st, who, a); last = Object.assign({ who }, a);
         if (a.type === 'move' && st.p[who][0] === GOAL[who]) { winner = who; return finish(); }
         turn = who === 'a' ? 'b' : 'a';
-        if (turn === 'b') cpuTurn();
+        if (turn === 'b' && !friend) cpuTurn();
       }
       function cpuTurn() {
         thinking = true;
@@ -178,6 +179,11 @@
         }, api.rand(450, 700));
       }
       function finish() {
+        if (friend) {
+          api.sfx('win'); burst();
+          api.timeout(() => api.over({ score: winner === 'a' ? 1 : 0, won: true, title: nameOf(winner) + ' wins', message: nameOf(winner) + ' made it across first' }), 1400);
+          return;
+        }
         if (winner === 'a') {
           matches++; api.score(matches); api.sfx('win'); burst();
           api.timeout(() => { banner = { title: 'You made it across', sub: matches + (matches === 1 ? ' game' : ' games') + ' in a row', t: clock }; }, 450);
@@ -219,13 +225,13 @@
         }
         return { kind: 'cell', r: cy, c: cx };
       }
-      const myTurn = () => turn === 'a' && !winner && !thinking;
+      const myTurn = () => (friend || turn === 'a') && !winner && !thinking;
       function click(t) {
         if (!t || !myTurn()) return;
         if (t.kind === 'cell') {
-          const m = legalMoves(st, 'a').find(([r, c]) => r === t.r && c === t.c);
-          if (m) act('a', { type: 'move', to: m });
-        } else if (st.left.a > 0 && wallOk(st, t.o, t.r, t.c)) act('a', { type: 'wall', o: t.o, r: t.r, c: t.c });
+          const m = legalMoves(st, turn).find(([r, c]) => r === t.r && c === t.c);
+          if (m) act(turn, { type: 'move', to: m });
+        } else if (st.left[turn] > 0 && wallOk(st, t.o, t.r, t.c)) act(turn, { type: 'wall', o: t.o, r: t.r, c: t.c });
         else api.sfx('hit');
       }
       function rotate() { flip = !flip; if (hover && hover.kind === 'wall') hover.o = hover.o === 'h' ? 'v' : 'h'; api.sfx('tick'); }
@@ -237,9 +243,9 @@
         if (e.key === 'r' || e.key === 'R') { rotate(); return; }
         const d = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1], w: [-1, 0], s: [1, 0], a: [0, -1], d: [0, 1] }[e.key];
         if (!d || !myTurn()) return;
-        const [r, c] = st.p.a, ms = legalMoves(st, 'a');
+        const [r, c] = st.p[turn], ms = legalMoves(st, turn);
         const m = ms.find(([mr, mc]) => Math.sign(mr - r) === d[0] && Math.sign(mc - c) === d[1]);
-        if (m) act('a', { type: 'move', to: m });
+        if (m) act(turn, { type: 'move', to: m });
       });
 
       // ---------- render ----------
@@ -264,17 +270,17 @@
         // header
         const walls = n => n + (n === 1 ? ' wall' : ' walls');
         D.duelHeader(ctx, 8, 8, w - 16, {
-          left: { who: 'you', score: walls(st.left.a) }, right: { who: 'bot', score: walls(st.left.b) },
+          left: friend ? { who: 'you', label: 'Player 1', score: walls(st.left.a) } : { who: 'you', score: walls(st.left.a) }, right: friend ? { who: 'p2', label: 'Player 2', score: walls(st.left.b) } : { who: 'bot', score: walls(st.left.b) },
           turn: winner ? null : (turn === 'a' ? 'left' : 'right'),
-          status: winner ? (winner === 'a' ? 'You made it' : 'Bot made it') : turn === 'a' ? 'Your move' : 'Bot is thinking',
-          thinking: !winner && turn === 'b'
+          status: winner ? (friend ? nameOf(winner) + ' made it' : winner === 'a' ? 'You made it' : 'Bot made it') : friend ? nameOf(turn) + '\u2019s move' : turn === 'a' ? 'Your move' : 'Bot is thinking',
+          thinking: !winner && turn === 'b' && !friend
         }, col);
-        const BOTC = col.dark ? '#aab2bf' : '#6b7380';
+        const BOTC = friend ? D.P2 : col.dark ? '#aab2bf' : '#6b7380';
 
         // board
         ctx.fillStyle = col.dark ? '#2b2721' : '#e7decf';
         D.roundRect(ctx, L.ox - L.gap, L.oy - L.gap, L.size + L.gap * 2, L.size + L.gap * 2, 12); ctx.fill();
-        const moves = myTurn() ? legalMoves(st, 'a') : [];
+        const moves = myTurn() ? legalMoves(st, turn) : [];
         for (let r = 0; r < S; r++) for (let c = 0; c < S; c++) {
           const x = L.ox + c * L.p, y = L.oy + r * L.p;
           ctx.fillStyle = col.dark ? '#3a342d' : '#fbf6ee';
@@ -310,7 +316,7 @@
         // pawns
         const [bx, by] = pawnPos('b', L), [ax, ay] = pawnPos('a', L), pr = L.cell * 0.36;
         ctx.fillStyle = 'rgba(0,0,0,0.12)'; ctx.beginPath(); ctx.ellipse(bx, by + pr * 0.9, pr * 0.8, pr * 0.25, 0, 0, Math.PI * 2); ctx.fill();
-        D.avatar(ctx, bx, by, pr, 'bot', col);
+        D.avatar(ctx, bx, by, pr, friend ? 'p2' : 'bot', col);
         ctx.strokeStyle = BOTC; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(bx, by, pr, 0, Math.PI * 2); ctx.stroke();
         if (thinking && !api.reduceMotion) { ctx.strokeStyle = BOTC; ctx.lineWidth = 2; ctx.globalAlpha = 0.5; ctx.beginPath(); ctx.arc(bx, by, pr * (1.25 + 0.15 * Math.sin(clock * 6)), 0, Math.PI * 2); ctx.stroke(); ctx.globalAlpha = 1; }
         ctx.fillStyle = 'rgba(0,0,0,0.12)'; ctx.beginPath(); ctx.ellipse(ax, ay + pr * 0.9, pr * 0.8, pr * 0.25, 0, 0, Math.PI * 2); ctx.fill();
@@ -352,7 +358,7 @@
         st = n; turn = sv.turn === 'b' ? 'b' : 'a';
         anim = { a: { from: st.p.a.slice(), t: -9 }, b: { from: st.p.b.slice(), t: -9 } };
         last = sv.last && (sv.last.type === 'move' || sv.last.type === 'wall') ? sv.last : null;
-        if (turn === 'b') cpuTurn();
+        if (turn === 'b' && !friend) cpuTurn();
         return true;
       }
 

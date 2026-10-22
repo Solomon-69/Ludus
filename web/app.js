@@ -168,7 +168,7 @@
     $('gameScores').hidden = !!g.versus;
     box.hidden = !g.versus;
     if (!g.versus) return;
-    const mode = (S.vs && S.vs[g.id]) === 'friend' ? 'friend' : 'bot';
+    const mode = ((S.vs && S.vs[g.id]) || g.defaultVs || 'bot') === 'friend' ? 'friend' : 'bot';
     box.querySelectorAll('button').forEach(b => {
       const on = b.dataset.vs === mode;
       b.classList.toggle('is-on', on); b.setAttribute('aria-pressed', String(on));
@@ -481,4 +481,101 @@
   applyTheme();
   renderFilters();
   renderCards();
+  maybeIntro();
+
+  // ---------- first-run welcome ----------
+  // Shown once to someone new (no games played yet). Three short pages over the home screen,
+  // each part rising in after the one above, pages sliding sideways. Skippable.
+  function maybeIntro() {
+    if (S.introDone) return;
+    const fresh = !S.last && !Object.keys(S.plays).length;
+    const testing = navigator.webdriver || window.__LUDUS_SKIP_INTRO__;
+    if (!fresh || testing) { if (!testing) { S.introDone = true; L.save(); } return; }
+    showIntro();
+  }
+
+  function showIntro(startPage) {
+    const win = window.__LUDUS_PLATFORM__ === 'windows';
+    const mark = '<svg viewBox="6 27 88 55" aria-hidden="true"><use href="#ludus-mark"/></svg>';
+    const ic = d => `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="${d}"/></svg>`;
+    const pages = [
+      { art: mark, app: true, title: 'Welcome to Ludus', text: `${L.games.length} little games, one click away. Take a short break, then get back to work.`,
+        items: [
+          [ic('M5 19l4-8 3 5 2-3 5 6zM15 6h.01'), 'Arcade', 'Sky Raiders, Snake, Breakout, Stack and more'],
+          [ic('M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z'), 'Puzzle', '2048, Sudoku, Five Letters, Minesweeper'],
+          [ic('M8 12h8M6 8a4 4 0 1 0 0 8M18 8a4 4 0 1 1 0 8'), 'Duel and 2 Player', 'Beat the computer, or a friend on one keyboard'],
+        ] },
+      { art: ic(win ? 'M3 15h18v5H3zM17 17.5h.01M12 4v7M9 8l3 3 3-3' : 'M3 5h18M7 9h10a4 4 0 0 1 0 8H7a4 4 0 0 1 0-8zM9 13h2M10 12v2M15 13h.01'),
+        title: win ? 'It lives in your tray' : 'It lives in your menu bar',
+        text: win ? 'Click the Ludus icon next to the clock to open it. Or press Ctrl+Alt+G from anywhere.'
+                  : 'Click the controller icon at the top of your screen to open it. Click outside to put it away.',
+        items: [
+          [ic('M6 5h4v14H6zM14 5h4v14h-4z'), 'Close it mid-game', 'Every game saves itself and waits for you'],
+          [ic('M4 6h16M4 12h10M4 18h7'), 'Pick a tab', 'All, Arcade, Puzzle, Duel or 2 Player'],
+          [ic('M11 4a2 2 0 1 1 2 0v1a7 7 0 0 1 5 6.7V15l2 3H4l2-3v-3.3A7 7 0 0 1 11 5z'), 'Make it yours', 'Colours, sound and light or dark in Settings'],
+        ] },
+      { art: ic('M8 5v14l11-7z'), title: 'Ready to play', text: 'Start with something quick. Your best scores are kept on this computer only.' },
+    ];
+
+    const box = el('div', 'intro');
+    box.setAttribute('role', 'dialog'); box.setAttribute('aria-label', 'Welcome to Ludus');
+    const stage = el('div', 'intro-stage');
+    const foot = el('div', 'intro-foot');
+    const back = el('button', 'btn ghost intro-back'), dots = el('div', 'intro-dots'), next = el('button', 'btn primary intro-next');
+    pages.forEach(() => dots.appendChild(el('i')));
+    foot.append(back, dots, next);
+    const card = el('div', 'intro-card');
+    card.append(stage, foot);
+    box.append(card);
+    let page = -1;
+
+    function build(p) {
+      const v = el('div', 'intro-page');
+      let i = 0;
+      const add = n => { n.style.setProperty('--i', i++); v.appendChild(n); };
+      add(el('div', 'intro-art' + (p.app ? ' app' : ''), p.art));
+      add(el('h2', '', p.title));
+      add(el('p', 'intro-text', p.text));
+      (p.items || []).forEach(([icon, t, d]) => {
+        const r = el('div', 'intro-item');
+        r.append(el('div', 'intro-ic', icon));
+        const g = el('div'); g.append(el('b', '', t), el('small', '', d));
+        r.append(g); add(r);
+      });
+      return v;
+    }
+    function go(n) {
+      if (n < 0 || n >= pages.length || n === page) return;
+      const dir = n > page ? 'next' : 'prev';
+      const old = stage.firstChild;
+      if (old) { old.classList.add('out-' + dir); setTimeout(() => old.remove(), 340); }
+      const v = build(pages[n]);
+      if (page >= 0) v.classList.add('in-' + dir);
+      stage.appendChild(v);
+      page = n;
+      dots.childNodes.forEach((d, k) => d.classList.toggle('on', k === n));
+      back.textContent = n === 0 ? 'Skip' : 'Back';
+      next.textContent = n === pages.length - 1 ? 'Let\u2019s play' : 'Continue';
+      L.sfx('click');
+    }
+    function close() {
+      S.introDone = true; L.save(true);
+      box.classList.add('leaving');
+      setTimeout(() => box.remove(), 260);
+      L.native('introDone');
+    }
+    back.onclick = () => page === 0 ? close() : go(page - 1);
+    next.onclick = () => page === pages.length - 1 ? close() : go(page + 1);
+    box.addEventListener('keydown', e => {
+      if (e.key === 'ArrowRight') { e.preventDefault(); next.click(); }
+      else if (e.key === 'ArrowLeft' && page > 0) { e.preventDefault(); back.click(); }
+      else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); }
+    });
+    $('app').appendChild(box);
+    go(startPage || 0);
+    next.focus({ preventScroll: true });
+    L.native('intro');   // the app opens its panel so the welcome is seen
+  }
+  // Test helper (screenshots): show the welcome on any page.
+  window.ludusShowIntro = n => { document.querySelectorAll('.intro').forEach(x => x.remove()); showIntro(n || 0); };
 })();

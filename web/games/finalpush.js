@@ -14,6 +14,9 @@
     atk: ['Space', 'Enter', 'KeyJ', 'KeyX']
   };
   const ACTS = Object.keys(KEYS);
+  // vs Friend: each player gets their own half of the keyboard.
+  const KEYS1 = { left: ['KeyA'], right: ['KeyD'], up: ['KeyW'], down: ['KeyS'], atk: ['KeyF', 'Space'] };
+  const KEYS2 = { left: ['ArrowLeft'], right: ['ArrowRight'], up: ['ArrowUp'], down: ['ArrowDown'], atk: ['Slash', 'Enter'] };
   // Bot by level: how late it sees you, how often it copies your height, how long it waits after changing height before thrusting
   const AI = [
     { lag: 0.36, guard: 0.5, commit: [0.45, 0.7], gap: [0.35, 0.6], atk: 0.45 },
@@ -23,8 +26,8 @@
   const PADS = [{ a: 'left' }, { a: 'right' }, { a: 'up' }, { a: 'down' }, { a: 'atk', l: 'Thrust' }];
 
   Ludus.register({
-    id: 'finalpush', name: 'Nidhogg', aka: 'Right of Way', tag: 'Duel', tint: RUST,
-    hint: '<kbd>←</kbd><kbd>→</kbd> walk · <kbd>↑</kbd><kbd>↓</kbd> spear high / middle / low · <kbd>Space</kbd> thrust (or the buttons). Same height blocks. Kill the bot, then run right to your gate',
+    id: 'finalpush', name: 'Nidhogg', aka: 'Right of Way', tag: 'Duel', tint: RUST, versus: true,
+    hint: '<kbd>←</kbd><kbd>→</kbd> walk · <kbd>↑</kbd><kbd>↓</kbd> spear high / middle / low · <kbd>Space</kbd> thrust (or the buttons). Same height blocks. Kill the bot, then run right to your gate. vs Friend: P1 <kbd>A</kbd><kbd>D</kbd> walk, <kbd>W</kbd><kbd>S</kbd> spear, <kbd>F</kbd> thrust; P2 arrows and <kbd>/</kbd> or <kbd>Enter</kbd>',
     art(ctx, w, h) {
       const f = h * 0.84;
       ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.fillRect(0, f, w, h - f);
@@ -43,6 +46,7 @@
       const view = api.canvas();
       const { ctx } = view;
       const cfg = AI[api.level] || AI[1];
+      const friend = api.friend, BOT = friend ? 'Player 2' : 'The bot', YOU = friend ? 'Player 1' : 'You';
       let clock = 0, now = 0, phase = 'count', countT = 1.6, zone = 0, row = '', parts = [], shake = 0;
       let rounds = { r: 0, y: 0 }, deciders = 0, banner = null, toastM = null, C = {}, endAt = 0;
       const mk = side => ({ side, x: side === 'r' ? 200 : 340, face: side === 'r' ? 1 : -1, h: 1, hAt: -9, atkH: 1, st: 'idle', t: 0, dur: 0,
@@ -53,20 +57,26 @@
 
       // ---------- input: keys + on-screen buttons ----------
       const held = new Set(), edge = {}, pad = {}, padPtr = new Map();
-      const actOf = code => ACTS.find(a => KEYS[a].includes(code));
+      const K1 = friend ? KEYS1 : KEYS, edgeCodes = new Set();
+      const actOf = code => ACTS.find(a => K1[a].includes(code) || (friend && KEYS2[a].includes(code)));
       api.keys(e => {
         const a = actOf(e.code); if (!a) return;
         e.preventDefault();
-        if (phase === 'roundover' || (phase === 'matchover' && rounds.y < TOWIN)) { if (a === 'atk') go(); return; }
-        if (!held.has(e.code)) edge[a] = true;
+        if (phase === 'roundover' || (phase === 'matchover' && rounds.y < TOWIN && !friend)) { if (a === 'atk') go(); return; }
+        if (!held.has(e.code)) edgeCodes.add(e.code);
         held.add(e.code);
       });
       api.keysUp(e => held.delete(e.code));
       api.on(window, 'blur', () => clearInput());
-      function clearInput() { held.clear(); padPtr.clear(); for (const k in pad) pad[k] = false; for (const k in edge) edge[k] = false; }
-      function readInput() {
+      function clearInput() { held.clear(); padPtr.clear(); for (const k in pad) pad[k] = false; for (const k in edge) edge[k] = false; edgeCodes.clear(); }
+      function readInput(keys, usePad) {
+        keys = keys || K1; if (usePad === undefined) usePad = true;
         const o = {};
-        for (const a of ACTS) { o[a] = KEYS[a].some(c => held.has(c)) || !!pad[a]; o['_' + a] = !!edge[a]; edge[a] = false; }
+        for (const a of ACTS) {
+          o[a] = keys[a].some(c => held.has(c)) || (usePad && !!pad[a]);
+          o['_' + a] = keys[a].some(c => edgeCodes.has(c)) || (usePad && !!edge[a]);
+          keys[a].forEach(c => edgeCodes.delete(c)); if (usePad) edge[a] = false;
+        }
         return o;
       }
       const noInput = () => { const o = {}; for (const a of ACTS) { o[a] = false; o['_' + a] = false; } return o; };
@@ -88,7 +98,7 @@
         d.alive = false; d.deadAt = now; d.deadX = d.x; setSt(d, 'idle');
         burst(d.x, FLOOR - 56, d.side, 26); doShake(0.25); api.sfx(d.side === 'r' ? 'boom' : 'hit');
         const had = row; row = a.side; d.respawnAt = now + RESPAWN; d.spawnX = null;
-        toast(had !== a.side ? (a.side === 'r' ? 'You take the road. Run right' : 'Bot takes the road') : (a.side === 'r' ? 'Got it. Keep running' : 'The bot got through'));
+        toast(had !== a.side ? (a.side === 'r' ? YOU + ' take' + (friend ? 's' : '') + ' the road. Run right' : BOT + ' takes the road') : (a.side === 'r' ? 'Got it. Keep running' : BOT + ' got through'));
       }
       const facing = (a, d) => Math.sign(d.x - a.x || a.face) === a.face;
       // what happens when a's thrust lands on d
@@ -141,7 +151,11 @@
         rounds[side]++;
         if (rounds[side] >= TOWIN) {
           phase = 'matchover'; endAt = clock;
-          if (side === 'r') {
+          if (friend) {
+            api.sfx('win'); clearInput();
+            const wn = side === 'r' ? 'Player 1' : 'Player 2';
+            api.timeout(() => api.over({ score: side === 'r' ? 1 : 0, won: true, title: wn + ' wins', message: 'Rounds ' + rounds.r + ' to ' + rounds.y }), 1400);
+          } else if (side === 'r') {
             deciders++; api.score(deciders); api.sfx('win');
             banner = { t: clock, title: 'You take the decider', sub: deciders + ' in a row. Next one starts soon' };
           } else {
@@ -150,12 +164,12 @@
           }
         } else {
           phase = 'roundover'; endAt = clock; api.sfx(side === 'r' ? 'line' : 'over');
-          banner = { t: clock, title: side === 'r' ? 'You reached your gate' : 'The bot reached its gate', sub: 'Rounds ' + rounds.r + ' to ' + rounds.y + '. Next round starts soon' };
+          banner = { t: clock, title: side === 'r' ? YOU + (friend ? ' reached the gate' : ' reached your gate') : BOT + ' reached its gate', sub: 'Rounds ' + rounds.r + ' to ' + rounds.y + '. Next round starts soon' };
         }
       }
       function resetRound() { zone = 0; row = ''; parts = []; P = { r: mk('r'), y: mk('y') }; ai.hist = []; ai.next = 0; ai.thrustAt = 0; }
       function go() {
-        if (phase === 'matchover') { if (rounds.y >= TOWIN) return; rounds = { r: 0, y: 0 }; }
+        if (phase === 'matchover') { if (rounds.y >= TOWIN || friend) return; rounds = { r: 0, y: 0 }; }
         if (phase === 'roundover' || phase === 'matchover') { resetRound(); phase = 'count'; countT = 1.1; banner = null; clearInput(); api.sfx('tap'); }
       }
 
@@ -294,7 +308,7 @@
         ctx.globalAlpha = 1;
       }
       function drawFighter(p) {
-        const col = C[p.side], d = p.face, who = p.side === 'r' ? 'you' : 'bot';
+        const col = C[p.side], d = p.face, who = p.side === 'r' ? 'you' : friend ? 'p2' : 'bot';
         if (!p.alive) {
           const age = now - p.deadAt; if (age > 1.6 || p.deadAt < 0) return;
           ctx.globalAlpha = Math.max(0, 1 - age / 1.6);
@@ -329,11 +343,11 @@
         ctx.clearRect(0, 0, w, h);
         // header
         let status;
-        if (phase === 'matchover') status = rounds.y >= TOWIN ? 'Bot wins' : 'You win';
+        if (phase === 'matchover') status = rounds.y >= TOWIN ? (friend ? 'Player 2 wins' : 'Bot wins') : (friend ? 'Player 1 wins' : 'You win');
         else if (phase === 'roundover') status = 'Round over';
         else if (phase === 'count') status = 'Get ready';
-        else status = !row ? 'Take the road' : row === 'r' ? 'Run right' : 'Stop the bot';
-        D.duelHeader(ctx, 8, 8, w - 16, { left: { who: 'you', pips: rounds.r, of: TOWIN }, right: { who: 'bot', pips: rounds.y, of: TOWIN },
+        else status = !row ? 'Take the road' : friend ? (row === 'r' ? 'P1: run right' : 'P2: run left') : row === 'r' ? 'Run right' : 'Stop the bot';
+        D.duelHeader(ctx, 8, 8, w - 16, { left: { who: 'you', label: friend ? 'Player 1' : undefined, pips: rounds.r, of: TOWIN }, right: { who: friend ? 'p2' : 'bot', label: friend ? 'Player 2' : undefined, pips: rounds.y, of: TOWIN },
           turn: phase === 'play' && row ? (row === 'r' ? 'left' : 'right') : null, status }, col);
         // world
         ctx.save();
@@ -349,7 +363,7 @@
           ctx.fillStyle = z === zone ? col.ink : z === ZMAX ? C.r : z === ZMIN ? C.y : col.line;
           D.roundRect(ctx, x, L.stripY - 4, zw, z === zone ? 9 : 7, 3); ctx.fill();
         }
-        D.avatar(ctx, zx - 16, L.stripY, 10, 'bot', col);
+        D.avatar(ctx, zx - 16, L.stripY, 10, friend ? 'p2' : 'bot', col);
         D.avatar(ctx, zx + NZ * (zw + 4) + 12, L.stripY, 10, 'you', col);
         // toast
         if (toastM && clock - toastM.t < 1.3) {
@@ -362,7 +376,7 @@
         }
         // buttons: walk left / right, spear up / down, thrust
         L.pads.forEach(p => {
-          const on = !!pad[p.a] || KEYS[p.a].some(c => held.has(c));
+          const on = !!pad[p.a] || K1[p.a].some(c => held.has(c));
           ctx.save(); ctx.translate(p.x + p.w / 2, p.y + p.h / 2); const s = on ? 0.96 : 1; ctx.scale(s, s);
           ctx.fillStyle = on ? (p.a === 'atk' ? col.accent : col.ink) : (p.a === 'atk' ? col.ink : col.surface2);
           D.roundRect(ctx, -p.w / 2, -p.h / 2, p.w, p.h, 14); ctx.fill();
@@ -413,7 +427,7 @@
       api.loop(dt => {
         clock += dt;
         const ir = phase === 'play' ? readInput() : (readInput(), noInput());
-        const iy = phase === 'play' ? aiInput() : noInput();
+        const iy = phase === 'play' ? (friend ? readInput(KEYS2, false) : aiInput()) : (friend ? (readInput(KEYS2, false), noInput()) : noInput());
         sim(dt, ir, iy);
         for (let i = parts.length - 1; i >= 0; i--) {
           const q = parts[i]; q.life -= dt; q.vy += 900 * dt; q.x += q.vx * dt; q.y += q.vy * dt;
