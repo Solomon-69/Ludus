@@ -13,7 +13,10 @@ All notable changes to Ludus. Versions follow the app's version number (`Info.pl
 - **Settings cleanup:** clearer layout and wording.
 - **Light panel fix:** choosing Light now gives a light panel even when the Mac is in dark mode.
 - **Smooth quit:** the panel folds away before Ludus quits; switching panel size no longer flickers.
-- **New icon:** a game controller with a d-pad and the spark as its buttons.
+- **New icon:** a premium controller mark (cream controller on a terracotta squircle, face buttons
+  arranged as a spark), the same mark in the menu bar and next to "Ludus" in the panel.
+- **Invisible icon (Mac):** an App setting that keeps Ludus in the menu bar as an empty spot at the far
+  left of the menu bar icons. Click it to open; opening Ludus again from Finder or Spotlight also opens it.
 - **Windows version:** a tray app that runs the same games (new in this release's source).
 
 ## 1.0

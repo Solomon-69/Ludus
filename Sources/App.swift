@@ -14,9 +14,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
     private var styled = false
     private var quitting = false
     private var themeAppearance: NSAppearance?
+    private var anchorWindow: NSPanel?
 
     private let stateKey = "ludusState"
     private let sizeKey = "ludusSize"
+    private let invisibleKey = "ludusInvisible"
+    // Status item names: macOS remembers a menu bar position per name. The invisible item gets its own
+    // name, and its remembered position is cleared each time, so it is always created at the far left.
+    private let visibleItemName = "Ludus"
+    private let invisibleItemName = "LudusInvisible"
+    private var invisible: Bool { UserDefaults.standard.bool(forKey: invisibleKey) }
     private static let compact = NSSize(width: 400, height: 600)
     private static let large = NSSize(width: 520, height: 740)
     private let testNotification = Notification.Name("com.solomon.Ludus.test")
@@ -25,15 +32,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
         // Keep "open at login" valid after the app is moved or renamed.
         if SMAppService.mainApp.status == .enabled { try? SMAppService.mainApp.register() }
 
-        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        if let button = statusItem.button {
-            button.image = Self.menuBarIcon()
-            button.wantsLayer = true
-            button.target = self
-            button.action = #selector(statusClicked)
-            button.sendAction(on: [.leftMouseUp, .rightMouseUp])
-            button.setAccessibilityLabel("Ludus games")
-        }
+        statusItem = makeStatusItem()
 
         setUpWebView()
         let controller = NSViewController()
@@ -80,6 +79,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
         window.__LUDUS_NATIVE__ = true;
         window.__LUDUS_STATE__ = \(savedStateLiteral());
         window.__LUDUS_LOGIN__ = \(login);
+        window.__LUDUS_INVISIBLE__ = \(invisible);
         window.__LUDUS_DARK__ = \(isDark());
         """
     }
@@ -134,6 +134,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
             applyThemeAppearance()
         case "login":
             setLogin(body["on"] as? Bool ?? false)
+        case "invisible":
+            setInvisible(body["on"] as? Bool ?? false)
         case "quit":
             // Let the panel fold away with its normal animation, then quit (popoverDidClose).
             // Write the running game's snapshot first, then fold the panel away and quit.
@@ -180,14 +182,84 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
         webView.evaluateJavaScript("window.__LUDUS_LOGIN__ = \(now)")
     }
 
+    // MARK: - Status item
+
+    /// The menu bar item. Invisible mode keeps the same width and click target but draws nothing.
+    private func makeStatusItem() -> NSStatusItem {
+        let hidden = invisible
+        let name = hidden ? invisibleItemName : visibleItemName
+        if hidden { UserDefaults.standard.removeObject(forKey: "NSStatusItem Preferred Position \(name)") }
+        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        item.autosaveName = name
+        if let button = item.button {
+            button.image = hidden ? Self.emptyIcon() : Self.menuBarIcon()
+            button.wantsLayer = true
+            button.target = self
+            button.action = #selector(statusClicked)
+            button.sendAction(on: [.leftMouseUp, .rightMouseUp])
+            button.setAccessibilityLabel("Ludus games")
+            if hidden {
+                // No pressed pill while invisible: clicks land on a clear view above the button, so the
+                // button itself is never pressed and the spot stays empty before, during and after a click.
+                let catcher = ClickCatcher(frame: button.bounds)
+                catcher.autoresizingMask = [.width, .height]
+                catcher.onClick = { [weak self] in self?.statusClicked() }
+                button.addSubview(catcher)
+            }
+        }
+        return item
+    }
+
+    /// Swaps the menu bar item. A new item is the leftmost of the menu bar extras, which is where the
+    /// invisible spot should sit. An open panel moves to the new item before the old one goes away.
+    private func setInvisible(_ on: Bool) {
+        if on != invisible {
+            UserDefaults.standard.set(on, forKey: invisibleKey)
+            let old = statusItem!
+            statusItem = makeStatusItem()
+            if popover.isShown, let anchor = popoverAnchor() {
+                popover.show(relativeTo: anchor.bounds, of: anchor, preferredEdge: .minY)
+            }
+            NSStatusBar.system.removeStatusItem(old)
+        }
+        webView.evaluateJavaScript("window.__LUDUS_INVISIBLE__ = \(invisible)")
+    }
+
+    /// Safety net: opening Ludus again from Finder or Spotlight while the icon is invisible opens the panel.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if invisible && !popover.isShown { openPopover() }
+        return false
+    }
+
     // MARK: - Popover
 
     @objc private func statusClicked() {
         if popover.isShown { closePopover() } else { openPopover() }
     }
 
+    /// The view the panel's arrow points at: the menu bar button, or while invisible a clear window over
+    /// the empty spot (a panel shown from the menu bar button itself makes macOS draw a pill behind it).
+    private func popoverAnchor() -> NSView? {
+        guard invisible, var frame = statusItem.button?.window?.frame else { anchorWindow?.orderOut(nil); return statusItem.button }
+        // Bottom edge raised a little, so the arrow sits as snug under the menu bar as it does for the real icon.
+        frame.origin.y += 4; frame.size.height -= 4
+        // A clear window of its own sitting exactly over the invisible spot, so the panel is not tied to the
+        // menu bar item and macOS draws no pill. It never takes clicks; the catcher below it does.
+        let window = anchorWindow ?? {
+            let w = NSPanel(contentRect: frame, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+            w.isOpaque = false; w.backgroundColor = .clear; w.hasShadow = false
+            w.ignoresMouseEvents = true; w.level = .statusBar
+            w.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
+            anchorWindow = w
+            return w
+        }()
+        window.setFrame(frame, display: false)
+        window.orderFrontRegardless()
+        return window.contentView
+    }
+
     private func openPopover() {
-        guard let button = statusItem.button else { return }
+        guard let button = popoverAnchor() else { return }
         bounceIcon()
         popover.contentViewController?.preferredContentSize = currentSize()
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
@@ -209,6 +281,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
     }
 
     func popoverDidClose(_ notification: Notification) {
+        anchorWindow?.orderOut(nil)
         if let monitor = clickMonitor { NSEvent.removeMonitor(monitor); clickMonitor = nil }
         if quitting {
             // The save message from ludusClosed was already handled; give the bridge a moment, then quit.
@@ -218,34 +291,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
         webView.evaluateJavaScript("window.ludusClosed && ludusClosed()")
     }
 
-    /// Menu bar icon: a game controller with a d-pad and the Claude spark as its buttons (template, adapts to the menu bar).
+    /// Menu bar icon: the Ludus mark, a solid controller with the d-pad and a spark of face buttons cut out
+    /// (same silhouette as the app icon; template, so it adapts to the menu bar).
     private static func menuBarIcon() -> NSImage {
         let image = NSImage(size: NSSize(width: 20, height: 16), flipped: true) { _ in
-            NSColor.black.setStroke(); NSColor.black.setFill()
-            let body = NSBezierPath()
-            body.move(to: NSPoint(x: 6, y: 3.2))
-            body.line(to: NSPoint(x: 14, y: 3.2))
-            body.curve(to: NSPoint(x: 18.6, y: 11.6), controlPoint1: NSPoint(x: 17.4, y: 3.2), controlPoint2: NSPoint(x: 19.2, y: 8.4))
-            body.curve(to: NSPoint(x: 15.1, y: 13.4), controlPoint1: NSPoint(x: 18.2, y: 13.8), controlPoint2: NSPoint(x: 16.4, y: 14.4))
-            body.line(to: NSPoint(x: 13.2, y: 11.2))
-            body.line(to: NSPoint(x: 6.8, y: 11.2))
-            body.line(to: NSPoint(x: 4.9, y: 13.4))
-            body.curve(to: NSPoint(x: 1.4, y: 11.6), controlPoint1: NSPoint(x: 3.6, y: 14.4), controlPoint2: NSPoint(x: 1.8, y: 13.8))
-            body.curve(to: NSPoint(x: 6, y: 3.2), controlPoint1: NSPoint(x: 0.8, y: 8.4), controlPoint2: NSPoint(x: 2.6, y: 3.2))
-            body.close()
-            body.lineWidth = 1.5; body.lineJoinStyle = .round; body.stroke()
-            // d-pad
-            NSBezierPath(roundedRect: NSRect(x: 4.4, y: 6.6, width: 4.2, height: 1.4), xRadius: 0.5, yRadius: 0.5).fill()
-            NSBezierPath(roundedRect: NSRect(x: 5.8, y: 5.2, width: 1.4, height: 4.2), xRadius: 0.5, yRadius: 0.5).fill()
-            // spark buttons
-            let spark = NSBezierPath(); spark.lineWidth = 1.2; spark.lineCapStyle = .round
-            let c = NSPoint(x: 13.9, y: 7.3)
-            for i in 0..<4 {
-                let a = CGFloat(i) * .pi / 4
-                spark.move(to: NSPoint(x: c.x - cos(a) * 2.2, y: c.y - sin(a) * 2.2))
-                spark.line(to: NSPoint(x: c.x + cos(a) * 2.2, y: c.y + sin(a) * 2.2))
-            }
-            spark.stroke()
+            guard let ctx = NSGraphicsContext.current?.cgContext else { return false }
+            // The mark is drawn in a 100-unit design space (y down), scaled into 20 x 16 points.
+            var t = CGAffineTransform(translationX: 10, y: 8).scaledBy(x: 0.222, y: 0.222).translatedBy(x: -50, y: -54)
+            guard let body = controllerBody().copy(using: &t), let holes = controllerCutouts().copy(using: &t) else { return false }
+            ctx.addPath(body.subtracting(holes))
+            ctx.setFillColor(NSColor.black.cgColor)
+            ctx.fillPath()
             return true
         }
         image.isTemplate = true
@@ -253,8 +309,53 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
         return image
     }
 
+    /// Invisible mode: same size as the real icon, nothing drawn.
+    private static func emptyIcon() -> NSImage {
+        let image = NSImage(size: NSSize(width: 20, height: 16))
+        image.isTemplate = true
+        image.accessibilityDescription = "Ludus"
+        return image
+    }
+
+    private static func controllerBody() -> CGPath {
+        let p = CGMutablePath()
+        p.move(to: CGPoint(x: 32, y: 29))
+        p.addLine(to: CGPoint(x: 68, y: 29))
+        p.addCurve(to: CGPoint(x: 89, y: 48), control1: CGPoint(x: 80, y: 29), control2: CGPoint(x: 86.5, y: 36))
+        p.addCurve(to: CGPoint(x: 88, y: 75), control1: CGPoint(x: 92, y: 60), control2: CGPoint(x: 93, y: 70))
+        p.addCurve(to: CGPoint(x: 72, y: 71), control1: CGPoint(x: 83, y: 80), control2: CGPoint(x: 76, y: 77.5))
+        p.addLine(to: CGPoint(x: 67.5, y: 63.5))
+        p.addCurve(to: CGPoint(x: 60, y: 60), control1: CGPoint(x: 65.8, y: 61), control2: CGPoint(x: 63.5, y: 60))
+        p.addLine(to: CGPoint(x: 40, y: 60))
+        p.addCurve(to: CGPoint(x: 32.5, y: 63.5), control1: CGPoint(x: 36.5, y: 60), control2: CGPoint(x: 34.2, y: 61))
+        p.addLine(to: CGPoint(x: 28, y: 71))
+        p.addCurve(to: CGPoint(x: 12, y: 75), control1: CGPoint(x: 24, y: 77.5), control2: CGPoint(x: 17, y: 80))
+        p.addCurve(to: CGPoint(x: 11, y: 48), control1: CGPoint(x: 7, y: 70), control2: CGPoint(x: 8, y: 60))
+        p.addCurve(to: CGPoint(x: 32, y: 29), control1: CGPoint(x: 13.5, y: 36), control2: CGPoint(x: 20, y: 29))
+        p.closeSubpath()
+        return p
+    }
+
+    /// D-pad and a bold four-line spark for the face buttons (bolder than the app icon's, to read at 18 px).
+    private static func controllerCutouts() -> CGPath {
+        let d = CGPoint(x: 30.5, y: 45)
+        let plus = CGMutablePath()
+        plus.addRoundedRect(in: CGRect(x: d.x - 9, y: d.y - 3.3, width: 18, height: 6.6), cornerWidth: 1.5, cornerHeight: 1.5)
+        plus.addRoundedRect(in: CGRect(x: d.x - 3.3, y: d.y - 9, width: 6.6, height: 18), cornerWidth: 1.5, cornerHeight: 1.5)
+        var holes = plus.union(CGPath(rect: .zero, transform: nil))
+        let c = CGPoint(x: 69.5, y: 45)
+        for i in 0..<4 {
+            let a = CGFloat(i) * .pi / 4
+            let ray = CGMutablePath()
+            ray.move(to: CGPoint(x: c.x - cos(a) * 9, y: c.y - sin(a) * 9))
+            ray.addLine(to: CGPoint(x: c.x + cos(a) * 9, y: c.y + sin(a) * 9))
+            holes = holes.union(ray.copy(strokingWithWidth: i % 2 == 0 ? 5.6 : 4.2, lineCap: .round, lineJoin: .round, miterLimit: 1))
+        }
+        return holes
+    }
+
     private func bounceIcon() {
-        guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion,
+        guard !invisible, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion,
               let button = statusItem.button, let layer = button.layer else { return }
         let b = button.bounds
         var from = CATransform3DMakeTranslation(b.midX, b.midY, 0)
@@ -277,12 +378,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
         case "close": closePopover()
         case "home": webView.evaluateJavaScript("document.getElementById('backBtn').click()")
         case "settings": webView.evaluateJavaScript("document.getElementById('openSettings').click()")
+        case "focus":
+            // Which element has keyboard focus, and whether it would draw a focus ring (no-focus-ring check).
+            webView.evaluateJavaScript("(()=>{const a=document.activeElement;return (a&&(a.id||a.className||a.tagName))+' ring='+!!(a&&a.matches&&a.matches(':focus-visible'))})()") { [weak self] result, _ in
+                self?.appendLog("\(Date()) focus \(result as? String ?? "nil")\n")
+            }
+        case "invisible:on": setInvisible(true)
+        case "invisible:off": setInvisible(false)
+        case "click":
+            // Same path as a real click on the menu bar spot (the clear catcher view while invisible).
+            if let catcher = statusItem.button?.subviews.first(where: { $0 is ClickCatcher }) as? ClickCatcher {
+                catcher.onClick?()
+            } else {
+                statusItem.button?.performClick(nil)
+            }
+        case "reopen": _ = applicationShouldHandleReopen(NSApp, hasVisibleWindows: false)
+        case "status":
+            // Where the menu bar item is, how wide, and whether it draws anything (for the invisible-mode check).
+            let frame = statusItem.button?.window?.frame ?? .zero
+            let line = "\(Date()) status invisible=\(invisible) shown=\(popover.isShown) frame=\(NSStringFromRect(frame)) "
+                + "image=\(statusItem.button?.image.map { NSStringFromSize($0.size) } ?? "nil") "
+                + "catcher=\(statusItem.button?.subviews.contains { $0 is ClickCatcher } ?? false)\n"
+            appendLog(line)
         case "state":
-            webView.evaluateJavaScript("window.ludusState && ludusState()") { result, _ in
-                let line = "\(Date()) \(result as? String ?? "nil")\n"
-                let url = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/Ludus.log")
-                if let handle = try? FileHandle(forWritingTo: url) { handle.seekToEndOfFile(); handle.write(Data(line.utf8)); try? handle.close() }
-                else { try? line.write(to: url, atomically: true, encoding: .utf8) }
+            webView.evaluateJavaScript("window.ludusState && ludusState()") { [weak self] result, _ in
+                self?.appendLog("\(Date()) \(result as? String ?? "nil")\n")
             }
         default:
             if command.hasPrefix("tap:") {
@@ -298,6 +418,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
             }
         }
     }
+
+    private func appendLog(_ line: String) {
+        let url = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/Ludus.log")
+        if let handle = try? FileHandle(forWritingTo: url) { handle.seekToEndOfFile(); handle.write(Data(line.utf8)); try? handle.close() }
+        else { try? line.write(to: url, atomically: true, encoding: .utf8) }
+    }
+}
+
+/// Clear view laid over the invisible menu bar item: takes left, right and Option clicks without
+/// pressing the button underneath, so no highlight pill is ever drawn.
+final class ClickCatcher: NSView {
+    var onClick: (() -> Void)?
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+    override func mouseDown(with event: NSEvent) {}
+    override func mouseUp(with event: NSEvent) { onClick?() }
+    override func rightMouseDown(with event: NSEvent) {}
+    override func rightMouseUp(with event: NSEvent) { onClick?() }
 }
 
 @main

@@ -25,6 +25,13 @@
   check('2 Player chip', [...document.querySelectorAll('.chip')].some(c => c.textContent === '2 Player'));
   check('2 player section', !Ludus.games.some(g => g.tag === '2 Player') || [...document.querySelectorAll('.section-label')].some(l => /2 players/.test(l.textContent)));
   check('subtitle', $('brandSub').textContent === 'Little games for little breaks');
+  // Logo: the controller mark (not the old plain spark) next to "Ludus", in the accent colour.
+  const logo = document.querySelector('.brand svg.logo use');
+  check('controller logo', logo && logo.getAttribute('href') === '#ludus-mark' && document.getElementById('ludus-mark') && !document.getElementById('spark'));
+  const probe = document.createElement('span'); probe.style.color = 'var(--accent)'; document.body.appendChild(probe);
+  const logoEl = document.querySelector('.brand svg.logo');
+  check('logo uses accent', getComputedStyle(logoEl).color === getComputedStyle(probe).color && logoEl.getBoundingClientRect().width > 20);
+  probe.remove();
 
   // Settings open, theme switch, accent, hidden game
   $('openSettings').click(); await wait(500);
@@ -98,6 +105,27 @@
   S.best.g2048 = 999; reset.click(); check('reset asks first', reset.textContent === 'Sure?' && S.best.g2048 === 999);
   reset.click(); check('reset clears', !S.best.g2048);
   $('settingsBack').click(); await wait(300);
+
+  // Invisible icon (Mac only): the row shows when the Mac app hands over the flag, and the switch
+  // flips at once and tells the app.
+  check('no invisible row in browser', ![...document.querySelectorAll('.row-title')].some(t => t.textContent === 'Invisible icon'));
+  const sent = [];
+  const hadWebkit = window.webkit;
+  window.__LUDUS_NATIVE__ = true; window.__LUDUS_INVISIBLE__ = false;
+  window.webkit = { messageHandlers: { ludus: { postMessage: m => sent.push(m) } } };
+  $('openSettings').click(); await wait(400);
+  const invRow = [...document.querySelectorAll('.row')].find(r => r.querySelector('.row-title')?.textContent === 'Invisible icon');
+  check('invisible row', invRow && /far left of your menu bar icons/.test(invRow.querySelector('.row-sub').textContent));
+  const invSw = invRow && invRow.querySelector('.switch');
+  const appGroup = invRow && invRow.parentElement.previousElementSibling;
+  check('invisible row in App group', appGroup && appGroup.textContent === 'App');
+  invSw.click();
+  check('invisible switch flips at once', invSw.getAttribute('aria-checked') === 'true' && window.__LUDUS_INVISIBLE__ === true);
+  check('invisible sent to app', sent.some(m => m.type === 'invisible' && m.on === true));
+  invSw.click();
+  check('invisible off sent', invSw.getAttribute('aria-checked') === 'false' && sent.some(m => m.type === 'invisible' && m.on === false));
+  $('settingsBack').click(); await wait(300);
+  delete window.__LUDUS_NATIVE__; delete window.__LUDUS_INVISIBLE__; window.webkit = hadWebkit;
 
   // restore
   Object.keys(S).forEach(k => delete S[k]); Object.assign(S, JSON.parse(saved)); Ludus.save();

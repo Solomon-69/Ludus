@@ -74,7 +74,7 @@ svg { display: block; }
   flex: none;
 }
 .brand { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
-.spark { width: 26px; height: 26px; color: var(--accent); flex: none; }
+.logo { width: 34px; height: 22px; color: var(--accent); flex: none; }
 .brand-name { font: 650 17px/1.1 var(--font-round); letter-spacing: -0.01em; }
 .brand-sub { color: var(--ink-3); font-size: 11.5px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .spacer { flex: 1; }

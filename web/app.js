@@ -312,6 +312,9 @@
     const appRows = [];
     if (window.__LUDUS_NATIVE__) {
       appRows.push(row('Open at login', null, sw(!!window.__LUDUS_LOGIN__, v => { window.__LUDUS_LOGIN__ = v; L.native('login', { on: v }); }, 'Open at login')));
+      // Mac only: the Mac app hands over __LUDUS_INVISIBLE__ (the Windows tray has no such option).
+      if (typeof window.__LUDUS_INVISIBLE__ === 'boolean') appRows.push(row('Invisible icon', 'Hidden in the menu bar. Click the empty space at the far left of your menu bar icons to open',
+        sw(!!window.__LUDUS_INVISIBLE__, v => { window.__LUDUS_INVISIBLE__ = v; L.native('invisible', { on: v }); }, 'Invisible icon')));
     }
     const reset = el('button', 'small-btn bad', 'Reset');
     reset.onclick = () => {

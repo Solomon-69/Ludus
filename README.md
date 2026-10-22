@@ -70,7 +70,7 @@ their `register()` calls and grows with new releases.
 
 Settings (gear icon): appearance (Auto, Light, Dark), accent colour, panel size (Compact or
 Large), reduce motion, difficulty (Easy, Normal, Hard), sound and volume, show controls,
-open on (all games or last game), open at login, reset best scores, quit.
+open on (all games or last game), open at login, invisible menu bar icon (Mac), reset best scores, quit.
 
 ## Build from source
 
