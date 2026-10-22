@@ -49,6 +49,22 @@
     view = next;
   }
 
+  // ---------- wide or tall ----------
+  // The .io games work in either shape; the button next to Pause flips the panel and remembers the choice.
+  const ORIENT = new Set(['slither', 'holeio', 'paperio']);
+  function wideFor(g) { return ORIENT.has(g.id) ? !!(S.orient && S.orient[g.id]) : !!g.wide; }
+  function renderOrient(g) {
+    const b = $('orientBtn'); b.hidden = !ORIENT.has(g.id);
+    b.classList.toggle('is-wide', wideFor(g));
+    b.onclick = () => {
+      if (!S.orient) S.orient = {};
+      S.orient[g.id] = !wideFor(g); L.save(); L.sfx('click');
+      b.classList.toggle('is-wide', wideFor(g));
+      L.native('wide', { on: wideFor(g) });
+      b.blur();
+    };
+  }
+
   // ---------- home ----------
   // Search box: matches a game's name, its group and its older Ludus name, ignoring case and accents.
   let query = '';
@@ -137,7 +153,8 @@
     hideOver();
     $('pauseSheet').hidden = true;
     // Wide games (Tag, Rally...) get a landscape panel while they are open; every other game uses the normal size.
-    const inApp = L.native('wide', { on: !!g.wide });
+    const inApp = L.native('wide', { on: wideFor(g) });
+    renderOrient(g);
     show('game');
     L.sfx('tap');
     // The card that was clicked keeps keyboard focus otherwise, and Enter in a game would click it again.

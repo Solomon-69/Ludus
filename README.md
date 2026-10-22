@@ -67,7 +67,7 @@ Every board game has a <b>vs Bot / vs Friend</b> switch at the top. Pick Friend 
 
 - <b>Turn-based with a friend:</b> Connect Four, Dots and Boxes, Ultimate Tic-Tac-Toe, Hex and Dead Centre.
 - <b>Secret picks:</b> in Rock Paper Scissors, Player 1 picks with <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> and Player 2 with <kbd>J</kbd> <kbd>K</kbd> <kbd>L</kbd>. Both hands show only once you have both locked in.
-- <b>Real time:</b> Air Hockey, Tron, Rally, Tag and Tank Trouble, with one player on <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> and the other on the arrow keys.
+- <b>Real time:</b> Pong, Air Hockey, Rally, Tag, Nidhogg and Tank Trouble, with one player on <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> and the other on the arrow keys.
 - All of them are in the <b>2 Player</b> tab. The panel widens by itself when a game needs the room.
 
 <br>
@@ -181,7 +181,7 @@ brew install --cask ludus   # not available yet
 | **Arcade** (beat your best) | Tetris, Breakout, Pac-Man, Asteroids, Flappy Bird, Plants vs. Zombies, Getting Over It, Space Invaders, Snake, Doodle Jump, Stack |
 | **Puzzle** | 2048, Sokoban, Wordle, Minesweeper, Memory, Solitaire, Candy Crush, Sudoku |
 | **Duel** (you against the computer) | Dots and Boxes, Dead Centre, Connect Four, Last Wire, Ultimate Tic-Tac-Toe, Nidhogg, Hex, Rock Paper Scissors, Quoridor |
-| **2 Player** (one keyboard) | Air Hockey, Tron, Pong, Tag, Tank Trouble |
+| **2 Player** (one keyboard) | Air Hockey, Pong, Tag, Tank Trouble |
 
 Connect Four, Dots and Boxes, Ultimate Tic-Tac-Toe, Hex, Rock Paper Scissors and Dead Centre also have a **vs Friend** mode, so they show up in the 2 Player tab too.
 

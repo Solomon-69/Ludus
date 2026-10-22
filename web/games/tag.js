@@ -554,13 +554,13 @@
             vy = Math.min(mf, vy + g * dt); dropT = Math.max(0, dropT - dt);
             const pb = y + PH; y += vy * dt;
             if (vy > 0) {
-              const r = Math.floor((y + PH - 0.01) / T); let best = null;
+              const r = Math.floor((y + PH - 0.01) / T); let best = null, lava = false;
               for (let c = l; c <= rr; c++) {
                 const tt = tile(c, r);
-                if (tt === '%') return null;
+                if (tt === '%') { y = r * T - PH; vy = -LAVA * Math.sqrt(map.grav); bounce = true; best = null; lava = true; break; }
                 if (solidT(tt) || (tt === '-' && dropT <= 0 && pb <= r * T + 0.5)) { const cc = x + PW / 2 - (c * T + T / 2); if (!best || Math.abs(cc) < Math.abs(best.cc)) best = { c, cc }; }
               }
-              if (best) {
+              if (best && !lava) {
                 y = r * T - PH; vy = 0; const nn = nav.get(best.c, r - 1);
                 if (!nn) return null;
                 if (nn === src) { if (mode === 'fall') { grounded = true; continue; } return null; }

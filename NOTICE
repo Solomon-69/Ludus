@@ -64,3 +64,10 @@ Five Letters word list
 The allowed-guess list in web/games/words.js is taken from Webster's New International Dictionary (1934),
 which is in the public domain (as distributed in /usr/share/dict/words on macOS and BSD systems), plus plurals
 formed from its four-letter words.
+
+
+Flag Quiz flag images
+---------------------
+The country flags in web/games/flags/ (used by the Flag Quiz game) come from the flag-icons project
+(https://github.com/lipis/flag-icons, 4x3 set), Copyright (c) 2013 Panayiotis Lipiridis, MIT License.
+The SVG files are bundled unchanged except for size optimisation (SVGO) and explicit width and height attributes.

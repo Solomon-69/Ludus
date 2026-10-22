@@ -390,3 +390,8 @@ svg { display: block; }
 @media (prefers-reduced-motion: reduce) {
   .intro-page > *, .intro-page.in-next, .intro-page.in-prev, .intro-art.app { animation: intro-bg .2s ease both; animation-delay: 0s; }
 }
+
+/* Wide / tall switch for the .io games, next to Pause */
+.bar-right { display: flex; gap: 8px; align-items: center; }
+#orientBtn svg { transition: transform 0.35s var(--spring); }
+#orientBtn.is-wide svg { transform: rotate(90deg); }

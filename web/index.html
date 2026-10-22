@@ -49,9 +49,14 @@
           <button type="button" data-vs="friend">vs Friend</button>
         </div>
       </div>
-      <button class="icon-btn" id="pauseBtn" aria-label="Pause">
-        <svg viewBox="0 0 24 24"><use href="#i-pause"/></svg>
-      </button>
+      <div class="bar-right">
+        <button class="icon-btn" id="orientBtn" aria-label="Switch between wide and tall" title="Wide or tall" hidden>
+          <svg viewBox="0 0 24 24"><use href="#i-rotate"/></svg>
+        </button>
+        <button class="icon-btn" id="pauseBtn" aria-label="Pause">
+          <svg viewBox="0 0 24 24"><use href="#i-pause"/></svg>
+        </button>
+      </div>
     </header>
     <div class="stage-wrap">
       <div class="stage" id="stage"></div>
@@ -98,6 +103,7 @@
   <symbol id="i-search" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></g></symbol>
   <symbol id="i-back" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M15 5l-7 7 7 7"/></symbol>
   <symbol id="i-down" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M6 9l6 6 6-6"/></symbol>
+  <symbol id="i-rotate" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="8" width="11" height="12" rx="2.5"/><path d="M13 3.5h2.5A4.5 4.5 0 0 1 20 8v2"/><path d="M17.5 8 20 10.5 22.5 8"/></g></symbol>
   <symbol id="i-pause" viewBox="0 0 24 24"><path fill="currentColor" d="M7 5h3.2v14H7zM13.8 5H17v14h-3.2z"/></symbol>
 </svg>
 
@@ -120,9 +126,9 @@
 <script src="games/finalpush.js"></script>
 <script src="games/tag.js"></script>
 <script src="games/pong.js"></script>
-<script src="games/tron.js"></script>
 <script src="games/hockey.js"></script>
 <script src="games/tanks.js"></script>
+<script src="games/slither.js"></script>
 <script src="games/invaders.js"></script>
 <script src="games/rocks.js"></script>
 <script src="games/memory.js"></script>
@@ -135,6 +141,10 @@
 <script src="games/sudoku.js"></script>
 <script src="games/match3.js"></script>
 <script src="games/stack.js"></script>
+<script src="games/holeio.js"></script>
+<script src="games/paperio.js"></script>
+<script src="games/popduel.js"></script>
+<script src="games/flags.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
