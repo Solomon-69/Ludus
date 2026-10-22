@@ -9,7 +9,7 @@
   const N = 6, ROAD = 56, BLOCK = 244, PITCH = BLOCK + ROAD, WORLD = N * PITCH + ROAD;
   const CELL = 100, GC = Math.ceil(WORLD / CELL) + 1;
   const R0 = 12;
-  const rOf = m => R0 + 2.6 * Math.sqrt(m);
+  const rOf = m => R0 + 2.1 * Math.sqrt(m);
   const lvOf = m => Math.floor(Math.sqrt(m) / 2) + 1;
   const AI_COLORS = ['#5aa38f', '#e0a526', '#d9779b', '#4aa3c8', '#8f7fd0', '#c9784a', '#7aa84a'];
   const AI_NAMES = ['Moss', 'Bolt', 'Pip', 'Juno', 'Kit', 'Orbit', 'Nova'];
@@ -18,8 +18,8 @@
     person: { w: 5, d: 5, h: 11, need: 6, val: 1 }, cone: { w: 5, d: 5, h: 8, need: 6, val: 1 },
     lamp: { w: 3, d: 3, h: 30, need: 7, val: 2 }, bench: { w: 15, d: 6, h: 7, need: 9, val: 2 },
     tree: { w: 12, d: 12, h: 30, need: 12, val: 3 }, car: { w: 28, d: 14, h: 11, need: 18, val: 6 },
-    bus: { w: 54, d: 16, h: 20, need: 30, val: 14 }, house: { w: 54, d: 46, h: 34, need: 38, val: 30 },
-    shop: { w: 84, d: 68, h: 58, need: 52, val: 55 }, tower: { w: 120, d: 120, h: 120, need: 80, val: 130 }
+    bus: { w: 54, d: 16, h: 20, need: 30, val: 14 }, house: { w: 54, d: 46, h: 34, need: 38, val: 24 },
+    shop: { w: 84, d: 68, h: 58, need: 52, val: 45 }, tower: { w: 120, d: 120, h: 120, need: 80, val: 100 }
   };
 
   // ---------- projection: oblique, camera looks from the south; tops lean left so the east side shows ----------
@@ -284,11 +284,11 @@
           [[14, 14], [BLOCK - 14, 14], [14, BLOCK - 14], [BLOCK - 14, BLOCK - 14]].forEach(c => put('lamp', bx + c[0], by + c[1], 4));
           if (parkSet.has(i + ',' + j)) {
             scatter('tree', api.randInt(13, 18), 11, 20); scatter('bench', 4, 10, 30); scatter('lamp', 3, 6, 24); scatter('person', api.randInt(7, 11), 5, 20);
-          } else if (d < 0.4) {
+          } else if (d < 0.52) {
             if (Math.random() < 0.65) put('tower', cx + rnd(-8, 8), cy + rnd(-8, 8), 86);
             else { scatter('shop', api.randInt(2, 3), 62, 50); }
             scatter('tree', 3, 11, 18); scatter('bench', 1, 10, 22);
-          } else if (d < 0.78) {
+          } else if (d < 0.74) {
             scatter('shop', api.randInt(1, 2), 62, 50); scatter('house', api.randInt(1, 3), 38, 34);
             scatter('tree', api.randInt(3, 5), 11, 18); scatter('bench', 1, 10, 22);
           } else {
@@ -327,7 +327,7 @@
         const nAI = (friend ? 4 : 5) + LV;
         holes.push(newHole(0, 1));
         if (friend) holes.push(newHole(1, 2));
-        for (let i = 0; i < nAI; i++) { const h = newHole(holes.length, 0); h.name = AI_NAMES[i]; h.color = AI_COLORS[i % AI_COLORS.length]; h.ai.spd = [0.86, 0.95, 1.02][LV] * rnd(0.94, 1.04); h.ai.aggr = [0.35, 0.6, 0.85][LV] * rnd(0.8, 1.15); holes.push(h); }
+        for (let i = 0; i < nAI; i++) { const h = newHole(holes.length, 0); h.name = AI_NAMES[i]; h.color = AI_COLORS[i % AI_COLORS.length]; h.ai.spd = [0.7, 0.8, 0.9][LV] * rnd(0.92, 1.04); h.ai.aggr = [0.35, 0.6, 0.85][LV] * rnd(0.8, 1.15); holes.push(h); }
         holes[0].x = roadC(2); holes[0].y = roadC(3);
         if (friend) { holes[1].x = roadC(4); holes[1].y = roadC(3); }
         const cs = crossings().filter(c => Math.hypot(c[0] - roadC(3), c[1] - roadC(3)) > PITCH * 1.4);
@@ -527,7 +527,7 @@
             if (a === b || !b.alive || b.invuln > 0 || a.rr < b.rr * 1.18) continue;
             if (Math.hypot(a.x - b.x, a.y - b.y) < a.rr - b.rr * 0.5) {
               b.alive = false; b.dying = { t: 0, by: a, x0: b.x, y0: b.y, r0: b.rr }; b.respawn = b.human ? 2.8 : 2.2; b.eatenBy = nameFor(a);
-              a.mass += b.mass * 0.5 + 8; a.pulse = 1; b.mass = b.mass; b.vx = b.vy = 0;
+              a.mass += b.mass * 0.35 + 6; a.pulse = 1; b.mass = b.mass; b.vx = b.vy = 0;
               if (b.human || a.human) api.sfx(b.human ? 'lose' : 'boom');
               if (!rm) for (let i = 0; i < 16; i++) { const an = rnd(0, 6.28); parts.push({ x: b.x, y: b.y, vx: Math.cos(an) * rnd(20, 80), vy: Math.sin(an) * rnd(20, 80), z: 4, vz: rnd(20, 60), life: 0.7, h: b }); }
               if (a.human) pops.push({ x: a.x, y: a.y, z: 0, t: 0, text: 'Ate ' + nameFor(b), h: a });
