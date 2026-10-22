@@ -155,7 +155,7 @@ jobs:
         shell: pwsh
         run: |
           $version = "$env:GITHUB_REF_NAME".TrimStart('v')
-          dotnet publish windows/Ludus.csproj -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -p:Version=$version -o out/Ludus
+          dotnet publish windows/Ludus.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:Version=$version -o out/Ludus
 
       - name: Check the game files came along
         shell: pwsh
