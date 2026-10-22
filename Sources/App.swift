@@ -142,9 +142,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
             resizePopover(animated: true)
         case "wide":
             let on = body["on"] as? Bool ?? false
-            if on != wide { wide = on; resizePopover() }
-            // The page starts the game once the panel has its size (app.js ludusResized), so always confirm.
-            webView.evaluateJavaScript("window.ludusResized && ludusResized()")
+            let animate = body["animate"] as? Bool ?? false   // the rotate button: same smooth resize as Compact/Large
+            if on != wide { wide = on; resizePopover(animated: animate) }
+            // The page starts the game once the panel has its size (app.js ludusResized), so always confirm,
+            // after the animation when there is one.
+            if resizeTimer != nil { resizedPending = true } else { webView.evaluateJavaScript("window.ludusResized && ludusResized()") }
         case "theme":
             // Light or Dark picked in Ludus wins over the Mac's own look, panel background included.
             themeAppearance = switch body["mode"] as? String {
@@ -185,6 +187,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
     /// Animated (Compact/Large switch): the panel grows or shrinks smoothly under the arrow while its
     /// contents fade out and back in at the new layout. Not animated (wide games, opening): straight to
     /// the new size, so games lay out once at their final size.
+    private var resizedPending = false
+
     private func resizePopover(animated: Bool = false) {
         let target = currentSize()
         if resizeTimer != nil { finishResize() }
@@ -258,6 +262,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
 
     private func finishResize() {
         resizeTimer?.invalidate(); resizeTimer = nil
+        if resizedPending { resizedPending = false; webView.evaluateJavaScript("window.ludusResized && ludusResized()") }
         DispatchQueue.main.async { [weak self] in self?.popover.animates = true }
         let full = NSRect(origin: .zero, size: popover.contentViewController?.view.bounds.size ?? popover.contentSize)
         if webView.frame != full { webView.frame = full }

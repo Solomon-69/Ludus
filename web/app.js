@@ -70,7 +70,7 @@
       if (!S.orient) S.orient = {};
       S.orient[g.id] = !wideFor(g); L.save(); L.sfx('click');
       icon();
-      L.native('wide', { on: wideFor(g) });
+      L.native('wide', { on: wideFor(g), animate: true });
       b.blur();
     };
   }
