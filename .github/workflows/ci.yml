@@ -55,7 +55,7 @@ jobs:
 
       - name: Publish Ludus.exe
         shell: pwsh
-        run: dotnet publish windows/Ludus.csproj -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -o out/Ludus
+        run: dotnet publish windows/Ludus.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o out/Ludus
 
       - name: Check the game files came along
         shell: pwsh
