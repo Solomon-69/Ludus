@@ -7,8 +7,7 @@ repo) inside Microsoft Edge WebView2.
 ## Requirements
 
 - Windows 10 or Windows 11, 64-bit (x64; Windows on Arm runs it through emulation).
-- [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0) (x64). Windows asks
-  to install it the first time if it is missing.
+- Nothing else: `Ludus.exe` is self-contained (it carries its own .NET 8).
 - Microsoft Edge WebView2 Runtime. It is built into Windows 11. On Windows 10 it is usually
   already installed with Edge; if not, Ludus offers to open Microsoft's
   [Evergreen bootstrapper](https://developer.microsoft.com/microsoft-edge/webview2/) download page.
@@ -18,9 +17,14 @@ repo) inside Microsoft Edge WebView2.
 - **Left-click** the controller icon in the tray: open or close the panel.
 - **Click anywhere else**: the panel closes (a running game pauses).
 - **Right-click** the icon: Open, Open at login, Quit.
+- **Ctrl+Alt+G** anywhere: open or close the panel. **Start menu > Ludus** opens it too (Ludus keeps
+  that shortcut pointing at wherever `Ludus.exe` is).
+- **Invisible icon** (Settings): hides the tray icon; Ctrl+Alt+G and the Start menu still open Ludus.
+- The tray icon is drawn in code at the exact tray size: white on a dark taskbar, near-black on a light one.
 - **Esc** inside the panel is handled by the games (pause, back).
-- Settings inside the panel: theme (System, Light, Dark), panel size (Compact 400 x 600 or
-  Large 520 x 740, in screen-independent pixels), sound, open at login, quit.
+- Settings inside the panel: the same as on the Mac (appearance, accent, panel size Compact 400 x 600 or
+  Large 520 x 740, reduce motion, difficulty, sound, open at login, invisible icon, quit).
+- Wide (2-player) games turn the panel landscape: 760 x 500, or 900 x 600 at Large. Ludus always opens on All games.
 
 Starting Ludus a second time just opens the panel of the copy that is already running.
 
@@ -29,7 +33,8 @@ Starting Ludus a second time just opens the panel of the copy that is already ru
 | What | Where |
 | --- | --- |
 | Scores, saves, settings | `%APPDATA%\Ludus\state.json` |
-| Panel size | `%APPDATA%\Ludus\window.json` |
+| Panel size, invisible icon | `%APPDATA%\Ludus\window.json` |
+| Start menu shortcut | `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Ludus.lnk` |
 | Troubleshooting log | `%APPDATA%\Ludus\ludus.log` |
 | WebView2 cache | `%LOCALAPPDATA%\Ludus\WebView2` |
 | Open at login | `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, value `Ludus` |
@@ -43,8 +48,11 @@ You need the [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) on W
 
 ```powershell
 cd windows
-dotnet publish -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -o ..\out\Ludus
+dotnet publish -c Release -o ..\out\Ludus
 ```
+
+From a Mac: `dotnet publish windows/Ludus.csproj -c Release -o out/Ludus` also works (the project sets
+`EnableWindowsTargeting`, `win-x64`, self-contained, single file).
 
 The output folder holds `Ludus.exe` and a `web` folder (copied from `../web` by the project file).
 Keep them together. For a quick debug run: `dotnet run` (developer tools are on in Debug builds).
@@ -86,13 +94,19 @@ App to page: before the page loads it sets `window.__LUDUS_NATIVE__`, `__LUDUS_S
 `__LUDUS_LOGIN__`, `__LUDUS_DARK__` (and `__LUDUS_PLATFORM__ = 'windows'`), and later calls
 `ludusOpened()`, `ludusClosed()` and `ludusSetSystemDark(bool)`.
 
+## Testing on Windows
+
+`windows/ci/test.ps1` starts Ludus with `--test-open` (open the panel once the games load),
+`--selftest=PATH` (write a JSON result: page loaded, number of game cards, tab, panel and tray position)
+and `--test-game=pong` (open a wide game), sends Ctrl+Alt+G, quits with `Ludus.exe --quit`, and saves
+screenshots. It runs in GitHub Actions on `windows-latest`.
+
 ## Redrawing the icon
 
-On a Mac:
-
-```bash
-swiftc -O -framework AppKit windows/tools/make-ico.swift -o /tmp/mkico && /tmp/mkico windows/assets
-```
+`assets/Ludus.ico` (16 to 256 px) is made from the Mac app icon `assets/Ludus.icns`
+(`sips -s format png assets/Ludus.icns --out /tmp/ludus.png`, then any ICO writer, e.g. Pillow).
+The tray icon is not an image file: it is drawn by `Glyph.Controller` in `src/TrayContext.cs`.
+`tools/make-ico.swift` draws the old spark icon and is no longer used.
 
 ## Unsigned builds
 

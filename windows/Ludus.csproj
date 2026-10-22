@@ -18,19 +18,22 @@
     <Company>Solomon</Company>
     <Copyright>Copyright (c) 2026 Solomon</Copyright>
     <Version>1.5.0</Version>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
 
-    <!-- Single-file publish keeps one Ludus.exe; the WebView2 loader DLL rides inside it. -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+
+    <!-- One self-contained Ludus.exe (no .NET install needed); the WebView2 loader DLL rides inside it. -->
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
     <DebugType>embedded</DebugType>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3912.50" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <EmbeddedResource Include="assets\Ludus.ico" LogicalName="Ludus.ico" />
   </ItemGroup>
 
   <!-- The shared game files (../web) sit next to Ludus.exe in a "web" folder, loose, not bundled. -->

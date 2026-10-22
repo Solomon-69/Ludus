@@ -44,6 +44,17 @@ internal sealed class PopupForm : Form
     /// <summary>Raised when "Open at login" changes from inside the page.</summary>
     public event Action? LoginChanged;
 
+    /// <summary>Raised when the "Invisible icon" setting changes (true = hide the tray icon).</summary>
+    public event Action<bool>? InvisibleChanged;
+
+    /// <summary>Raised once the games page has loaded.</summary>
+    public event Action? PageReady;
+
+    public bool IsReady => ready;
+
+    /// <summary>Keeps the panel open when it loses focus (automated test only).</summary>
+    public bool StayOpen { get; set; }
+
     public PopupForm(Theme theme, Action onQuit)
     {
         this.theme = theme;
@@ -144,8 +155,9 @@ internal sealed class PopupForm : Form
             core.NavigationCompleted += (_, e) =>
             {
                 ready = e.IsSuccess;
-                if (!e.IsSuccess) Store.Log($"Page failed to load: {e.WebErrorStatus}");
-                else if (Visible) RunScript("window.ludusOpened && ludusOpened()");
+                if (!e.IsSuccess) { Store.Log($"Page failed to load: {e.WebErrorStatus}"); return; }
+                if (Visible) RunScript("window.ludusOpened && ludusOpened()");
+                PageReady?.Invoke();
             };
             core.ProcessFailed += (_, e) =>
             {
@@ -198,7 +210,8 @@ internal sealed class PopupForm : Form
                "window.__LUDUS_PLATFORM__ = 'windows';\n" +
                $"window.__LUDUS_STATE__ = {Store.LoadStateJson()};\n" +
                $"window.__LUDUS_LOGIN__ = {Bool(Store.LoginEnabled())};\n" +
-               $"window.__LUDUS_DARK__ = {Bool(theme.SystemDark)};\n";
+               $"window.__LUDUS_DARK__ = {Bool(theme.SystemDark)};\n" +
+               $"window.__LUDUS_INVISIBLE__ = {Bool(Store.LoadInvisible())};\n";
     }
 
     private void RunScript(string js)
@@ -247,6 +260,11 @@ internal sealed class PopupForm : Form
                     PushLogin();
                     LoginChanged?.Invoke();
                     break;
+                case "invisible":
+                    var hide = msg.TryGetProperty("on", out var hideProp) && hideProp.ValueKind == JsonValueKind.True;
+                    Store.SaveInvisible(hide);
+                    InvisibleChanged?.Invoke(hide);
+                    break;
                 case "quit":
                     // Leave the WebView2 event first; quitting disposes the control.
                     BeginInvoke((MethodInvoker)Quit);
@@ -263,6 +281,9 @@ internal sealed class PopupForm : Form
 
     private static string? StringProp(JsonElement obj, string name) =>
         obj.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
+
+    /// <summary>Runs JavaScript and returns its JSON result (used by the automated test).</summary>
+    public async Task<string> Eval(string js) => web.CoreWebView2 == null ? "null" : await web.ExecuteScriptAsync(js);
 
     public void PushLogin() => RunScript($"window.__LUDUS_LOGIN__ = {(Store.LoginEnabled() ? "true" : "false")}");
 
@@ -338,7 +359,7 @@ internal sealed class PopupForm : Form
     protected override void OnDeactivate(EventArgs e)
     {
         base.OnDeactivate(e);
-        if (!quitting) HidePopup();   // click outside = close, like the Mac popover
+        if (!quitting && !StayOpen) HidePopup();   // click outside = close, like the Mac popover
     }
 
     protected override void OnDpiChanged(DpiChangedEventArgs e)

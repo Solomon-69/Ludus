@@ -44,25 +44,72 @@ internal static class Store
         WriteAtomic(StatePath, state.GetRawText());
     }
 
-    // ---- Panel size ----
+    // ---- Panel size and the invisible tray icon (window.json) ----
 
-    public static string LoadSize()
+    private sealed record WindowPrefs(string Size, bool Invisible);
+
+    private static WindowPrefs LoadPrefs()
     {
         try
         {
-            if (!File.Exists(WindowPath)) return "compact";
+            if (!File.Exists(WindowPath)) return new WindowPrefs("compact", false);
             using var doc = JsonDocument.Parse(File.ReadAllText(WindowPath));
-            return doc.RootElement.TryGetProperty("size", out var s) && s.GetString() == "large" ? "large" : "compact";
+            var root = doc.RootElement;
+            var size = root.TryGetProperty("size", out var s) && s.ValueKind == JsonValueKind.String && s.GetString() == "large" ? "large" : "compact";
+            var invisible = root.TryGetProperty("invisible", out var i) && i.ValueKind == JsonValueKind.True;
+            return new WindowPrefs(size, invisible);
         }
         catch (Exception ex)
         {
             Log($"window.json could not be read: {ex.Message}");
-            return "compact";
+            return new WindowPrefs("compact", false);
         }
     }
 
-    public static void SaveSize(string size) =>
-        WriteAtomic(WindowPath, JsonSerializer.Serialize(new { size = size == "large" ? "large" : "compact" }));
+    private static void SavePrefs(WindowPrefs prefs) =>
+        WriteAtomic(WindowPath, JsonSerializer.Serialize(new { size = prefs.Size, invisible = prefs.Invisible }));
+
+    public static string LoadSize() => LoadPrefs().Size;
+
+    public static void SaveSize(string size) => SavePrefs(LoadPrefs() with { Size = size == "large" ? "large" : "compact" });
+
+    /// <summary>Invisible icon: no tray icon; Ludus opens with Ctrl+Alt+G or from the Start menu.</summary>
+    public static bool LoadInvisible() => LoadPrefs().Invisible;
+
+    public static void SaveInvisible(bool on) => SavePrefs(LoadPrefs() with { Invisible = on });
+
+    // ---- Start menu shortcut ----
+
+    /// <summary>Keeps "Ludus" in the Start menu pointing at this exe (the way back in when the tray icon is hidden).</summary>
+    public static void EnsureStartMenuShortcut()
+    {
+        try
+        {
+            var folder = Environment.GetFolderPath(Environment.SpecialFolder.Programs);
+            var link = Path.Combine(folder, "Ludus.lnk");
+            var shellType = Type.GetTypeFromProgID("WScript.Shell");
+            if (shellType == null) return;
+            dynamic shell = Activator.CreateInstance(shellType)!;
+            try
+            {
+                dynamic shortcut = shell.CreateShortcut(link);
+                if (File.Exists(link) && string.Equals((string)shortcut.TargetPath, ExePath(), StringComparison.OrdinalIgnoreCase)) return;
+                shortcut.TargetPath = ExePath();
+                shortcut.WorkingDirectory = AppContext.BaseDirectory;
+                shortcut.IconLocation = ExePath() + ",0";
+                shortcut.Description = "Ludus: 33 little games";
+                shortcut.Save();
+            }
+            finally
+            {
+                System.Runtime.InteropServices.Marshal.FinalReleaseComObject(shell);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log($"Start menu shortcut not made: {ex.Message}");
+        }
+    }
 
     // ---- Open at login ----
 

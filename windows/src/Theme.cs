@@ -18,6 +18,12 @@ internal sealed class Theme : IDisposable
 
     public bool SystemDark { get; private set; }
 
+    /// <summary>Windows' taskbar colour (SystemUsesLightTheme), which the tray icon follows.</summary>
+    public bool TaskbarDark { get; private set; }
+
+    /// <summary>Raised when the taskbar colour flips (the tray icon redraws).</summary>
+    public event Action? TaskbarChanged;
+
     public bool EffectiveDark => Mode switch
     {
         "dark" => true,
@@ -28,6 +34,7 @@ internal sealed class Theme : IDisposable
     public Theme()
     {
         SystemDark = ReadSystemDark();
+        TaskbarDark = ReadTaskbarDark();
         SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged;
     }
 
@@ -44,6 +51,12 @@ internal sealed class Theme : IDisposable
     /// <summary>Re-reads the Windows setting and raises SystemDarkChanged if it flipped.</summary>
     public void Refresh()
     {
+        var taskbar = ReadTaskbarDark();
+        if (taskbar != TaskbarDark)
+        {
+            TaskbarDark = taskbar;
+            TaskbarChanged?.Invoke();
+        }
         var dark = ReadSystemDark();
         if (dark == SystemDark) return;
         SystemDark = dark;
@@ -60,6 +73,19 @@ internal sealed class Theme : IDisposable
         catch
         {
             return false;
+        }
+    }
+
+    private static bool ReadTaskbarDark()
+    {
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(PersonalizeKey);
+            return key?.GetValue("SystemUsesLightTheme") is not int light || light == 0;
+        }
+        catch
+        {
+            return true;
         }
     }
 

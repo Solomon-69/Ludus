@@ -3,25 +3,47 @@ using Microsoft.Web.WebView2.Core;
 
 namespace Ludus;
 
+/// <summary>Command-line switches: --quit (close the running Ludus), and for the automated Windows test
+/// --test-open (open the panel once the games have loaded) and --selftest=PATH (write a result file).</summary>
+internal sealed record LaunchOptions(bool TestOpen, bool Quit, string? SelfTestPath, string? TestGame)
+{
+    public static LaunchOptions Parse(string[] args)
+    {
+        string? path = null, game = null;
+        foreach (var a in args)
+        {
+            if (a.StartsWith("--selftest=", StringComparison.OrdinalIgnoreCase)) path = a["--selftest=".Length..].Trim('"');
+            if (a.StartsWith("--test-game=", StringComparison.OrdinalIgnoreCase)) game = a["--test-game=".Length..];
+        }
+        return new LaunchOptions(
+            args.Contains("--test-open", StringComparer.OrdinalIgnoreCase),
+            args.Contains("--quit", StringComparer.OrdinalIgnoreCase),
+            path, game);
+    }
+}
+
 internal static class Program
 {
     private const string MutexName = @"Local\Ludus.SingleInstance";
     private const string OpenEventName = @"Local\Ludus.Open";
+    private const string QuitEventName = @"Local\Ludus.Quit";
     // Microsoft's Evergreen WebView2 Runtime bootstrapper (needed on some Windows 10 PCs).
     private const string WebView2Download = "https://go.microsoft.com/fwlink/p/?LinkId=2124703";
 
     [STAThread]
-    private static void Main()
+    private static void Main(string[] args)
     {
-        // Single instance: a second launch just asks the running Ludus to open its panel.
+        var options = LaunchOptions.Parse(args);
+
+        // Single instance: a second launch just asks the running Ludus to open its panel (or to quit).
         using var mutex = new Mutex(initiallyOwned: true, MutexName, out var firstInstance);
         if (!firstInstance)
         {
             try
             {
-                using var open = EventWaitHandle.OpenExisting(OpenEventName);
+                using var signal = EventWaitHandle.OpenExisting(options.Quit ? QuitEventName : OpenEventName);
                 Native.AllowSetForegroundWindow(Native.ASFW_ANY);
-                open.Set();
+                signal.Set();
             }
             catch (Exception ex)
             {
@@ -29,9 +51,11 @@ internal static class Program
             }
             return;
         }
+        if (options.Quit) return;   // nothing running, nothing to quit
 
         // Created straight away so a second launch can always reach this one.
         using var openSignal = new EventWaitHandle(false, EventResetMode.AutoReset, OpenEventName);
+        using var quitSignal = new EventWaitHandle(false, EventResetMode.AutoReset, QuitEventName);
 
         ApplicationConfiguration.Initialize();
         Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
@@ -50,13 +74,16 @@ internal static class Program
             return;
         }
 
-        var context = new TrayContext();
-        var wait = ThreadPool.RegisterWaitForSingleObject(
+        var context = new TrayContext(options);
+        var openWait = ThreadPool.RegisterWaitForSingleObject(
             openSignal, (_, _) => context.OpenFromOutside(), null, Timeout.Infinite, executeOnlyOnce: false);
+        var quitWait = ThreadPool.RegisterWaitForSingleObject(
+            quitSignal, (_, _) => context.QuitFromOutside(), null, Timeout.Infinite, executeOnlyOnce: false);
 
         Application.Run(context);
 
-        wait.Unregister(null);
+        openWait.Unregister(null);
+        quitWait.Unregister(null);
         GC.KeepAlive(mutex);
     }
 
