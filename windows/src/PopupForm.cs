@@ -7,7 +7,7 @@ namespace Ludus;
 /// <summary>
 /// The Ludus panel: a borderless, rounded, shadowed window that opens just above the tray and hosts
 /// the shared web games (../web) in WebView2. Mirrors the Mac popover in Sources/App.swift, including
-/// the page bridge (save, size, theme, login, quit, playing) and the window.ludus* callbacks.
+/// the page bridge (save, size, wide, theme, login, quit, playing) and the window.ludus* callbacks.
 /// </summary>
 internal sealed class PopupForm : Form
 {
@@ -19,6 +19,9 @@ internal sealed class PopupForm : Form
 
     private static readonly Size CompactDip = new(400, 600);
     private static readonly Size LargeDip = new(520, 740);
+    // Landscape panel used only while a wide game is open (same sizes as the Mac app).
+    private static readonly Size WideCompactDip = new(760, 500);
+    private static readonly Size WideLargeDip = new(900, 600);
     private const int GapDip = 12;              // space between the panel and the taskbar / screen edge
     private const int ReopenGuardMs = 600;      // a tray click that closed the panel must not reopen it
     private const int QuitFadeMs = 180;
@@ -30,6 +33,7 @@ internal sealed class PopupForm : Form
     private readonly Theme theme;
     private readonly Action onQuit;
     private string size;
+    private bool wide;
     private Point anchor;
     private bool hasAnchor;
     private bool ready;
@@ -227,6 +231,11 @@ internal sealed class PopupForm : Form
                     Store.SaveSize(size);
                     if (Visible) Bounds = PopupBounds();   // one layout at the new size, no animated reflow
                     break;
+                case "wide":
+                    wide = msg.TryGetProperty("on", out var wideProp) && wideProp.ValueKind == JsonValueKind.True;
+                    if (Visible) Bounds = PopupBounds();
+                    RunScript("window.ludusResized && ludusResized()");   // the page waits for this before starting the game
+                    break;
                 case "theme":
                     var mode = StringProp(msg, "mode");
                     theme.Mode = mode is "light" or "dark" ? mode : "system";
@@ -298,6 +307,7 @@ internal sealed class PopupForm : Form
         }
 
         theme.Refresh();   // in case a theme change event was missed while hidden
+        wide = false;   // Ludus always opens on All games, so never at a wide game's landscape size
         Bounds = PopupBounds();
         if (!Visible) Show();
         Activate();
@@ -345,7 +355,7 @@ internal sealed class PopupForm : Form
         var screen = Screen.FromPoint(anchor);
         var work = screen.WorkingArea;
         var scale = Native.ScaleAt(anchor);
-        var dip = size == "large" ? LargeDip : CompactDip;
+        var dip = wide ? (size == "large" ? WideLargeDip : WideCompactDip) : (size == "large" ? LargeDip : CompactDip);
         var gap = (int)Math.Round(GapDip * scale);
         var w = Math.Min((int)Math.Round(dip.Width * scale), work.Width - gap * 2);
         var h = Math.Min((int)Math.Round(dip.Height * scale), work.Height - gap * 2);

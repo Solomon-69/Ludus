@@ -233,20 +233,23 @@
       }
       function restore(s) {
         const num = v => typeof v === 'number' && isFinite(v);
-        // A save from an arena of another size (e.g. an old portrait session) starts fresh.
-        if (!s || (s.cols === undefined ? PCOLS : s.cols) !== COLS || (s.rows === undefined ? PROWS : s.rows) !== ROWS) return false;
+        // A save from an arena of another shape (e.g. an old portrait session) starts fresh.
+        // A wide save may come back on a slightly different wide stage: keep its arena and scale it.
+        const cols = s && (s.cols === undefined ? PCOLS : s.cols), rows = s && (s.rows === undefined ? PROWS : s.rows);
+        if (!s || rows !== ROWS || !Number.isInteger(cols) || cols < PCOLS || cols > MAX_COLS || (rows === PROWS && cols !== PCOLS)) return false;
         if (s.v !== 1 || !s.wins || !num(s.wins.p1) || !num(s.wins.p2) || s.wins.p1 >= FIRST_TO || s.wins.p2 >= FIRST_TO) return false;
         if (!num(s.round) || !['count', 'play', 'end'].includes(s.phase) || !num(s.phaseT) || !num(s.acc)) return false;
         if (!Array.isArray(s.riders) || s.riders.length !== 2) return false;
-        const g = new Array(COLS * ROWS).fill(0);
+        const g = new Array(cols * rows).fill(0);
         for (let i = 0; i < 2; i++) {
           const r = s.riders[i];
           if (!r || !DIRS[r.dir] || !Array.isArray(r.trail) || !r.trail.length) return false;
           for (const c of r.trail) {
-            if (!Array.isArray(c) || !num(c[0]) || !num(c[1]) || c[0] < 0 || c[1] < 0 || c[0] >= COLS || c[1] >= ROWS) return false;
-            g[c[1] * COLS + c[0]] = i + 1;
+            if (!Array.isArray(c) || !num(c[0]) || !num(c[1]) || c[0] < 0 || c[1] < 0 || c[0] >= cols || c[1] >= rows) return false;
+            g[c[1] * cols + c[0]] = i + 1;
           }
         }
+        layout([cols, rows]);
         grid = g; wins = { p1: s.wins.p1, p2: s.wins.p2 }; round = s.round; phase = s.phase; phaseT = s.phaseT; acc = s.acc;
         result = s.result === 'p1' || s.result === 'p2' ? s.result : null;
         crash = s.crash && typeof s.crash === 'object' ? s.crash : null;

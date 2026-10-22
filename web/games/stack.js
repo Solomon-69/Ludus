@@ -129,8 +129,8 @@
         const S = baseScale(), n = score();
         let tCam, tCy, tZoom;
         if (state === 'over') {
-          // Pull back until the whole tower, plinth included, fits above the result bar.
-          const top = n * H, avail = view.h - 74 - 64, need = (top + PED + 104) * S;
+          // Pull back until the whole tower, plinth included, fits the stage (the result bar sits under it).
+          const top = n * H, avail = view.h - 64, need = (top + PED + 104) * S;
           tZoom = Math.min(1, avail / need);
           tCam = top; tCy = 64 + 52 * S * tZoom + Math.max(0, avail - need * tZoom) / 2;
         } else { tCam = (n + 1) * H; tCy = view.h * 0.46; tZoom = 1; }
@@ -307,7 +307,7 @@
       }
 
       api.loop(dt => { clock += dt; update(dt); render(); });
-      Ludus.games.find(g => g.id === 'stack')._peek = () => ({ layers, cur, combo, perfects, state, tol: TOL[lv], camY, zoom });
+      if (window.ludusDebug) Ludus.games.find(g => g.id === 'stack')._peek = () => ({ layers, cur, combo, perfects, state, tol: TOL[lv], camY, zoom });
       return {
         save() {
           if (state !== 'play' || !cur || layers.length < 2) return null;

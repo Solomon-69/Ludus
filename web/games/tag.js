@@ -736,13 +736,12 @@
       const PF = ['x', 'y', 'vx', 'vy', 'face', 'frozen', 'speedT', 'jumpT', 'ghostT', 'shrinkT', 'shieldT'];
       function save() {
         if (phase === 'over' || api.ended || (!restored && !api.touched)) return null;
-        const base = { v: 2, phase, sel: { map: sel.map, time: sel.time, rounds: sel.rounds }, focus: { row: focus.row, col: focus.col } };
-        if (phase === 'menu') return base;
-        return Object.assign(base, {
+        if (phase === 'menu') return null;   // still picking a scene: nothing to resume
+        return { v: 2, phase, sel: { map: sel.map, time: sel.time, rounds: sel.rounds }, focus: { row: focus.row, col: focus.col },
           mapIdx, round, wins: { p1: wins.p1, p2: wins.p2 }, it, firstIt, timer, phaseT, itemT, tagCool, mt,
           items: items.map(i => ({ x: i.x, y: i.y, type: i.type })),
           ps: players.map(p => { const o = { hold: p.hold, dead: p.dead, onM: p.onM }; PF.forEach(k => { o[k] = p[k]; }); return o; })
-        });
+        };
       }
       function restore(s) {
         const num = v => typeof v === 'number' && isFinite(v), int = (v, a, b) => Number.isInteger(v) && v >= a && v <= b;

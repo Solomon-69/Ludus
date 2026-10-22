@@ -288,14 +288,17 @@
       }
       function restore(s) {
         const num = v => typeof v === 'number' && isFinite(v);
-        // A save from a maze of another size (e.g. an old portrait session) starts fresh.
-        if (!s || (s.mc === undefined ? PMC : s.mc) !== MC || (s.mr === undefined ? PMRW : s.mr) !== MRW) return false;
+        // A save from a maze of another shape (e.g. an old portrait session) starts fresh.
+        // A wide save may come back on a slightly different wide stage: keep its maze and scale it.
+        const mc = s && (s.mc === undefined ? PMC : s.mc), mr = s && (s.mr === undefined ? PMRW : s.mr);
+        if (!s || mr !== MRW || !Number.isInteger(mc) || mc < PMC || mc > MAX_MC || (mr === PMRW && mc !== PMC)) return false;
         if (s.v !== 1 || !s.wins || !num(s.wins.p1) || !num(s.wins.p2) || s.wins.p1 >= FIRST_TO || s.wins.p2 >= FIRST_TO) return false;
         if (!num(s.round) || !['ready', 'play', 'end', 'result'].includes(s.phase) || !num(s.phaseT)) return false;
         const bits = (arr, n, len) => Array.isArray(arr) && arr.length === n && arr.every(r => typeof r === 'string' && r.length === len && /^[01]+$/.test(r));
-        if (!s.maze || !bits(s.maze.h, MRW + 1, MC) || !bits(s.maze.v, MRW, MC + 1)) return false;
+        if (!s.maze || !bits(s.maze.h, mr + 1, mc) || !bits(s.maze.v, mr, mc + 1)) return false;
         if (!Array.isArray(s.tanks) || s.tanks.length !== 2 || !s.tanks.every(t => num(t.x) && num(t.y) && num(t.a) && num(t.cool))) return false;
         if (!Array.isArray(s.shells) || !s.shells.every(q => ['x', 'y', 'vx', 'vy', 'life', 'age'].every(k => num(q[k])) && (q.owner === 'p1' || q.owner === 'p2'))) return false;
+        layout([mc, mr]);
         maze = { h: s.maze.h.map(r => r.split('').map(Number)), v: s.maze.v.map(r => r.split('').map(Number)) };
         rects = wallRects(maze);
         wins = { p1: s.wins.p1, p2: s.wins.p2 }; round = s.round; phase = s.phase; phaseT = s.phaseT;

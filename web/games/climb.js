@@ -365,7 +365,7 @@
       }
 
       api.loop(dt => { clock += dt; update(dt); render(); });
-      Ludus.games.find(x => x.id === 'climb')._peek = () => ({ s, maxH, state, aim, camY, time, toScreen });
+      if (window.ludusDebug) Ludus.games.find(x => x.id === 'climb')._peek = () => ({ s, maxH, state, aim, camY, time, toScreen });
       return {
         save() {
           if (state !== 'play' || time < 1) return null;

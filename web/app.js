@@ -9,6 +9,8 @@
   const TWO = '2 Player';
   const REVEAL_MS = 1200;   // how long the final board stays on screen before the result bar slides up
   const SAVE_EVERY_MS = 4000;
+  const SLIDE_MS = 60;          // the game screen's slide-in, before a game is started
+  const RESIZE_WAIT_MS = 400;   // longest wait for the app to confirm a panel resize (ludusResized)
   const DIFFS = [['easy', 'Easy'], ['normal', 'Normal'], ['hard', 'Hard']];
   const THEMES = [['system', 'Auto'], ['light', 'Light'], ['dark', 'Dark']];
   const SIZES = [['compact', 'Compact'], ['large', 'Large']];
@@ -19,6 +21,7 @@
   let overAt = 0;           // when the result bar appeared (keys are armed 300 ms later)
   let revealTimer = null;
   let launchTimer = null;
+  let pendingLaunch = null; // { go, at }: the game waiting for the panel to reach its size
 
   // ---------- theme ----------
   function applyTheme() {
@@ -124,14 +127,17 @@
     hideOver();
     $('pauseSheet').hidden = true;
     // Wide games (Tag, Rally...) get a landscape panel while they are open; every other game uses the normal size.
-    L.native('wide', { on: !!g.wide });
+    const inApp = L.native('wide', { on: !!g.wide });
     show('game');
     L.sfx('tap');
     // The card that was clicked keeps keyboard focus otherwise, and Enter in a game would click it again.
     if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
-    // Wait for the slide-in so the stage has its final size.
+    // Wait for the slide-in, and in the app for the panel to confirm its new size (ludusResized), so the
+    // game lays out once at its final size. The timeout is a fallback in case the confirmation never comes.
     clearTimeout(launchTimer);
-    launchTimer = setTimeout(() => {
+    const go = () => {
+      if (!pendingLaunch || pendingLaunch.go !== go) return;
+      pendingLaunch = null; clearTimeout(launchTimer);
       if (view !== 'game') return;
       launch(g);
       if (!current || !S.saves[id]) return;
@@ -140,7 +146,9 @@
       try { restored = current.instance.save ? current.instance.save() : null; } catch (e) { restored = null; }
       if (restored) { pause(); $('pauseTitle').textContent = 'Welcome back'; $('pauseSheet').classList.add('welcome'); }
       else forget(id);
-    }, 60);
+    };
+    pendingLaunch = { go, at: performance.now() };
+    launchTimer = setTimeout(go, inApp ? RESIZE_WAIT_MS : SLIDE_MS);
     L.native('playing', { id });
   }
   function launch(g) {
@@ -173,7 +181,7 @@
   }
   function forget(id) { if (S.saves[id]) { delete S.saves[id]; L.save(); } }
   function stop() {
-    clearTimeout(launchTimer);
+    clearTimeout(launchTimer); pendingLaunch = null;
     if (!current) return;
     if (current.run.ended) forget(current.game.id);   // left during the end-of-game reveal: the run is over
     clearInterval(current.saver); clearTimeout(revealTimer);
@@ -341,8 +349,9 @@
     // in the "Continue" card at the top.
     if (view !== 'home') { root.classList.add('instant'); goHome(); }   // safety net; normally done on close
     if (S.filter !== 'All') { S.filter = 'All'; L.save(); renderFilters(); renderCards(); }
-    root.classList.remove('instant');
     replayCards();
+    // Next frame, once the home screen has been laid out without transitions.
+    requestAnimationFrame(() => root.classList.remove('instant'));
   };
   // Go back to All games while the panel is closing, with transitions off, so the next open shows
   // the finished home screen straight away instead of the game flashing and sliding out.
@@ -355,6 +364,14 @@
     L.save(true);
   };
   window.ludusOpenGame = id => start(id);
+  // The app has resized the panel for a game (wide or normal): start it once the page has the new size.
+  window.ludusResized = () => {
+    const p = pendingLaunch; if (!p) return;
+    requestAnimationFrame(() => {
+      clearTimeout(launchTimer);
+      launchTimer = setTimeout(p.go, Math.max(0, SLIDE_MS - (performance.now() - p.at)));
+    });
+  };
   // Test helper: end the current run as if the game called api.over (used by QA/shell-test.js).
   window.ludusTestOver = score => { if (current) current.run.api.over({ score }); };
   window.ludusState = () => JSON.stringify({ view, game: current && current.game.id, score: $('scoreNow').textContent, paused: !$('pauseSheet').hidden, over: overShown(), revealing: revealing(), games: L.games.length, theme: root.dataset.theme, saved: Object.keys(S.saves) });

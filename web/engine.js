@@ -17,7 +17,7 @@
   const defaults = {
     theme: 'system', accent: '#d97757', sound: true, volume: 0.6, difficulty: 'normal',
     reduceMotion: false, hints: true, size: 'compact', hidden: [], best: {}, plays: {}, last: null,
-    filter: 'All', startOn: 'home', saves: {}
+    filter: 'All', saves: {}
   };
 
   // ---------- persistence (native bridge first, browser storage as fallback) ----------

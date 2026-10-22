@@ -26,10 +26,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
     private var invisible: Bool { UserDefaults.standard.bool(forKey: invisibleKey) }
     private static let compact = NSSize(width: 400, height: 600)
     private static let large = NSSize(width: 520, height: 740)
-    // Landscape panel used only while a wide game (Tag, Rally, Air Puck, Tank Duel, Light Trails) is open.
+    // Landscape panel used only while one of the 6 wide games is open: Tag, Rally, Air Puck, Tank Duel,
+    // Light Trails and Spark Hop (jumper.js).
     private static let wideCompact = NSSize(width: 760, height: 500)
     private static let wideLarge = NSSize(width: 900, height: 600)
     private var wide = false
+    private var openCount = 0   // per-open counter, so a late reveal from an earlier open does nothing
     private let testNotification = Notification.Name("com.solomon.Ludus.test")
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -131,6 +133,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
         case "wide":
             let on = body["on"] as? Bool ?? false
             if on != wide { wide = on; resizePopover() }
+            // The page starts the game once the panel has its size (app.js ludusResized), so always confirm.
+            webView.evaluateJavaScript("window.ludusResized && ludusResized()")
         case "theme":
             // Light or Dark picked in Ludus wins over the Mac's own look, panel background included.
             themeAppearance = switch body["mode"] as? String {
@@ -248,11 +252,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
 
     /// The view the panel's arrow points at: the menu bar button, or while invisible a clear window over
     /// the empty spot (a panel shown from the menu bar button itself makes macOS draw a pill behind it).
+    /// If the item can't be seen (behind the notch, pushed out of a full menu bar, off screen), the clear
+    /// window sits under the menu bar near the mouse pointer instead, so the panel always opens on screen.
     private func popoverAnchor() -> NSView? {
-        guard invisible, var frame = statusItem.button?.window?.frame else { anchorWindow?.orderOut(nil); return statusItem.button }
+        let itemFrame = statusItem.button?.window.flatMap { itemVisible($0) ? $0.frame : nil }
+        if !invisible, itemFrame != nil { anchorWindow?.orderOut(nil); return statusItem.button }
+        guard var frame = itemFrame ?? pointerAnchorFrame() else { anchorWindow?.orderOut(nil); return nil }
         // Bottom edge raised a little, so the arrow sits as snug under the menu bar as it does for the real icon.
         frame.origin.y += 4; frame.size.height -= 4
-        // A clear window of its own sitting exactly over the invisible spot, so the panel is not tied to the
+        // A clear window of its own sitting exactly over that spot, so the panel is not tied to the
         // menu bar item and macOS draws no pill. It never takes clicks; the catcher below it does.
         let window = anchorWindow ?? {
             let w = NSPanel(contentRect: frame, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
@@ -265,6 +273,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
         window.setFrame(frame, display: false)
         window.orderFrontRegardless()
         return window.contentView
+    }
+
+    /// Whether the menu bar item's window is really on screen: shown, not covered, fully on one screen,
+    /// and on a notch screen not in the strip behind the notch.
+    private func itemVisible(_ window: NSWindow) -> Bool {
+        let frame = window.frame
+        guard window.isVisible, window.occlusionState.contains(.visible), frame.width > 0, frame.height > 0,
+              let screen = NSScreen.screens.first(where: { $0.frame.insetBy(dx: -1, dy: -1).contains(frame) }) else { return false }
+        if let left = screen.auxiliaryTopLeftArea, let right = screen.auxiliaryTopRightArea {
+            // Only widths are used, so this holds whatever coordinates the areas are given in.
+            let notchMinX = screen.frame.minX + left.width, notchMaxX = screen.frame.maxX - right.width
+            if frame.maxX > notchMinX && frame.minX < notchMaxX { return false }
+        }
+        return true
+    }
+
+    /// An icon-sized spot just under the menu bar, near the mouse pointer, kept inside the pointer's screen.
+    private func pointerAnchorFrame() -> NSRect? {
+        let mouse = NSEvent.mouseLocation
+        guard let screen = NSScreen.screens.first(where: { $0.frame.contains(mouse) }) ?? NSScreen.main else { return nil }
+        let bar = NSStatusBar.system.thickness   // a square item is as wide as the menu bar is tall
+        let x = min(max(mouse.x - bar / 2, screen.frame.minX), screen.frame.maxX - bar)
+        return NSRect(x: x, y: screen.frame.maxY - bar, width: bar, height: bar)
     }
 
     private func openPopover() {
@@ -283,8 +314,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
         // The web view still holds its last picture (often the game that was open) until it repaints.
         // Keep it hidden until the home screen has really been drawn, then fade it in, so opening is clean.
         webView.alphaValue = 0
+        openCount += 1
+        let thisOpen = openCount
         let reveal: () -> Void = { [weak self] in
-            guard let self, self.webView.alphaValue < 1 else { return }
+            guard let self, self.openCount == thisOpen, self.webView.alphaValue < 1 else { return }
             NSAnimationContext.runAnimationGroup { ctx in
                 ctx.duration = 0.12
                 self.webView.animator().alphaValue = 1
@@ -394,6 +427,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
 
     // MARK: - Test hook (UI-only: open/close the panel, open a game, report state)
 
+    #if LUDUS_TEST
     @objc private func testCommand(_ note: Notification) {
         guard let command = note.object as? String else { return }
         switch command {
@@ -447,6 +481,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
         if let handle = try? FileHandle(forWritingTo: url) { handle.seekToEndOfFile(); handle.write(Data(line.utf8)); try? handle.close() }
         else { try? line.write(to: url, atomically: true, encoding: .utf8) }
     }
+    #endif
 }
 
 /// Clear view laid over the invisible menu bar item: takes left, right and Option clicks without
