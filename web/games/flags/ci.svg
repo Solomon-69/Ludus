@@ -1,1 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="640" height="480" viewBox="0 0 640 480"><g fill-rule="evenodd"><path fill="#009a44" d="M426.8 0H640v480H426.8z"/><path fill="#ff8200" d="M0 0h212.9v480H0z"/><path fill="#fff" d="M212.9 0h214v480h-214z"/></g></svg>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg xmlns="http://www.w3.org/2000/svg" version="1.1" width="450" height="300" id="Flag_of_Cote_dIvoire">
+ <rect width="450" height="300" fill="#ffffff"/>
+ <rect width="150" height="300" fill="#f77f00"/>
+ <rect width="150" height="300" x="300" fill="#009e60"/>
+</svg>

@@ -275,11 +275,210 @@
     'gb|r-gb-nir|Northern Ireland|',
     'gb|r-gb-sct|Scotland|',
     'gb|r-gb-wls|Wales|',
+    // world regions (Wikimedia Commons, rendered to PNG)
+    'es|r-es-andalusia|Andalusia|andalucia',
+    'es|r-es-aragon|Aragon|',
+    'es|r-es-asturias|Asturias|',
+    'es|r-es-balearic-islands|Balearic Islands|balearics,baleares',
+    'es|r-es-canary-islands|Canary Islands|canaries,canarias',
+    'es|r-es-cantabria|Cantabria|',
+    'es|r-es-castile-and-leon|Castile and Leon|castilla y leon,castile leon',
+    'es|r-es-castilla-la-mancha|Castilla-La Mancha|castile la mancha',
+    'es|r-es-catalonia|Catalonia|catalunya,cataluna',
+    'es|r-es-valencia|Valencia|valencian community,comunitat valenciana',
+    'es|r-es-extremadura|Extremadura|',
+    'es|r-es-galicia|Galicia|',
+    'es|r-es-madrid|Madrid|community of madrid',
+    'es|r-es-murcia|Murcia|region of murcia',
+    'es|r-es-navarre|Navarre|navarra',
+    'es|r-es-basque-country|Basque Country|pais vasco,euskadi',
+    'es|r-es-la-rioja|La Rioja|rioja',
+    'es|r-es-ceuta|Ceuta|',
+    'es|r-es-melilla|Melilla|',
+    'fr|r-fr-auvergne-rhone-alpes|Auvergne-Rhone-Alpes|auvergne rhone alpes',
+    'fr|r-fr-bourgogne-franche-comte|Bourgogne-Franche-Comte|burgundy franche comte',
+    'fr|r-fr-brittany|Brittany|bretagne',
+    'fr|r-fr-centre-val-de-loire|Centre-Val de Loire|centre val de loire',
+    'fr|r-fr-corsica|Corsica|corse',
+    'fr|r-fr-grand-est|Grand Est|alsace',
+    'fr|r-fr-hauts-de-france|Hauts-de-France|hauts de france',
+    'fr|r-fr-ile-de-france|Ile-de-France|ile de france,paris region',
+    'fr|r-fr-normandy|Normandy|normandie',
+    'fr|r-fr-nouvelle-aquitaine|Nouvelle-Aquitaine|nouvelle aquitaine,aquitaine',
+    'fr|r-fr-occitanie|Occitanie|occitania',
+    'fr|r-fr-pays-de-la-loire|Pays de la Loire|',
+    'fr|r-fr-provence-alpes-cote-d-azur|Provence-Alpes-Cote d\'Azur|paca,provence',
+    'de|r-de-baden-wurttemberg|Baden-Wurttemberg|baden wurttemberg,baden-wuerttemberg',
+    'de|r-de-bavaria|Bavaria|bayern',
+    'de|r-de-berlin|Berlin|',
+    'de|r-de-brandenburg|Brandenburg|',
+    'de|r-de-bremen|Bremen|',
+    'de|r-de-hamburg|Hamburg|',
+    'de|r-de-hesse|Hesse|hessen',
+    'de|r-de-mecklenburg-vorpommern|Mecklenburg-Vorpommern|mecklenburg western pomerania',
+    'de|r-de-lower-saxony|Lower Saxony|niedersachsen',
+    'de|r-de-north-rhine-westphalia|North Rhine-Westphalia|nordrhein westfalen,nrw',
+    'de|r-de-rhineland-palatinate|Rhineland-Palatinate|rheinland pfalz',
+    'de|r-de-saarland|Saarland|',
+    'de|r-de-saxony|Saxony|sachsen',
+    'de|r-de-saxony-anhalt|Saxony-Anhalt|sachsen anhalt',
+    'de|r-de-schleswig-holstein|Schleswig-Holstein|',
+    'de|r-de-thuringia|Thuringia|thuringen,thueringen',
+    'it|r-it-abruzzo|Abruzzo|',
+    'it|r-it-aosta-valley|Aosta Valley|valle d aosta',
+    'it|r-it-basilicata|Basilicata|',
+    'it|r-it-calabria|Calabria|',
+    'it|r-it-campania|Campania|',
+    'it|r-it-emilia-romagna|Emilia-Romagna|emilia romagna',
+    'it|r-it-friuli-venezia-giulia|Friuli-Venezia Giulia|friuli venezia giulia,friuli',
+    'it|r-it-lazio|Lazio|latium',
+    'it|r-it-liguria|Liguria|',
+    'it|r-it-lombardy|Lombardy|lombardia',
+    'it|r-it-marche|Marche|',
+    'it|r-it-molise|Molise|',
+    'it|r-it-piedmont|Piedmont|piemonte',
+    'it|r-it-apulia|Apulia|puglia',
+    'it|r-it-sardinia|Sardinia|sardegna',
+    'it|r-it-sicily|Sicily|sicilia',
+    'it|r-it-trentino-south-tyrol|Trentino-South Tyrol|trentino alto adige,south tyrol',
+    'it|r-it-tuscany|Tuscany|toscana',
+    'it|r-it-umbria|Umbria|',
+    'it|r-it-veneto|Veneto|',
+    'nl|r-nl-drenthe|Drenthe|',
+    'nl|r-nl-flevoland|Flevoland|',
+    'nl|r-nl-friesland|Friesland|fryslan',
+    'nl|r-nl-gelderland|Gelderland|',
+    'nl|r-nl-groningen|Groningen|',
+    'nl|r-nl-limburg|Limburg|',
+    'nl|r-nl-north-brabant|North Brabant|noord brabant',
+    'nl|r-nl-north-holland|North Holland|noord holland',
+    'nl|r-nl-overijssel|Overijssel|',
+    'nl|r-nl-south-holland|South Holland|zuid holland',
+    'nl|r-nl-utrecht|Utrecht|',
+    'nl|r-nl-zeeland|Zeeland|',
+    'be|r-be-flanders|Flanders|vlaanderen',
+    'be|r-be-wallonia|Wallonia|wallonie',
+    'be|r-be-brussels|Brussels|brussels capital region',
+    'be|r-be-german-speaking-community|German-speaking Community|east belgium',
+    'ch|r-ch-zurich|Zurich|zuerich',
+    'ch|r-ch-bern|Bern|berne',
+    'ch|r-ch-lucerne|Lucerne|luzern',
+    'ch|r-ch-uri|Uri|',
+    'ch|r-ch-schwyz|Schwyz|',
+    'ch|r-ch-obwalden|Obwalden|',
+    'ch|r-ch-nidwalden|Nidwalden|',
+    'ch|r-ch-glarus|Glarus|',
+    'ch|r-ch-zug|Zug|',
+    'ch|r-ch-fribourg|Fribourg|freiburg',
+    'ch|r-ch-solothurn|Solothurn|',
+    'ch|r-ch-basel-stadt|Basel-Stadt|basel stadt,basel city',
+    'ch|r-ch-basel-landschaft|Basel-Landschaft|basel landschaft,basel country',
+    'ch|r-ch-schaffhausen|Schaffhausen|',
+    'ch|r-ch-appenzell-ausserrhoden|Appenzell Ausserrhoden|appenzell outer rhodes',
+    'ch|r-ch-appenzell-innerrhoden|Appenzell Innerrhoden|appenzell inner rhodes',
+    'ch|r-ch-st-gallen|St. Gallen|st gallen,saint gallen',
+    'ch|r-ch-graubunden|Graubunden|grisons,graubuenden',
+    'ch|r-ch-aargau|Aargau|',
+    'ch|r-ch-thurgau|Thurgau|',
+    'ch|r-ch-ticino|Ticino|tessin',
+    'ch|r-ch-vaud|Vaud|',
+    'ch|r-ch-valais|Valais|wallis',
+    'ch|r-ch-neuchatel|Neuchatel|neuenburg',
+    'ch|r-ch-geneva|Geneva|geneve,genf',
+    'ch|r-ch-jura|Jura|',
+    'at|r-at-vienna|Vienna|wien',
+    'at|r-at-lower-austria|Lower Austria|niederosterreich',
+    'at|r-at-upper-austria|Upper Austria|oberosterreich',
+    'at|r-at-salzburg|Salzburg|',
+    'at|r-at-tyrol|Tyrol|tirol',
+    'at|r-at-vorarlberg|Vorarlberg|',
+    'at|r-at-carinthia|Carinthia|karnten',
+    'at|r-at-styria|Styria|steiermark',
+    'at|r-at-burgenland|Burgenland|',
+    'au|r-au-new-south-wales|New South Wales|nsw',
+    'au|r-au-victoria|Victoria|',
+    'au|r-au-queensland|Queensland|',
+    'au|r-au-south-australia|South Australia|',
+    'au|r-au-western-australia|Western Australia|',
+    'au|r-au-tasmania|Tasmania|',
+    'au|r-au-northern-territory|Northern Territory|',
+    'au|r-au-australian-capital-territory|Australian Capital Territory|act,canberra',
+    'br|r-br-acre|Acre|',
+    'br|r-br-alagoas|Alagoas|',
+    'br|r-br-amapa|Amapa|',
+    'br|r-br-amazonas|Amazonas|',
+    'br|r-br-bahia|Bahia|',
+    'br|r-br-ceara|Ceara|',
+    'br|r-br-federal-district|Federal District|distrito federal,brasilia',
+    'br|r-br-espirito-santo|Espirito Santo|',
+    'br|r-br-goias|Goias|',
+    'br|r-br-maranhao|Maranhao|',
+    'br|r-br-mato-grosso|Mato Grosso|',
+    'br|r-br-mato-grosso-do-sul|Mato Grosso do Sul|',
+    'br|r-br-minas-gerais|Minas Gerais|',
+    'br|r-br-para|Para|',
+    'br|r-br-paraiba|Paraiba|',
+    'br|r-br-parana|Parana|',
+    'br|r-br-pernambuco|Pernambuco|',
+    'br|r-br-piaui|Piaui|',
+    'br|r-br-rio-de-janeiro|Rio de Janeiro|',
+    'br|r-br-rio-grande-do-norte|Rio Grande do Norte|',
+    'br|r-br-rio-grande-do-sul|Rio Grande do Sul|',
+    'br|r-br-rondonia|Rondonia|',
+    'br|r-br-roraima|Roraima|',
+    'br|r-br-santa-catarina|Santa Catarina|',
+    'br|r-br-sao-paulo|Sao Paulo|',
+    'br|r-br-sergipe|Sergipe|',
+    'br|r-br-tocantins|Tocantins|',
+    'ar|r-ar-buenos-aires|Buenos Aires|',
+    'ar|r-ar-catamarca|Catamarca|',
+    'ar|r-ar-chaco|Chaco|',
+    'ar|r-ar-chubut|Chubut|',
+    'ar|r-ar-cordoba|Cordoba|',
+    'ar|r-ar-corrientes|Corrientes|',
+    'ar|r-ar-entre-rios|Entre Rios|',
+    'ar|r-ar-formosa|Formosa|',
+    'ar|r-ar-jujuy|Jujuy|',
+    'ar|r-ar-la-pampa|La Pampa|',
+    'ar|r-ar-la-rioja|La Rioja|',
+    'ar|r-ar-mendoza|Mendoza|',
+    'ar|r-ar-misiones|Misiones|',
+    'ar|r-ar-neuquen|Neuquen|',
+    'ar|r-ar-rio-negro|Rio Negro|',
+    'ar|r-ar-salta|Salta|',
+    'ar|r-ar-san-juan|San Juan|',
+    'ar|r-ar-san-luis|San Luis|',
+    'ar|r-ar-santa-cruz|Santa Cruz|',
+    'ar|r-ar-santa-fe|Santa Fe|',
+    'ar|r-ar-santiago-del-estero|Santiago del Estero|',
+    'ar|r-ar-tierra-del-fuego|Tierra del Fuego|',
+    'ar|r-ar-tucuman|Tucuman|',
+    'ie|r-ie-leinster|Leinster|',
+    'ie|r-ie-munster|Munster|',
+    'ie|r-ie-connacht|Connacht|',
+    'ie|r-ie-ulster|Ulster|',
+    'my|r-my-johor|Johor|',
+    'my|r-my-kedah|Kedah|',
+    'my|r-my-kelantan|Kelantan|',
+    'my|r-my-malacca|Malacca|melaka',
+    'my|r-my-negeri-sembilan|Negeri Sembilan|',
+    'my|r-my-pahang|Pahang|',
+    'my|r-my-penang|Penang|pulau pinang',
+    'my|r-my-perak|Perak|',
+    'my|r-my-perlis|Perlis|',
+    'my|r-my-sabah|Sabah|',
+    'my|r-my-sarawak|Sarawak|',
+    'my|r-my-selangor|Selangor|',
+    'my|r-my-terengganu|Terengganu|',
+    'my|r-my-kuala-lumpur|Kuala Lumpur|',
+    'my|r-my-labuan|Labuan|',
+    'my|r-my-putrajaya|Putrajaya|',
   ];
-  const GROUP_LABEL = { us: 'Which US state is this?', ca: 'Which Canadian province or territory?', gb: 'Which UK nation is this?' };
-  const GROUP_TYPE = { us: 'Type the US state', ca: 'Type the province or territory', gb: 'Type the UK nation' };
+  const GROUP_LABEL = { us: 'Which US state is this?', ca: 'Which Canadian province or territory?', gb: 'Which UK nation is this?', ar: 'Which Argentine province is this?', at: 'Which Austrian state is this?', au: 'Which Australian state or territory?', be: 'Which Belgian region is this?', br: 'Which Brazilian state is this?', ch: 'Which Swiss canton is this?', de: 'Which German state is this?', es: 'Which Spanish region is this?', fr: 'Which French region is this?', ie: 'Which Irish province is this?', it: 'Which Italian region is this?', my: 'Which Malaysian state is this?', nl: 'Which Dutch province is this?' };
+  const GROUP_TYPE = { us: 'Type the US state', ca: 'Type the province or territory', gb: 'Type the UK nation', ar: 'Type the Argentine province', at: 'Type the Austrian state', au: 'Type the state or territory', be: 'Type the Belgian region', br: 'Type the Brazilian state', ch: 'Type the Swiss canton', de: 'Type the German state', es: 'Type the Spanish region', fr: 'Type the French region', ie: 'Type the Irish province', it: 'Type the Italian region', my: 'Type the Malaysian state', nl: 'Type the Dutch province' };
   // Big regional files are stored as PNG instead of SVG to keep the app small.
-  const PNG = new Set('r-ca-pe r-us-ca r-us-ct r-us-de r-us-fl r-us-id r-us-il r-us-ks r-us-ky r-us-la r-us-ma r-us-me r-us-mi r-us-mn r-us-mo r-us-mt r-us-nd r-us-ne r-us-nh r-us-nj r-us-ok r-us-or r-us-pa r-us-sd r-us-ut r-us-va r-us-vt r-us-wa r-us-wi r-us-wv'.split(' '));
+  const PNG = new Set('ec rs do mx sv va sm r-ca-pe r-us-ca r-us-ct r-us-de r-us-fl r-us-id r-us-il r-us-ks r-us-ky r-us-la r-us-ma r-us-me r-us-mi r-us-mn r-us-mo r-us-mt r-us-nd r-us-ne r-us-nh r-us-nj r-us-ok r-us-or r-us-pa r-us-sd r-us-ut r-us-va r-us-vt r-us-wa r-us-wi r-us-wv'.split(' '));
+  const WORLD = /^r-(?!us-|ca-|gb-)/;
   const parse = (r, region) => { const p = r.split('|'); return region ? { region: true, group: p[0], tier: 2, code: p[1], name: p[2], alias: p[3] ? p[3].split(',') : [] } : { region: false, tier: +p[0], code: p[1], name: p[2], alias: p[3] ? p[3].split(',') : [] }; };
   const COUNTRIES = RAW.map(r => parse(r, false));
   const REGIONS = RAW_REGIONS.map(r => parse(r, true));
@@ -329,7 +528,7 @@
       e = imgs[code] = { img: new Image(), ok: false, bad: false };
       e.img.onload = () => { e.ok = true; };
       e.img.onerror = () => { e.bad = true; };
-      e.img.src = DIR + code + (PNG.has(code) ? '.png' : '.svg');
+      e.img.src = DIR + code + (PNG.has(code) || WORLD.test(code) ? '.png' : '.svg');
     }
     return e;
   }
@@ -356,7 +555,9 @@
     if (asRegion) {
       let pool = REGIONS.filter(c => !seen.includes(c.code));
       if (!pool.length) pool = REGIONS.slice();
-      const target = pickFrom(pool);
+      const gs = [...new Set(pool.map(c => c.group))];            // pick a country first so every country gets a fair share
+      const gp = pickFrom(gs);
+      const target = pickFrom(pool.filter(c => c.group === gp));
       // wrong answers come from the same group (states with states), topped up from the others
       const same = shuffle(REGIONS.filter(c => c.group === target.group && c.code !== target.code).map(c => c.code));
       const rest = shuffle(REGIONS.filter(c => c.group !== target.group).map(c => c.code));
@@ -533,11 +734,16 @@
       });
 
       // ---------- drawing ----------
-      function drawFlag(code, x, y, fw, fh, alpha, scale, col) {
-        const e = flagImg(code), rad = Math.max(8, fw * 0.045);
+      function drawFlag(code, bx, by, bw, bh, alpha, scale, col) {
+        const e = flagImg(code);
+        // natural aspect ratio, contain-fit inside the box and centred (never stretched)
+        let iw = e.ok ? (e.img.naturalWidth || 0) : 0, ih = e.ok ? (e.img.naturalHeight || 0) : 0;
+        if (!(iw > 0 && ih > 0)) { iw = 3; ih = 2; }
+        if (!e.ok) { iw = 4; ih = 3; }
+        const k = Math.min(bw / iw, bh / ih), fw = iw * k, fh = ih * k, rad = Math.max(6, Math.min(fw, fh) * 0.05);
         ctx.save();
         ctx.globalAlpha = alpha;
-        ctx.translate(x + fw / 2, y + fh / 2); ctx.scale(scale, scale); ctx.translate(-fw / 2, -fh / 2);
+        ctx.translate(bx + bw / 2, by + bh / 2); ctx.scale(scale, scale); ctx.translate(-fw / 2, -fh / 2);
         ctx.shadowColor = col.dark ? 'rgba(0,0,0,0.5)' : 'rgba(40,30,20,0.22)'; ctx.shadowBlur = 16; ctx.shadowOffsetY = 5;
         D.roundRect(ctx, 0, 0, fw, fh, rad); ctx.fillStyle = col.surface2 || '#ddd'; ctx.fill();
         ctx.shadowColor = 'transparent';
@@ -552,7 +758,7 @@
         }
         ctx.restore();
         D.roundRect(ctx, 0.5, 0.5, fw - 1, fh - 1, rad);
-        ctx.strokeStyle = col.dark ? 'rgba(255,255,255,0.14)' : 'rgba(0,0,0,0.14)'; ctx.lineWidth = 1; ctx.stroke();
+        ctx.strokeStyle = col.dark ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.16)'; ctx.lineWidth = 1; ctx.stroke();
         ctx.restore();
       }
 

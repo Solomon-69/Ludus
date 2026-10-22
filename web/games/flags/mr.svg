@@ -1,1 +1,14 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="640" height="480" viewBox="0 0 640 480"><path fill="#cd2a3e" d="M0 0h640v480H0z"/><path fill="#006233" d="M0 72h640v336H0z"/><path fill="#ffc400" d="M470 154.6a150 150 0 0 1-300 0 155 155 0 0 0-5 39.2 155 155 0 1 0 310 0 154 154 0 0 0-5-39.2" class="mr-st1"/><path fill="#ffc400" d="m320 93.8-13.5 41.5H263l35.3 25.6-13.5 41.4 35.3-25.6 35.3 25.6-13.5-41.4 35.3-25.6h-43.6z"/></svg>
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="900" height="600" viewBox="-72 -28 144 96">
+	<rect x="-72" y="-28" width="144" height="96" fill="#006233"/>
+	<circle cy="8" r="31" fill="#ffc400"/>
+	<circle r="30" fill="#006233"/>
+	<g id="c">
+		<path id="t" d="M 0,-12 v 12 h 6" transform="rotate(18 0,-12)" fill="#ffc400"/>
+		<use xlink:href="#t" transform="scale(-1,1)"/>
+	</g>
+	<use xlink:href="#c" transform="rotate(72)"/>
+	<use xlink:href="#c" transform="rotate(144)"/>
+	<use xlink:href="#c" transform="rotate(216)"/>
+	<use xlink:href="#c" transform="rotate(288)"/>
+</svg>
