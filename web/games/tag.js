@@ -246,14 +246,16 @@
         const place = (gr, gi, x0, yy) => gr.opts.forEach((o, k) => chips.push({ x: x0 + 72 + k * (gr.cw + 8), y: yy, w: gr.cw, h: 28, text: o, key: gr.key, val: k, glabel: k === 0 ? gr.label : null, gx: x0 }));
         if (one) { const tw = gw(groups[0]) + gw(groups[1]) + 28, x0 = (w - tw) / 2; place(groups[0], 0, x0, y); place(groups[1], 1, x0 + gw(groups[0]) + 28, y); y += 28; }
         else { place(groups[0], 0, (w - gw(groups[0])) / 2, y); place(groups[1], 1, (w - gw(groups[1])) / 2, y + 36); y += 64; }
-        const top = y + 16, availH = h - top - 12, availW = w - pad * 2, n = MAPS.length + 1, gap = 12;
-        let best = null; [3, 4, 5].forEach(gc => {
+        const top = y + 22, availH = h - top - 16, availW = w - pad * 4, n = MAPS.length + 1, gap = 18, LAB = 54;
+        // Eight scenes plus Random make nine tiles: a 3 x 3 grid unless it would make the tiles much smaller.
+        const fit = gc => {
           const gr = Math.ceil(n / gc);
-          let tw = (availW - (gc - 1) * gap) / gc, th = (availH - (gr - 1) * gap) / gr;
-          tw = Math.min(tw, (th - 46) * 2 + 12, 230); th = (tw - 12) / 2 + 46;
-          if (!best || tw > best.tw) best = { gc, gr, tw, th };
-        });
-        const { gc, gr, tw, th } = best, tiles = [], gy = top + Math.max(0, (availH - (gr * th + (gr - 1) * gap)) * 0.3);
+          let tw = (availW - (gc - 1) * gap) / gc; const th0 = (availH - (gr - 1) * gap) / gr;
+          tw = Math.min(tw, (th0 - LAB) * 2 + 12, 260); return { gc, gr, tw, th: (tw - 12) / 2 + LAB };
+        };
+        const opts = [3, 4, 5].map(fit), widest = opts.reduce((a, b) => (b.tw > a.tw ? b : a));
+        const best = opts[0].tw >= widest.tw * 0.8 ? opts[0] : widest;
+        const { gc, gr, tw, th } = best, tiles = [], gy = top + Math.max(0, (availH - (gr * th + (gr - 1) * gap)) * 0.5);
         for (let i = 0; i < n; i++) {
           const r = Math.floor(i / gc), inRow = Math.min(gc, n - r * gc), k = i - r * gc;
           const x0 = (w - (inRow * tw + (inRow - 1) * gap)) / 2;
@@ -331,8 +333,8 @@
             D.spark(ctx, 6 + tw / 2, 6 + th / 2, th * 0.3, '#fffaf3', api.reduceMotion ? 0 : clock);
           }
           const name = t.map >= 0 ? MAPS[t.map].name : 'Random', note = t.map >= 0 ? MAPS[t.map].note : 'New map each round';
-          D.text(ctx, name, t.w / 2, th + 21, Math.min(13, t.w / 8.5), col.ink, 750);
-          D.text(ctx, note, t.w / 2, th + 37, Math.min(10.5, t.w / 10.5), col.ink2, 600);
+          D.text(ctx, name, t.w / 2, th + 25, Math.min(13.5, t.w / 8.5), col.ink, 750);
+          D.text(ctx, note, t.w / 2, th + 43, Math.min(11, t.w / 10.5), col.ink2, 600);
           if (sel.map === t.map && !foc) { ctx.fillStyle = col.accent; ctx.beginPath(); ctx.arc(t.w - 12, 13, 4, 0, 7); ctx.fill(); }
           ctx.restore();
         });
