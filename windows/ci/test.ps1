@@ -1,4 +1,4 @@
-# Automated Windows test for Ludus: start it, check the 33 games load in WebView2, the panel opens on
+# Automated Windows test for Ludus: start it, check every game loads in WebView2, the panel opens on
 # All games above the tray, a wide game turns the panel landscape, the invisible icon + Ctrl+Alt+G work,
 # then quit. Screenshots go to $Shots.
 param([string]$Exe = 'out/Ludus/Ludus.exe', [string]$Shots = 'shots')
@@ -18,7 +18,7 @@ $r = Get-Content $json -Raw | ConvertFrom-Json
 Write-Host ($r | ConvertTo-Json -Depth 5)
 Check (-not $p.HasExited) 'process alive'
 Check $r.ready 'WebView2 loaded the games page'
-Check ($r.cards -eq 33) "33 game cards on the page (found $($r.cards))"
+Check (($r.cards -ge 33) -and ($r.cards -eq [int]$r.games)) "every game has a card (cards $($r.cards), games $($r.games))"
 Check ($r.filter -eq 'All') "opens on All games (tab: $($r.filter))"
 Check $r.panelVisible 'panel opened (--test-open)'
 Check ($null -ne $r.tray) 'tray icon has a position on screen'
