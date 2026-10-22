@@ -36,7 +36,7 @@ jobs:
     name: Mac app
     runs-on: macos-latest
     env:
-      LUDUS_OUT: ${{ runner.temp }}/ludus-build
+      LUDUS_OUT: /tmp/ludus-build
       HAS_SIGNING: ${{ secrets.MACOS_CERT_P12 != '' && secrets.MACOS_CERT_PASSWORD != '' && secrets.MACOS_SIGN_IDENTITY != '' }}
       HAS_NOTARY: ${{ secrets.NOTARY_APPLE_ID != '' && secrets.NOTARY_TEAM_ID != '' && secrets.NOTARY_PASSWORD != '' }}
     steps:
