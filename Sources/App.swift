@@ -44,7 +44,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
 
         setUpWebView()
         let controller = NSViewController()
-        controller.view = webView
+        // The page sits in a clipping container so a size change can animate the panel's outline
+        // without re-laying out the page on every frame (that is what made it judder).
+        let container = NSView(frame: webView.frame)
+        container.wantsLayer = true
+        container.layer?.masksToBounds = true
+        webView.autoresizingMask = [.width, .height]
+        container.addSubview(webView)
+        controller.view = container
         controller.preferredContentSize = currentSize()
         popover.contentViewController = controller
         popover.behavior = .applicationDefined
@@ -172,36 +179,95 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
     /// reflow on every frame and flicker. The page lays out once at the new size instead.
     private var resizeTimer: Timer?
 
-    /// Animated (Compact/Large switch): the panel grows or shrinks smoothly from the arrow, about a third
-    /// of a second with a soft ease-out. Not animated (wide games, opening): straight to the new size, so
-    /// games lay out once at their final size.
+    /// Animated (Compact/Large switch): the panel grows or shrinks smoothly under the arrow while its
+    /// contents fade out and back in at the new layout. Not animated (wide games, opening): straight to
+    /// the new size, so games lay out once at their final size.
     private func resizePopover(animated: Bool = false) {
         let target = currentSize()
-        resizeTimer?.invalidate(); resizeTimer = nil
+        if resizeTimer != nil { finishResize() }
         guard popover.isShown else { popover.contentViewController?.preferredContentSize = target; return }
-        popover.animates = false
         let start = popover.contentSize
         let calm = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
         guard animated, !calm, start != target, start.width > 0 else {
+            popover.animates = false
             setPanelSize(target)
             DispatchQueue.main.async { [weak self] in self?.popover.animates = true }
             return
         }
-        let duration: TimeInterval = 0.38
-        let began = CACurrentMediaTime()
-        let timer = Timer(timeInterval: 1.0 / 120.0, repeats: true) { [weak self] t in
-            guard let self else { t.invalidate(); return }
-            let p = min(1, (CACurrentMediaTime() - began) / duration)
-            let e = 1 - pow(1 - p, 4)   // ease-out quart: quick start, gentle landing
-            self.setPanelSize(NSSize(width: (start.width + (target.width - start.width) * e).rounded(),
-                                     height: (start.height + (target.height - start.height) * e).rounded()))
-            if p >= 1 {
-                t.invalidate(); self.resizeTimer = nil
-                DispatchQueue.main.async { [weak self] in self?.popover.animates = true }
+        // The page keeps its current layout (centred, top pinned) and fades out while the panel's outline
+        // grows or shrinks smoothly; it re-lays out once, unseen, and fades back in at the new size. (A
+        // web page can't redraw fast enough to follow a resizing panel frame by frame without tearing.)
+        let page = start
+        webView.autoresizingMask = []   // placed by hand each frame
+        if let container = popover.contentViewController?.view { placePage(page, in: container) }
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = 0.14
+            ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            webView.animator().alphaValue = 0
+        }
+        popover.animates = false
+        guard let window = popover.contentViewController?.view.window else { setPanelSize(target); finishResize(); return }
+        // Driven frame by frame on the panel's own window (macOS animates a popover shrinking but not
+        // growing, and per-frame popover resizes only reach the screen at the end). The window keeps its
+        // top edge and centre line, so the panel grows and shrinks evenly under the arrow.
+        let from = window.frame
+        let chrome = NSSize(width: from.width - start.width, height: from.height - start.height)
+        let top = from.maxY, mid = from.midX
+        let duration: TimeInterval = 0.42
+        let run = { [weak self] in
+            guard let self else { return }
+            let began = CACurrentMediaTime()
+            let timer = Timer(timeInterval: 1.0 / 120.0, repeats: true) { [weak self] t in
+                guard let self else { t.invalidate(); return }
+                let p = min(1, (CACurrentMediaTime() - began) / duration)
+                let e = 1 - pow(1 - p, 4)   // ease-out quart: quick start, long soft landing
+                let cw = (start.width + (target.width - start.width) * e).rounded()
+                let ch = (start.height + (target.height - start.height) * e).rounded()
+                let w = cw + chrome.width, h = ch + chrome.height
+                window.setFrame(NSRect(x: (mid - w / 2).rounded(), y: top - h, width: w, height: h), display: false)
+                // The popover doesn't re-lay out its content during a manual window resize: size the
+                // container and place the page (centred, top pinned) by hand, then draw once.
+                if let container = self.popover.contentViewController?.view {
+                    container.setFrameSize(NSSize(width: cw, height: ch))
+                    self.placePage(page, in: container)
+                }
+                window.display()
+                if p >= 1 {
+                    // Hand the final size back to the popover (already on screen) in one screen update.
+                    window.disableScreenUpdatesUntilFlush()
+                    self.setPanelSize(target)
+                    self.finishResize()
+                }
+            }
+            RunLoop.main.add(timer, forMode: .common)
+            self.resizeTimer = timer
+        }
+        run()
+    }
+
+    /// The page centred in the container with its top edge on the container's top edge.
+    private func placePage(_ page: NSSize, in container: NSView) {
+        let b = container.bounds
+        webView.frame = NSRect(x: ((b.width - page.width) / 2).rounded(),
+                               y: container.isFlipped ? 0 : b.height - page.height,
+                               width: page.width, height: page.height)
+    }
+
+    private func finishResize() {
+        resizeTimer?.invalidate(); resizeTimer = nil
+        DispatchQueue.main.async { [weak self] in self?.popover.animates = true }
+        let full = NSRect(origin: .zero, size: popover.contentViewController?.view.bounds.size ?? popover.contentSize)
+        if webView.frame != full { webView.frame = full }
+        webView.autoresizingMask = [.width, .height]
+        // Fade the page back in once it has drawn at the new size.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.03) { [weak self] in
+            guard let self, self.resizeTimer == nil else { return }
+            NSAnimationContext.runAnimationGroup { ctx in
+                ctx.duration = 0.22
+                ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                self.webView.animator().alphaValue = 1
             }
         }
-        RunLoop.main.add(timer, forMode: .common)
-        resizeTimer = timer
     }
 
     private func setPanelSize(_ size: NSSize) {
