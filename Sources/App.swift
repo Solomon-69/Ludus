@@ -1,4 +1,5 @@
 import AppKit
+import QuartzCore
 import ServiceManagement
 import WebKit
 
@@ -131,7 +132,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
             }
         case "size":
             UserDefaults.standard.set(body["size"] as? String ?? "compact", forKey: sizeKey)
-            resizePopover()
+            resizePopover(animated: true)
         case "wide":
             let on = body["on"] as? Bool ?? false
             if on != wide { wide = on; resizePopover() }
@@ -169,13 +170,43 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
 
     /// Compact <-> Large without the popover's own resize animation, which made the web page
     /// reflow on every frame and flicker. The page lays out once at the new size instead.
-    private func resizePopover() {
-        let size = currentSize()
-        guard popover.isShown else { popover.contentViewController?.preferredContentSize = size; return }
+    private var resizeTimer: Timer?
+
+    /// Animated (Compact/Large switch): the panel grows or shrinks smoothly from the arrow, about a third
+    /// of a second with a soft ease-out. Not animated (wide games, opening): straight to the new size, so
+    /// games lay out once at their final size.
+    private func resizePopover(animated: Bool = false) {
+        let target = currentSize()
+        resizeTimer?.invalidate(); resizeTimer = nil
+        guard popover.isShown else { popover.contentViewController?.preferredContentSize = target; return }
         popover.animates = false
+        let start = popover.contentSize
+        let calm = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        guard animated, !calm, start != target, start.width > 0 else {
+            setPanelSize(target)
+            DispatchQueue.main.async { [weak self] in self?.popover.animates = true }
+            return
+        }
+        let duration: TimeInterval = 0.38
+        let began = CACurrentMediaTime()
+        let timer = Timer(timeInterval: 1.0 / 120.0, repeats: true) { [weak self] t in
+            guard let self else { t.invalidate(); return }
+            let p = min(1, (CACurrentMediaTime() - began) / duration)
+            let e = 1 - pow(1 - p, 4)   // ease-out quart: quick start, gentle landing
+            self.setPanelSize(NSSize(width: (start.width + (target.width - start.width) * e).rounded(),
+                                     height: (start.height + (target.height - start.height) * e).rounded()))
+            if p >= 1 {
+                t.invalidate(); self.resizeTimer = nil
+                DispatchQueue.main.async { [weak self] in self?.popover.animates = true }
+            }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        resizeTimer = timer
+    }
+
+    private func setPanelSize(_ size: NSSize) {
         popover.contentViewController?.preferredContentSize = size
         popover.contentSize = size
-        DispatchQueue.main.async { [weak self] in self?.popover.animates = true }
     }
 
     private func applyThemeAppearance() {
