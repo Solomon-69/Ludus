@@ -3,6 +3,12 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## Unreleased
+
+- **Play online (opt-in):** create a room, share the 5 character code and play Connect Four, Dots and Boxes,
+  Ultimate Tic-Tac-Toe, Hex, Quoridor, Rock Paper Scissors, Dead Centre or Last Wire with someone in another
+  place. Nothing is sent unless you use it. See `web/ONLINE.md`.
+
 ## 1.5
 
 - **Saves and resume:** close the panel mid-game and pick up exactly where you left off.

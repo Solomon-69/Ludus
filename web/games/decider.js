@@ -101,7 +101,8 @@
   }
 
   Ludus.register({
-    id: 'decider', name: 'Rock Paper Scissors', aka: 'The Decider', tag: 'Duel', tint: PINK, versus: true,
+    id: 'decider', name: 'Rock Paper Scissors', aka: 'The Decider', tag: 'Duel', tint: PINK, versus: true, online: { min: 2, max: 2 },
+    onlineHint: 'Pick with <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd>, <kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> or a click. Picks are secret until both players have locked in. First to 3',
     hint: 'Pick with <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd>, <kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> or a click. Rock beats scissors, scissors beat paper, paper beats rock. First to 3. vs Friend: secret picks, Player 1 <kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>, Player 2 <kbd>J</kbd><kbd>K</kbd><kbd>L</kbd>',
     _rules: { makeBrain, outcome, BEATS, COUNTER },
     art(ctx, w, h) {
@@ -115,7 +116,16 @@
       const view = api.canvas();
       const { ctx } = view;
       const brain = makeBrain(api.level);
-      const friend = api.friend, nameOf = left => (left ? 'Player 1' : 'Player 2');
+      const friend = api.friend;
+      // Online: seat 0 is the left hand, seat 1 the right. Picks are secret: each screen first sends a fingerprint
+      // (SHA-256 of round, seat, pick and a random nonce) and only when both fingerprints are in does it send the pick
+      // itself. The other screen checks the pick against the fingerprint, so nobody can change their mind after seeing.
+      const on = api.online;
+      const mySeat = on ? on.seat : -1, otherSeat = on ? 1 - on.seat : -1;
+      const nameOf = left => (on && on.names[left ? 0 : 1]) || (left ? 'Player 1' : 'Player 2');
+      let rid = 0, own = null, theirs = { commit: '', pick: '' }, locked = [false, false];
+      const hexNonce = () => { const a = new Uint8Array(8); crypto.getRandomValues(a); return Array.from(a, x => x.toString(16).padStart(2, '0')).join(''); };
+      const fingerprint = (seat, k, n) => Ludus.net.sha256(rid + ':' + seat + ':' + k + ':' + n);
       let p1 = null, p2 = null;
       let clock = 0, matches = 0, round = 1;
       let pts = { you: 0, cpu: 0 };
@@ -125,7 +135,27 @@
       const log = [], history = [];
       api.score(0);
 
-      function newRound() { phase = 'pick'; phaseT = clock; lockT = friend ? clock : clock + api.rand(0.35, 0.7); you = cpu = null; p1 = p2 = null; }
+      function newRound() {
+        phase = 'pick'; phaseT = clock; lockT = friend ? clock : clock + api.rand(0.35, 0.7); you = cpu = null; p1 = p2 = null;
+        rid++; own = null; theirs = { commit: '', pick: '' }; locked = [false, false];
+      }
+      // online: lock my secret pick
+      function onlinePick(k) {
+        if (phase !== 'pick' || own) return;
+        const nonce = hexNonce();
+        own = { k, nonce, sent: false }; locked[mySeat] = true; api.sfx('tap');
+        on.send('commit', { r: rid, h: fingerprint(mySeat, k, nonce) });
+        stepOnline();
+      }
+      // both fingerprints in: show mine; both picks shown: reveal
+      function stepOnline() {
+        if (phase !== 'pick' || !own) return;
+        if (theirs.commit && !own.sent) { own.sent = true; on.send('reveal', { r: rid, k: own.k, n: own.nonce }); }
+        if (own.sent && theirs.pick) {
+          const mine = own.k, other = theirs.pick;
+          if (mySeat === 0) shakeOut(mine, other, -1); else shakeOut(other, mine, -1);
+        }
+      }
       // vs Friend: each player locks a secret pick; the hands show only when both are in
       function lockPick(first, k) {
         if (phase !== 'pick') return;
@@ -136,6 +166,7 @@
       }
       function choose(k) {
         if (phase !== 'pick') return;
+        if (on) { onlinePick(k); return; }
         if (friend) { lockPick(!p1, k); return; }
         lockT = Math.min(lockT, clock);
         shakeOut(k, brain.choose(), MOVES.indexOf(k));
@@ -201,6 +232,11 @@
       api.on(view.canvas, 'pointermove', e => { hover = hitBtn(e); view.canvas.style.cursor = hover >= 0 && phase === 'pick' ? 'pointer' : 'default'; });
       api.on(view.canvas, 'pointerleave', () => { hover = -1; });
       api.keys(e => {
+        if (on) {
+          const k = { 1: 'rock', 2: 'paper', 3: 'scissors', a: 'rock', s: 'paper', d: 'scissors', ArrowLeft: 'rock', ArrowDown: 'paper', ArrowUp: 'paper', ArrowRight: 'scissors' }[e.key.length === 1 ? e.key.toLowerCase() : e.key];
+          if (k) choose(k);
+          return;
+        }
         if (friend) {
           const key = e.key.toLowerCase();
           const a = { a: 'rock', s: 'paper', d: 'scissors', 1: 'rock', 2: 'paper', 3: 'scissors' }[key];
@@ -234,8 +270,8 @@
         if (shake > 0) ctx.translate(api.rand(-1, 1) * shake * 14, api.rand(-1, 1) * shake * 8);
         // header
         D.duelHeader(ctx, 8, 8, w - 16, {
-          left: friend ? { who: 'you', label: 'Player 1', pips: pts.you, of: TARGET } : { who: 'you', pips: pts.you, of: TARGET },
-          right: friend ? { who: 'p2', label: 'Player 2', pips: pts.cpu, of: TARGET } : { who: 'bot', pips: pts.cpu, of: TARGET },
+          left: friend ? { who: 'you', label: nameOf(true), pips: pts.you, of: TARGET } : { who: 'you', pips: pts.you, of: TARGET },
+          right: friend ? { who: 'p2', label: nameOf(false), pips: pts.cpu, of: TARGET } : { who: 'bot', pips: pts.cpu, of: TARGET },
           turn: friend ? null : phase === 'pick' ? (clock < lockT ? 'right' : 'left') : null,
           status: phase === 'done' ? (friend ? nameOf(pts.you >= TARGET) + ' wins' : 'Bot wins') : 'Round ' + round, thinking: !friend && phase === 'pick' && clock < lockT
         }, col);
@@ -262,7 +298,7 @@
           else if (shaking) drawHand(ctx, 'rock', 0, 0, r, c, col.ink, flip);
           else if (friend) {
             D.avatar(ctx, 0, 0, r * 0.62, i === 0 ? 'you' : 'p2', col);
-            if (i === 0 ? p1 : p2) lockBadge(r);
+            if (on ? locked[i] : (i === 0 ? p1 : p2)) lockBadge(r);
           }
           else if (i === 0) D.avatar(ctx, 0, 0, r * 0.62, 'you', col);
           else {
@@ -275,13 +311,14 @@
 
         // status line
         let msg = '';
-        if (phase === 'pick' && friend) msg = p1 ? 'Player 1 locked in. Player 2: J K L' : p2 ? 'Player 2 locked in. Player 1: A S D' : 'Secret picks: A S D  vs  J K L';
+        if (phase === 'pick' && on) msg = own ? (theirs.commit ? 'Both locked in' : 'Locked in. Waiting for ' + nameOf(otherSeat === 0)) : theirs.commit ? nameOf(otherSeat === 0) + ' locked in. Your pick' : 'Pick rock, paper or scissors';
+        else if (phase === 'pick' && friend) msg = p1 ? 'Player 1 locked in. Player 2: J K L' : p2 ? 'Player 2 locked in. Player 1: A S D' : 'Secret picks: A S D  vs  J K L';
         else if (phase === 'pick') msg = clock < lockT ? 'Bot is choosing' : 'Bot locked in. Your pick';
         else if (phase === 'shake') msg = ['Rock', 'Paper', 'Scissors'][Math.min(2, Math.floor(st / 0.32))] + '...';
         else if (phase === 'reveal' || phase === 'between' || phase === 'done') {
-          msg = result === 0 ? 'Same pick. No point' : result > 0 ? LABEL[you] + ' beats ' + LABEL[cpu] + (friend ? '. Player 1 point' : '. Your point') : LABEL[cpu] + ' beats ' + LABEL[you] + (friend ? '. Player 2 point' : '. Bot point');
+          msg = result === 0 ? 'Same pick. No point' : result > 0 ? LABEL[you] + ' beats ' + LABEL[cpu] + (friend ? '. ' + nameOf(true) + ' point' : '. Your point') : LABEL[cpu] + ' beats ' + LABEL[you] + (friend ? '. ' + nameOf(false) + ' point' : '. Bot point');
         }
-        D.text(ctx, msg, w / 2, ay + r * 1.05 + 24, 14, phase === 'reveal' && result > 0 ? col.accent : phase === 'reveal' && result < 0 && friend ? D.P2 : col.ink, 680);
+        D.fitText(ctx, msg, w / 2, ay + r * 1.05 + 24, w - 24, 14, phase === 'reveal' && result > 0 ? col.accent : phase === 'reveal' && result < 0 && friend ? D.P2 : col.ink, 680);
         // recent rounds
         log.forEach((g, i) => {
           const x = w / 2 + (i - (log.length - 1) / 2) * 26, y = ay + r * 1.05 + 48;
@@ -293,7 +330,7 @@
 
         // buttons
         L.btns.forEach((b, i) => {
-          const can = phase === 'pick';
+          const can = phase === 'pick' && !(on && own);
           const hov = can && hover === i;
           const pt = clock - pressT, press = pressed === i && pt < 0.25 ? 1 - Math.sin(pt / 0.25 * Math.PI) * 0.06 : 1;
           const chosen = you === b.m && phase !== 'pick' && !friend;
@@ -304,7 +341,7 @@
           ctx.strokeStyle = hov ? col.accent : col.line; ctx.lineWidth = hov ? 2 : 1; ctx.stroke();
           const ic = chosen ? '#fff8f2' : col.ink;
           drawHand(ctx, b.m, 0, -b.h * 0.12, b.h * 0.3, ic, chosen ? col.accent : col.surface2, false);
-          D.text(ctx, (friend ? 'ASD'[i] + ' ' + 'JKL'[i] : i + 1) + '  ' + LABEL[b.m], 0, b.h * 0.32, 11, chosen ? '#fff8f2' : col.ink2, 650);
+          D.text(ctx, (friend && !on ? 'ASD'[i] + ' ' + 'JKL'[i] : i + 1) + '  ' + LABEL[b.m], 0, b.h * 0.32, 11, chosen ? '#fff8f2' : col.ink2, 650);
           ctx.restore();
         });
 
@@ -341,6 +378,23 @@
       restore(api.saved);
 
       newRound();
+      // The other player's fingerprint and pick. A message from a round we have not reached yet waits.
+      if (on) on.queue((type, d, from) => {
+        if (type !== 'commit' && type !== 'reveal') return true;
+        if (!d || !Number.isInteger(d.r) || from !== otherSeat) return true;
+        if (d.r > rid) return false;
+        if (d.r < rid || phase !== 'pick') return true;
+        if (type === 'commit') {
+          if (typeof d.h !== 'string' || !/^[0-9a-f]{64}$/.test(d.h) || theirs.commit) return true;
+          theirs.commit = d.h; locked[otherSeat] = true; api.sfx('tap');
+        } else {
+          if (!MOVES.includes(d.k) || typeof d.n !== 'string' || d.n.length > 32 || !theirs.commit || theirs.pick) return true;
+          if (fingerprint(otherSeat, d.k, d.n) !== theirs.commit) return true;   // does not match what they locked in
+          theirs.pick = d.k;
+        }
+        stepOnline();
+        return true;
+      });
       api.loop(dt => {
         clock += dt;
         shake = Math.max(0, shake - dt);

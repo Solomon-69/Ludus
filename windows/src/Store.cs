@@ -18,6 +18,46 @@ internal static class Store
     private const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
     private const string RunValue = "Ludus";
 
+    // ---- Room invites (ludus://join/CODE) ----
+
+    private static string PendingJoinPath => Path.Combine(Folder, "pending-join.txt");
+
+    /// <summary>Makes ludus:// links open this Ludus (per user, HKCU, no admin needed). Safe to run on every start.</summary>
+    public static void RegisterUrlScheme()
+    {
+        try
+        {
+            var exe = Environment.ProcessPath;
+            if (string.IsNullOrEmpty(exe)) return;
+            using var root = Registry.CurrentUser.CreateSubKey(@"Software\Classes\ludus");
+            root.SetValue("", "URL:Ludus room invite");
+            root.SetValue("URL Protocol", "");
+            using var command = root.CreateSubKey(@"shell\open\command");
+            command.SetValue("", $"\"{exe}\" \"%1\"");
+        }
+        catch (Exception ex) { Log($"Could not register ludus:// links: {ex.Message}"); }
+    }
+
+    /// <summary>A second launch (a clicked invite link) leaves the room code here for the running Ludus to pick up.</summary>
+    public static void QueueJoin(string code)
+    {
+        try { Directory.CreateDirectory(Folder); File.WriteAllText(PendingJoinPath, code); }
+        catch (Exception ex) { Log($"Could not hand over the room code: {ex.Message}"); }
+    }
+
+    /// <summary>The queued room code (5 letters or digits), or null. Reading it removes it.</summary>
+    public static string? TakeJoin()
+    {
+        try
+        {
+            if (!File.Exists(PendingJoinPath)) return null;
+            var text = File.ReadAllText(PendingJoinPath).Trim().ToUpperInvariant();
+            File.Delete(PendingJoinPath);
+            return System.Text.RegularExpressions.Regex.IsMatch(text, "^[A-Z0-9]{5}$") ? text : null;
+        }
+        catch { return null; }
+    }
+
     // ---- Game state ----
 
     /// <summary>The saved state as a JSON object literal, or "null" when there is none or it is unreadable.</summary>

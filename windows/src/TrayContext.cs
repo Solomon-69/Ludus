@@ -83,7 +83,12 @@ internal sealed class TrayContext : ApplicationContext
     }
 
     /// <summary>Called by the second-instance signal: just open the panel.</summary>
-    public void OpenFromOutside() => Post(() => popup.ShowPopup(TrayCenter()));
+    public void OpenFromOutside() => Post(() =>
+    {
+        popup.ShowPopup(TrayCenter());
+        var code = Store.TakeJoin();   // a clicked ludus://join/CODE link: go straight to joining that room
+        if (code != null) popup.JoinRoom(code);
+    });
 
     /// <summary>Called by "Ludus.exe --quit".</summary>
     public void QuitFromOutside() => Post(() => { if (popup.Visible) popup.Quit(); else ExitApp(); });
@@ -171,6 +176,11 @@ internal sealed class TrayContext : ApplicationContext
         {
             popup.StayOpen = true;
             popup.ShowPopup(TrayCenter());
+        }
+        if (options.JoinCode != null)
+        {
+            popup.ShowPopup(TrayCenter());
+            popup.JoinRoom(options.JoinCode);
         }
         if (options.SelfTestPath == null) return;
         await Task.Delay(2500);

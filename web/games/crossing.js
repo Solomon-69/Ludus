@@ -98,7 +98,7 @@
   }
 
   Ludus.register({
-    id: 'crossing', name: 'Hex', aka: 'The Crossing', tag: 'Duel', tint: PURPLE, versus: true,
+    id: 'crossing', name: 'Hex', aka: 'The Crossing', tag: 'Duel', tint: PURPLE, versus: true, online: { min: 2, max: 2 },
     hint: 'Click a hex, or <kbd>←</kbd><kbd>↑</kbd><kbd>→</kbd><kbd>↓</kbd> + <kbd>Space</kbd>. Link your left and right edges with a chain. <kbd>S</kbd> steals the bot opening stone. vs Friend: take turns, Player 2 joins top to bottom, first to 3 games',
     _rules: { winPath, cpuConnects, swapBoard, winningCell, bridgeReply, makeSearch, N, YOU, CPU },
     art(ctx, w, h) {
@@ -117,7 +117,13 @@
       const D = Ludus.draw;
       const view = api.canvas();
       const { ctx } = view;
-      const friend = api.friend, nameOf = sd => (sd === YOU ? 'Player 1' : 'Player 2'), TARGET = 3;
+      const friend = api.friend, TARGET = 3;
+      // Online: seat 0 plays YOU (left to right), seat 1 plays CPU (top to bottom). Moves go out as 'stone' { i } and
+      // 'swap' {}; every screen applies the same move to the same board.
+      const on = api.online;
+      const mySide = on ? (on.seat === 0 ? YOU : CPU) : 0;
+      const mayAct = () => !on || turn === mySide;
+      const nameOf = sd => (on && on.names[sd === YOU ? 0 : 1]) || (sd === YOU ? 'Player 1' : 'Player 2');
       const wins = [0, 0, 0];
       let clock = 0, matches = 0, starter = YOU;
       let board, turn, moves, last, lastBy, swapped, winner, path, pathArr, winT, placeT, job, hover = -1, banner = null, parts = [], kc = 24, useKeys = false;
@@ -142,7 +148,7 @@
         return bi;
       }
       function stealBtn() { const G = geo(); return { x: G.w / 2 - 70, y: G.h - 46, w: 140, h: 34 }; }
-      const canSteal = () => !winner && (turn === YOU || friend) && moves === 1 && !swapped && board.some(v => v && v !== turn);
+      const canSteal = () => !winner && (turn === YOU || friend) && mayAct() && moves === 1 && !swapped && board.some(v => v && v !== turn);
 
       function place(i, s) {
         board[i] = s; moves++; last = i; lastBy[s] = i; placeT[i] = clock; api.sfx(s === YOU ? 'drop' : 'click');
@@ -228,19 +234,20 @@
 
       // ---------- input ----------
       function tryPlay(i) {
-        if (winner || (turn !== YOU && !friend) || job || i < 0 || board[i]) return;
+        if (winner || (turn !== YOU && !friend) || job || i < 0 || board[i] || !mayAct()) return;
+        if (on) on.send('stone', { i });
         place(i, turn);
       }
       api.on(view.canvas, 'pointerdown', e => {
         const rect = view.canvas.getBoundingClientRect(), x = e.clientX - rect.left, y = e.clientY - rect.top, b = stealBtn();
-        if (canSteal() && x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h) { doSwap(turn); return; }
+        if (canSteal() && x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h) { if (on) on.send('swap', {}); doSwap(turn); return; }
         tryPlay(cellAt(e));
       });
-      api.on(view.canvas, 'pointermove', e => { hover = cellAt(e); if (hover >= 0) useKeys = false; view.canvas.style.cursor = hover >= 0 && !board[hover] && (turn === YOU || friend) && !winner ? 'pointer' : 'default'; });
+      api.on(view.canvas, 'pointermove', e => { hover = cellAt(e); if (hover >= 0) useKeys = false; view.canvas.style.cursor = hover >= 0 && !board[hover] && (turn === YOU || friend) && mayAct() && !winner ? 'pointer' : 'default'; });
       api.on(view.canvas, 'pointerleave', () => { hover = -1; });
       api.keys(e => {
         const k = e.key;
-        if ((k === 's' || k === 'S') && canSteal()) { doSwap(turn); return; }
+        if ((k === 's' || k === 'S') && canSteal()) { if (on) on.send('swap', {}); doSwap(turn); return; }
         const d = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] }[k];
         if (d) { const r = Math.max(0, Math.min(N - 1, Math.floor(kc / N) + d[0])), c = Math.max(0, Math.min(N - 1, kc % N + d[1])); kc = r * N + c; useKeys = true; hover = -1; api.sfx('tick'); return; }
         if (k === ' ' || k === 'Enter') { useKeys = true; tryPlay(kc); }
@@ -313,15 +320,15 @@
         // header
         const yourTurn = turn === YOU && !winner, cpuTurn = turn === CPU && !winner;
         let msg;
-        if (friend) msg = winner ? nameOf(winner) + ' crossed' : canSteal() ? nameOf(turn) + ': steal it or play' : nameOf(turn) + (moves === 0 ? '\u2019s opening' : '\u2019s move');
+        if (friend) msg = winner ? nameOf(winner) + ' crossed' : canSteal() ? (on ? 'Steal it or play' : nameOf(turn) + ': steal it or play') : (on && turn === mySide ? (moves === 0 ? 'Your opening' : 'Your move') : nameOf(turn) + (moves === 0 ? '\u2019s opening' : '\u2019s move'));
         else if (winner) msg = winner === YOU ? 'You crossed' : 'Bot crossed';
         else if (cpuTurn) msg = 'Bot is thinking';
         else if (moves === 0) msg = 'Your opening';
         else if (canSteal()) msg = 'Steal it or play';
         else msg = 'Your move';
         D.duelHeader(ctx, 8, 8, w - 16, {
-          left: friend ? { who: 'you', label: 'Player 1 \u00b7 ' + wins[YOU], score: 'Left to right' } : { who: 'you', score: 'Left to right' },
-          right: friend ? { who: 'p2', label: wins[CPU] + ' \u00b7 Player 2', score: 'Top to bottom' } : { who: 'bot', score: 'Top to bottom' },
+          left: friend ? { who: 'you', label: nameOf(YOU) + ' \u00b7 ' + wins[YOU], score: 'Left to right' } : { who: 'you', score: 'Left to right' },
+          right: friend ? { who: 'p2', label: wins[CPU] + ' \u00b7 ' + nameOf(CPU), score: 'Top to bottom' } : { who: 'bot', score: 'Top to bottom' },
           turn: winner ? null : (yourTurn ? 'left' : 'right'), status: msg, thinking: cpuTurn && !friend
         }, col);
 
@@ -339,14 +346,14 @@
           hexPath(x, y, R - 1);
           ctx.fillStyle = col.dark ? '#3d3730' : '#efe6d8'; ctx.fill();
           ctx.strokeStyle = col.dark ? 'rgba(255,255,255,0.06)' : 'rgba(32,28,23,0.08)'; ctx.lineWidth = 1; ctx.stroke();
-          if (!v && (useKeys ? i === kc : i === hover) && (turn === YOU || friend) && !winner && !job) {
+          if (!v && (useKeys ? i === kc : i === hover) && (turn === YOU || friend) && mayAct() && !winner && !job) {
             hexPath(x, y, R * 0.62); ctx.fillStyle = turn === YOU ? col.accent : BOTC; ctx.globalAlpha = 0.3; ctx.fill(); ctx.globalAlpha = 1;
           }
           if (v) drawStone(i, x, y, v, R, col, BOTC);
         }
         [YOU, CPU].forEach(sd => { if (lastBy[sd] >= 0 && board[lastBy[sd]] === sd && !winner) pulseRing(G, lastBy[sd], sd === YOU ? col.accent : BOTC); });
         if (winner && pathArr) drawWinPath(G, winner === YOU ? col.accent : BOTC, col, BOTC);
-        if (useKeys && (turn === YOU || friend) && !winner) {
+        if (useKeys && (turn === YOU || friend) && mayAct() && !winner) {
           const r = Math.floor(kc / N), c = kc % N; hexPath(G.cx(r, c), G.cy(r), R - 1);
           ctx.strokeStyle = turn === YOU ? col.accent : BOTC; ctx.lineWidth = 2; ctx.stroke();
         }
@@ -392,6 +399,17 @@
       }
 
       if (!restore(api.saved)) newGame();
+      // The other player's moves. Waits while the last game's result is still on screen; ignores anything illegal.
+      if (on) on.queue((type, d, from) => {
+        if (type !== 'stone' && type !== 'swap') return true;
+        if (winner) return false;
+        const who = from === 0 ? YOU : CPU;
+        if (turn !== who) return true;
+        if (type === 'swap') { if (moves === 1 && !swapped && board.some(v => v && v !== who)) doSwap(who); return true; }
+        if (!d || !Number.isInteger(d.i) || d.i < 0 || d.i >= NN || board[d.i]) return true;
+        place(d.i, who);
+        return true;
+      });
       api.loop(dt => {
         clock += dt;
         stepJob();

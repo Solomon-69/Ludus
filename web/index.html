@@ -47,12 +47,17 @@
         <div class="vs-toggle" id="vsToggle" role="group" aria-label="Opponent" hidden>
           <button type="button" data-vs="bot">vs Bot</button>
           <button type="button" data-vs="friend">vs Friend</button>
+          <button type="button" data-vs="online" hidden>Online</button>
+        </div>
+        <div class="online-chip" id="onlineChip" role="status" hidden>
+          <i class="dot" aria-hidden="true"></i><span id="onlineState">Online</span><b id="onlineCode"></b>
         </div>
       </div>
       <div class="bar-right">
         <button class="icon-btn" id="orientBtn" aria-label="Switch between wide and tall" title="Wide or tall" hidden>
           <svg viewBox="0 0 24 24"><use href="#i-rotate"/></svg>
         </button>
+        <button class="btn leave-btn" id="leaveBtn" hidden>Leave</button>
         <button class="icon-btn" id="pauseBtn" aria-label="Pause">
           <svg viewBox="0 0 24 24"><use href="#i-pause"/></svg>
         </button>
@@ -67,6 +72,9 @@
           <button class="btn" id="restartBtn">Restart</button>
           <button class="btn ghost" id="quitBtn">All games</button>
         </div>
+      </div>
+      <div class="sheet lobby" id="lobbySheet" role="dialog" aria-modal="true" aria-label="Play online" hidden>
+        <div class="lobby-card" id="lobbyCard"></div>
       </div>
       <button class="over-peek" id="overPeek" hidden>Show result</button>
     </div>
@@ -108,6 +116,8 @@
 </svg>
 
 <script src="engine.js"></script>
+<script src="net.js"></script>
+<script src="lobby.js"></script>
 <script src="games/g2048.js"></script>
 <script src="games/blocks.js"></script>
 <script src="games/flappy.js"></script>

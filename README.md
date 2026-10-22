@@ -35,7 +35,7 @@ Ludus is a small panel of games that lives in the Mac menu bar (and the Windows 
 Click the controller, play a quick round, then click anywhere else. The panel tucks itself
 away and your game waits, paused, exactly where you left it.
 
-It is free, open source, works fully offline and collects nothing.
+It is free, open source, works fully offline by default and collects nothing. Playing a friend over the internet is an opt-in extra (see [Play online](#play-online-with-a-room-code)).
 
 ## Contents
 
@@ -76,6 +76,10 @@ Every board game has a <b>vs Bot / vs Friend</b> switch at the top. Pick Friend 
   <source media="(prefers-color-scheme: dark)" srcset="docs/showcase/ludus-3-dark.png">
   <img src="docs/showcase/ludus-3-light.png" width="880" alt="Space Invaders, Stack and Chomp side by side">
 </picture>
+
+### Play online with a room code
+
+Eight two-player games have an <b>Online</b> button next to vs Bot / vs Friend: Connect Four, Dots and Boxes, Ultimate Tic-Tac-Toe, Hex, Quoridor, Rock Paper Scissors, Dead Centre and Last Wire. One player taps <b>Create room</b> and gets a 5 character room code (with a <b>Copy invite</b> button that copies a message and a `ludus://join/CODE` link); the other taps <b>Join room</b> and types or pastes it, or just clicks the link. No account and no server of ours: the two copies of Ludus talk through a free public relay. Nothing is sent unless you use this. Anyone who knows the code can join, so it is not private. See [PRIVACY.md](PRIVACY.md) and [web/ONLINE.md](web/ONLINE.md).
 
 ### Arcade classics that feel right
 
@@ -136,7 +140,7 @@ Ludus follows your Mac's light or dark look, or you can choose one. Everything e
 
 
 **Also:** best scores and progress for every game stay on your Mac. There are no accounts, no
-ads and no analytics, and Ludus makes no network connections at all. It is one small native app,
+ads and no analytics, and Ludus makes no network connections unless you choose Play online. It is one small native app,
 and the games inside are plain HTML, CSS and JavaScript.
 
 
@@ -216,7 +220,8 @@ Open Settings with the gear in the top corner of the panel.
 ## Privacy
 
 Nothing leaves your Mac. Ludus has no accounts, no analytics, no ads and makes no network
-connections. Scores, saved games and settings are stored locally. The game pages run in a
+connections unless you press Play online (then only game moves and a random room code go through
+a public relay). Scores, saved games and settings are stored locally. The game pages run in a
 sandboxed web view that can only load files from inside the app. See [PRIVACY.md](PRIVACY.md).
 
 ## Requirements
@@ -252,7 +257,7 @@ everything, quit Ludus and run `defaults delete com.solomon.Ludus`.
 <details>
 <summary><b>Does Ludus use the internet?</b></summary>
 
-No. It never connects to anything. It works the same with Wi-Fi off.
+Not unless you ask it to. Every game works the same with Wi-Fi off. The only time Ludus goes online is when you choose <b>Play online</b> for one of the eight online games.
 </details>
 
 <details>

@@ -32,7 +32,8 @@
   };
 
   Ludus.register({
-    id: 'deadcentre', name: 'Dead Centre', tag: 'Duel', tint: TEAL, versus: true,
+    id: 'deadcentre', name: 'Dead Centre', tag: 'Duel', tint: TEAL, versus: true, online: { min: 2, max: 2 },
+    onlineHint: '<kbd>Space</kbd> or a click stops the needle on your turn. Closer to the line than your opponent wins the round. First to 3',
     hint: '<kbd>Space</kbd> or a click stops the needle on your turn. Closer to the line than the bot wins the round. First to 3. vs Friend: take turns, Space stops for whoever is up',
     _rules: { stepNeedle, cpuError, judge, modeOf },
     art(ctx, w, h) {
@@ -46,7 +47,14 @@
       const D = Ludus.draw;
       const view = api.canvas();
       const { ctx } = view;
-      const friend = api.friend, nameOf = k => (k === 'you' ? 'Player 1' : 'Player 2');
+      const friend = api.friend;
+      // Online: seat 0 is 'you' (left), seat 1 is 'cpu' (right). The line comes from the shared random stream so both
+      // screens see the same one. Each player stops their own needle and sends the spot as 'stop' { v }; the other screen
+      // shows the mark and the result. (The needle is only drawn for the player whose shot it is.)
+      const on = api.online;
+      const mySide = on ? (on.seat === 0 ? 'you' : 'cpu') : '';
+      const mayAct = () => !on || turn === mySide;
+      const nameOf = k => (on && on.names[k === 'you' ? 0 : 1]) || (k === 'you' ? 'Player 1' : 'Player 2');
       let clock = 0, matches = 0, roundNo = 1, starter = 'you';
       let pts = { you: 0, cpu: 0 }, shot = { you: -1, cpu: -1 }, landT = { you: -9, cpu: -9 };
       let target = 50, turn = 'you', phase = 'ready', phaseT = 0, roundRes = 0;
@@ -54,7 +62,7 @@
       let cpuAim = 50, cpuMinT = 0, prevPos = 0, glowT = -9, shake = 0, banner = null, parts = [];
       api.score(0);
 
-      const newTarget = () => Math.round((12 + Math.random() * 76) * 10) / 10;
+      const newTarget = () => Math.round((12 + (on ? on.rand() : Math.random()) * 76) * 10) / 10;
       let counted = false;
       function startRound() {
         counted = false; target = newTarget(); shot = { you: -1, cpu: -1 }; roundRes = 0;
@@ -69,9 +77,10 @@
           if (turn === 'cpu' && !friend) { cpuAim = Math.max(0.5, Math.min(99.5, target + cpuError(api.level, roundNo, Math.random))); cpuMinT = clock + api.rand(0.7, 1.5); }
         }, api.reduceMotion ? 250 : 550);
       }
-      function stopAt(who) {
+      function stopAt(who, fixed) {
         if (phase !== 'run' || turn !== who) return;
-        const v = Math.round(needle.pos * 10) / 10;
+        const v = fixed !== undefined ? fixed : Math.round(needle.pos * 10) / 10;
+        if (on && fixed === undefined) on.send('stop', { v });
         shot[who] = v; landT[who] = clock; phase = 'stopped'; api.sfx('drop');
         const off = Math.abs(v - target);
         if (off < 0.1) { glowT = clock; api.sfx('power'); burst(v); }
@@ -116,7 +125,7 @@
         return { w, h, bx, bw, bh, by, btn };
       }
       // vs Friend: Space, Enter or a click stops the needle for whoever is up
-      const stopper = () => (friend ? turn : 'you');
+      const stopper = () => (on ? mySide : friend ? turn : 'you');
       api.on(view.canvas, 'pointerdown', () => stopAt(stopper()));
       api.keys(e => { if (e.key === ' ' || e.key === 'Enter') stopAt(stopper()); });
 
@@ -135,8 +144,8 @@
         const mode = modeOf(roundNo), BOTC = friend ? D.P2 : '#c9cdd6';
         const going = phase === 'ready' || phase === 'run';
         D.duelHeader(ctx, 8, 8, w - 16, {
-          left: friend ? { who: 'you', label: 'Player 1', pips: pts.you, of: TARGET } : { who: 'you', pips: pts.you, of: TARGET },
-          right: friend ? { who: 'p2', label: 'Player 2', pips: pts.cpu, of: TARGET } : { who: 'bot', pips: pts.cpu, of: TARGET },
+          left: friend ? { who: 'you', label: nameOf('you'), pips: pts.you, of: TARGET } : { who: 'you', pips: pts.you, of: TARGET },
+          right: friend ? { who: 'p2', label: nameOf('cpu'), pips: pts.cpu, of: TARGET } : { who: 'bot', pips: pts.cpu, of: TARGET },
           turn: going ? (turn === 'you' ? 'left' : 'right') : null,
           status: phase === 'done' ? (friend ? nameOf(pts.you >= TARGET ? 'you' : 'cpu') + ' wins' : 'Bot wins') : 'Round ' + roundNo, thinking: going && turn === 'cpu' && !friend
         }, col);
@@ -168,7 +177,7 @@
           else D.avatar(ctx, X(shot[k]), by + bh + 14, 10, friend ? 'p2' : 'bot', col);
         });
         // needle
-        const live = phase === 'run' || phase === 'ready';
+        const live = (phase === 'run' || phase === 'ready') && mayAct();
         if (live) {
           ctx.globalAlpha = phase === 'ready' ? 0.35 : 1;
           ctx.fillStyle = '#fff'; ctx.shadowColor = 'rgba(255,255,255,0.7)'; ctx.shadowBlur = 10;
@@ -178,7 +187,7 @@
 
         // readouts
         const ry = by + bh + 34, cw = (bw - 10) / 2;
-        [['you', friend ? 'Player 1 off by' : 'You off by', col.accent, bx], ['cpu', friend ? 'Player 2 off by' : 'Bot off by', friend ? D.P2 : col.ink2, bx + cw + 10]].forEach(([k, label, c, x]) => {
+        [['you', friend ? nameOf('you') + ' off by' : 'You off by', col.accent, bx], ['cpu', friend ? nameOf('cpu') + ' off by' : 'Bot off by', friend ? D.P2 : col.ink2, bx + cw + 10]].forEach(([k, label, c, x]) => {
           const best = (phase === 'result' || phase === 'done') && ((roundRes > 0 && k === 'you') || (roundRes < 0 && k === 'cpu'));
           ctx.fillStyle = col.surface2; D.roundRect(ctx, x, ry, cw, 46, 12); ctx.fill();
           if (best || (turn === k && (phase === 'ready' || phase === 'run' || phase === 'stopped'))) { ctx.strokeStyle = best ? c : col.line; ctx.lineWidth = best ? 2 : 1.5; ctx.stroke(); }
@@ -200,15 +209,15 @@
           const o = shot.cpu >= 0 ? ' Beat ' + Math.abs(shot.cpu - target).toFixed(1) : '';
           msg = phase === 'ready' ? 'Your shot. Get ready' : 'Stop it on the line.' + o;
         } else msg = phase === 'stopped' ? 'Bot stopped' : 'Bot is aiming';
-        D.text(ctx, msg, w / 2, ry + 72, 14, phase === 'result' && roundRes > 0 ? col.accent : phase === 'result' && roundRes < 0 && friend ? D.P2 : col.ink, 680);
+        D.fitText(ctx, msg, w / 2, ry + 72, w - 24, 14, phase === 'result' && roundRes > 0 ? col.accent : phase === 'result' && roundRes < 0 && friend ? D.P2 : col.ink, 680);
 
         // stop button
-        const b = L.btn, can = (turn === 'you' || friend) && phase === 'run';
+        const b = L.btn, can = (turn === 'you' || friend) && mayAct() && phase === 'run';
         ctx.globalAlpha = can ? 1 : 0.4;
         const pulse = can && !api.reduceMotion ? 1 + Math.sin(clock * 6) * 0.015 : 1;
         ctx.save(); ctx.translate(b.x + b.w / 2, b.y + b.h / 2); ctx.scale(pulse, pulse);
         ctx.fillStyle = col.ink; D.roundRect(ctx, -b.w / 2, -b.h / 2, b.w, b.h, 14); ctx.fill();
-        D.text(ctx, friend ? 'Stop: ' + nameOf(turn) : 'Stop', 0, 1, 16, col.bg, 750);
+        D.fitText(ctx, on ? (turn === mySide ? 'Stop' : 'Waiting for ' + nameOf(turn)) : friend ? 'Stop: ' + nameOf(turn) : 'Stop', 0, 1, b.w - 24, 16, col.bg, 750);
         ctx.restore(); ctx.globalAlpha = 1;
 
         parts.forEach(p => { ctx.globalAlpha = Math.max(0, Math.min(1, p.life * 2)); ctx.fillStyle = '#5fd6c4'; ctx.fillRect(p.x, p.y, p.s, p.s); });
@@ -244,6 +253,15 @@
       }
 
       if (!restore(api.saved)) startRound();
+      // The other player's shot. Waits until this screen has reached their turn; a repeat is ignored.
+      if (on) on.queue((type, d, from) => {
+        if (type !== 'stop') return true;
+        const who = from === 0 ? 'you' : 'cpu';
+        if (!d || typeof d.v !== 'number' || !(d.v >= 0 && d.v <= 100) || shot[who] >= 0) return true;
+        if (phase !== 'run' || turn !== who) return false;
+        stopAt(who, Math.round(d.v * 10) / 10);
+        return true;
+      });
       api.loop(dt => {
         clock += dt;
         shake = Math.max(0, shake - dt);

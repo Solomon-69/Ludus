@@ -133,7 +133,7 @@
   }
 
   Ludus.register({
-    id: 'wallrun', name: 'Quoridor', aka: 'Wall Run', tag: 'Duel', tint: GREEN, versus: true,
+    id: 'wallrun', name: 'Quoridor', aka: 'Wall Run', tag: 'Duel', tint: GREEN, versus: true, online: { min: 2, max: 2 },
     hint: 'Reach the top row first. Click a dot or use <kbd>←</kbd><kbd>↑</kbd><kbd>→</kbd><kbd>↓</kbd> to step. Click a groove to place a wall (6 each), <kbd>R</kbd> or right-click turns it. vs Friend: take turns, Player 2 races to the bottom',
     _rules: { blank, clone, legalMoves, dist, wallOk, apply, rankWalls, chooseAction, S, G },
     art(ctx, w, h) {
@@ -151,7 +151,14 @@
       const D = Ludus.draw;
       const view = api.canvas();
       const { ctx } = view;
-      const friend = api.friend, nameOf = who => (who === 'a' ? 'Player 1' : 'Player 2');
+      const friend = api.friend;
+      // Online: seat 0 is pawn 'a', seat 1 is pawn 'b'. Each action goes out as 'act' ({ type:'move', to:[r,c] } or
+      // { type:'wall', o, r, c }); every screen checks it is legal and applies it.
+      const on = api.online;
+      const mySide = on ? (on.seat === 0 ? 'a' : 'b') : '';
+      const mayAct = () => !on || turn === mySide;
+      const nameOf = who => (on && on.names[who === 'a' ? 0 : 1]) || (who === 'a' ? 'Player 1' : 'Player 2');
+      const doLocal = a => { if (on) on.send('act', a); act(turn, a); };
       let clock = 0, matches = 0, starter = 'a';
       let st, turn, winner, thinking, last, anim, wallT, hover = null, flip = false, flipKey = '', banner = null, parts = [];
       api.score(0);
@@ -225,13 +232,13 @@
         }
         return { kind: 'cell', r: cy, c: cx };
       }
-      const myTurn = () => (friend || turn === 'a') && !winner && !thinking;
+      const myTurn = () => (friend || turn === 'a') && !winner && !thinking && mayAct();
       function click(t) {
         if (!t || !myTurn()) return;
         if (t.kind === 'cell') {
           const m = legalMoves(st, turn).find(([r, c]) => r === t.r && c === t.c);
-          if (m) act(turn, { type: 'move', to: m });
-        } else if (st.left[turn] > 0 && wallOk(st, t.o, t.r, t.c)) act(turn, { type: 'wall', o: t.o, r: t.r, c: t.c });
+          if (m) doLocal({ type: 'move', to: m });
+        } else if (st.left[turn] > 0 && wallOk(st, t.o, t.r, t.c)) doLocal({ type: 'wall', o: t.o, r: t.r, c: t.c });
         else api.sfx('hit');
       }
       function rotate() { flip = !flip; if (hover && hover.kind === 'wall') hover.o = hover.o === 'h' ? 'v' : 'h'; api.sfx('tick'); }
@@ -245,7 +252,7 @@
         if (!d || !myTurn()) return;
         const [r, c] = st.p[turn], ms = legalMoves(st, turn);
         const m = ms.find(([mr, mc]) => Math.sign(mr - r) === d[0] && Math.sign(mc - c) === d[1]);
-        if (m) act(turn, { type: 'move', to: m });
+        if (m) doLocal({ type: 'move', to: m });
       });
 
       // ---------- render ----------
@@ -270,9 +277,9 @@
         // header
         const walls = n => n + (n === 1 ? ' wall' : ' walls');
         D.duelHeader(ctx, 8, 8, w - 16, {
-          left: friend ? { who: 'you', label: 'Player 1', score: walls(st.left.a) } : { who: 'you', score: walls(st.left.a) }, right: friend ? { who: 'p2', label: 'Player 2', score: walls(st.left.b) } : { who: 'bot', score: walls(st.left.b) },
+          left: friend ? { who: 'you', label: nameOf('a'), score: walls(st.left.a) } : { who: 'you', score: walls(st.left.a) }, right: friend ? { who: 'p2', label: nameOf('b'), score: walls(st.left.b) } : { who: 'bot', score: walls(st.left.b) },
           turn: winner ? null : (turn === 'a' ? 'left' : 'right'),
-          status: winner ? (friend ? nameOf(winner) + ' made it' : winner === 'a' ? 'You made it' : 'Bot made it') : friend ? nameOf(turn) + '\u2019s move' : turn === 'a' ? 'Your move' : 'Bot is thinking',
+          status: winner ? (friend ? nameOf(winner) + ' made it' : winner === 'a' ? 'You made it' : 'Bot made it') : friend ? (on && turn === mySide ? 'Your move' : nameOf(turn) + '\u2019s move') : turn === 'a' ? 'Your move' : 'Bot is thinking',
           thinking: !winner && turn === 'b' && !friend
         }, col);
         const BOTC = friend ? D.P2 : col.dark ? '#aab2bf' : '#6b7380';
@@ -308,7 +315,7 @@
           D.roundRect(ctx, -ww / 2, -hh / 2, ww, hh, Math.min(ww, hh) / 2); ctx.fill();
           ctx.restore();
         }
-        if (hover && hover.kind === 'wall' && myTurn() && st.left.a > 0) {
+        if (hover && hover.kind === 'wall' && myTurn() && st.left[turn] > 0) {
           const ok = wallOk(st, hover.o, hover.r, hover.c), [x, y, ww, hh] = wallRect(L, hover.o, hover.r, hover.c);
           ctx.fillStyle = ok ? col.accent : col.bad; ctx.globalAlpha = ok ? 0.55 : 0.4;
           D.roundRect(ctx, x, y, ww, hh, Math.min(ww, hh) / 2); ctx.fill(); ctx.globalAlpha = 1;
@@ -363,6 +370,20 @@
       }
 
       if (!restore(api.saved)) newGame();
+      // The other player's actions; anything illegal on their turn is ignored.
+      if (on) on.queue((type, d, from) => {
+        if (type !== 'act') return true;
+        const who = from === 0 ? 'a' : 'b';
+        if (winner || turn !== who || !d || typeof d !== 'object') return true;
+        const int = v => Number.isInteger(v);
+        if (d.type === 'move' && Array.isArray(d.to) && int(d.to[0]) && int(d.to[1])) {
+          const m = legalMoves(st, who).find(([r, c]) => r === d.to[0] && c === d.to[1]);
+          if (m) act(who, { type: 'move', to: m });
+        } else if (d.type === 'wall' && (d.o === 'h' || d.o === 'v') && int(d.r) && int(d.c) && d.r >= 0 && d.r < G && d.c >= 0 && d.c < G) {
+          if (st.left[who] > 0 && wallOk(st, d.o, d.r, d.c)) act(who, { type: 'wall', o: d.o, r: d.r, c: d.c });
+        }
+        return true;
+      });
       api.loop(dt => {
         clock += dt;
         for (let i = parts.length - 1; i >= 0; i--) { const p = parts[i]; p.life -= dt; p.vy += 500 * dt; p.x += p.vx * dt; p.y += p.vy * dt; if (p.life <= 0) parts.splice(i, 1); }

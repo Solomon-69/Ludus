@@ -2,8 +2,17 @@
 
 **Ludus collects no data.** No accounts, no analytics, no crash reporting, no ads, no tracking.
 
-- **No network.** The games and sounds are bundled with the app. Ludus does not connect to the
-  internet, and the app refuses to load any page other than its own bundled files.
+- **No network unless you use Play online.** The games and sounds are bundled with the app. Ludus
+  does not connect to the internet on its own, and the app refuses to load any page other than its
+  own bundled files. The only exception is the optional **Play online** feature, described below.
+- **Play online (opt-in).** Nothing is sent until you press *Create room* or *Join room* in an
+  online-capable game. Then Ludus opens a connection to a free public relay (an MQTT message server:
+  `broker.emqx.io`, `broker.hivemq.com` or `test.mosquitto.org`, tried in that order) and sends only
+  the game messages (moves and picks), a random room code, a random temporary id, and the optional
+  nickname you typed. No account, no device information and no scores are sent. The relay is public
+  and **not private**: anyone who knows or guesses a room code can join the room or read its
+  messages, and the relay operators can see them. Ludus keeps no copy; closing the room or the app
+  ends the connection. Do not type anything private as your nickname.
 - **What is stored, and where.** Your best scores, saved games and settings are kept on your
   own computer only:
   - Mac: in the app's preferences (`~/Library/Preferences/com.solomon.Ludus.plist`) and the

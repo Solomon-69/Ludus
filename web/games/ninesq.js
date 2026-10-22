@@ -172,7 +172,7 @@
   };
 
   Ludus.register({
-    id: 'ninesq', name: 'Ultimate Tic-Tac-Toe', aka: 'Nine Squared', tag: 'Duel', tint: '#5b8def', versus: true,
+    id: 'ninesq', name: 'Ultimate Tic-Tac-Toe', aka: 'Nine Squared', tag: 'Duel', tint: '#5b8def', versus: true, online: { min: 2, max: 2 },
     hint: 'Click a square, or <kbd>←</kbd><kbd>↑</kbd><kbd>→</kbd><kbd>↓</kbd> + <kbd>Space</kbd>. The square you pick sends the bot to that board. Win 3 boards in a row. vs Friend: take turns',
     _logic: logic,
     art(ctx, w, h) {
@@ -196,7 +196,12 @@
     },
     create(stage, api) {
       const D = Ludus.draw, L = logic;
-      const friend = api.friend, nameOf = who => (who === P ? 'Player 1' : 'Player 2');
+      const friend = api.friend;
+      // Online: seat 0 plays P (X), seat 1 plays C (O). A move is sent as { i } (the cell number 0..80) and every screen applies it.
+      const on = api.online;
+      const mySide = on ? (on.seat === 0 ? P : C) : 0;
+      const mayAct = () => !on || s.turn === mySide;
+      const nameOf = who => (on && on.names[who === P ? 0 : 1]) || (who === P ? 'Player 1' : 'Player 2');
       const view = api.canvas();
       const { ctx } = view;
       let s = L.newState(), phase = 'play', thinking = false, last = -1, hover = -1, cur = 40, useCursor = false;
@@ -248,7 +253,9 @@
 
       function playerMove(i) {
         if (phase !== 'play' || (s.turn !== P && !friend) || thinking || i < 0) return;
+        if (!mayAct()) return;
         if (!L.moves(s).includes(i)) { api.sfx('hit'); return; }
+        if (on) on.send('cell', { i });
         doMove(i);
       }
 
@@ -318,10 +325,10 @@
         const ended = phase !== 'play';
         const n = who => { let k = 0; for (let b = 0; b < 9; b++) if (s.smalls[b] === who) k++; return k + (k === 1 ? ' board' : ' boards'); };
         D.duelHeader(ctx, 8, 8, view.w - 16, {
-          left: friend ? { who: 'you', label: 'Player 1', score: n(P) } : { who: 'you', score: n(P) },
-          right: friend ? { who: 'p2', label: 'Player 2', score: n(C) } : { who: 'bot', score: n(C) },
+          left: friend ? { who: 'you', label: nameOf(P), score: n(P) } : { who: 'you', score: n(P) },
+          right: friend ? { who: 'p2', label: nameOf(C), score: n(C) } : { who: 'bot', score: n(C) },
           turn: ended ? null : (s.turn === P ? 'left' : 'right'),
-          status: ended ? (banner ? banner.text : '') : friend ? nameOf(s.turn) + (s.force >= 0 && !s.smalls[s.force] ? '\u2019s move' : ': play anywhere') : s.turn === P ? (s.force >= 0 && !s.smalls[s.force] ? 'Your move' : 'Play anywhere') : 'Bot is thinking',
+          status: ended ? (banner ? banner.text : '') : friend ? (on && s.turn === mySide ? (s.force >= 0 && !s.smalls[s.force] ? 'Your move' : 'Play anywhere') : nameOf(s.turn) + (s.force >= 0 && !s.smalls[s.force] ? '\u2019s move' : ': play anywhere')) : s.turn === P ? (s.force >= 0 && !s.smalls[s.force] ? 'Your move' : 'Play anywhere') : 'Bot is thinking',
           thinking: !ended && s.turn === C && !friend
         }, col);
       }
@@ -396,7 +403,7 @@
         }
         // hover / cursor preview
         const target = useCursor ? cur : hover;
-        if (phase === 'play' && (s.turn === P || friend) && target >= 0) {
+        if (phase === 'play' && (s.turn === P || friend) && mayAct() && target >= 0) {
           const [x, y] = cellXY(target), tc = markCol(s.turn, col);
           if (legal.has(target)) { if (s.turn === P) markX(x, y, cs * 0.34, tc, 1, 0.35); else markO(x, y, cs * 0.34, tc, 1, 0.35); }
           if (useCursor) { ctx.strokeStyle = legal.has(target) ? tc : col.ink3; ctx.lineWidth = 2; D.roundRect(ctx, x - cs * 0.45, y - cs * 0.45, cs * 0.9, cs * 0.9, 6); ctx.stroke(); }
@@ -443,6 +450,15 @@
 
       api.score(0);
       restore(api.saved);
+      // The other player's moves; anything that is not legal on their turn is ignored.
+      if (on) on.queue((type, d, from) => {
+        if (type !== 'cell') return true;
+        if (phase !== 'play') return false;
+        const who = from === 0 ? P : C;
+        if (s.turn !== who || !d || !Number.isInteger(d.i) || d.i < 0 || d.i >= 81 || !L.moves(s).includes(d.i)) return true;
+        doMove(d.i);
+        return true;
+      });
       api.loop(dt => render(dt));
       return {
         save() {

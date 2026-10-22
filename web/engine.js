@@ -17,7 +17,7 @@
   const defaults = {
     theme: 'system', accent: '#d97757', sound: true, volume: 0.6, difficulty: 'normal',
     reduceMotion: false, hints: true, size: 'compact', hidden: [], best: {}, plays: {}, last: null,
-    filter: 'All', saves: {}, introDone: false
+    filter: 'All', saves: {}, introDone: false, onlineName: ''
   };
 
   // ---------- persistence (native bridge first, browser storage as fallback) ----------
@@ -104,8 +104,10 @@
     return snap;
   }
 
-  function makeApi(game, stage, hooks) {
+  function makeApi(game, stage, hooks, online) {
     const cleanups = [];
+    // online = the api.online object when this run is a room game (see ONLINE.md), otherwise null: local play.
+    if (online) cleanups.push(() => { try { online.dispose(); } catch (e) {} });
     const loops = new Set();
     let paused = false;
     const held = new Map();   // keys down right now (key -> code), released on resume
@@ -121,11 +123,13 @@
       best: state.best[game.id] || 0,
       // Board games with a bot can also be played by two people on one keyboard ("versus: true").
       // 'bot' or 'friend'; api.friend is the shortcut.
-      vs: versusMode(game),
+      // An online game reads as a 'friend' game: seat 0 is Player 1, seat 1 is Player 2.
+      vs: online ? 'friend' : versusMode(game),
+      online: online || null,
       get friend() { return api.vs === 'friend'; },
       // The snapshot this game returned from save() last time, or null. Restore from it in create().
       // A snapshot from the other mode (bot vs friend) is not resumed.
-      saved: savedFor(game),
+      saved: online ? null : savedFor(game),
       get ended() { return ended; },
       get touched() { return touched; },
       get paused() { return paused; },
@@ -323,7 +327,13 @@
         const ax = right ? px + pw - 20 : px + 20;
         draw.avatar(ctx, ax, y + h / 2, 13, o.who, c);
         const tx = right ? ax - 19 : ax + 19, align = right ? 'right' : 'left';
-        draw.text(ctx, o.label || (o.who === 'bot' ? 'Bot' : 'You'), tx, y + 13, 11.5, c.ink, 650, align);
+        // a long player name shrinks, then is trimmed with an ellipsis, so it never runs into the middle of the header
+        let lab = String(o.label || (o.who === 'bot' ? 'Bot' : 'You')), lsz = 11.5;
+        const labMax = pw - 46;
+        ctx.font = `650 ${lsz}px ui-rounded, system-ui, sans-serif`;
+        while (lsz > 9.5 && ctx.measureText(lab).width > labMax) { lsz -= 0.5; ctx.font = `650 ${lsz}px ui-rounded, system-ui, sans-serif`; }
+        while (lab.length > 1 && ctx.measureText(lab).width > labMax) { lab = lab.slice(0, -1); }
+        draw.text(ctx, lab, tx, y + 13, lsz, c.ink, 650, align);
         if (o.of) {
           for (let i = 0; i < o.of; i++) {
             const dx = right ? tx - i * 9 - 3 : tx + i * 9 + 3;

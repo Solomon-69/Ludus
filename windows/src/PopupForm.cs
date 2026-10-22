@@ -359,6 +359,13 @@ internal sealed class PopupForm : Form
         if (ready) RunScript("window.ludusOpened && ludusOpened()");
     }
 
+    /// <summary>Opens the join flow for a room code. Only a 5 character letters/digits code ever reaches the page.</summary>
+    public void JoinRoom(string code)
+    {
+        if (!System.Text.RegularExpressions.Regex.IsMatch(code, "^[A-Z0-9]{5}$")) return;
+        RunScript($"window.ludusJoin && ludusJoin('{code}')");
+    }
+
     public void HidePopup()
     {
         if (!Visible) return;

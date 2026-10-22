@@ -400,3 +400,63 @@ svg { display: block; }
 .card.found { outline: 2px solid var(--accent); outline-offset: 2px; animation: cardIn 0.45s var(--spring) both, foundGlow 1.6s ease-out 0.2s 1; }
 @keyframes foundGlow { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent); } 100% { box-shadow: 0 0 0 18px transparent; } }
 @media (prefers-reduced-motion: reduce) { .card.found { animation: none; } }
+
+/* ---------- online play ---------- */
+.vs-toggle button[hidden], .online-chip[hidden], .leave-btn[hidden], #pauseBtn[hidden] { display: none; }
+.vs-toggle button { white-space: nowrap; }
+/* Header while in a room: connection dot, state and the room code. */
+.online-chip { display: inline-flex; align-items: center; gap: 6px; margin-top: 4px; padding: 2px 10px; border-radius: 999px;
+  background: var(--surface-2); font-size: 11px; font-weight: 600; color: var(--ink-2); max-width: 100%; white-space: nowrap; }
+.online-chip .dot, .conn-chip i { width: 7px; height: 7px; border-radius: 50%; background: var(--ink-3); flex: none; }
+.online-chip[data-state="online"] .dot, .conn-chip.online i { background: var(--good); }
+.online-chip[data-state="connecting"] .dot, .conn-chip.connecting i { background: #e0a526; animation: pulseDot 1s ease-in-out infinite; }
+.online-chip[data-state="offline"] .dot, .conn-chip.offline i { background: var(--bad); }
+.online-chip b { font: 700 11px/1 var(--font-round); letter-spacing: 0.12em; color: var(--ink); }
+.leave-btn { height: 32px; padding: 0 12px; border-radius: 10px; font-size: 12px; flex: none; }
+@keyframes pulseDot { 50% { opacity: 0.35; } }
+
+.sheet.lobby { z-index: 8; padding: 12px; overflow-y: auto; }
+.lobby-card {
+  width: min(330px, 100%); max-height: 100%; overflow-y: auto; scrollbar-width: none;
+  background: var(--surface); border-radius: 20px; box-shadow: var(--shadow-lift);
+  padding: 18px 16px 14px; display: flex; flex-direction: column; gap: 10px; align-items: stretch;
+  animation: sheetIn 0.5s var(--spring); text-align: center; margin: auto;
+}
+.lobby-card::-webkit-scrollbar { display: none; }
+.lobby-card .sheet-title { overflow-wrap: anywhere; }
+.lobby-sub { margin: 0; color: var(--ink-2); font-size: 12.5px; line-height: 1.4; overflow-wrap: anywhere; }
+.lobby-note { margin: 0; color: var(--ink-3); font-size: 11px; line-height: 1.35; }
+.lobby-error { min-height: 16px; color: var(--bad); font-size: 12px; line-height: 1.35; overflow-wrap: anywhere; }
+.lobby-live { color: var(--ink-2); font-size: 12px; font-weight: 600; overflow-wrap: anywhere; }
+.lobby-row { display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; }
+.btn.small { height: 30px; padding: 0 12px; font-size: 12px; border-radius: 10px; }
+.btn:disabled { opacity: 0.4; pointer-events: none; }
+.field { display: flex; flex-direction: column; gap: 4px; text-align: left; }
+.field-label { font-size: 11px; color: var(--ink-3); font-weight: 600; }
+.lobby-card input {
+  width: 100%; height: 38px; border: 0; border-radius: 11px; padding: 0 12px; font: inherit; font-size: 13px; color: var(--ink);
+  background: var(--surface-2); outline: 0; user-select: text; -webkit-user-select: text;
+  box-shadow: inset 0 0 0 1px var(--line); transition: box-shadow 0.2s;
+}
+.lobby-card input:focus { box-shadow: inset 0 0 0 2px var(--accent); }
+.lobby-card input::placeholder { color: var(--ink-3); }
+.lobby-card input.code-input { height: 52px; text-align: center; font: 700 26px/1 var(--font-round); letter-spacing: 0.3em; padding-left: 0.3em; text-transform: uppercase; }
+.code-row { display: flex; justify-content: center; gap: 6px; }
+.code-ch { width: 40px; height: 52px; display: grid; place-items: center; border-radius: 12px; background: var(--surface-2);
+  font: 720 26px/1 var(--font-round); color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); animation: cardIn 0.5s var(--spring) both; }
+.code-ch:nth-child(2) { animation-delay: 40ms; } .code-ch:nth-child(3) { animation-delay: 80ms; }
+.code-ch:nth-child(4) { animation-delay: 120ms; } .code-ch:nth-child(5) { animation-delay: 160ms; }
+.conn-chip { display: inline-flex; align-self: center; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px;
+  background: var(--surface-2); font-size: 11px; font-weight: 600; color: var(--ink-2); white-space: nowrap; }
+.seats { display: flex; flex-direction: column; gap: 6px; }
+.seat { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-radius: 12px; background: var(--surface-2); opacity: 0.55; text-align: left; min-width: 0; }
+.seat.on { opacity: 1; animation: cardIn 0.4s var(--spring) both; }
+.seat-dot { width: 26px; height: 26px; border-radius: 50%; flex: none; display: grid; place-items: center; background: var(--line); color: #fff; font: 700 12px/1 var(--font-round); }
+.seat-name { flex: 1; min-width: 0; font-weight: 600; font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.seat-tag { flex: none; font-size: 10px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-3); }
+@media (max-height: 520px) {
+  .lobby-card { padding: 12px 14px 10px; gap: 7px; }
+  .code-ch { width: 34px; height: 42px; font-size: 21px; }
+  .seat { padding: 4px 10px; }
+}
+@media (prefers-reduced-motion: reduce) { .online-chip .dot, .conn-chip i, .code-ch, .seat.on { animation: none !important; } }

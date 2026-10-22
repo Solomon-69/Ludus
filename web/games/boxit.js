@@ -125,7 +125,7 @@
   };
 
   Ludus.register({
-    id: 'boxit', name: 'Dots and Boxes', aka: 'Box It', tag: 'Duel', versus: true, tint: '#e0a526',
+    id: 'boxit', name: 'Dots and Boxes', aka: 'Box It', tag: 'Duel', versus: true, online: { min: 2, max: 2 }, tint: '#e0a526',
     hint: 'Click a gap between two dots, or <kbd>←</kbd><kbd>↑</kbd><kbd>→</kbd><kbd>↓</kbd> + <kbd>Space</kbd>. Close a box to score and go again. Most boxes wins. vs Friend: take turns',
     _logic: logic,
     art(ctx, w, h) {
@@ -149,7 +149,11 @@
       const D = Ludus.draw, L = logic;
       // vs Friend: two people take turns on this keyboard; C is Player 2 and the bot never moves.
       const friend = api.friend;
-      const nameOf = who => (who === P ? 'Player 1' : 'Player 2');
+      // Online: seat 0 draws as P, seat 1 as C. A move is sent as { e } (the edge number) and every screen applies it.
+      const on = api.online;
+      const mySide = on ? (on.seat === 0 ? P : C) : 0;
+      const mayAct = () => !on || turn === mySide;
+      const nameOf = who => (on && on.names[who === P ? 0 : 1]) || (who === P ? 'Player 1' : 'Player 2');
       const view = api.canvas();
       const { ctx } = view;
       let st = L.newState(), turn = P, phase = 'play', thinking = false, last = -1;
@@ -195,7 +199,8 @@
       }
 
       function playerMove(e) {
-        if (phase !== 'play' || (turn !== P && !friend) || thinking || e < 0 || st.edges[e]) return;
+        if (phase !== 'play' || (turn !== P && !friend) || thinking || e < 0 || st.edges[e] || !mayAct()) return;
+        if (on) on.send('edge', { e });
         doMove(e, turn);
       }
 
@@ -249,11 +254,11 @@
       function hud(col) {
         const ended = phase !== 'play';
         const status = ended ? (endBanner ? endBanner.text : '')
-          : friend ? nameOf(turn) + (again ? ' goes again' : '\u2019s move')
+          : friend ? (on && turn === mySide ? (again ? 'Go again' : 'Your move') : nameOf(turn) + (again ? ' goes again' : '\u2019s move'))
           : turn === P ? (again ? 'Go again' : 'Your move') : 'Bot is thinking';
         D.duelHeader(ctx, 8, 8, view.w - 16, {
-          left: { who: 'you', label: friend ? 'Player 1' : undefined, score: count(P) },
-          right: friend ? { who: 'p2', label: 'Player 2', score: count(C) } : { who: 'bot', score: count(C) },
+          left: { who: 'you', label: friend ? nameOf(P) : undefined, score: count(P) },
+          right: friend ? { who: 'p2', label: nameOf(C), score: count(C) } : { who: 'bot', score: count(C) },
           turn: ended ? null : (turn === P ? 'left' : 'right'),
           status,
           thinking: !ended && turn === C && !friend
@@ -288,7 +293,7 @@
           const x1 = ox + p.x1 * s, y1 = oy + p.y1 * s, x2 = ox + p.x2 * s, y2 = oy + p.y2 * s;
           const who = st.edges[e];
           if (!who) {
-            const hot = e === target && phase === 'play' && (turn === P || friend);
+            const hot = e === target && phase === 'play' && (turn === P || friend) && mayAct();
             ctx.strokeStyle = hot ? (turn === P ? col.accent : D.P2) : col.line; ctx.globalAlpha = hot ? 0.55 : 1;
             ctx.lineWidth = hot ? 5 : 2; ctx.setLineDash(hot ? [] : [2, 5]);
             ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
@@ -350,6 +355,15 @@
 
       api.score(0);
       restore(api.saved);
+      // The other player's moves; anything that is not a free edge on their turn is ignored.
+      if (on) on.queue((type, d, from) => {
+        if (type !== 'edge') return true;
+        if (phase !== 'play') return phase !== 'end';
+        const who = from === 0 ? P : C;
+        if (turn !== who || !d || !Number.isInteger(d.e) || d.e < 0 || d.e >= E || st.edges[d.e]) return true;
+        doMove(d.e, who);
+        return true;
+      });
       api.loop(dt => render(dt));
       return {
         save() {

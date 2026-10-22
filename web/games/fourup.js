@@ -90,7 +90,7 @@
   };
 
   Ludus.register({
-    id: 'fourup', name: 'Connect Four', aka: 'Four Up', tag: 'Duel', versus: true, tint: '#c4633f',
+    id: 'fourup', name: 'Connect Four', aka: 'Four Up', tag: 'Duel', versus: true, online: { min: 2, max: 2 }, tint: '#c4633f',
     hint: 'Click a column, or <kbd>←</kbd><kbd>→</kbd> + <kbd>Space</kbd> (or <kbd>1</kbd>-<kbd>7</kbd>). Four in a row wins a game. First to 3 games. vs Friend: take turns',
     _logic: logic,
     art(ctx, w, h) {
@@ -116,7 +116,12 @@
       const L = logic;
       // vs Friend: both players take turns on this keyboard; 'C' is Player 2 and the bot never moves.
       const friend = api.friend;
-      const nameOf = who => (who === P ? 'Player 1' : 'Player 2');
+      // Online: seat 0 plays P, seat 1 plays C; each screen controls only its own side. Moves are sent as { c } and
+      // every screen applies the same move to the same board, so the games never drift apart.
+      const on = api.online;
+      const mySide = on ? (on.seat === 0 ? P : C) : 0;
+      const mayAct = () => !on || turn === mySide;
+      const nameOf = who => (on && on.names[who === P ? 0 : 1]) || (who === P ? 'Player 1' : 'Player 2');
       let board, discs, turn, wins = { p: 0, c: 0 }, starter = P, winLine = null, lastIdx = -1;
       let phase = 'play', cursor = 3, hoverCol = -1, thinking = false, banner = null, shake = 0, flashT = 0;
       let geo = null, gameNo = 0, sparks = [];
@@ -187,8 +192,10 @@
 
       function playerDrop(c) {
         if (phase !== 'play' || (turn !== P && !friend) || c < 0 || c >= COLS) return;
+        if (!mayAct()) return;
         if (L.openRow(board, c) < 0) { api.sfx('hit'); return; }
         cursor = c;
+        if (on) on.send('drop', { c });
         place(c, turn);
       }
 
@@ -254,12 +261,12 @@
         const ended = phase === 'end' || api.ended;
         let status = '';
         if (ended) status = banner ? banner.text : '';
-        else if (friend) status = phase === 'play' ? nameOf(turn) + '\u2019s move' : '';
+        else if (friend) status = phase === 'play' ? (on && turn === mySide ? 'Your move' : nameOf(turn) + '\u2019s move') : '';
         else if (turn === P) status = phase === 'play' ? 'Your move' : '';
         else status = 'Bot is thinking';
         D.duelHeader(ctx, 8, 8, view.w - 16, {
-          left: { who: 'you', label: friend ? 'Player 1' : undefined, pips: wins.p, of: TARGET },
-          right: friend ? { who: 'p2', label: 'Player 2', pips: wins.c, of: TARGET } : { who: 'bot', pips: wins.c, of: TARGET },
+          left: { who: 'you', label: friend ? nameOf(P) : undefined, pips: wins.p, of: TARGET },
+          right: friend ? { who: 'p2', label: nameOf(C), pips: wins.c, of: TARGET } : { who: 'bot', pips: wins.c, of: TARGET },
           turn: ended ? null : (turn === P ? 'left' : 'right'), status, thinking: !ended && turn === C && !friend
         }, col);
       }
@@ -277,7 +284,7 @@
 
         // hover / thinking ghost disc
         let gc = -1, gw = P;
-        if (phase === 'play' && (turn === P || friend)) { gc = hoverCol >= 0 ? hoverCol : cursor; gw = turn; }
+        if (phase === 'play' && (turn === P || friend) && mayAct()) { gc = hoverCol >= 0 ? hoverCol : cursor; gw = turn; }
         else if (thinking) { gc = 3 + Math.sin(now / 420) * 2.6; gw = C; }
         if (gc !== -1) {
           const x = geo.x0 + gc * cell + cell / 2;
@@ -329,7 +336,7 @@
           }
         }
         // keyboard cursor under board
-        if (phase === 'play' && (turn === P || friend) && hoverCol < 0) {
+        if (phase === 'play' && (turn === P || friend) && mayAct() && hoverCol < 0) {
           ctx.fillStyle = turn === P ? col.accent : D.P2;
           D.roundRect(ctx, cx(cursor) - cell * 0.18, oy + bh + 5, cell * 0.36, 4, 2); ctx.fill();
         }
@@ -383,6 +390,15 @@
 
       api.score(0);
       if (!restore(api.saved)) newGame();
+      // The other player's moves. Waits (returns false) while a disc is still falling; ignores anything illegal.
+      if (on) on.queue((type, d, from) => {
+        if (type !== 'drop') return true;
+        if (phase !== 'play') return false;
+        const who = from === 0 ? P : C;
+        if (turn !== who || !d || !Number.isInteger(d.c) || d.c < 0 || d.c >= COLS || L.openRow(board, d.c) < 0) return true;
+        place(d.c, who);
+        return true;
+      });
       api.loop(dt => render(dt));
       return {
         save() {

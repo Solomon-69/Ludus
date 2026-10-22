@@ -22,6 +22,7 @@
   let revealTimer = null;
   let launchTimer = null;
   let pendingLaunch = null; // { go, at }: the game waiting for the panel to reach its size
+  let online = null;        // a room in progress or being set up: { game, session, started }; null = local play
 
   // ---------- theme ----------
   function applyTheme() {
@@ -144,9 +145,10 @@
     const el = $('scoreNow');
     if (el.textContent !== String(n)) { el.textContent = n; el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); }
   }
-  function start(id) {
+  function start(id, keepRoom) {
     const g = L.games.find(x => x.id === id);
     if (!g) return;
+    if (!keepRoom) leaveOnline();
     stop();
     S.last = id; S.plays[id] = (S.plays[id] || 0) + 1; L.save();
     $('gameName').textContent = g.name;
@@ -190,15 +192,21 @@
      score line; switching starts a fresh game in the other mode. */
   function renderVsToggle(g) {
     const box = $('vsToggle');
+    const inRoom = !!(online && online.game === g);      // setting up a room or playing in one
+    const playing = inRoom && online.started;
     $('gameScores').hidden = !!g.versus;
-    box.hidden = !g.versus;
+    box.hidden = !g.versus || playing;
+    syncOnlineBar(g);
     if (!g.versus) return;
-    const mode = ((S.vs && S.vs[g.id]) || g.defaultVs || 'bot') === 'friend' ? 'friend' : 'bot';
+    const mode = inRoom ? 'online' : ((S.vs && S.vs[g.id]) || g.defaultVs || 'bot') === 'friend' ? 'friend' : 'bot';
     box.querySelectorAll('button').forEach(b => {
+      if (b.dataset.vs === 'online') b.hidden = !g.online;
       const on = b.dataset.vs === mode;
       b.classList.toggle('is-on', on); b.setAttribute('aria-pressed', String(on));
       b.onclick = () => {
         if (on) return;
+        if (b.dataset.vs === 'online') { openLobby(g); L.sfx('click'); return; }
+        if (inRoom) leaveOnline();
         S.vs[g.id] = b.dataset.vs; forget(g.id); L.save(); L.sfx('click');
         renderVsToggle(g);
         if (!current || current.game !== g) return;
@@ -209,29 +217,118 @@
         if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
       };
     });
+    if (inRoom && !playing) box.querySelector('[data-vs="online"]').onclick = null;
   }
 
-  function launch(g) {
+  /* ---------- online rooms ----------
+     The lobby (lobby.js) makes or joins a room. Once the host starts, the room belongs to this file:
+     the game runs with api.online, and any room trouble sends the player back to the menu with a message. */
+  function openLobby(g) {
+    persist(); stop(); hideOver(); $('pauseSheet').hidden = true;
+    online = { game: g, session: null, started: false };
+    renderVsToggle(g);
+    L.lobby.open(g, lobbyOps(g));
+  }
+  function lobbyOps(g) {
+    return {
+      toast,
+      onStart: s => beginOnline(g, s),
+      onCancel: () => {
+        // back to whatever mode was there before
+        online = null; renderVsToggle(g);
+        if (view === 'game') { $('scoreNow').textContent = '0'; launch(g); }
+      }
+    };
+  }
+  // A room invite: the code typed or pasted, or a ludus://join/CODE link opened by the Mac / Windows app. The link does not
+  // say which game, so the room tells us; then that game's screen opens with the room already joined.
+  function joinFromInvite(text) {
+    const code = L.net.extractCode(text);
+    if (!code) { toast('No room code found'); return false; }
+    leaveOnline(); stop(); hideOver(); $('pauseSheet').hidden = true;
+    toast('Joining room ' + code);
+    const s = L.net.joinRoom(code, { gameId: '', name: L.net.cleanName(S.onlineName, '') });
+    online = { game: null, session: s, started: false };
+    s.on('error', e => { online = null; toast(L.lobby.why(e.code === 'no-room' || e.code === 'full' || e.code === 'started' ? e.code : 'offline')[0]); });
+    s.on('ready', () => {
+      const g = L.games.find(x => x.id === s.gameId && x.online);
+      if (!g) { online = null; s.leave(); toast('This version of Ludus cannot play that room'); return; }
+      online = null;                       // start() must not leave the room we just joined
+      start(g.id, true);
+      clearTimeout(launchTimer); pendingLaunch = null;   // no local game behind the lobby
+      online = { game: g, session: s, started: false };
+      renderVsToggle(g);
+      L.lobby.attach(g, s, lobbyOps(g));
+    });
+    return true;
+  }
+  window.ludusJoin = joinFromInvite;
+  function beginOnline(g, s) {
+    online = { game: g, session: s, started: true };
+    s.on('start', () => { if (online && online.session === s) launchOnline(g); });
+    s.on('rematch', e => toast((e.name || 'Your opponent') + ' wants a rematch'));
+    s.on('conn', () => syncOnlineBar(g));
+    s.on('left', e => {
+      if (online && online.session === s && s.count() < s.min) endOnline((e.name || 'Your opponent') + ' left', 'The game cannot go on without them, so you are going back to the menu.');
+    });
+    s.on('closed', e => { if (online && online.session === s) endOnline(...L.lobby.why(e.reason)); });
+    launchOnline(g);
+  }
+  function launchOnline(g) {
+    const s = online.session;
+    stop(); hideOver(); $('pauseSheet').hidden = true;
+    $('scoreNow').textContent = '0';
+    renderVsToggle(g);
+    launch(g, s.makeOnline());
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  }
+  function endOnline(title, text) {
+    if (online) online.session = null;
+    stop(); hideOver();
+    L.lobby.notice(title, text, goHome);
+  }
+  function leaveOnline() {
+    if (!online) return;
+    const s = online.session, g = online.game;
+    online = null;
+    L.lobby.close();
+    if (s) { try { s.leave(); } catch (e) { /* already closed */ } }
+    syncOnlineBar(g);
+  }
+  // Header while in a room: the code and connection chip replace the Bot/Friend switch; Leave replaces Pause.
+  function syncOnlineBar(g) {
+    const playing = !!(online && online.started && online.session);
+    $('onlineChip').hidden = !playing; $('leaveBtn').hidden = !playing; $('pauseBtn').hidden = !!online;   // no pausing in a room
+    if (!playing) return;
+    const st = online.session.conn;
+    $('onlineChip').dataset.state = st;
+    $('onlineState').textContent = st === 'online' ? 'Online' : st === 'offline' ? 'Reconnecting' : 'Connecting';
+    $('onlineCode').textContent = online.session.code;
+  }
+
+  function launch(g, onlineApi) {
     const stage = $('stage'); stage.innerHTML = '';
+    $('hint').innerHTML = S.hints ? ((onlineApi && g.onlineHint) || g.hint || '') : '';
+    $('againBtn').textContent = onlineApi ? (onlineApi.isHost ? 'Rematch' : 'Ask for rematch') : 'Play again';
     clearTimeout(revealTimer);
     const run = L.makeApi(g, stage, {
       onScore: setScore,
       onOver: res => finish(g, res),
       toast
-    });
+    }, onlineApi);
     current = { game: g, run, instance: null };
     try { current.instance = g.create(stage, run.api) || {}; }
     catch (e) {
       // A saved game that no longer loads must not lock the player out: drop it and start fresh.
-      if (run.api.saved) { delete S.saves[g.id]; L.save(); run.destroy(); return launch(g); }
+      if (run.api.saved) { delete S.saves[g.id]; L.save(); run.destroy(); return launch(g, onlineApi); }
       const msg = el('div', 'foot', ''); msg.style.padding = '40px'; msg.textContent = 'This game hit a problem: ' + e.message;
       stage.innerHTML = ''; stage.appendChild(msg);
     }
-    if (current.instance && current.instance.save) current.saver = setInterval(() => { if (!run.api.paused) persist(); }, SAVE_EVERY_MS);
+    if (!onlineApi && current.instance && current.instance.save) current.saver = setInterval(() => { if (!run.api.paused) persist(); }, SAVE_EVERY_MS);
   }
   // Keep the running game's snapshot so leaving and coming back finds it exactly as it was.
   function persist() {
-    if (!current || current.run.ended || !current.instance || !current.instance.save) return;
+    if (online || !current || current.run.ended || !current.instance || !current.instance.save) return;
     const id = current.game.id;
     try {
       const snap = current.instance.save();
@@ -275,13 +372,18 @@
   function revealing() { return !!(current && current.run.ended && !overShown()); }
   function restart() {
     if (!current) return;
+    if (online && online.session) {   // a rematch: the host starts it for everybody, the guest asks
+      if (online.session.role === 'host') online.session.start();
+      else { online.session.requestRematch(); toast('Asked the host for a rematch'); }
+      return;
+    }
     const g = current.game; forget(g.id); stop();
     hideOver(); $('pauseSheet').hidden = true;
     $('scoreNow').textContent = '0';
     launch(g);
   }
   function pause() {
-    if (!current || current.run.ended || !$('pauseSheet').hidden) return;
+    if (online || !current || current.run.ended || !$('pauseSheet').hidden) return;
     $('pauseTitle').textContent = 'Paused'; $('pauseSheet').classList.remove('welcome');
     current.run.pause(); current.instance && current.instance.pause && current.instance.pause();
     $('pauseSheet').hidden = false;
@@ -291,9 +393,10 @@
     $('pauseSheet').hidden = true;
     current.run.resume(); current.instance && current.instance.resume && current.instance.resume();
   }
-  function goHome() { persist(); stop(); hideOver(); $('pauseSheet').hidden = true; show('home'); renderCards(); L.native('playing', { id: null }); L.native('wide', { on: false }); }
+  function goHome() { leaveOnline(); persist(); stop(); hideOver(); $('pauseSheet').hidden = true; show('home'); renderCards(); L.native('playing', { id: null }); L.native('wide', { on: false }); }
 
   $('backBtn').onclick = goHome;
+  $('leaveBtn').onclick = goHome;
   $('quitBtn').onclick = goHome;
   $('overQuitBtn').onclick = goHome;
   $('pauseBtn').onclick = pause;
@@ -470,7 +573,7 @@
     if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
     // Ludus always opens on All games, wherever it was left. A game left open is saved and waits
     // in the "Continue" card at the top.
-    if (view !== 'home') { root.classList.add('instant'); goHome(); }   // safety net; normally done on close
+    if (view !== 'home' && !online) { root.classList.add('instant'); goHome(); }   // safety net; normally done on close (a room stays open)
     if (S.filter !== 'All') { S.filter = 'All'; L.save(); renderFilters(); renderCards(); }
     replayCards();
     // Next frame, once the home screen has been laid out without transitions.
@@ -479,7 +582,7 @@
   // Go back to All games while the panel is closing, with transitions off, so the next open shows
   // the finished home screen straight away instead of the game flashing and sliding out.
   window.ludusClosed = () => {
-    if (view !== 'home') {
+    if (view !== 'home' && !online) {
       root.classList.add('instant');
       if (view === 'game') goHome(); else { show('home'); renderCards(); }
     }
@@ -496,6 +599,8 @@
     });
   };
   // Test helper: end the current run as if the game called api.over (used by QA/shell-test.js).
+  window.ludusOnline = () => online;
+  window.ludusSnapshot = () => { try { return current && current.instance && current.instance.save ? current.instance.save() : null; } catch (e) { return null; } };   // test helper   // test helper: the current room, if any
   window.ludusTestOver = score => { if (current) current.run.api.over({ score }); };
   window.ludusState = () => JSON.stringify({ view, game: current && current.game.id, score: $('scoreNow').textContent, paused: !$('pauseSheet').hidden, over: overShown(), revealing: revealing(), games: L.games.length, theme: root.dataset.theme, saved: Object.keys(S.saves) });
 

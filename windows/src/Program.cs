@@ -5,20 +5,23 @@ namespace Ludus;
 
 /// <summary>Command-line switches: --quit (close the running Ludus), and for the automated Windows test
 /// --test-open (open the panel once the games have loaded) and --selftest=PATH (write a result file).</summary>
-internal sealed record LaunchOptions(bool TestOpen, bool Quit, string? SelfTestPath, string? TestGame)
+internal sealed record LaunchOptions(bool TestOpen, bool Quit, string? SelfTestPath, string? TestGame, string? JoinCode)
 {
     public static LaunchOptions Parse(string[] args)
     {
-        string? path = null, game = null;
+        string? path = null, game = null, join = null;
         foreach (var a in args)
         {
+            // ludus://join/K7M2Q (a clicked room invite): only a 5 character code is ever taken from it
+            var m = System.Text.RegularExpressions.Regex.Match(a, @"^ludus://join/([A-Za-z0-9]{5})/?$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            if (m.Success) join = m.Groups[1].Value.ToUpperInvariant();
             if (a.StartsWith("--selftest=", StringComparison.OrdinalIgnoreCase)) path = a["--selftest=".Length..].Trim('"');
             if (a.StartsWith("--test-game=", StringComparison.OrdinalIgnoreCase)) game = a["--test-game=".Length..];
         }
         return new LaunchOptions(
             args.Contains("--test-open", StringComparer.OrdinalIgnoreCase),
             args.Contains("--quit", StringComparer.OrdinalIgnoreCase),
-            path, game);
+            path, game, join);
     }
 }
 
@@ -41,6 +44,7 @@ internal static class Program
         {
             try
             {
+                if (options.JoinCode != null && !options.Quit) Store.QueueJoin(options.JoinCode);
                 using var signal = EventWaitHandle.OpenExisting(options.Quit ? QuitEventName : OpenEventName);
                 Native.AllowSetForegroundWindow(Native.ASFW_ANY);
                 signal.Set();
@@ -52,6 +56,7 @@ internal static class Program
             return;
         }
         if (options.Quit) return;   // nothing running, nothing to quit
+        Store.RegisterUrlScheme();   // so ludus://join/CODE links open Ludus
 
         // Created straight away so a second launch can always reach this one.
         using var openSignal = new EventWaitHandle(false, EventResetMode.AutoReset, OpenEventName);
