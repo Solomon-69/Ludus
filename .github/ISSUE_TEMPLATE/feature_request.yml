@@ -1,0 +1,29 @@
+name: Feature or game idea
+description: Suggest an improvement or a new game
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Ludus is meant for quick breaks: games that start fast, pause cleanly and work offline.
+        Ideas that fit that are the most likely to land.
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like?
+      placeholder: A daily puzzle mode for Five Letters.
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why would it help?
+      description: What would it let you do that you can't do now?
+    validations:
+      required: true
+  - type: checkboxes
+    id: help
+    attributes:
+      label: Can you help?
+      options:
+        - label: I'd like to work on this myself and open a pull request

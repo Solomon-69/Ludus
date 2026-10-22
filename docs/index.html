@@ -11,7 +11,9 @@
 <meta property="og:title" content="Ludus">
 <meta property="og:description" content="Take a little break. Free for Mac and Windows.">
 <meta property="og:type" content="website">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23ec9273'/%3E%3Cstop offset='1' stop-color='%23b0502f'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect x='3' y='3' width='58' height='58' rx='14' fill='url(%23g)'/%3E%3Csvg x='9' y='12' width='46' height='40' viewBox='6 27 88 55'%3E%3Cpath fill='%23fff8ee' fill-rule='evenodd' d='M89 48C92 60 93 70 88 75C83 80 76 77.5 72 71L67.5 63.5C65.8 61 63.5 60 60 60L40 60C36.5 60 34.2 61 32.5 63.5L28 71C24 77.5 17 80 12 75C7 70 8 60 11 48C13.5 36 20 29 32 29L68 29C80 29 86.5 36 89 48ZM66.4 39.1A3.1 3.1 0 1 0 72.6 39.1A3.1 3.1 0 1 0 66.4 39.1ZM72.3 45A3.1 3.1 0 1 0 78.5 45A3.1 3.1 0 1 0 72.3 45ZM66.4 50.9A3.1 3.1 0 1 0 72.6 50.9A3.1 3.1 0 1 0 66.4 50.9ZM60.5 45A3.1 3.1 0 1 0 66.7 45A3.1 3.1 0 1 0 60.5 45ZM28.7 36C27.9 36 27.2 36.7 27.2 37.5L27.2 41.7L23 41.7C22.2 41.7 21.5 42.4 21.5 43.2L21.5 46.8C21.5 47.6 22.2 48.3 23 48.3L27.2 48.3L27.2 52.5C27.2 53.3 27.9 54 28.7 54L32.3 54C33.1 54 33.8 53.3 33.8 52.5L33.8 48.3L38 48.3C38.8 48.3 39.5 47.6 39.5 46.8L39.5 43.2C39.5 42.4 38.8 41.7 38 41.7L33.8 41.7L33.8 37.5C33.8 36.7 33.1 36 32.3 36Z'/%3E%3C/svg%3E%3C/svg%3E">
+<link rel="icon" type="image/png" href="img/icon-light.png">
+<link rel="apple-touch-icon" href="img/icon-light.png">
+<meta property="og:image" content="img/panel-light.png">
 <!--
   Download links point at the newest GitHub Release. Replace Solomon-69/Ludus (it appears in the
   three links marked data-repo below, and in the footer) with the real GitHub user and repository,
@@ -72,8 +74,9 @@
   header.top.scrolled { border-bottom-color: var(--line); }
   .bar { display: flex; align-items: center; justify-content: space-between; height: 60px; }
   .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; font: 700 18px/1 var(--font-round); letter-spacing: -0.01em; }
-  .mark { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; background: linear-gradient(#e6856a, #c76142); box-shadow: 0 4px 10px -4px rgba(199, 97, 66, .6); }
-  .mark svg { width: 21px; height: 14px; color: #fff8ee; }
+  .mark { width: 34px; height: 34px; flex: none; transition: transform .45s var(--spring); }
+  .mark img { width: 100%; height: 100%; }
+  .brand:hover .mark { transform: rotate(-8deg) scale(1.06); }
   nav ul { display: flex; gap: 4px; list-style: none; margin: 0; padding: 0; }
   nav a { display: inline-block; padding: 8px 12px; border-radius: 10px; text-decoration: none; color: var(--ink-2); font-size: 14.5px; transition: color .2s, background .2s; }
   nav a:hover { color: var(--ink); background: var(--accent-soft); }
@@ -109,7 +112,7 @@
   .reqs { margin: 18px 0 0; font-size: 13.5px; color: var(--ink-3); }
   .reqs b { color: var(--ink-2); font-weight: 600; }
 
-  /* panel illustration: a drawing of the Ludus panel, not a screenshot */
+  /* hero: a real screenshot of the panel under a drawn menu bar */
   .stagebox { position: relative; display: grid; place-items: center; }
   .glow { position: absolute; inset: 8% 4%; background: radial-gradient(closest-side, var(--accent-soft), transparent); filter: blur(10px); }
   .menubar { position: relative; width: min(400px, 100%); }
@@ -117,22 +120,27 @@
   .menubar .strip span { width: 16px; height: 5px; border-radius: 3px; background: color-mix(in srgb, var(--ink) 18%, transparent); }
   .menubar .strip .pad { width: 22px; height: 18px; color: var(--ink); background: none; display: grid; place-items: center; }
   .menubar .strip .pad svg { width: 20px; height: 13px; }
-  .panel { position: relative; margin: 10px auto 0; width: 100%; border-radius: 20px; background: var(--bg); box-shadow: var(--shadow-lift), 0 0 0 1px var(--line); padding: 16px; transform-origin: 85% 0; animation: pop .9s var(--spring) both .15s; }
-  .panel::before { content: ""; position: absolute; top: -7px; right: 18px; width: 14px; height: 14px; background: var(--bg); transform: rotate(45deg); border-radius: 3px 0 0 0; box-shadow: -1px -1px 0 var(--line); }
-  @keyframes pop { from { opacity: 0; transform: translateY(-8px) scale(.94); } to { opacity: 1; transform: none; } }
-  .p-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
-  .p-head svg { width: 32px; height: 20px; color: var(--accent); }
-  .p-head b { display: block; font: 700 15px/1.1 var(--font-round); }
-  .p-head small { display: block; font-size: 11px; color: var(--ink-3); }
-  .chips { display: flex; gap: 4px; margin-bottom: 12px; flex-wrap: wrap; }
-  .chips span { font-size: 11px; padding: 4px 9px; border-radius: 8px; color: var(--ink-2); }
-  .chips span:first-child { background: var(--ink); color: var(--bg); }
-  .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-  .tile { border-radius: 13px; background: var(--surface); box-shadow: var(--shadow); padding: 6px; animation: rise .7s var(--ease-out) both; }
-  .tile .art { aspect-ratio: 4 / 3; border-radius: 9px; background: var(--t); position: relative; overflow: hidden; }
-  .tile .art::after { content: ""; position: absolute; inset: 0; background: radial-gradient(circle at 30% 25%, rgba(255,255,255,.35), transparent 55%); }
-  .tile .nm { font-size: 11px; font-weight: 600; margin: 5px 2px 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+  .appicon { display: block; width: 96px; height: 96px; margin: 0 0 18px -6px; animation: iconIn 1s var(--spring) both; }
+  .appicon img { width: 100%; height: 100%; filter: drop-shadow(0 14px 22px rgba(120, 60, 30, .28)); }
+  @keyframes iconIn { from { opacity: 0; transform: translateY(14px) scale(.8) rotate(-10deg); } to { opacity: 1; transform: none; } }
+  .shot { position: relative; margin: 2px auto 0; transform-origin: 82% 0; animation: pop .9s var(--spring) both .2s; }
+  .shot img { width: 100%; height: auto; }
+  .shot .float { display: block; animation: float 7s ease-in-out infinite 1.2s; }
+  .shot picture img { transform: perspective(1200px) rotateX(var(--tx, 0deg)) rotateY(var(--ty, 0deg)); transition: transform .6s var(--ease-out); }
+  @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+  .menubar .strip .pad { position: relative; }
+  .menubar .strip .pad::after { content: ""; position: absolute; inset: -5px -6px; border-radius: 7px; background: color-mix(in srgb, var(--ink) 12%, transparent); z-index: -1; animation: pill .5s var(--ease-out) both .1s; }
+  @keyframes pill { from { opacity: 0; transform: scale(.7); } to { opacity: 1; transform: none; } }
+
+  .gallery { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; align-items: start; }
+  @media (max-width: 800px) { .gallery { grid-template-columns: 1fr; max-width: 360px; margin-inline: auto; } }
+  .gallery figure { margin: 0; }
+  .gallery img { width: 100%; height: auto; transition: transform .5s var(--spring); }
+  .gallery figure:hover img { transform: translateY(-6px) rotate(-.6deg); }
+  .gallery figcaption { text-align: center; font-size: 14px; color: var(--ink-2); margin-top: 6px; }
+  .gallery figure:nth-child(2) { margin-top: 36px; }
+  @media (max-width: 800px) { .gallery figure:nth-child(2) { margin-top: 0; } }
 
   /* ---------- sections ---------- */
   section { padding: 76px 0; }
@@ -207,7 +215,7 @@
 <header class="top" id="top">
   <div class="wrap bar">
     <a class="brand" href="#top" aria-label="Ludus, back to top">
-      <span class="mark"><svg viewBox="0 0 88 55" aria-hidden="true"><use href="#ludus-mark"/></svg></span>
+      <span class="mark"><picture><source media="(prefers-color-scheme: dark)" srcset="img/icon-dark.png"><img src="img/icon-light.png" width="34" height="34" alt=""></picture></span>
       Ludus
     </a>
     <nav aria-label="Sections">
@@ -224,12 +232,16 @@
 <main id="main">
   <div class="wrap hero">
     <div>
+      <picture class="appicon">
+        <source media="(prefers-color-scheme: dark)" srcset="img/icon-dark.png">
+        <img src="img/icon-light.png" width="96" height="96" alt="The Ludus app icon">
+      </picture>
       <span class="eyebrow"><i aria-hidden="true"></i>Free for Mac and Windows</span>
       <h1>Ludus</h1>
       <p class="sub">Take a little break</p>
       <p class="lede">A small panel of games that lives in your menu bar or system tray. Click the controller, play a round of Snake, Sudoku or a quick duel against the computer, then get back to work. Your place is saved when you close it.</p>
       <div class="downloads">
-        <a class="btn" id="dl-mac" data-os="mac" href="https://github.com/Solomon-69/Ludus/releases/latest/download/Ludus-mac.zip" data-repo>
+        <a class="btn" id="dl-mac" data-os="mac" href="https://github.com/Solomon-69/Ludus/releases/latest/download/Ludus.dmg" data-repo>
           <svg class="os" aria-hidden="true"><use href="#apple"/></svg>
           <span>Download for Mac<small>macOS 14 or later, Apple silicon</small></span>
           <svg class="arrow" aria-hidden="true"><use href="#arrow"/></svg>
@@ -243,21 +255,15 @@
       <p class="reqs"><b>Mac:</b> macOS 14 Sonoma or later on Apple silicon (M1 or newer). <b>Windows:</b> Windows 10 or 11, 64-bit. Both are free, open source and work offline.</p>
     </div>
 
-    <div class="stagebox" aria-hidden="true">
-      <div class="glow"></div>
+    <div class="stagebox">
+      <div class="glow" aria-hidden="true"></div>
       <div class="menubar">
-        <div class="strip"><span></span><span></span><b class="pad"><svg viewBox="0 0 88 55"><use href="#ludus-mark"/></svg></b><span></span></div>
-        <div class="panel">
-          <div class="p-head"><svg viewBox="0 0 88 55"><use href="#ludus-mark"/></svg><div><b>Ludus</b><small>Take a little break</small></div></div>
-          <div class="chips"><span>All</span><span>Arcade</span><span>Puzzle</span><span>Duel</span><span>2 Player</span></div>
-          <div class="tiles">
-            <div class="tile" style="--t:#e0a526;animation-delay:.25s"><div class="art"></div><div class="nm">2048</div></div>
-            <div class="tile" style="--t:#5b8def;animation-delay:.3s"><div class="art"></div><div class="nm">Blocks</div></div>
-            <div class="tile" style="--t:#4f9d69;animation-delay:.35s"><div class="art"></div><div class="nm">Snake</div></div>
-            <div class="tile" style="--t:#9b6dd6;animation-delay:.4s"><div class="art"></div><div class="nm">Minesweeper</div></div>
-            <div class="tile" style="--t:#c4633f;animation-delay:.45s"><div class="art"></div><div class="nm">Four Up</div></div>
-            <div class="tile" style="--t:#3aa6a6;animation-delay:.5s"><div class="art"></div><div class="nm">Flappy Spark</div></div>
-          </div>
+        <div class="strip" aria-hidden="true"><span></span><span></span><b class="pad"><svg viewBox="0 0 88 55"><use href="#ludus-mark"/></svg></b><span></span></div>
+        <div class="shot" id="heroShot">
+          <picture class="float">
+            <source media="(prefers-color-scheme: dark)" srcset="img/panel-dark.png">
+            <img src="img/panel-light.png" width="449" height="649" fetchpriority="high" alt="The Ludus panel open under the menu bar, with a Continue card for 2048 and a grid of games">
+          </picture>
         </div>
       </div>
     </div>
@@ -284,6 +290,28 @@
           <h3>Private and offline</h3>
           <p>Everything runs on your computer. Ludus never connects to the internet and collects nothing.</p>
         </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="screens">
+    <div class="wrap">
+      <p class="kicker reveal">A closer look</p>
+      <h2 class="reveal">Small panel, lots to play</h2>
+      <p class="intro reveal">Screenshots of the panel. Ludus follows your light or dark setting, or you can pick one.</p>
+      <div class="gallery">
+        <figure class="reveal">
+          <picture><source media="(prefers-color-scheme: dark)" srcset="img/home-dark.png"><img src="img/home-light.png" width="449" height="649" loading="lazy" alt="The games list"></picture>
+          <figcaption>Every game in one list</figcaption>
+        </figure>
+        <figure class="reveal">
+          <picture><source media="(prefers-color-scheme: dark)" srcset="img/game-dark.png"><img src="img/game-light.png" width="449" height="649" loading="lazy" alt="A game of 2048 in progress"></picture>
+          <figcaption>Close it mid-game, it waits for you</figcaption>
+        </figure>
+        <figure class="reveal">
+          <picture><source media="(prefers-color-scheme: dark)" srcset="img/settings-dark.png"><img src="img/settings-light.png" width="449" height="649" loading="lazy" alt="The settings screen"></picture>
+          <figcaption>Make it yours in Settings</figcaption>
+        </figure>
       </div>
     </div>
   </section>
@@ -365,12 +393,12 @@
           <h3><svg aria-hidden="true"><use href="#apple"/></svg>Mac</h3>
           <p class="req">macOS 14 Sonoma or later, Apple silicon (M1 or newer)</p>
           <ol>
-            <li><b>Download</b> Ludus-mac.zip and open it. You get <b>Ludus.app</b>.</li>
-            <li><b>Drag Ludus.app into Applications.</b></li>
-            <li>The first time only: in Applications, <b>right-click Ludus and choose Open</b>, then Open again. On newer macOS versions, if you see no Open button, go to System Settings, Privacy &amp; Security, and click <b>Open Anyway</b>.</li>
+            <li><b>Download</b> Ludus.dmg and open it.</li>
+            <li><b>Drag Ludus into Applications</b>, then open it from there.</li>
+            <li>If macOS asks the first time: in Applications, <b>right-click Ludus and choose Open</b>, then Open again. On newer macOS versions, if you see no Open button, go to System Settings, Privacy &amp; Security, and click <b>Open Anyway</b>.</li>
             <li>Look for the <b>controller icon</b> in the menu bar and click it.</li>
           </ol>
-          <p class="why">Why the extra step: this build is not notarised by Apple yet, so macOS cannot check the developer for you.</p>
+          <p class="why">Why the extra step: builds that are not notarised by Apple need you to confirm once. A notarised build opens straight away. Homebrew install is coming soon.</p>
         </div>
         <div class="card reveal">
           <h3><svg aria-hidden="true"><use href="#windows"/></svg>Windows</h3>
@@ -476,6 +504,21 @@
           b.style.setProperty('--lean-x', '0px');
           b.style.setProperty('--lean-y', '0px');
         });
+      });
+    }
+
+    // Hero screenshot tilts a touch toward the pointer.
+    var shot = document.getElementById('heroShot');
+    if (!reduce && shot && window.matchMedia('(hover: hover)').matches) {
+      var img = shot.querySelector('img');
+      shot.addEventListener('pointermove', function (e) {
+        var r = shot.getBoundingClientRect();
+        img.style.setProperty('--ty', (((e.clientX - r.left) / r.width) - 0.5) * 6 + 'deg');
+        img.style.setProperty('--tx', (0.5 - ((e.clientY - r.top) / r.height)) * 5 + 'deg');
+      });
+      shot.addEventListener('pointerleave', function () {
+        img.style.setProperty('--tx', '0deg');
+        img.style.setProperty('--ty', '0deg');
       });
     }
 
