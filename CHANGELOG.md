@@ -3,11 +3,17 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
-## Unreleased
+## 1.6.0 (2026-10-23)
 
-- **Play online (opt-in):** create a room, share the 5 character code and play Connect Four, Dots and Boxes,
-  Ultimate Tic-Tac-Toe, Hex, Quoridor, Rock Paper Scissors, Dead Centre or Last Wire with someone in another
-  place. Nothing is sent unless you use it. See `web/ONLINE.md`.
+- **Play online (opt-in):** create a room, share the 5 character code (or the Copy invite link,
+  `ludus://join/CODE`) and play with someone in another place. Works on Mac and Windows, for 2 to 4 players,
+  in 13 games. Uses free public relays only when you choose Play online. Rooms are not private. See `web/ONLINE.md`.
+- **3-4 Player tab:** Tag, Paper.io and Hole.io for three or four players.
+- **Search:** the best match leads as a highlighted card, with related games below it.
+- **Rename games (Settings > Play):** click a game's name to give it your own. The original name is still shown.
+- **Game list (37 games):** new Flag Quiz (countries plus regional flags from the US, Canada, the UK and 13 more
+  countries), Slither.io, Hole.io, Paper.io, Bloons TD Battles, Plants vs. Zombies (Easy and Hard), Getting Over It
+  (difficulty menu) and the Brain rot skin for Stack. Tron has been removed.
 
 ## 1.5
 

@@ -7,10 +7,10 @@
 
 <h1>Ludus</h1>
 
-<p><b>33 little games in your menu bar. Take a little break.</b></p>
+<p><b>37 little games in your menu bar. Take a little break.</b></p>
 
 <p>
-  <a href="https://github.com/Solomon-69/Ludus/releases/latest"><img alt="Version 1.5.0" src="https://img.shields.io/badge/version-1.5.0-d97757?style=flat-square"></a>
+  <a href="https://github.com/Solomon-69/Ludus/releases/latest"><img alt="Version 1.6.0" src="https://img.shields.io/badge/version-1.6.0-d97757?style=flat-square"></a>
   <img alt="macOS 14 or later" src="https://img.shields.io/badge/macOS-14%2B-1f1d1a?style=flat-square&logo=apple&logoColor=white">
   <img alt="Windows 10 or 11" src="https://img.shields.io/badge/Windows-10%20%7C%2011-1f1d1a?style=flat-square">
   <a href="LICENSE"><img alt="MIT licence" src="https://img.shields.io/badge/licence-MIT-5b8a5a?style=flat-square"></a>
@@ -54,7 +54,7 @@ It is free, open source, works fully offline by default and collects nothing. Pl
 
 ## Features
 
-Ludus puts 33 small, polished games one click away. Here is what is inside.
+Ludus puts 37 small, polished games one click away. Here is what is inside.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/showcase/ludus-2-dark.png">
@@ -67,7 +67,7 @@ Every board game has a <b>vs Bot / vs Friend</b> switch at the top. Pick Friend 
 
 - <b>Turn-based with a friend:</b> Connect Four, Dots and Boxes, Ultimate Tic-Tac-Toe, Hex and Dead Centre.
 - <b>Secret picks:</b> in Rock Paper Scissors, Player 1 picks with <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> and Player 2 with <kbd>J</kbd> <kbd>K</kbd> <kbd>L</kbd>. Both hands show only once you have both locked in.
-- <b>Real time:</b> Pong, Air Hockey, Rally, Tag, Nidhogg and Tank Trouble, with one player on <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> and the other on the arrow keys. Tag takes up to four on one keyboard: P3 on <kbd>I</kbd> <kbd>J</kbd> <kbd>K</kbd> <kbd>L</kbd> (+<kbd>U</kbd>) and P4 on the number pad <kbd>8</kbd> <kbd>4</kbd> <kbd>5</kbd> <kbd>6</kbd> (+<kbd>0</kbd>).
+- <b>Real time:</b> Pong, Air Hockey, Tag, Nidhogg and Tank Trouble, with one player on <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> and the other on the arrow keys. Tag takes up to four on one keyboard: P3 on <kbd>I</kbd> <kbd>J</kbd> <kbd>K</kbd> <kbd>L</kbd> (+<kbd>U</kbd>) and P4 on the number pad <kbd>8</kbd> <kbd>4</kbd> <kbd>5</kbd> <kbd>6</kbd> (+<kbd>0</kbd>).
 - All of them are in the <b>2 Player</b> tab. The panel widens by itself when a game needs the room.
 
 <br>
@@ -79,17 +79,22 @@ Every board game has a <b>vs Bot / vs Friend</b> switch at the top. Pick Friend 
 
 ### Play online with a room code
 
-Thirteen games have an <b>Online</b> button next to vs Bot / vs Friend: the board games Connect Four, Dots and Boxes, Ultimate Tic-Tac-Toe, Hex, Quoridor, Rock Paper Scissors, Dead Centre and Last Wire, the two-player action games Pong and Air Hockey, and three games for <b>2 to 4 players</b>: Tag, Paper.io and Hole.io (all in the <b>3-4 Player</b> tab; the host can press <b>Start now</b> once two are in, or the room starts by itself when all four seats are taken). One player taps <b>Create room</b> and gets a 5 character room code (with a <b>Copy invite</b> button that copies a message and a `ludus://join/CODE` link); the other taps <b>Join room</b> and types or pastes it, or just clicks the link. No account and no server of ours: the two copies of Ludus talk through a free public relay. Nothing is sent unless you use this. Anyone who knows the code can join, so it is not private. See [PRIVACY.md](PRIVACY.md) and [web/ONLINE.md](web/ONLINE.md).
+Thirteen games have an <b>Online</b> button next to vs Bot / vs Friend: the board games Connect Four, Dots and Boxes, Ultimate Tic-Tac-Toe, Hex, Quoridor, Rock Paper Scissors, Dead Centre and Last Wire, the action games Pong and Air Hockey, and Tag, Paper.io and Hole.io, which take <b>2 to 4 players</b> (they are in the <b>3-4 Player</b> tab; the host can press <b>Start now</b> once the room has enough players, or the game starts by itself when every seat is taken). Most games are for two players.
+
+One player taps <b>Create room</b> and gets a 5 character room code. The <b>Copy invite</b> button copies a short message with the code and a `ludus://join/CODE` link. The other player taps <b>Join room</b> and types or pastes the code, or just clicks the link. It works on Mac and Windows. There is no account and no server of ours: the copies of Ludus talk through free public relays, and that only happens when you choose Play online. Rooms are not private: anyone who knows the code can join. See [PRIVACY.md](PRIVACY.md) and [web/ONLINE.md](web/ONLINE.md).
 
 ### Arcade classics that feel right
 
-Eleven arcade games built to play smoothly at 60 frames a second, each with its own best score to beat.
+Fourteen arcade games built to play smoothly at 60 frames a second, each with its own best score to beat.
 
 - <b>Space Invaders</b>: waves of invaders, shields and a mystery ship.
 - <b>Stack</b>: drop each block in 3D and line it up perfectly for a combo. Press <kbd>B</kbd> (or the top-left button) for the silly <b>Brain rot</b> skin: every slab is a made-up character with a name and sound captions.
 - <b>Pac-Man</b>: a maze, four ghosts and power pellets.
-- Plus Blocks (falling blocks with proper locking), Breakout, Drift, Flappy Bird, Plants vs. Zombies, Getting Over It, Snake and Doodle Jump.
-- Three difficulty levels change the speed and how clever the computer is.
+- <b>Getting Over It</b>: climb a mountain with a hammer. Pick a difficulty from the menu.
+- <b>Plants vs. Zombies</b>: plant a garden against the creeping weeds, on Easy or Hard.
+- <b>Hole.io</b>, <b>Paper.io</b> and <b>Slither.io</b>: eat, claim land or grow longer than the rest.
+- Plus Tetris (falling blocks with proper locking), Breakout, Asteroids, Flappy Bird, Snake and Doodle Jump.
+- Most games have difficulty levels that change the speed and how clever the computer is.
 
 <br>
 
@@ -100,10 +105,11 @@ Eleven arcade games built to play smoothly at 60 frames a second, each with its 
 
 ### Puzzles for a quick think
 
-Eight calm puzzle games for a two-minute break or a longer think. Close the panel at any point and the game is saved exactly as it was.
+Nine calm puzzle games for a two-minute break or a longer think. Close the panel at any point and the game is saved exactly as it was.
 
 - <b>2048</b>, <b>Wordle</b> (guess the word in six tries), <b>Sudoku</b> with notes and undo.
 - <b>Minesweeper</b>, <b>Solitaire</b>, <b>Memory</b>, <b>Sokoban</b> and <b>Candy Crush</b>.
+- <b>Flag Quiz</b>: name the country from its flag. It also has regional flags: US states, Canadian provinces, UK nations and regions in 13 more countries.
 - Keyboard first, but every puzzle also works with clicks.
 
 <br>
@@ -127,6 +133,14 @@ Clicking anywhere outside the panel pauses your game and saves it. Next time you
   <source media="(prefers-color-scheme: dark)" srcset="docs/showcase/ludus-6-dark.png">
   <img src="docs/showcase/ludus-6-light.png" width="880" alt="The Ludus settings screen in light and dark">
 </picture>
+
+### Find a game in a second
+
+- Type in the search box. The best match appears first as a highlighted card, and <b>Related games</b> follow below it.
+- Tabs for All, Arcade, Puzzle, Duel, 2 Player and 3-4 Player.
+- Optional <b>Rename games</b> in Settings: turn it on and click a game's name to give it your own. The original name is still shown.
+
+<br>
 
 ### Feels at home on your Mac
 
@@ -182,9 +196,9 @@ brew install --cask ludus   # not available yet
 
 | Group | Games |
 | --- | --- |
-| **Arcade** (beat your best) | Tetris, Breakout, Pac-Man, Asteroids, Flappy Bird, Plants vs. Zombies, Getting Over It, Space Invaders, Snake, Doodle Jump, Stack |
-| **Puzzle** | 2048, Sokoban, Wordle, Minesweeper, Memory, Solitaire, Candy Crush, Sudoku |
-| **Duel** (you against the computer) | Dots and Boxes, Dead Centre, Connect Four, Last Wire, Ultimate Tic-Tac-Toe, Nidhogg, Hex, Rock Paper Scissors, Quoridor |
+| **Arcade** (beat your best) | Tetris, Breakout, Pac-Man, Getting Over It, Plants vs. Zombies, Flappy Bird, Asteroids, Space Invaders, Snake, Doodle Jump, Stack, Hole.io, Paper.io, Slither.io |
+| **Puzzle** | 2048, Sokoban, Wordle, Minesweeper, Memory, Solitaire, Candy Crush, Sudoku, Flag Quiz |
+| **Duel** (you against the computer) | Dots and Boxes, Dead Centre, Connect Four, Last Wire, Ultimate Tic-Tac-Toe, Nidhogg, Hex, Rock Paper Scissors, Quoridor, Bloons TD Battles |
 | **2 Player** (one keyboard) | Air Hockey, Pong, Tag, Tank Trouble |
 | **3-4 Player** (online, Tag also on one keyboard) | Tag, Paper.io, Hole.io |
 
@@ -215,7 +229,7 @@ Open Settings with the gear in the top corner of the panel.
 | Section | What you can change |
 | --- | --- |
 | **Look** | Appearance (Auto, Light, Dark), accent colour, panel size (Compact or Large), reduce motion |
-| **Play** | Difficulty (Easy, Normal, Hard), sound and volume, show controls under games, open on all games or the last game |
+| **Play** | Difficulty (Easy, Normal, Hard), sound and volume, show controls under games, rename games, open on all games or the last game |
 | **App** | Open at login, invisible menu bar icon (Mac), reset best scores, quit |
 
 ## Privacy
