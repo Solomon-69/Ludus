@@ -23,8 +23,8 @@
   };
 
   // ---------- projection: oblique, camera looks from the south; tops lean left so the east side shows ----------
-  let SH = SHEAR0;
-  const px = (x, z) => x - z * SH, py = (y, z) => y * TILT - z * ZK;
+  let SH = SHEAR0, ZV = ZK;
+  const px = (x, z) => x - z * SH, py = (y, z) => y * TILT - z * ZV;
   const hsl = (h, s, l) => `hsl(${h.toFixed(0)} ${s.toFixed(0)}% ${l.toFixed(0)}%)`;
   // [top, south, east] in light and dark
   function tones(h, s, l) {
@@ -36,7 +36,8 @@
   }
   function box(g, x0, y0, x1, y1, z0, z1, f) {
     g.lineWidth = 0.45; g.lineJoin = 'round';
-    g.fillStyle = g.strokeStyle = f[2]; quad(g, [x1, y1, z0], [x1, y0, z0], [x1, y0, z1], [x1, y1, z1]);
+    if (SH > 0.02) { g.fillStyle = g.strokeStyle = f[2]; quad(g, [x1, y1, z0], [x1, y0, z0], [x1, y0, z1], [x1, y1, z1]); }
+    else if (SH < -0.02) { g.fillStyle = g.strokeStyle = f[2]; quad(g, [x0, y1, z0], [x0, y0, z0], [x0, y0, z1], [x0, y1, z1]); }
     g.fillStyle = g.strokeStyle = f[1]; quad(g, [x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1]);
     g.fillStyle = g.strokeStyle = f[0]; quad(g, [x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]);
   }
@@ -50,6 +51,7 @@
     g.fill();
   }
   function winsE(g, x, y0, y1, zA, zB, cols, rows, col) {
+    if (SH < 0.02) return;
     g.fillStyle = col; g.beginPath();
     const cw = (y1 - y0) / cols, rh = (zB - zA) / rows;
     for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
@@ -142,7 +144,8 @@
         winsE(g, hw, -hd + 4, hd - 4, 5, h0 - 3, 2, 1, dark ? 'rgba(255,224,160,0.45)' : 'rgba(255,255,255,0.55)');
         const ax0 = -hw - e, ax1 = hw + e, ay0 = -hd - e, ay1 = hd + e, rx = hw * 0.22, ry = hd * 0.16;
         g.lineWidth = 0.45;
-        g.fillStyle = g.strokeStyle = rf[2]; quad(g, [ax1, ay1, h0], [ax1, ay0, h0], [rx, -ry, o.h], [rx, ry, o.h]);
+        if (SH >= 0) { g.fillStyle = g.strokeStyle = rf[2]; quad(g, [ax1, ay1, h0], [ax1, ay0, h0], [rx, -ry, o.h], [rx, ry, o.h]); }
+        else { g.fillStyle = g.strokeStyle = rf[2]; quad(g, [ax0, ay1, h0], [ax0, ay0, h0], [-rx, -ry, o.h], [-rx, ry, o.h]); }
         g.fillStyle = g.strokeStyle = rf[1]; quad(g, [ax0, ay1, h0], [ax1, ay1, h0], [rx, ry, o.h], [-rx, ry, o.h]);
         g.fillStyle = g.strokeStyle = rf[0]; quad(g, [-rx, -ry, o.h], [rx, -ry, o.h], [rx, ry, o.h], [-rx, ry, o.h]);
         break;
@@ -152,7 +155,7 @@
         box(g, -hw, -hd, hw, hd, 0, o.h, f);
         g.lineWidth = 0.45; g.fillStyle = g.strokeStyle = o.c2[k][1];
         quad(g, [-hw - 2, hd, 22], [hw + 2, hd, 22], [hw + 2, hd + 8, 17], [-hw - 2, hd + 8, 17]);
-        g.fillStyle = g.strokeStyle = o.c2[k][2]; quad(g, [hw + 2, hd, 22], [hw + 2, hd + 8, 17], [hw + 2, hd + 8, 14], [hw + 2, hd, 18]);
+        if (SH > 0.02) { g.fillStyle = g.strokeStyle = o.c2[k][2]; quad(g, [hw + 2, hd, 22], [hw + 2, hd + 8, 17], [hw + 2, hd + 8, 14], [hw + 2, hd, 18]); }
         winsS(g, -hw + 5, hw - 5, hd, 24, o.h - 4, 5, 2, dark ? 'rgba(255,224,160,0.5)' : 'rgba(255,255,255,0.62)');
         winsS(g, -hw + 5, hw - 5, hd, 3, 14, 5, 1, dark ? 'rgba(160,200,230,0.4)' : 'rgba(150,185,215,0.5)');
         winsE(g, hw, -hd + 5, hd - 5, 6, o.h - 4, 4, 3, dark ? 'rgba(255,224,160,0.4)' : 'rgba(255,255,255,0.5)');
@@ -191,7 +194,6 @@
       const hx = w * 0.5, hy = h * 0.78;
       ctx.fillStyle = 'rgba(255,248,240,0.9)'; ctx.beginPath(); ctx.ellipse(hx, hy, h * 0.28, h * 0.18, 0, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = '#1b1713'; ctx.beginPath(); ctx.ellipse(hx, hy + 1, h * 0.25, h * 0.15, 0, 0, Math.PI * 2); ctx.fill();
-      D.spark(ctx, hx, hy, h * 0.06, '#d97757', 0);
       ctx.fillStyle = '#5b8def'; ctx.beginPath(); ctx.ellipse(w * 0.86, h * 0.84, h * 0.09, h * 0.056, 0, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = '#1b1713'; ctx.beginPath(); ctx.ellipse(w * 0.86, h * 0.845, h * 0.075, h * 0.045, 0, 0, Math.PI * 2); ctx.fill();
     },
@@ -363,7 +365,7 @@
       const cam = { x: WORLD / 2, y: WORLD / 2, s: 1.6, snap: true, yoff: 0, top: 52, bot: 56 };
       function humans() { return holes.filter(h => (on ? isMine(h) : h.human)); }
       function singleScale(rmax) {
-        const { w, h } = view, zw = 150 + rmax * 6.2;
+        const { w, h } = view, zw = 96 + rmax * 4.4;
         return (0.62 * Math.min(w, h * 0.92) + 0.38 * Math.sqrt(w * h * 0.92)) / zw;
       }
       function camLimits() {   // friend: how far apart the two humans may be on screen
@@ -393,6 +395,11 @@
         cx = WORLD + 2 * m > 2 * halfW ? clamp(cx, halfW - m, WORLD - halfW + m) : WORLD / 2;
         cy = WORLD + 2 * m > halfH + halfHb ? clamp(cy, halfH - m, WORLD - halfHb + m) : WORLD / 2;
         cam.x += (cx - cam.x) * k; cam.y += (cy - cam.y) * k; cam.snap = false;
+      }
+      // perspective-like lean: tops of tall things lean away from the screen centre (the player's hole); nearer (lower) things are taller
+      function setLean(x, y) {
+        SH = -clamp((x - cam.x) * cam.s / (view.w * 0.5), -1, 1) * 0.4;
+        ZV = ZK * (1 + 0.28 * clamp((y - cam.y) * cam.s * TILT / (view.h * 0.5), -1, 1));
       }
       const sxOf = x => (x - cam.x) * cam.s + view.w / 2, syOf = y => (y - cam.y) * cam.s * TILT + view.h / 2 + cam.yoff;
 
@@ -688,12 +695,12 @@
           for (const o of h.falling) {
             const f = o.fall, p = clamp(f.t / f.dur, 0, 1), e = p * p * (3 - 2 * p);
             const ox = f.x0 + (x - f.x0) * e, oy = f.y0 + (y - f.y0) * e;
-            const k = 1 - 0.55 * p * p, sink = p * p * (o.h * ZK + ry * 0.9) * cam.s * 0.9;
-            SH = SHEAR0 + f.side * 0.55 * Math.sin(Math.min(1, p / 0.4) * Math.PI / 2) * (1 - p * 0.4);
+            const k = 1 - 0.8 * p * p, sink = p * p * (o.h * ZK + ry * 0.9) * cam.s * 0.9;
+            setLean(ox, oy); SH += f.side * 0.45 * Math.sin(Math.min(1, p / 0.4) * Math.PI / 2) * (1 - p * 0.4);
             ctx.save(); ctx.translate(sxOf(ox), syOf(oy) + sink); ctx.scale(cam.s * k, cam.s * k);
             drawObj(ctx, o, dark); ctx.restore();
           }
-          SH = SHEAR0; ctx.restore();
+          SH = SHEAR0; ZV = ZK; ctx.restore();
         }
         // front rim: a bright lip so the drop reads as going down
         ctx.strokeStyle = c; ctx.lineWidth = Math.max(2, rx * 0.1); ctx.lineCap = 'round';
@@ -701,8 +708,6 @@
         ctx.globalAlpha = alpha * 0.25 * h.pulse; ctx.lineWidth = 3;
         ctx.beginPath(); ctx.ellipse(sx, sy, rx * 1.3, ry * 1.3, 0, 0, Math.PI * 2); ctx.stroke();
         ctx.globalAlpha = alpha;
-        if (h.human === 1) D.spark(ctx, sx, sy, Math.min(15, Math.max(6, rx * 0.34)), 'rgba(255,255,255,0.78)', clock * 0.5);
-        if (h.human === 2) D.spark(ctx, sx, sy, Math.min(15, Math.max(6, rx * 0.34)), 'rgba(255,255,255,0.78)', -clock * 0.5);
         ctx.restore();
       }
 
@@ -720,9 +725,11 @@
         vis.sort((a, b) => a.y - b.y);
         for (let k = 0; k < vis.length; k++) {
           const o = vis[k];
+          setLean(o.x, o.y);
           ctx.save(); ctx.translate(sxOf(o.x), syOf(o.y)); ctx.scale(cam.s, cam.s);
           drawObj(ctx, o, dark); ctx.restore();
         }
+        SH = SHEAR0; ZV = ZK;
       }
 
       function tag(str, x, y, size, fill, line) {
