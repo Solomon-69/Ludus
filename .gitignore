@@ -1,0 +1,24 @@
+# macOS
+.DS_Store
+
+# Mac build
+assets/*.iconset
+/out/
+*.app
+*.zip
+
+# Windows build
+windows/bin/
+windows/obj/
+windows/out/
+*.user
+.vs/
+
+# Test harness scratch pages
+web/.harness-*
+
+# Personal signing identity and internal notes
+.signing
+QA/AGENT-BRIEF.md
+QA/PROGRESS.md
+reference/

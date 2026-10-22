@@ -1,0 +1,319 @@
+/* Ludus engine: game registry, settings, storage, sound and helpers shared by every game.
+   Game contract (see games/g2048.js for a full example):
+
+   Ludus.register({
+     id: 'snake', name: 'Snake', tag: 'Arcade' | 'Puzzle' | 'Duel' | '2 Player', tint: '#hex',
+     hint: 'Arrows or swipe',            // shown under the stage (HTML allowed, use <kbd>)
+     art(ctx, w, h, colors) { ... },     // draws the card thumbnail (CSS pixels, already scaled)
+     create(stage, api) { ...; return { destroy() {}, pause() {}, resume() {} } } // all optional
+   })
+
+   Everything a game registers through api.on / api.loop / api.timeout is cleaned up automatically
+   on restart, quit and pause. Restart = destroy + create again.
+*/
+(function () {
+  const games = [];
+  const STORE_KEY = 'ludus.v1';
+  const defaults = {
+    theme: 'system', accent: '#d97757', sound: true, volume: 0.6, difficulty: 'normal',
+    reduceMotion: false, hints: true, size: 'compact', hidden: [], best: {}, plays: {}, last: null,
+    filter: 'All', startOn: 'home', saves: {}
+  };
+
+  // ---------- persistence (native bridge first, browser storage as fallback) ----------
+  function loadState() {
+    let s = null;
+    try { if (window.__LUDUS_STATE__) s = window.__LUDUS_STATE__; } catch (e) {}
+    if (!s) { try { s = JSON.parse(localStorage.getItem(STORE_KEY) || 'null'); } catch (e) {} }
+    return Object.assign({}, defaults, s || {});
+  }
+  const state = loadState();
+  let saveTimer = null;
+  function write() {
+    const json = JSON.stringify(state);
+    try { localStorage.setItem(STORE_KEY, json); } catch (e) {}
+    native('save', { state: JSON.parse(json) });
+  }
+  // Batched save; pass true to write at once (panel closing or app quitting).
+  function save(now) {
+    clearTimeout(saveTimer);
+    if (now) { write(); return; }
+    saveTimer = setTimeout(write, 120);
+  }
+  function native(type, payload) {
+    try { window.webkit.messageHandlers.ludus.postMessage(Object.assign({ type }, payload || {})); return true; }
+    catch (e) {
+      try { if (window.chrome && window.chrome.webview) { window.chrome.webview.postMessage(Object.assign({ type }, payload || {})); return true; } } catch (e2) {}
+      return false;
+    }
+  }
+
+  // ---------- sound: tiny WebAudio synth, no files ----------
+  let actx = null;
+  const tones = {
+    tap: [[660, 0.04, 'sine']], click: [[520, 0.03, 'triangle']], move: [[300, 0.03, 'triangle']],
+    merge: [[520, 0.05, 'sine'], [780, 0.07, 'sine']], score: [[880, 0.06, 'sine'], [1320, 0.08, 'sine']],
+    eat: [[620, 0.04, 'square'], [820, 0.05, 'square']], jump: [[420, 0.07, 'sine', 760]],
+    drop: [[180, 0.06, 'triangle']], line: [[660, 0.06, 'sine'], [880, 0.06, 'sine'], [1100, 0.1, 'sine']],
+    hit: [[160, 0.09, 'sawtooth', 90]], boom: [[120, 0.25, 'sawtooth', 40]], power: [[300, 0.18, 'square', 900]],
+    win: [[523, 0.09, 'sine'], [659, 0.09, 'sine'], [784, 0.09, 'sine'], [1046, 0.18, 'sine']],
+    lose: [[392, 0.12, 'triangle'], [330, 0.12, 'triangle'], [262, 0.22, 'triangle']],
+    over: [[330, 0.12, 'triangle'], [247, 0.24, 'triangle']], tick: [[1200, 0.015, 'square']]
+  };
+  function sfx(name) {
+    if (!state.sound) return;
+    const seq = tones[name] || tones.tap;
+    try {
+      actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+      if (actx.state === 'suspended') actx.resume();
+      let t = actx.currentTime;
+      seq.forEach(([f, d, type, toF]) => {
+        const o = actx.createOscillator(), g = actx.createGain();
+        o.type = type; o.frequency.setValueAtTime(f, t);
+        if (toF) o.frequency.exponentialRampToValueAtTime(toF, t + d);
+        const v = 0.12 * state.volume;
+        g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(v, t + 0.008);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+        o.connect(g).connect(actx.destination); o.start(t); o.stop(t + d + 0.02);
+        t += d * 0.85;
+      });
+    } catch (e) {}
+  }
+
+  // ---------- colours from CSS tokens ----------
+  function colors() {
+    const cs = getComputedStyle(document.documentElement);
+    const v = n => cs.getPropertyValue(n).trim();
+    return {
+      bg: v('--bg'), bg2: v('--bg-2'), surface: v('--surface'), surface2: v('--surface-2'),
+      ink: v('--ink'), ink2: v('--ink-2'), ink3: v('--ink-3'), line: v('--line'),
+      accent: v('--accent'), good: v('--good'), bad: v('--bad'),
+      dark: document.documentElement.dataset.theme === 'dark'
+    };
+  }
+
+  // ---------- per-run api ----------
+  function makeApi(game, stage, hooks) {
+    const cleanups = [];
+    const loops = new Set();
+    let paused = false;
+    const held = new Map();   // keys down right now (key -> code), released on resume
+    let touched = false; // the player pressed a key or clicked at least once this run
+    let ended = false;   // after api.over: input is ignored but drawing continues so the final board can be seen
+    let score = 0;
+    const api = {
+      settings: state, colors, sfx,
+      difficulty: state.difficulty,
+      // 0 = easy, 1 = normal, 2 = hard
+      level: { easy: 0, normal: 1, hard: 2 }[state.difficulty] ?? 1,
+      reduceMotion: state.reduceMotion || matchMedia('(prefers-reduced-motion: reduce)').matches,
+      best: state.best[game.id] || 0,
+      // The snapshot this game returned from save() last time, or null. Restore from it in create().
+      saved: (state.saves && state.saves[game.id]) || null,
+      get ended() { return ended; },
+      get touched() { return touched; },
+      get paused() { return paused; },
+      rand: (a, b) => (b === undefined ? Math.random() * a : a + Math.random() * (b - a)),
+      randInt: (a, b) => Math.floor(a + Math.random() * (b - a + 1)),
+      pick: arr => arr[Math.floor(Math.random() * arr.length)],
+      on(target, type, fn, opts) {
+        const wrapped = e => {
+          // keyup and blur still reach the game while paused, so a key let go during the pause is not stuck down.
+          if ((paused || ended) && type !== 'resize' && type !== 'keyup' && type !== 'blur') return;
+          if (type === 'keydown' || type === 'pointerdown') touched = true;
+          if (type === 'keydown' && e.key) held.set(e.key, e.code);
+          if (type === 'keyup' && e.key) held.delete(e.key);
+          fn(e);
+        };
+        target.addEventListener(type, wrapped, opts);
+        cleanups.push(() => target.removeEventListener(type, wrapped, opts));
+      },
+      keys(fn) {
+        api.on(window, 'keydown', e => {
+          if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) e.preventDefault();
+          if (e.key === 'Escape' || e.key === 'p' || e.key === 'P') return;
+          fn(e);
+        });
+      },
+      keysUp(fn) { api.on(window, 'keyup', fn); },
+      swipe(fn, el) {
+        el = el || stage;
+        let sx = 0, sy = 0, down = false;
+        api.on(el, 'pointerdown', e => { down = true; sx = e.clientX; sy = e.clientY; });
+        api.on(el, 'pointerup', e => {
+          if (!down) return; down = false;
+          const dx = e.clientX - sx, dy = e.clientY - sy;
+          if (Math.max(Math.abs(dx), Math.abs(dy)) < 18) { fn('tap', e); return; }
+          fn(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up'), e);
+        });
+      },
+      loop(fn) {
+        let last = performance.now(), id = 0, t0 = last;
+        const entry = { running: true, needsFrame: true };
+        const tick = now => {
+          if (!entry.running) return;
+          const dt = Math.min(0.05, (now - last) / 1000); last = now;
+          // While paused, draw one still frame (dt 0) when asked, e.g. right after a restore or a resize.
+          const step = !paused || entry.needsFrame;
+          entry.needsFrame = false;
+          id = requestAnimationFrame(tick);
+          if (step) {
+            try { fn(paused ? 0 : dt, (now - t0) / 1000); }
+            catch (e) { if (!entry.failed) { entry.failed = true; hooks.toast('This game hit a problem'); setTimeout(() => { throw e; }); } }
+          }
+        };
+        entry.reset = () => { last = performance.now(); };
+        id = requestAnimationFrame(tick);
+        loops.add(entry);
+        cleanups.push(() => { entry.running = false; cancelAnimationFrame(id); });
+        return entry;
+      },
+      timeout(fn, ms) { const id = setTimeout(() => { if (!paused) fn(); else api.timeout(fn, 60); }, ms); cleanups.push(() => clearTimeout(id)); return id; },
+      // Full-stage canvas sized for the screen's pixel density. onResize(w, h) fires on start and on resize.
+      canvas(onResize) {
+        const c = document.createElement('canvas');
+        stage.appendChild(c);
+        const ctx = c.getContext('2d');
+        const view = { canvas: c, ctx, w: 0, h: 0, dpr: 1 };
+        const fit = notify => {
+          const r = stage.getBoundingClientRect();
+          const dpr = Math.min(3, window.devicePixelRatio || 1);
+          view.w = Math.max(1, Math.round(r.width)); view.h = Math.max(1, Math.round(r.height)); view.dpr = dpr;
+          c.width = Math.round(view.w * dpr); c.height = Math.round(view.h * dpr);
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          if (notify && onResize) onResize(view.w, view.h);
+          if (notify) loops.forEach(l => { l.needsFrame = true; });
+        };
+        // Size now, but only call onResize after create() has returned (the game's own
+        // variables, like the returned view, exist by then). ResizeObserver fires once on observe.
+        fit(false);
+        const ro = new ResizeObserver(() => fit(true)); ro.observe(stage);
+        cleanups.push(() => ro.disconnect());
+        return view;
+      },
+      score(n) {
+        score = Math.max(0, Math.round(n));
+        hooks.onScore(score);
+      },
+      addScore(d) { api.score(score + d); },
+      getScore() { return score; },
+      // End the run. opts: { score, title, won, message }
+      over(opts) {
+        if (ended) return;
+        ended = true;
+        opts = opts || {};
+        const final = opts.score !== undefined ? opts.score : score;
+        hooks.onOver(Object.assign({ score: final }, opts));
+      },
+      toast(text) { hooks.toast(text); }
+    };
+    return {
+      api,
+      pause() { paused = true; loops.forEach(l => { l.needsFrame = true; }); },
+      get ended() { return ended; },
+      resume() {
+        paused = false; loops.forEach(l => l.reset && l.reset());
+        // A key let go while the panel was closed never sent keyup: release it now so nothing stays stuck down.
+        const keys = [...held]; held.clear();
+        keys.forEach(([key, code]) => window.dispatchEvent(new KeyboardEvent('keyup', { key, code })));
+      },
+      destroy() { cleanups.splice(0).forEach(fn => { try { fn(); } catch (e) {} }); loops.clear(); }
+    };
+  }
+
+  // ---------- drawing helpers for games ----------
+  const draw = {
+    roundRect(ctx, x, y, w, h, r) {
+      w = Math.max(0, w); h = Math.max(0, h);
+      r = Math.max(0, Math.min(r, w / 2, h / 2));
+      ctx.beginPath(); ctx.moveTo(x + r, y);
+      ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+      ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+    },
+    // The Claude spark (8 rounded rays). Used as the hero in several games.
+    spark(ctx, x, y, r, color, rot) {
+      ctx.save(); ctx.translate(x, y); ctx.rotate(rot || 0);
+      ctx.strokeStyle = color; ctx.lineCap = 'round'; ctx.lineWidth = Math.max(1.5, r * 0.32);
+      for (let i = 0; i < 8; i++) {
+        const a = i * Math.PI / 4;
+        const inner = r * 0.18, outer = i % 2 ? r * 0.78 : r;
+        ctx.beginPath(); ctx.moveTo(Math.cos(a) * inner, Math.sin(a) * inner);
+        ctx.lineTo(Math.cos(a) * outer, Math.sin(a) * outer); ctx.stroke();
+      }
+      ctx.restore();
+    },
+    text(ctx, s, x, y, size, color, weight, align) {
+      ctx.fillStyle = color; ctx.font = `${weight || 650} ${size}px ui-rounded, "SF Pro Rounded", "Segoe UI Variable Display", system-ui, sans-serif`;
+      ctx.textAlign = align || 'center'; ctx.textBaseline = 'middle'; ctx.fillText(s, x, y);
+    },
+    ease: {
+      // Clamped at 0: a tiny negative result (floating point at t = 0) sizing an arc throws and stops a game's loop.
+      outBack: t => { const c = 1.7; return Math.max(0, 1 + (c + 1) * Math.pow(t - 1, 3) + c * Math.pow(t - 1, 2)); },
+      outCubic: t => 1 - Math.pow(1 - t, 3),
+      inOut: t => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2)
+    },
+    lerp: (a, b, t) => a + (b - a) * t,
+    // Player avatars, the same in every game: 'you' = Claude spark, 'bot' = the computer's robot face,
+    // 'p1' / 'p2' = two people on one keyboard (spark in accent / spark in blue).
+    P2: '#5b8def',
+    avatar(ctx, x, y, r, who, c) {
+      c = c || Ludus.colors();
+      ctx.save();
+      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fillStyle = who === 'bot' ? (c.dark ? '#3a3f47' : '#e4e7ec') : (c.dark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)');
+      ctx.fill();
+      if (who === 'bot') {
+        const s = r * 0.62, ink = c.dark ? '#cfd5de' : '#4a5260';
+        ctx.fillStyle = ink; ctx.strokeStyle = ink; ctx.lineWidth = Math.max(1, r * 0.1); ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(x, y - s * 0.62); ctx.lineTo(x, y - s * 0.95); ctx.stroke();
+        ctx.beginPath(); ctx.arc(x, y - s * 1.0, r * 0.1, 0, Math.PI * 2); ctx.fill();
+        draw.roundRect(ctx, x - s * 0.78, y - s * 0.6, s * 1.56, s * 1.2, s * 0.32); ctx.fill();
+        ctx.fillStyle = c.dark ? '#3a3f47' : '#e4e7ec';
+        ctx.beginPath(); ctx.arc(x - s * 0.34, y - s * 0.05, s * 0.17, 0, Math.PI * 2); ctx.arc(x + s * 0.34, y - s * 0.05, s * 0.17, 0, Math.PI * 2); ctx.fill();
+      } else {
+        draw.spark(ctx, x, y, r * 0.66, who === 'p2' ? draw.P2 : c.accent, 0);
+      }
+      ctx.restore();
+    },
+    // Standard header for every game with two sides. opts: { left:{who,label,score,pips,of}, right:{...},
+    // turn:'left'|'right'|null, status:'Your move', thinking:true }. Returns the header height.
+    duelHeader(ctx, x, y, w, opts, c) {
+      c = c || Ludus.colors();
+      const h = 40, pw = Math.min(132, w * 0.34), t = performance.now() / 1000;
+      const side = (o, px, right) => {
+        if (!o) return;
+        const active = opts.turn === (right ? 'right' : 'left');
+        ctx.save();
+        draw.roundRect(ctx, px, y, pw, h, 12);
+        ctx.fillStyle = c.dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)'; ctx.fill();
+        if (active) { ctx.strokeStyle = o.who === 'bot' ? c.ink3 : (o.who === 'p2' ? draw.P2 : c.accent); ctx.lineWidth = 1.5; ctx.stroke(); }
+        const ax = right ? px + pw - 20 : px + 20;
+        draw.avatar(ctx, ax, y + h / 2, 13, o.who, c);
+        const tx = right ? ax - 19 : ax + 19, align = right ? 'right' : 'left';
+        draw.text(ctx, o.label || (o.who === 'bot' ? 'Bot' : 'You'), tx, y + 13, 11.5, c.ink, 650, align);
+        if (o.of) {
+          for (let i = 0; i < o.of; i++) {
+            const dx = right ? tx - i * 9 - 3 : tx + i * 9 + 3;
+            ctx.beginPath(); ctx.arc(dx, y + 28, 3, 0, Math.PI * 2);
+            ctx.fillStyle = i < (o.pips || 0) ? (o.who === 'bot' ? c.ink2 : (o.who === 'p2' ? draw.P2 : c.accent)) : c.line; ctx.fill();
+          }
+        } else if (o.score !== undefined) {
+          draw.text(ctx, String(o.score), tx, y + 28, 13, c.ink, 700, align);
+        }
+        if (active && o.who === 'bot' && opts.thinking) {
+          for (let i = 0; i < 3; i++) {
+            ctx.globalAlpha = 0.35 + 0.65 * Math.max(0, Math.sin(t * 6 - i * 0.9));
+            ctx.beginPath(); ctx.arc(ax - 6 + i * 6, y + h + 6, 2, 0, Math.PI * 2); ctx.fillStyle = c.ink2; ctx.fill();
+          }
+        }
+        ctx.restore();
+      };
+      side(opts.left, x, false);
+      side(opts.right, x + w - pw, true);
+      if (opts.status) draw.text(ctx, opts.status, x + w / 2, y + h / 2, 12, c.accent, 650);
+      return h;
+    }
+  };
+
+  window.Ludus = { games, state, save, native, sfx, colors, draw, makeApi, register(g) { games.push(g); } };
+})();

@@ -1,0 +1,501 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ludus: little games for little breaks</title>
+<meta name="description" content="Ludus is a free menu bar and tray app for Mac and Windows with quick, offline mini games: arcade, puzzles, duels against the computer and two-player games.">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#f4efe6" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1b1814" media="(prefers-color-scheme: dark)">
+<meta property="og:title" content="Ludus">
+<meta property="og:description" content="Little games for little breaks. Free for Mac and Windows.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23e6856a'/%3E%3Cstop offset='1' stop-color='%23c76142'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect x='3' y='3' width='58' height='58' rx='14' fill='url(%23g)'/%3E%3Cpath fill='none' stroke='%23fff8ee' stroke-width='5.5' stroke-linecap='round' d='M32 13v13M32 38v13M13 32h13M38 32h13M18.6 18.6l9.2 9.2M36.2 36.2l9.2 9.2M45.4 18.6l-9.2 9.2M27.8 36.2l-9.2 9.2'/%3E%3C/svg%3E">
+<!--
+  Download links point at the newest GitHub Release. Replace Solomon-69/Ludus (it appears in the
+  three links marked data-repo below, and in the footer) with the real GitHub user and repository,
+  for example solomon/ludus.
+-->
+<style>
+  :root {
+    --bg: #f4efe6;
+    --bg-2: #ebe4d7;
+    --surface: #fffcf7;
+    --ink: #201c17;
+    --ink-2: #6b6256;
+    --ink-3: #8f857a;
+    --line: rgba(32, 28, 23, 0.10);
+    --accent: #d97757;
+    --accent-deep: #b9573a;
+    --accent-soft: rgba(217, 119, 87, 0.13);
+    --shadow: 0 1px 1px rgba(40, 28, 16, 0.04), 0 10px 30px -12px rgba(40, 28, 16, 0.22);
+    --shadow-lift: 0 2px 2px rgba(40, 28, 16, 0.05), 0 30px 60px -24px rgba(40, 28, 16, 0.35);
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+    --font-round: ui-rounded, "SF Pro Rounded", "Segoe UI Variable Display", -apple-system, system-ui, sans-serif;
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+    --spring: cubic-bezier(0.34, 1.4, 0.5, 1);
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1b1814;
+      --bg-2: #24201b;
+      --surface: #2a2621;
+      --ink: #f3ede3;
+      --ink-2: #b5aa9b;
+      --ink-3: #8c8276;
+      --line: rgba(255, 245, 230, 0.09);
+      --accent-deep: #e48a6c;
+      --accent-soft: rgba(217, 119, 87, 0.18);
+      --shadow: 0 1px 1px rgba(0, 0, 0, 0.3), 0 12px 30px -12px rgba(0, 0, 0, 0.7);
+      --shadow-lift: 0 2px 2px rgba(0, 0, 0, 0.3), 0 30px 60px -24px rgba(0, 0, 0, 0.85);
+      color-scheme: dark;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 var(--font); -webkit-font-smoothing: antialiased;
+  }
+  a { color: inherit; }
+  img, svg { display: block; }
+  .wrap { width: min(1080px, 100% - 32px); margin-inline: auto; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
+  .skip { position: absolute; left: -999px; top: 8px; background: var(--ink); color: var(--bg); padding: 8px 12px; border-radius: 8px; z-index: 10; }
+  .skip:focus { left: 8px; }
+
+  /* ---------- header ---------- */
+  header.top { position: sticky; top: 0; z-index: 5; backdrop-filter: saturate(1.4) blur(12px); -webkit-backdrop-filter: saturate(1.4) blur(12px); background: color-mix(in srgb, var(--bg) 82%, transparent); border-bottom: 1px solid transparent; transition: border-color .3s; }
+  header.top.scrolled { border-bottom-color: var(--line); }
+  .bar { display: flex; align-items: center; justify-content: space-between; height: 60px; }
+  .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; font: 700 18px/1 var(--font-round); letter-spacing: -0.01em; }
+  .mark { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; background: linear-gradient(#e6856a, #c76142); box-shadow: 0 4px 10px -4px rgba(199, 97, 66, .6); }
+  .mark svg { width: 18px; height: 18px; color: #fff8ee; }
+  nav ul { display: flex; gap: 4px; list-style: none; margin: 0; padding: 0; }
+  nav a { display: inline-block; padding: 8px 12px; border-radius: 10px; text-decoration: none; color: var(--ink-2); font-size: 14.5px; transition: color .2s, background .2s; }
+  nav a:hover { color: var(--ink); background: var(--accent-soft); }
+  @media (max-width: 560px) { nav li.opt { display: none; } }
+
+  /* ---------- hero ---------- */
+  .hero { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 56px; align-items: center; padding: 72px 0 88px; }
+  @media (max-width: 880px) { .hero { grid-template-columns: 1fr; gap: 48px; padding: 44px 0 64px; } }
+  .eyebrow { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-2); background: var(--surface); border: 1px solid var(--line); padding: 5px 12px 5px 8px; border-radius: 999px; }
+  .eyebrow i { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+  h1 { font: 800 clamp(52px, 9vw, 88px)/0.95 var(--font-round); letter-spacing: -0.035em; margin: 22px 0 10px; }
+  .sub { font: 600 clamp(21px, 3vw, 27px)/1.25 var(--font-round); color: var(--accent-deep); margin: 0 0 18px; letter-spacing: -0.01em; }
+  .lede { font-size: 17.5px; color: var(--ink-2); max-width: 34em; margin: 0 0 30px; }
+  .downloads { display: flex; flex-wrap: wrap; gap: 12px; }
+  .btn {
+    --lean-x: 0px; --lean-y: 0px;
+    position: relative; display: inline-flex; align-items: center; gap: 12px; min-height: 56px; padding: 0 22px 0 18px;
+    border-radius: 16px; text-decoration: none; font-weight: 650; font-size: 16px; letter-spacing: -0.005em;
+    border: 1px solid var(--line); background: var(--surface); color: var(--ink); box-shadow: var(--shadow);
+    transform: translate(var(--lean-x), var(--lean-y)); transition: transform .35s var(--spring), box-shadow .3s, background .2s;
+    overflow: hidden; isolation: isolate;
+  }
+  .btn svg.os { width: 22px; height: 22px; flex: none; }
+  .btn small { display: block; font-weight: 500; font-size: 12px; color: var(--ink-3); margin-top: 1px; }
+  .btn .arrow { width: 16px; height: 16px; margin-left: 2px; opacity: 0; transform: translateX(-6px); transition: opacity .25s, transform .35s var(--spring); }
+  .btn:hover { box-shadow: var(--shadow-lift); }
+  .btn:hover .arrow { opacity: 1; transform: translateX(0); }
+  .btn:active { transform: translate(var(--lean-x), var(--lean-y)) scale(.97); transition-duration: .12s; }
+  .btn::before { content: ""; position: absolute; inset: 0; z-index: -1; background: radial-gradient(160px circle at var(--gx, 50%) var(--gy, 50%), rgba(255, 255, 255, .16), transparent 60%); opacity: 0; transition: opacity .3s; }
+  .btn:hover::before { opacity: 1; }
+  .btn.primary { background: var(--ink); color: var(--bg); border-color: transparent; }
+  .btn.primary small { color: color-mix(in srgb, var(--bg) 62%, transparent); }
+  .reqs { margin: 18px 0 0; font-size: 13.5px; color: var(--ink-3); }
+  .reqs b { color: var(--ink-2); font-weight: 600; }
+
+  /* panel illustration: a drawing of the Ludus panel, not a screenshot */
+  .stagebox { position: relative; display: grid; place-items: center; }
+  .glow { position: absolute; inset: 8% 4%; background: radial-gradient(closest-side, var(--accent-soft), transparent); filter: blur(10px); }
+  .menubar { position: relative; width: min(400px, 100%); }
+  .menubar .strip { height: 30px; border-radius: 10px; background: color-mix(in srgb, var(--ink) 7%, transparent); display: flex; justify-content: flex-end; align-items: center; gap: 14px; padding: 0 14px; }
+  .menubar .strip span { width: 16px; height: 5px; border-radius: 3px; background: color-mix(in srgb, var(--ink) 18%, transparent); }
+  .menubar .strip .pad { width: 22px; height: 18px; color: var(--ink); background: none; display: grid; place-items: center; }
+  .menubar .strip .pad svg { width: 22px; height: 18px; }
+  .panel { position: relative; margin: 10px auto 0; width: 100%; border-radius: 20px; background: var(--bg); box-shadow: var(--shadow-lift), 0 0 0 1px var(--line); padding: 16px; transform-origin: 85% 0; animation: pop .9s var(--spring) both .15s; }
+  .panel::before { content: ""; position: absolute; top: -7px; right: 18px; width: 14px; height: 14px; background: var(--bg); transform: rotate(45deg); border-radius: 3px 0 0 0; box-shadow: -1px -1px 0 var(--line); }
+  @keyframes pop { from { opacity: 0; transform: translateY(-8px) scale(.94); } to { opacity: 1; transform: none; } }
+  .p-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .p-head svg { width: 24px; height: 24px; color: var(--accent); }
+  .p-head b { display: block; font: 700 15px/1.1 var(--font-round); }
+  .p-head small { display: block; font-size: 11px; color: var(--ink-3); }
+  .chips { display: flex; gap: 4px; margin-bottom: 12px; flex-wrap: wrap; }
+  .chips span { font-size: 11px; padding: 4px 9px; border-radius: 8px; color: var(--ink-2); }
+  .chips span:first-child { background: var(--ink); color: var(--bg); }
+  .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .tile { border-radius: 13px; background: var(--surface); box-shadow: var(--shadow); padding: 6px; animation: rise .7s var(--ease-out) both; }
+  .tile .art { aspect-ratio: 4 / 3; border-radius: 9px; background: var(--t); position: relative; overflow: hidden; }
+  .tile .art::after { content: ""; position: absolute; inset: 0; background: radial-gradient(circle at 30% 25%, rgba(255,255,255,.35), transparent 55%); }
+  .tile .nm { font-size: 11px; font-weight: 600; margin: 5px 2px 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+  /* ---------- sections ---------- */
+  section { padding: 76px 0; }
+  section + section { border-top: 1px solid var(--line); }
+  .kicker { font-size: 13px; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; color: var(--accent-deep); margin: 0 0 10px; }
+  h2 { font: 750 clamp(30px, 4.4vw, 42px)/1.08 var(--font-round); letter-spacing: -0.025em; margin: 0 0 14px; }
+  .intro { color: var(--ink-2); max-width: 40em; margin: 0 0 36px; font-size: 17px; }
+
+  .points { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  @media (max-width: 800px) { .points { grid-template-columns: 1fr; } }
+  .point { background: var(--surface); border-radius: 18px; padding: 22px; box-shadow: var(--shadow); }
+  .point svg { width: 26px; height: 26px; color: var(--accent); margin-bottom: 12px; }
+  .point h3 { margin: 0 0 6px; font: 700 18px/1.25 var(--font-round); }
+  .point p { margin: 0; color: var(--ink-2); font-size: 15px; }
+
+  .group { margin-top: 34px; }
+  .group h3 { display: flex; align-items: baseline; gap: 10px; margin: 0 0 14px; font: 700 20px/1.2 var(--font-round); }
+  .group h3 small { font: 500 14px/1 var(--font); color: var(--ink-3); }
+  .games { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; list-style: none; margin: 0; padding: 0; }
+  .game { display: flex; gap: 12px; align-items: flex-start; background: var(--surface); border-radius: 14px; padding: 12px 14px; box-shadow: var(--shadow); transition: transform .35s var(--spring), box-shadow .3s; }
+  .game:hover { transform: translateY(-2px); box-shadow: var(--shadow-lift); }
+  .game i { flex: none; width: 34px; height: 34px; border-radius: 10px; background: var(--t, var(--accent)); margin-top: 2px; box-shadow: inset 0 0 0 1px rgba(0,0,0,.06); }
+  .game b { display: block; font-size: 15px; font-weight: 650; }
+  .game span { display: block; font-size: 13.5px; color: var(--ink-2); line-height: 1.45; }
+  .note { margin-top: 26px; font-size: 13.5px; color: var(--ink-3); }
+
+  .install { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 800px) { .install { grid-template-columns: 1fr; } }
+  .card { background: var(--surface); border-radius: 20px; padding: 26px 26px 22px; box-shadow: var(--shadow); }
+  .card h3 { display: flex; align-items: center; gap: 10px; margin: 0 0 4px; font: 700 21px/1.2 var(--font-round); }
+  .card h3 svg { width: 22px; height: 22px; }
+  .card .req { margin: 0 0 16px; font-size: 14px; color: var(--ink-3); }
+  .card ol { margin: 0; padding: 0; list-style: none; counter-reset: s; }
+  .card li { counter-increment: s; position: relative; padding: 0 0 14px 40px; color: var(--ink-2); font-size: 15px; }
+  .card li::before { content: counter(s); position: absolute; left: 0; top: -1px; width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; font: 700 13px/1 var(--font-round); background: var(--accent-soft); color: var(--accent-deep); }
+  .card li b { color: var(--ink); font-weight: 600; }
+  .card .why { margin: 6px 0 0; padding: 12px 14px; border-radius: 12px; background: var(--bg); font-size: 13.5px; color: var(--ink-2); }
+  kbd { font: 600 12px/1 var(--font); padding: 3px 6px; border-radius: 6px; background: var(--bg-2); border: 1px solid var(--line); color: var(--ink); white-space: nowrap; }
+
+  .faq { max-width: 760px; }
+  details { border-bottom: 1px solid var(--line); }
+  summary { cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 20px 2px; font: 650 17px/1.35 var(--font); }
+  summary::-webkit-details-marker { display: none; }
+  summary::after { content: ""; flex: none; width: 10px; height: 10px; border-right: 2px solid var(--ink-3); border-bottom: 2px solid var(--ink-3); transform: rotate(45deg) translate(-2px, -2px); transition: transform .3s var(--spring); }
+  details[open] summary::after { transform: rotate(-135deg) translate(-2px, -2px); }
+  details p { margin: -6px 2px 20px; color: var(--ink-2); font-size: 15.5px; max-width: 42em; }
+
+  footer { border-top: 1px solid var(--line); padding: 34px 0 44px; color: var(--ink-3); font-size: 13.5px; }
+  footer .row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 14px; }
+  footer a { color: var(--ink-2); }
+  footer p { margin: 0 0 6px; }
+
+  /* scroll reveal (only when JavaScript runs; replays each time a block comes into view) */
+  .js .reveal { opacity: 0; transform: translateY(18px); transition: opacity .7s var(--ease-out), transform .8s var(--ease-out); }
+  .js .reveal.in { opacity: 1; transform: none; }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+    .js .reveal { opacity: 1; transform: none; }
+  }
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="spark" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" d="M12 2.5v6.2M12 15.3v6.2M2.5 12h6.2M15.3 12h6.2M5.3 5.3l4.4 4.4M14.3 14.3l4.4 4.4M18.7 5.3l-4.4 4.4M9.7 14.3l-4.4 4.4"/></symbol>
+  <symbol id="pad" viewBox="0 0 20 16"><path fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" d="M6 3.2h8c3.4 0 5.2 5.2 4.6 8.4-.4 2.2-2.2 2.8-3.5 1.8l-1.9-2.2H6.8l-1.9 2.2c-1.3 1-3.1.4-3.5-1.8C.8 8.4 2.6 3.2 6 3.2z"/><path fill="currentColor" d="M4.4 6.6h4.2V8H4.4zM5.8 5.2h1.4v4.2H5.8z"/><path fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" d="M11.7 7.3h4.4M13.9 5.1v4.4M12.3 5.7l3.1 3.1M15.4 5.7l-3.1 3.1"/></symbol>
+  <symbol id="apple" viewBox="0 0 24 24"><path fill="currentColor" d="M16.4 12.6c0-2.6 2.1-3.8 2.2-3.9-1.2-1.8-3.1-2-3.7-2-1.6-.2-3.1.9-3.9.9-.8 0-2-.9-3.4-.9-1.7 0-3.3 1-4.2 2.6-1.8 3.1-.5 7.7 1.3 10.2.9 1.2 1.9 2.6 3.2 2.6 1.3-.1 1.8-.8 3.3-.8 1.6 0 2 .8 3.4.8 1.4 0 2.3-1.3 3.1-2.5 1-1.4 1.4-2.8 1.4-2.9-.1 0-2.7-1-2.7-4.1zM13.9 5c.7-.9 1.2-2 1.1-3.2-1 0-2.3.7-3 1.6-.7.8-1.2 2-1.1 3.1 1.2.1 2.3-.6 3-1.5z"/></symbol>
+  <symbol id="windows" viewBox="0 0 24 24"><path fill="currentColor" d="M3 5.3l7.4-1v7.2H3zM11.3 4.2L21 2.8v8.7h-9.7zM3 12.4h7.4v7.2L3 18.6zM11.3 12.4H21v8.8l-9.7-1.4z"/></symbol>
+  <symbol id="arrow" viewBox="0 0 16 16"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M3 8h9.5M8.5 4l4 4-4 4"/></symbol>
+</svg>
+
+<header class="top" id="top">
+  <div class="wrap bar">
+    <a class="brand" href="#top" aria-label="Ludus, back to top">
+      <span class="mark"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#spark"/></svg></span>
+      Ludus
+    </a>
+    <nav aria-label="Sections">
+      <ul>
+        <li class="opt"><a href="#games">Games</a></li>
+        <li><a href="#install">Install</a></li>
+        <li class="opt"><a href="#faq">FAQ</a></li>
+        <li><a href="https://github.com/Solomon-69/Ludus" data-repo>GitHub</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+  <div class="wrap hero">
+    <div>
+      <span class="eyebrow"><i aria-hidden="true"></i>Free for Mac and Windows</span>
+      <h1>Ludus</h1>
+      <p class="sub">Little games for little breaks</p>
+      <p class="lede">A small panel of games that lives in your menu bar or system tray. Click the controller, play a round of Snake, Sudoku or a quick duel against the computer, then get back to work. Your place is saved when you close it.</p>
+      <div class="downloads">
+        <a class="btn" id="dl-mac" data-os="mac" href="https://github.com/Solomon-69/Ludus/releases/latest/download/Ludus-mac.zip" data-repo>
+          <svg class="os" aria-hidden="true"><use href="#apple"/></svg>
+          <span>Download for Mac<small>macOS 14 or later, Apple silicon</small></span>
+          <svg class="arrow" aria-hidden="true"><use href="#arrow"/></svg>
+        </a>
+        <a class="btn" id="dl-win" data-os="windows" href="https://github.com/Solomon-69/Ludus/releases/latest/download/Ludus-windows.zip" data-repo>
+          <svg class="os" aria-hidden="true"><use href="#windows"/></svg>
+          <span>Download for Windows<small>Windows 10 or 11, 64-bit</small></span>
+          <svg class="arrow" aria-hidden="true"><use href="#arrow"/></svg>
+        </a>
+      </div>
+      <p class="reqs"><b>Mac:</b> macOS 14 Sonoma or later on Apple silicon (M1 or newer). <b>Windows:</b> Windows 10 or 11, 64-bit. Both are free, open source and work offline.</p>
+    </div>
+
+    <div class="stagebox" aria-hidden="true">
+      <div class="glow"></div>
+      <div class="menubar">
+        <div class="strip"><span></span><span></span><b class="pad"><svg><use href="#pad"/></svg></b><span></span></div>
+        <div class="panel">
+          <div class="p-head"><svg><use href="#spark"/></svg><div><b>Ludus</b><small>Little games for little breaks</small></div></div>
+          <div class="chips"><span>All</span><span>Arcade</span><span>Puzzle</span><span>Duel</span><span>2 Player</span></div>
+          <div class="tiles">
+            <div class="tile" style="--t:#e0a526;animation-delay:.25s"><div class="art"></div><div class="nm">2048</div></div>
+            <div class="tile" style="--t:#5b8def;animation-delay:.3s"><div class="art"></div><div class="nm">Blocks</div></div>
+            <div class="tile" style="--t:#4f9d69;animation-delay:.35s"><div class="art"></div><div class="nm">Snake</div></div>
+            <div class="tile" style="--t:#9b6dd6;animation-delay:.4s"><div class="art"></div><div class="nm">Minesweeper</div></div>
+            <div class="tile" style="--t:#c4633f;animation-delay:.45s"><div class="art"></div><div class="nm">Four Up</div></div>
+            <div class="tile" style="--t:#3aa6a6;animation-delay:.5s"><div class="art"></div><div class="nm">Flappy Spark</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <section id="about">
+    <div class="wrap">
+      <p class="kicker reveal">What it is</p>
+      <h2 class="reveal">A break you can close in one click</h2>
+      <p class="intro reveal">Ludus sits next to the clock. It opens as a small panel over whatever you are doing and closes the moment you click elsewhere. No windows to manage, no accounts, no ads.</p>
+      <div class="points">
+        <div class="point reveal">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M5 12.5l4 4L19 7"/></svg>
+          <h3>Picks up where you left off</h3>
+          <p>Close the panel mid-game and it pauses. Open it later and the game is still there, along with your best scores.</p>
+        </div>
+        <div class="point reveal">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M4 12a8 8 0 1 0 16 0 8 8 0 0 0-16 0zM12 8v4l2.5 2"/></svg>
+          <h3>Rounds that fit a short break</h3>
+          <p>Every game is built to be played in a minute or two, with keyboard controls and mouse or trackpad where it makes sense.</p>
+        </div>
+        <div class="point reveal">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M12 3l7 3v5c0 4.5-3 8.3-7 9.5-4-1.2-7-5-7-9.5V6z"/></svg>
+          <h3>Private and offline</h3>
+          <p>Everything runs on your computer. Ludus never connects to the internet and collects nothing.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="games">
+    <div class="wrap">
+      <p class="kicker reveal">The games</p>
+      <h2 class="reveal">Arcade, puzzles, duels and games for two</h2>
+      <p class="intro reveal">Every game has a light and a dark look, sound you can turn off, and an easy, normal or hard setting.</p>
+
+      <!-- Game list taken from the register() calls in web/games/*.js on 22 October 2026. Refresh it when games are added. -->
+      <div class="group">
+        <h3 class="reveal">Arcade <small>Beat your best score</small></h3>
+        <ul class="games">
+          <li class="game reveal" style="--t:#5b8def"><i></i><div><b>Blocks</b><span>Falling blocks with hold, ghost piece and a next queue.</span></div></li>
+          <li class="game reveal" style="--t:#e05d8b"><i></i><div><b>Breakout</b><span>Clear the bricks, catch the power-ups.</span></div></li>
+          <li class="game reveal" style="--t:#2f2a24"><i></i><div><b>Chomp</b><span>A maze chase with pellets, power sparks and four ghosts.</span></div></li>
+          <li class="game reveal" style="--t:#6b7a8f"><i></i><div><b>Drift</b><span>Steer a little ship through drifting rocks and split them apart.</span></div></li>
+          <li class="game reveal" style="--t:#3aa6a6"><i></i><div><b>Flappy Spark</b><span>Guide the spark through the gaps.</span></div></li>
+          <li class="game reveal" style="--t:#6f9a4a"><i></i><div><b>Garden Guard</b><span>Plant a garden that holds five lanes against creeping weeds.</span></div></li>
+          <li class="game reveal" style="--t:#c96a4a"><i></i><div><b>Hammer Climb</b><span>A spark in a pot climbs a mountain with nothing but a hammer.</span></div></li>
+          <li class="game reveal" style="--t:#5b6ee1"><i></i><div><b>Sky Raiders</b><span>Rows of raiders march down. Shoot them before they land.</span></div></li>
+          <li class="game reveal" style="--t:#4f9d69"><i></i><div><b>Snake</b><span>The classic, smooth and quick.</span></div></li>
+          <li class="game reveal" style="--t:#e08a3c"><i></i><div><b>Spark Hop</b><span>Bounce from platform to platform and climb as high as you can.</span></div></li>
+          <li class="game reveal" style="--t:#3f8fb3"><i></i><div><b>Stack</b><span>Drop each sliding block on the tower. Perfect drops keep it wide.</span></div></li>
+        </ul>
+      </div>
+
+      <div class="group">
+        <h3 class="reveal">Puzzle <small>Take your time</small></h3>
+        <ul class="games">
+          <li class="game reveal" style="--t:#e0a526"><i></i><div><b>2048</b><span>Slide the tiles, merge the pairs.</span></div></li>
+          <li class="game reveal" style="--t:#b5894f"><i></i><div><b>Crates</b><span>Push every crate onto its spot. Hand-made levels, with undo.</span></div></li>
+          <li class="game reveal" style="--t:#4f9d69"><i></i><div><b>Five Letters</b><span>Find the hidden five-letter word in six tries.</span></div></li>
+          <li class="game reveal" style="--t:#9b6dd6"><i></i><div><b>Minesweeper</b><span>The first click is always safe.</span></div></li>
+          <li class="game reveal" style="--t:#c06c9a"><i></i><div><b>Pairs</b><span>Flip two cards at a time and find every match.</span></div></li>
+          <li class="game reveal" style="--t:#2e7a5f"><i></i><div><b>Patience</b><span>Klondike solitaire, Ace to King.</span></div></li>
+          <li class="game reveal" style="--t:#e07a3f"><i></i><div><b>Spark Match</b><span>Swap gems to line up three or more.</span></div></li>
+          <li class="game reveal" style="--t:#4b6fae"><i></i><div><b>Sudoku</b><span>Fresh puzzles with exactly one solution.</span></div></li>
+        </ul>
+      </div>
+
+      <div class="group">
+        <h3 class="reveal">Duel <small>You against the computer</small></h3>
+        <ul class="games">
+          <li class="game reveal" style="--t:#e0a526"><i></i><div><b>Box It</b><span>Dots and boxes. Close a box and go again.</span></div></li>
+          <li class="game reveal" style="--t:#3aa6a6"><i></i><div><b>Dead Centre</b><span>Stop the needle on the line before the computer does.</span></div></li>
+          <li class="game reveal" style="--t:#c4633f"><i></i><div><b>Four Up</b><span>Four in a row, first to three games.</span></div></li>
+          <li class="game reveal" style="--t:#d1495b"><i></i><div><b>Last Wire</b><span>Nine wires, one is live. Take turns cutting.</span></div></li>
+          <li class="game reveal" style="--t:#5b8def"><i></i><div><b>Nine Squared</b><span>Ultimate tic-tac-toe: your square picks their board.</span></div></li>
+          <li class="game reveal" style="--t:#a4553a"><i></i><div><b>Right of Way</b><span>A spear duel across five screens. Change height to get past the guard.</span></div></li>
+          <li class="game reveal" style="--t:#7a8b5a"><i></i><div><b>The Crossing</b><span>Hex on a 7 by 7 board. Join your two sides first.</span></div></li>
+          <li class="game reveal" style="--t:#b0686b"><i></i><div><b>The Decider</b><span>Rock, paper, scissors. First to three takes the match.</span></div></li>
+          <li class="game reveal" style="--t:#8a6fb0"><i></i><div><b>Wall Run</b><span>Race across the board and block the computer with walls.</span></div></li>
+        </ul>
+      </div>
+
+      <div class="group">
+        <h3 class="reveal">2 Player <small>Two people, one keyboard</small></h3>
+        <ul class="games">
+          <li class="game reveal" style="--t:#e05d8b"><i></i><div><b>Air Puck</b><span>Air hockey. Guard your goal.</span></div></li>
+          <li class="game reveal" style="--t:#2a9d9f"><i></i><div><b>Light Trails</b><span>Light cycles. Don't hit a wall or any trail.</span></div></li>
+          <li class="game reveal" style="--t:#3f8fb5"><i></i><div><b>Rally</b><span>Two-paddle table tennis.</span></div></li>
+          <li class="game reveal" style="--t:#5b7d4a"><i></i><div><b>Tank Duel</b><span>Bouncing shells in a fresh maze every round.</span></div></li>
+          <li class="game reveal" style="--t:#6aa56b"><i></i><div><b>Tag</b><span>One of you is it. Touch the other to pass it on.</span></div></li>
+        </ul>
+      </div>
+      <p class="note reveal">The line-up grows with new releases. The app itself always shows the current list.</p>
+    </div>
+  </section>
+
+  <section id="install">
+    <div class="wrap">
+      <p class="kicker reveal">Install</p>
+      <h2 class="reveal">Two minutes, then it lives by the clock</h2>
+      <p class="intro reveal">Ludus is not sold through an app store, so your computer asks you to confirm the first time you open it. That is expected; the steps below show where to click.</p>
+      <div class="install">
+        <div class="card reveal">
+          <h3><svg aria-hidden="true"><use href="#apple"/></svg>Mac</h3>
+          <p class="req">macOS 14 Sonoma or later, Apple silicon (M1 or newer)</p>
+          <ol>
+            <li><b>Download</b> Ludus-mac.zip and open it. You get <b>Ludus.app</b>.</li>
+            <li><b>Drag Ludus.app into Applications.</b></li>
+            <li>The first time only: in Applications, <b>right-click Ludus and choose Open</b>, then Open again. On newer macOS versions, if you see no Open button, go to System Settings, Privacy &amp; Security, and click <b>Open Anyway</b>.</li>
+            <li>Look for the <b>controller icon</b> in the menu bar and click it.</li>
+          </ol>
+          <p class="why">Why the extra step: this build is not notarised by Apple yet, so macOS cannot check the developer for you.</p>
+        </div>
+        <div class="card reveal">
+          <h3><svg aria-hidden="true"><use href="#windows"/></svg>Windows</h3>
+          <p class="req">Windows 10 or 11, 64-bit</p>
+          <ol>
+            <li><b>Download</b> Ludus-windows.zip, right-click it and choose <b>Extract All</b>. Keep the Ludus folder somewhere permanent, for example Documents.</li>
+            <li>Open the folder and run <b>Ludus.exe</b>.</li>
+            <li>If Windows shows "Windows protected your PC", click <b>More info</b>, then <b>Run anyway</b>.</li>
+            <li>If Windows asks for the <b>.NET Desktop Runtime</b> (or WebView2 on some Windows 10 PCs), accept the free Microsoft download, then run Ludus.exe again.</li>
+            <li>Click the <b>controller icon</b> in the system tray. If you cannot see it, click the small arrow next to the tray icons.</li>
+          </ol>
+          <p class="why">Why the warning: this build is not code signed yet, so SmartScreen does not recognise it.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="faq">
+    <div class="wrap faq">
+      <p class="kicker reveal">Questions</p>
+      <h2 class="reveal">Good to know</h2>
+      <details class="reveal">
+        <summary>Does it work offline?</summary>
+        <p>Yes. Every game and every sound is inside the app. Ludus never needs, or uses, an internet connection.</p>
+      </details>
+      <details class="reveal">
+        <summary>Where are my scores and saved games kept?</summary>
+        <p>On your own computer only. On a Mac they are kept in the app's preferences; on Windows in a file at %APPDATA%\Ludus\state.json. Closing the panel or quitting keeps your place.</p>
+      </details>
+      <details class="reveal">
+        <summary>What does Ludus collect about me?</summary>
+        <p>Nothing. There are no accounts, no analytics, no ads and no tracking of any kind, and nothing you do in Ludus leaves your computer.</p>
+      </details>
+      <details class="reveal">
+        <summary>How do I open it when my computer starts?</summary>
+        <p>Turn on "Open at login" in Ludus settings (the gear icon), or on Windows right-click the tray icon.</p>
+      </details>
+      <details class="reveal">
+        <summary>What keys do the games use?</summary>
+        <p>Arrow keys or WASD for most games, <kbd>Space</kbd> to act, <kbd>Esc</kbd> or <kbd>P</kbd> to pause. Each game shows its own controls under the play area. Two-player games share one keyboard.</p>
+      </details>
+      <details class="reveal">
+        <summary>How do I remove it?</summary>
+        <p>Turn off "Open at login" and quit Ludus from its settings. On a Mac, drag Ludus from Applications to the Bin. On Windows, delete the Ludus folder, and %APPDATA%\Ludus if you also want to remove your scores.</p>
+      </details>
+      <details class="reveal">
+        <summary>Is it open source?</summary>
+        <p>Yes, under the MIT licence. The code, and instructions for building it yourself, are on <a href="https://github.com/Solomon-69/Ludus" data-repo>GitHub</a>.</p>
+      </details>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap row">
+    <div>
+      <p>Ludus. Copyright (c) 2026 Solomon. Released under the <a href="https://github.com/Solomon-69/Ludus/blob/main/LICENSE" data-repo>MIT licence</a>.</p>
+      <p>Not affiliated with Anthropic. Settings icon from Lucide (ISC licence).</p>
+    </div>
+    <div>
+      <p><a href="https://github.com/Solomon-69/Ludus/blob/main/PRIVACY.md" data-repo>Privacy</a> &middot; <a href="https://github.com/Solomon-69/Ludus/releases" data-repo>All releases</a> &middot; <a href="#top">Back to top</a></p>
+    </div>
+  </div>
+</footer>
+
+<script>
+  (function () {
+    var root = document.documentElement;
+    root.classList.add('js');
+
+    // Highlight the download that matches this computer.
+    var ua = navigator.userAgent || '';
+    var platform = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || '';
+    var os = /Win/i.test(platform) || /Windows/i.test(ua) ? 'windows' : /Mac/i.test(platform) || /Mac OS X/i.test(ua) ? 'mac' : '';
+    var mine = os && document.querySelector('.btn[data-os="' + os + '"]');
+    if (mine) {
+      mine.classList.add('primary');
+      mine.parentNode.insertBefore(mine, mine.parentNode.firstChild);
+    } else {
+      document.getElementById('dl-mac').classList.add('primary');
+    }
+
+    // Header line once the page scrolls.
+    var header = document.getElementById('top');
+    var onScroll = function () { header.classList.toggle('scrolled', window.scrollY > 8); };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+
+    var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    // Buttons: soft glow follows the cursor and the button leans toward it a little.
+    if (!reduce && window.matchMedia('(hover: hover)').matches) {
+      document.querySelectorAll('.btn').forEach(function (b) {
+        b.addEventListener('pointermove', function (e) {
+          var r = b.getBoundingClientRect();
+          var x = e.clientX - r.left, y = e.clientY - r.top;
+          b.style.setProperty('--gx', x + 'px');
+          b.style.setProperty('--gy', y + 'px');
+          b.style.setProperty('--lean-x', ((x / r.width) - 0.5) * 6 + 'px');
+          b.style.setProperty('--lean-y', ((y / r.height) - 0.5) * 4 + 'px');
+        });
+        b.addEventListener('pointerleave', function () {
+          b.style.setProperty('--lean-x', '0px');
+          b.style.setProperty('--lean-y', '0px');
+        });
+      });
+    }
+
+    // Reveal blocks as they scroll into view, in both directions, so the motion replays.
+    var items = document.querySelectorAll('.reveal');
+    if (reduce || !('IntersectionObserver' in window)) {
+      items.forEach(function (el) { el.classList.add('in'); });
+      return;
+    }
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        entry.target.classList.toggle('in', entry.isIntersecting);
+      });
+    }, { rootMargin: '0px 0px -8% 0px', threshold: 0.05 });
+    items.forEach(function (el, i) {
+      el.style.transitionDelay = (i % 6) * 40 + 'ms';
+      io.observe(el);
+    });
+  })();
+</script>
+</body>
+</html>

@@ -1,0 +1,46 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>Ludus</RootNamespace>
+    <AssemblyName>Ludus</AssemblyName>
+    <ApplicationIcon>assets\Ludus.ico</ApplicationIcon>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <ApplicationVisualStyles>true</ApplicationVisualStyles>
+
+    <Product>Ludus</Product>
+    <Description>Little games for little breaks</Description>
+    <Company>Solomon</Company>
+    <Copyright>Copyright (c) 2026 Solomon</Copyright>
+    <Version>1.5.0</Version>
+
+    <!-- Single-file publish keeps one Ludus.exe; the WebView2 loader DLL rides inside it. -->
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <DebugType>embedded</DebugType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3912.50" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="assets\Ludus.ico" LogicalName="Ludus.ico" />
+  </ItemGroup>
+
+  <!-- The shared game files (../web) sit next to Ludus.exe in a "web" folder, loose, not bundled. -->
+  <ItemGroup>
+    <Content Include="..\web\**\*"
+             Exclude="..\web\**\.DS_Store;..\web\**\.harness-*;..\web\**\.harness-*\**"
+             Link="web\%(RecursiveDir)%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest"
+             ExcludeFromSingleFile="true" />
+  </ItemGroup>
+
+</Project>

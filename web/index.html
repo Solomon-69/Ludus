@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ludus</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app" class="app">
+  <!-- Home -->
+  <section id="home" class="view view-home is-active" aria-label="Games">
+    <header class="topbar">
+      <div class="brand">
+        <svg class="spark" viewBox="0 0 24 24" aria-hidden="true"><use href="#spark"/></svg>
+        <div>
+          <div class="brand-name">Ludus</div>
+          <div class="brand-sub" id="brandSub">Little games for little breaks</div>
+        </div>
+      </div>
+      <button class="icon-btn" id="openSettings" aria-label="Settings">
+        <svg viewBox="0 0 24 24"><use href="#i-gear"/></svg>
+      </button>
+    </header>
+    <div class="filters" id="filters" role="tablist"></div>
+    <div class="grid" id="grid"></div>
+  </section>
+
+  <!-- Game -->
+  <section id="game" class="view view-game" aria-label="Game">
+    <header class="topbar game-bar">
+      <button class="icon-btn" id="backBtn" aria-label="Back to games">
+        <svg viewBox="0 0 24 24"><use href="#i-back"/></svg>
+      </button>
+      <div class="game-title">
+        <div class="game-name" id="gameName"></div>
+        <div class="scores">
+          <span>Score <b id="scoreNow">0</b></span>
+          <span>Best <b id="scoreBest">0</b></span>
+        </div>
+      </div>
+      <button class="icon-btn" id="pauseBtn" aria-label="Pause">
+        <svg viewBox="0 0 24 24"><use href="#i-pause"/></svg>
+      </button>
+    </header>
+    <div class="stage-wrap">
+      <div class="stage" id="stage"></div>
+      <div class="sheet" id="pauseSheet" hidden>
+        <div class="sheet-card">
+          <div class="sheet-title" id="pauseTitle">Paused</div>
+          <button class="btn primary" id="resumeBtn">Resume</button>
+          <button class="btn" id="restartBtn">Restart</button>
+          <button class="btn ghost" id="quitBtn">All games</button>
+        </div>
+      </div>
+      <div class="over-bar" id="overSheet" hidden>
+        <div class="over-info">
+          <div class="over-title" id="overTitle">Game over</div>
+          <div class="over-line"><b id="overScore">0</b><small id="overBest"></small></div>
+        </div>
+        <div class="over-actions">
+          <button class="btn primary" id="againBtn">Play again</button>
+          <button class="btn ghost" id="overQuitBtn">Menu</button>
+          <button class="icon-btn small" id="overHideBtn" aria-label="Hide result"><svg viewBox="0 0 24 24"><use href="#i-down"/></svg></button>
+        </div>
+      </div>
+      <button class="over-peek" id="overPeek" hidden>Show result</button>
+    </div>
+    <footer class="hint" id="hint"></footer>
+  </section>
+
+  <!-- Settings -->
+  <section id="settings" class="view view-settings" aria-label="Settings">
+    <header class="topbar">
+      <button class="icon-btn" id="settingsBack" aria-label="Back">
+        <svg viewBox="0 0 24 24"><use href="#i-back"/></svg>
+      </button>
+      <div class="brand-name">Settings</div>
+      <span style="width:32px;flex:none" aria-hidden="true"></span>
+    </header>
+    <div class="settings-body" id="settingsBody"></div>
+  </section>
+</div>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="spark" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" d="M12 2.5v6.2M12 15.3v6.2M2.5 12h6.2M15.3 12h6.2M5.3 5.3l4.4 4.4M14.3 14.3l4.4 4.4M18.7 5.3l-4.4 4.4M9.7 14.3l-4.4 4.4"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></g></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M15 5l-7 7 7 7"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M6 9l6 6 6-6"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24"><path fill="currentColor" d="M7 5h3.2v14H7zM13.8 5H17v14h-3.2z"/></symbol>
+</svg>
+
+<script src="engine.js"></script>
+<script src="games/g2048.js"></script>
+<script src="games/blocks.js"></script>
+<script src="games/flappy.js"></script>
+<script src="games/chomp.js"></script>
+<script src="games/snake.js"></script>
+<script src="games/mines.js"></script>
+<script src="games/breakout.js"></script>
+<script src="games/fourup.js"></script>
+<script src="games/boxit.js"></script>
+<script src="games/ninesq.js"></script>
+<script src="games/lastwire.js"></script>
+<script src="games/wallrun.js"></script>
+<script src="games/crossing.js"></script>
+<script src="games/decider.js"></script>
+<script src="games/deadcentre.js"></script>
+<script src="games/finalpush.js"></script>
+<script src="games/tag.js"></script>
+<script src="games/pong.js"></script>
+<script src="games/tron.js"></script>
+<script src="games/hockey.js"></script>
+<script src="games/tanks.js"></script>
+<script src="games/invaders.js"></script>
+<script src="games/rocks.js"></script>
+<script src="games/memory.js"></script>
+<script src="games/words.js"></script>
+<script src="games/sokoban.js"></script>
+<script src="games/jumper.js"></script>
+<script src="games/garden.js"></script>
+<script src="games/climb.js"></script>
+<script src="games/solitaire.js"></script>
+<script src="games/sudoku.js"></script>
+<script src="games/match3.js"></script>
+<script src="games/stack.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
