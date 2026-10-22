@@ -24,7 +24,7 @@
   check('thumbnails drawn', blank === 0, blank + ' blank');
   check('2 Player chip', [...document.querySelectorAll('.chip')].some(c => c.textContent === '2 Player'));
   check('2 player section', !Ludus.games.some(g => g.tag === '2 Player') || [...document.querySelectorAll('.section-label')].some(l => /2 players/.test(l.textContent)));
-  check('subtitle', $('brandSub').textContent === 'Little games for little breaks');
+  check('subtitle', $('brandSub').textContent === 'Take a little break');
   // Logo: the controller mark (not the old plain spark) next to "Ludus", in the accent colour.
   const logo = document.querySelector('.brand svg.logo use');
   check('controller logo', logo && logo.getAttribute('href') === '#ludus-mark' && document.getElementById('ludus-mark') && !document.getElementById('spark'));

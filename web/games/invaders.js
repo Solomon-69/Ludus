@@ -1,236 +1,356 @@
-/* Sky Raiders: rows of raiders march side to side and creep down. Shoot them from your spark ship, hide behind the shields. */
+/* Sky Raiders: a faithful take on the 1978 arcade classic. 55 raiders in 5 rows march side to side,
+   drop a row at each edge and speed up as they fall. One cannon shot at a time, four erodible bunkers,
+   three kinds of raider bombs and a mystery ship that pays out by the shot-count trick. */
 (function () {
   const D = Ludus.draw;
-  const W = 400, H = 520, TOP = 34;
-  const PY = H - 34, PW = 34;                     // player ship centre y and width
-  const COLS = 8, GX = 38, GY = 30;               // formation grid spacing
-  const SH_Y = H - 112, SH_C = 4.5, SH_W = 12, SH_H = 7;   // shields: cell size and cells per shield
-  const KINDS = [
-    { pts: 30, color: '#9b6dd6' }, { pts: 20, color: '#3f8fb5' }, { pts: 20, color: '#3f8fb5' },
-    { pts: 10, color: '#4f9d69' }, { pts: 10, color: '#4f9d69' }
+  const W = 224, H = 256;                          // the original screen, in arcade pixels
+  const COLS = 11, ROWS = 5, TOTAL = COLS * ROWS, CELL = 16;
+  const UFO_Y = 40, TOP_LIMIT = 30, PY = 216, GROUND = 239;
+  const SH_Y = 192, SH_W = 22, SH_H = 16, SH_X = [32, 77, 122, 167];
+  const START_X = 24, START_Y = 64;
+  const WAVE_DROP = [0, 24, 40, 48, 48, 48, 56, 56, 56];        // each new wave starts lower
+  const UFO_TABLE = [100, 50, 50, 100, 150, 100, 100, 50, 300, 100, 100, 100, 50, 150, 100];
+  const PLUNGER_COLS = [0, 6, 0, 0, 0, 3, 10, 0, 5, 2, 0, 0, 10, 8, 1, 7];
+  const SQUIGGLY_COLS = [10, 0, 5, 2, 0, 0, 10, 8, 1, 7, 1, 10, 3, 6, 9];
+  const NOTES = [98, 87, 78, 73];                  // the descending four-note march
+  const LEVEL = [                                  // api.level 0/1/2: march tempo and raider fire
+    { step: 1.0, reload: 1.6, maxBombs: 2, bombSpeed: 70, aim: 0.3, ufoEvery: 30 },
+    { step: 0.8, reload: 1.0, maxBombs: 3, bombSpeed: 80, aim: 0.45, ufoEvery: 25.6 },
+    { step: 0.6, reload: 0.65, maxBombs: 3, bombSpeed: 95, aim: 0.6, ufoEvery: 22 }
   ];
-  const DIFF = [
-    { rows: 4, march: 20, shots: 2, shotSpeed: 170, fireEvery: 1.3, myShots: 2 },
-    { rows: 5, march: 26, shots: 3, shotSpeed: 210, fireEvery: 0.95, myShots: 1 },
-    { rows: 5, march: 34, shots: 4, shotSpeed: 250, fireEvery: 0.7, myShots: 1 }
-  ];
 
-  function shieldShape() {
-    // a rounded bunker with an arch cut underneath
-    const cells = [];
-    for (let y = 0; y < SH_H; y++) for (let x = 0; x < SH_W; x++) {
-      let on = true;
-      if (y === 0 && (x < 2 || x > SH_W - 3)) on = false;
-      if (y === 1 && (x < 1 || x > SH_W - 2)) on = false;
-      if (y >= SH_H - 3 && x >= 4 && x <= SH_W - 5) on = y === SH_H - 3 && (x === 4 || x === SH_W - 5);
-      cells.push(on ? 1 : 0);
+  // ---------- pixel sprites (# = lit) ----------
+  const SPR = {
+    squid: [
+      ['...##...', '..####..', '.######.', '##.##.##', '########', '..#..#..', '.#.##.#.', '#.#..#.#'],
+      ['...##...', '..####..', '.######.', '##.##.##', '########', '.#.##.#.', '#......#', '.#....#.']],
+    crab: [
+      ['..#.....#..', '...#...#...', '..#######..', '.##.###.##.', '###########', '#.#######.#', '#.#.....#.#', '...##.##...'],
+      ['..#.....#..', '#..#...#..#', '#.#######.#', '###.###.###', '###########', '.#########.', '..#.....#..', '.#.......#.']],
+    octo: [
+      ['....####....', '.##########.', '############', '###..##..###', '############', '...##..##...', '..##.##.##..', '##........##'],
+      ['....####....', '.##########.', '############', '###..##..###', '############', '..###..###..', '.##..##..##.', '..##....##..']],
+    cannon: [['......#......', '.....###.....', '.....###.....', '.###########.', '#############', '#############', '#############', '#############']],
+    ufo: [['.....######.....', '...##########...', '..############..', '.##.##.##.##.##.', '################', '..###..##..###..', '...#........#...']],
+    boom: [['....#...#....', '.#...#.#...#.', '..#.......#..', '...#.....#...', '##.........##', '...#.....#...', '..#..#.#..#..', '.#..#...#..#.']],
+    pboom: [
+      ['..#.....#.......', '......#....#....', '...#.#..#.#.....', '.....###.#...#..', '..#.######......', '.#.##########.#.', '..############..', '.##############.'],
+      ['#.....#.....#..#', '...#......#.....', '.#...#.#.#...#..', '....##.###.#....', '#..#######.#..#.', '..###########...', '.#############.#', '##############..']],
+    pmask: [['#...#..#', '..#...#.', '.######.', '########', '########', '.######.', '..#..#..', '#..#...#']],
+    amask: [['..#...', '#...#.', '..##.#', '.####.', '#.###.', '.#####', '#.###.', '.#.#.#']],
+    shield: [['....##############....', '...################...', '..##################..', '.####################.',
+      '######################', '######################', '######################', '######################',
+      '######################', '######################', '######################', '######################',
+      '#######........#######', '######..........######', '#####............#####', '#####............#####']]
+  };
+  // the three raider bombs, 3x7, four animation frames each
+  function bombFrames(kind) {
+    const frames = [];
+    for (let f = 0; f < 4; f++) {
+      const rows = [];
+      for (let r = 0; r < 7; r++) {
+        let s = '.#.';
+        if (kind === 'rolling') { const k = (r + f) % 4; s = k === 0 ? '##.' : k === 2 ? '.##' : '.#.'; }
+        else if (kind === 'plunger') s = r === [6, 4, 2, 0][f] ? '###' : '.#.';
+        else { const k = [1, 2, 1, 0][(r + f) % 4]; s = '...'.slice(0, k) + '#' + '...'.slice(k + 1); }
+        rows.push(s);
+      }
+      frames.push(rows);
     }
-    return cells;
+    return frames;
   }
+  ['rolling', 'plunger', 'squiggly'].forEach(k => { SPR[k] = bombFrames(k); });
+  const BOMB_ORDER = ['rolling', 'plunger', 'squiggly'];
+  const KIND = r => (r === 0 ? 'squid' : r < 3 ? 'crab' : 'octo');
+  const WIDTH = { squid: 8, crab: 11, octo: 12 };
+  const POINTS = { squid: 30, crab: 20, octo: 10 };
 
-  function drawRaider(ctx, kind, x, y, frame, color) {
-    ctx.save(); ctx.translate(x, y);
-    ctx.fillStyle = color; ctx.strokeStyle = color; ctx.lineCap = 'round'; ctx.lineWidth = 2.4;
-    if (kind === 0) {               // scout: a little winged dome
-      ctx.beginPath(); ctx.arc(0, 1, 8, Math.PI, 0); ctx.lineTo(8, 4); ctx.lineTo(-8, 4); ctx.closePath(); ctx.fill();
-      const f = frame ? 1 : -1;
-      ctx.beginPath(); ctx.moveTo(-8, 2); ctx.lineTo(-13, 2 + f * 4); ctx.moveTo(8, 2); ctx.lineTo(13, 2 + f * 4); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(-3, 4); ctx.lineTo(-4, 8); ctx.moveTo(3, 4); ctx.lineTo(4, 8); ctx.stroke();
-    } else if (kind <= 2) {         // drone: rounded box with antennae
-      D.roundRect(ctx, -10, -6, 20, 13, 5); ctx.fill();
-      ctx.beginPath(); ctx.moveTo(-5, -6); ctx.lineTo(-7, -11); ctx.moveTo(5, -6); ctx.lineTo(7, -11); ctx.stroke();
-      const f = frame ? 3 : -3;
-      ctx.beginPath(); ctx.moveTo(-7, 7); ctx.lineTo(-7 - f, 11); ctx.moveTo(7, 7); ctx.lineTo(7 + f, 11); ctx.stroke();
-    } else {                        // blob: wide squishy body with feet
-      ctx.beginPath(); ctx.ellipse(0, 0, 12, 8 - (frame ? 1 : 0), 0, 0, Math.PI * 2); ctx.fill();
-      const f = frame ? 2 : 0;
-      for (let i = -1; i <= 1; i++) { ctx.beginPath(); ctx.arc(i * 7 + (i ? f * i : 0), 8, 2.4, 0, Math.PI * 2); ctx.fill(); }
+  const cache = new Map();
+  function spr(name, frame, color) {
+    const key = name + frame + color;
+    let c = cache.get(key);
+    if (!c) {
+      const rows = SPR[name][frame];
+      c = document.createElement('canvas'); c.width = rows[0].length; c.height = rows.length;
+      const g = c.getContext('2d'); g.fillStyle = color;
+      rows.forEach((row, y) => { for (let x = 0; x < row.length; x++) if (row[x] === '#') g.fillRect(x, y, 1, 1); });
+      cache.set(key, c);
     }
-    // eyes
-    ctx.fillStyle = '#fffaf2';
-    ctx.beginPath(); ctx.arc(-3.6, kind === 0 ? -2 : 0, 2.3, 0, Math.PI * 2); ctx.arc(3.6, kind === 0 ? -2 : 0, 2.3, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#2b2520';
-    ctx.beginPath(); ctx.arc(-3.3, kind === 0 ? -1.6 : 0.4, 1.1, 0, Math.PI * 2); ctx.arc(3.9, kind === 0 ? -1.6 : 0.4, 1.1, 0, Math.PI * 2); ctx.fill();
-    ctx.restore();
+    return c;
   }
-
-  function drawShip(ctx, x, y, col, broken, t) {
-    ctx.save(); ctx.translate(x, y);
-    const body = broken ? col.ink3 : col.ink;
-    ctx.fillStyle = col.dark ? 'rgba(0,0,0,0.35)' : 'rgba(60,40,20,0.14)';
-    D.roundRect(ctx, -PW / 2, 2, PW, 10, 5); ctx.fill();
-    ctx.fillStyle = body;
-    D.roundRect(ctx, -PW / 2, -2, PW, 11, 5.5); ctx.fill();
-    D.roundRect(ctx, -5, -10, 10, 10, 4); ctx.fill();
-    if (!broken) D.spark(ctx, 0, -12, 8, col.accent, t * 3);
-    else { ctx.strokeStyle = col.surface || '#fff'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(-8, -2); ctx.lineTo(-2, 4); ctx.lineTo(3, -1); ctx.lineTo(9, 6); ctx.stroke(); }
-    ctx.restore();
+  function palette(col) {
+    return col.dark
+      ? { squid: '#c3a0f0', crab: '#74bde0', octo: '#86c99a', shield: '#c99a68', ufo: '#f0809f', bomb: '#f0c060', cannon: col.accent }
+      : { squid: '#8656c4', crab: '#2c7ca3', octo: '#3b8654', shield: '#c8925a', ufo: '#d4456f', bomb: '#c4633f', cannon: col.accent };
   }
+  const pad4 = n => String(Math.max(0, n | 0)).padStart(4, '0');
 
   Ludus.register({
     id: 'skyraiders', name: 'Sky Raiders', tag: 'Arcade', tint: '#5b6ee1',
-    hint: '<kbd>←</kbd><kbd>→</kbd> move · <kbd>Space</kbd> fire · or move the mouse and click',
+    hint: '<kbd>←</kbd><kbd>→</kbd> or <kbd>A</kbd><kbd>D</kbd> move · <kbd>Space</kbd> fire',
     art(ctx, w, h) {
-      const s = Math.min(w, h) / 120;
-      for (let r = 0; r < 2; r++) for (let c = 0; c < 4; c++) {
-        ctx.save(); ctx.translate(w / 2 + (c - 1.5) * 24 * s, h * 0.28 + r * 20 * s); ctx.scale(s, s);
-        drawRaider(ctx, r ? 3 : 1, 0, 0, c % 2, 'rgba(255,255,255,0.85)'); ctx.restore();
+      const s = Math.max(1, Math.floor(Math.min(w, h) / 46));
+      ctx.save(); ctx.imageSmoothingEnabled = false;
+      const kinds = ['squid', 'crab', 'octo'];
+      for (let r = 0; r < 3; r++) for (let c = 0; c < 4; c++) {
+        const k = kinds[r], img = spr(k, c % 2, 'rgba(255,255,255,0.9)');
+        ctx.drawImage(img, Math.round(w / 2 + (c - 2) * 15 * s + (14 - WIDTH[k]) * s / 2), Math.round(h * 0.16 + r * 11 * s), img.width * s, img.height * s);
       }
-      ctx.fillStyle = 'rgba(255,255,255,0.9)'; ctx.fillRect(w / 2 - 1, h * 0.55, 2.5, 10 * s);
-      ctx.fillStyle = '#fffaf2'; D.roundRect(ctx, w / 2 - 15 * s, h * 0.8, 30 * s, 9 * s, 4 * s); ctx.fill();
-      D.spark(ctx, w / 2, h * 0.76, 7 * s, '#fffaf2', 0);
+      ctx.fillStyle = 'rgba(255,255,255,0.9)'; ctx.fillRect(Math.round(w / 2), Math.round(h * 0.62), s, 4 * s);
+      const cn = spr('cannon', 0, '#fffaf2');
+      ctx.drawImage(cn, Math.round(w / 2 - 6.5 * s), Math.round(h * 0.8), 13 * s, 8 * s);
+      ctx.restore();
+      D.spark(ctx, w * 0.84, h * 0.84, 4 * s, '#fffaf2', 0);
     },
     create(stage, api) {
-      const cfg = DIFF[api.level];
+      const cfg = LEVEL[api.level] || LEVEL[1];
       const view = api.canvas(() => render());   // also draws the board while a resumed game waits on "Welcome back"
-      const { ctx, canvas } = view;
-      const lay = { s: 1, ox: 0, oy: 0 };
-      let wave, score, lives, px, fx, fy, dir, alive, shields, shots, bombs, parts, clock, fireT, frameT, frame, hitAt, state, waveAt, bonus, bonusT, deadAt;
+      const { ctx } = view;
       const held = { l: false, r: false };
-      let targetX = null;
-      const rows = cfg.rows, total = rows * COLS;
+      let wave, score, lives, bonusGiven, alive, left, fx, fy, dir, frame, stepT, px, shields, shot, bombs, ufo, ufoT;
+      let fireCd, rr, plIdx, sqIdx, shotCount, phase, phaseT, clock = 0, effects = [], lastNote = -1, noteIdx = 0, deadAt = 0;
+      let actx = null;
 
-      function buildShields() { shields = [0, 1, 2, 3].map(i => ({ x: 34 + i * ((W - 68 - SH_W * SH_C) / 3), cells: shieldShape() })); }
+      // ---------- sound: the march thump, through WebAudio, honouring the Sound setting ----------
+      function thump() {
+        if (!api.settings.sound || clock - lastNote < 0.09) return;
+        lastNote = clock;
+        const f = NOTES[noteIdx]; noteIdx = (noteIdx + 1) % 4;
+        try {
+          actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+          if (actx.state === 'suspended') actx.resume().catch(() => {});
+          const t = actx.currentTime, o = actx.createOscillator(), g = actx.createGain(), lp = actx.createBiquadFilter();
+          o.type = 'square'; o.frequency.setValueAtTime(f, t); o.frequency.exponentialRampToValueAtTime(f * 0.82, t + 0.1);
+          lp.type = 'lowpass'; lp.frequency.value = 420;
+          const v = Math.max(0.0002, 0.22 * (api.settings.volume ?? 0.6));
+          g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(v, t + 0.006); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.11);
+          o.connect(lp).connect(g).connect(actx.destination); o.start(t); o.stop(t + 0.13);
+        } catch (e) { /* audio unavailable: play on silently */ }
+      }
+
+      // ---------- shields ----------
+      function newShield(i, bits) {
+        const cv = document.createElement('canvas'); cv.width = SH_W; cv.height = SH_H;
+        const cells = bits ? bits.split('').map(Number) : SPR.shield[0].join('').split('').map(ch => (ch === '#' ? 1 : 0));
+        return { x: SH_X[i], cells, cv, dirty: true, color: '' };
+      }
+      function shieldHit(x, y) {
+        const ix = Math.floor(x), iy = Math.floor(y);
+        if (iy < SH_Y || iy >= SH_Y + SH_H) return null;
+        for (const sh of shields) {
+          if (ix >= sh.x && ix < sh.x + SH_W && sh.cells[(iy - SH_Y) * SH_W + ix - sh.x]) return sh;
+        }
+        return null;
+      }
+      function erode(sh, x, y, mask, ox, oy) {
+        const rows = SPR[mask][0], lx = Math.floor(x) - sh.x + ox, ly = Math.floor(y) - SH_Y + oy;
+        rows.forEach((row, my) => {
+          for (let mx = 0; mx < row.length; mx++) {
+            const cx = lx + mx, cy = ly + my;
+            if (row[mx] === '#' && cx >= 0 && cy >= 0 && cx < SH_W && cy < SH_H) sh.cells[cy * SH_W + cx] = 0;
+          }
+        });
+        sh.dirty = true;
+      }
+      function eraseBox(x0, y0, x1, y1) {
+        for (const sh of shields) {
+          if (x1 <= sh.x || x0 >= sh.x + SH_W) continue;
+          for (let cy = Math.max(0, y0 - SH_Y); cy < Math.min(SH_H, y1 - SH_Y); cy++) {
+            for (let cx = Math.max(0, x0 - sh.x); cx < Math.min(SH_W, x1 - sh.x); cx++) {
+              if (sh.cells[cy * SH_W + cx]) { sh.cells[cy * SH_W + cx] = 0; sh.dirty = true; }
+            }
+          }
+        }
+      }
+
+      // ---------- formation ----------
+      function alienBox(i) {
+        const r = Math.floor(i / COLS), c = i % COLS, k = KIND(r), w = WIDTH[k];
+        const x = fx + c * CELL + Math.floor((CELL - w) / 2), y = fy + r * CELL;
+        return { x, y, w, h: 8, k, r, c };
+      }
+      function bounds() {
+        let l = 1e9, rgt = -1e9, bot = -1e9;
+        for (let i = 0; i < TOTAL; i++) {
+          if (!alive[i]) continue;
+          const b = alienBox(i);
+          l = Math.min(l, b.x); rgt = Math.max(rgt, b.x + b.w); bot = Math.max(bot, b.y + b.h);
+        }
+        return { l, r: rgt, bot };
+      }
+      function stepInterval() { return Math.max(1 / 60, cfg.step * left / TOTAL); }
+      function marchStep() {
+        frame ^= 1;
+        const b = bounds(), dx = dir > 0 && left === 1 ? 3 : 2;
+        if ((dir > 0 && b.r + dx > W - 6) || (dir < 0 && b.l - dx < 6)) { fy += 8; dir = -dir; }
+        else fx += dir * dx;
+        thump();
+      }
+      function lowestInColumn(c) {
+        for (let r = ROWS - 1; r >= 0; r--) if (alive[r * COLS + c]) return r * COLS + c;
+        return -1;
+      }
+      function nearestColumn() {
+        let best = -1, bd = 1e9;
+        for (let c = 0; c < COLS; c++) {
+          if (lowestInColumn(c) < 0) continue;
+          const d = Math.abs(fx + c * CELL + CELL / 2 - px);
+          if (d < bd) { bd = d; best = c; }
+        }
+        return best;
+      }
+      function reload() {
+        const f = score < 200 ? 1 : score < 1000 ? 0.8 : score < 2000 ? 0.65 : score < 3000 ? 0.55 : 0.5;
+        return cfg.reload * f;
+      }
+
+      // ---------- run flow ----------
       function startWave(n) {
-        wave = n; alive = Array(total).fill(1);
-        fx = 26; fy = TOP + 40 + Math.min(5, n - 1) * 10; dir = 1;
-        shots = []; bombs = []; fireT = cfg.fireEvery; waveAt = clock; state = 'play'; bonus = null; bonusT = 14 + Math.random() * 8;
-        buildShields();
+        wave = n; alive = Array(TOTAL).fill(1); left = TOTAL;
+        const drop = n <= WAVE_DROP.length ? WAVE_DROP[n - 1] : WAVE_DROP[1 + ((n - 2) % (WAVE_DROP.length - 1))];
+        fx = START_X; fy = START_Y + drop; dir = 1; frame = 0; stepT = 0;
+        shot = null; bombs = []; ufo = null; ufoT = cfg.ufoEvery; fireCd = 1.5; rr = 0; plIdx = 0; sqIdx = 0; shotCount = 0;
+        shields = [0, 1, 2, 3].map(i => newShield(i));
+        phase = 'enter'; phaseT = 0;
       }
       function reset() {
-        score = 0; lives = 3; px = W / 2; parts = []; clock = 0; frameT = 0; frame = 0; hitAt = -9; deadAt = -1;
+        score = 0; lives = 3; bonusGiven = false; px = 30; effects = [];
         startWave(1); api.score(0);
       }
-      function enemyPos(i) { return { x: fx + (i % COLS) * GX, y: fy + Math.floor(i / COLS) * GY }; }
-      function aliveCount() { return alive.reduce((a, b) => a + b, 0); }
-
+      function addScore(n) {
+        score += n; api.score(score);
+        if (!bonusGiven && score >= 1500) { bonusGiven = true; lives++; api.sfx('score'); api.toast('Extra cannon'); }
+      }
       function fire() {
-        if (state !== 'play') return;
-        if (shots.length >= cfg.myShots) return;
-        shots.push({ x: px, y: PY - 18 }); api.sfx('tap');
+        if (phase !== 'play' || shot) return;            // only one cannon shot on screen, like the original
+        shot = { x: Math.round(px), y: PY - 4 }; shotCount++; api.sfx('tap');
       }
-      function burst(x, y, color, n) {
-        if (api.reduceMotion) return;
-        for (let i = 0; i < n; i++) { const a = Math.random() * Math.PI * 2, sp = 40 + Math.random() * 120; parts.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 1, color }); }
-      }
-      function chipShield(x, y, radius) {
-        for (const sh of shields) {
-          const cx = Math.floor((x - sh.x) / SH_C), cy = Math.floor((y - SH_Y) / SH_C);
-          if (cx < -1 || cx > SH_W || cy < -1 || cy > SH_H) continue;
-          let hit = false;
-          if (cx >= 0 && cx < SH_W && cy >= 0 && cy < SH_H && sh.cells[cy * SH_W + cx]) hit = true;
-          if (!hit) continue;
-          for (let dy = -radius; dy <= radius; dy++) for (let dx = -radius; dx <= radius; dx++) {
-            const nx = cx + dx, ny = cy + dy;
-            if (nx < 0 || ny < 0 || nx >= SH_W || ny >= SH_H) continue;
-            if (Math.abs(dx) + Math.abs(dy) <= radius && (dx === 0 && dy === 0 || Math.random() < 0.7)) sh.cells[ny * SH_W + nx] = 0;
-          }
-          return true;
-        }
-        return false;
-      }
-      // a raider body wipes out every shield cell it overlaps
-      function eraseBox(x0, y0, x1, y1) {
-        shields.forEach(sh => sh.cells.forEach((on, j) => {
-          if (!on) return;
-          const cx = sh.x + (j % SH_W) * SH_C, cy = SH_Y + Math.floor(j / SH_W) * SH_C;
-          if (cx + SH_C > x0 && cx < x1 && cy + SH_C > y0 && cy < y1) sh.cells[j] = 0;
-        }));
-      }
-      function loseLife() {
-        lives--; hitAt = clock; bombs = []; api.sfx('boom'); burst(px, PY, api.colors().accent, 18);
-        if (lives <= 0) gameOver('Shot down');
-      }
-      function gameOver(title) {
-        if (state === 'over') return;
-        state = 'over'; deadAt = clock; lives = Math.max(0, lives);
-        api.timeout(() => api.over({ score, title, won: false, message: `Reached wave ${wave}` }), 900);
+      function killPlayer(invaded) {
+        if (phase === 'over' || phase === 'dying') return;
+        lives = invaded ? 0 : lives - 1; deadAt = clock; shot = null; bombs = [];
+        api.sfx('boom');
+        if (lives > 0) { phase = 'dying'; phaseT = 0; return; }
+        lives = 0; phase = 'over';
+        api.timeout(() => api.over({ score, title: invaded ? 'Invaded' : 'Cannon destroyed', won: false, message: `Reached wave ${wave}` }), 650);
       }
 
       function update(dt) {
         clock += dt;
-        parts.forEach(p => { p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 120 * dt; p.life -= dt * 1.6; });
-        parts = parts.filter(p => p.life > 0);
-        if (state === 'over') return;
-        // player
-        const d = (held.r ? 1 : 0) - (held.l ? 1 : 0);
-        if (d) { px += d * 230 * dt; targetX = null; } else if (targetX !== null) px += (targetX - px) * Math.min(1, dt * 14);
-        px = Math.max(PW / 2 + 6, Math.min(W - PW / 2 - 6, px));
-        if (state === 'clear') { if (clock - waveAt > 1.3) startWave(wave + 1); moveShots(dt); return; }
-
-        // formation march: faster as raiders fall
-        const left = aliveCount();
-        const speed = (cfg.march + wave * 3) * (1 + (1 - left / total) * 3.2);
-        let minX = 1e9, maxX = -1e9, maxY = -1e9;
-        alive.forEach((a, i) => { if (!a) return; const p = enemyPos(i); minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y); });
-        fx += dir * speed * dt;
-        if ((dir > 0 && maxX + dir * speed * dt > W - 16) || (dir < 0 && minX + dir * speed * dt < 16)) { dir = -dir; fy += 12; api.sfx('tick'); }
-        frameT += dt * (1.6 + (1 - left / total) * 5); if (frameT > 1) { frameT = 0; frame ^= 1; }
-        // raiders crush shields they touch, and win if they reach you
-        alive.forEach((a, i) => { if (!a) return; const p = enemyPos(i); if (p.y + 11 > SH_Y) eraseBox(p.x - 13, p.y - 11, p.x + 13, p.y + 11); });
-        if (maxY + 10 >= PY - 14) { loseLifeQuiet(); return; }
-
-        // enemy fire from the lowest raider in a random column
-        fireT -= dt;
-        if (fireT <= 0 && bombs.length < cfg.shots) {
-          fireT = cfg.fireEvery * (0.6 + Math.random() * 0.8);
-          const cols = [];
-          for (let c = 0; c < COLS; c++) for (let r = rows - 1; r >= 0; r--) if (alive[r * COLS + c]) { cols.push(r * COLS + c); break; }
-          // aim a bit: prefer columns near the player
-          cols.sort((a, b) => Math.abs(enemyPos(a).x - px) - Math.abs(enemyPos(b).x - px));
-          const pick = cols[Math.min(cols.length - 1, Math.floor(Math.random() * Math.min(cols.length, 3 - api.level + 2)))];
-          if (pick !== undefined) { const p = enemyPos(pick); bombs.push({ x: p.x, y: p.y + 10, wob: Math.random() * 6 }); }
+        effects.forEach(e => { e.t += dt; });
+        effects = effects.filter(e => e.t < e.life);
+        if (phase === 'over' || dt === 0) return;
+        if (phase === 'dying') {
+          phaseT += dt;
+          if (phaseT > 1.6) { phase = 'play'; px = 30; fireCd = reload(); }
+          return;
         }
-        // bonus kite across the top
-        bonusT -= dt;
-        if (!bonus && bonusT <= 0) { const fromLeft = Math.random() < 0.5; bonus = { x: fromLeft ? -20 : W + 20, v: fromLeft ? 70 : -70 }; }
-        if (bonus) { bonus.x += bonus.v * dt; if (bonus.x < -30 || bonus.x > W + 30) { bonus = null; bonusT = 16 + Math.random() * 10; } }
-
-        moveShots(dt);
-        bombs.forEach(b => { b.y += cfg.shotSpeed * dt; });
-        bombs = bombs.filter(b => {
-          if (b.y > H) return false;
-          if (b.y > SH_Y - 4 && b.y < SH_Y + SH_H * SH_C + 4 && chipShield(b.x, b.y + 4, 1)) return false;
-          const inv = clock - hitAt < 1.5;
-          if (!inv && Math.abs(b.x - px) < PW / 2 && b.y > PY - 12 && b.y < PY + 10) { loseLife(); return false; }
-          return true;
-        });
+        if (phase === 'clear') { phaseT += dt; if (phaseT > 1.2) startWave(wave + 1); return; }
+        movePlayer(dt);
+        if (phase === 'enter') { phaseT += dt; if (phaseT * 60 >= TOTAL + 6) phase = 'play'; return; }
+        moveShot(dt); if (phase !== 'play') return;
+        march(dt); if (phase !== 'play') return;
+        alienFire(dt);
+        moveBombs(dt); if (phase !== 'play') return;
+        moveUfo(dt);
       }
-      function loseLifeQuiet() { lives = 0; api.sfx('boom'); burst(px, PY, api.colors().accent, 18); gameOver('They landed'); }
-
-      function moveShots(dt) {
-        shots.forEach(s => { s.y -= 470 * dt; });
-        shots = shots.filter(s => {
-          if (s.y < TOP) return false;
-          if (s.y > SH_Y - 4 && s.y < SH_Y + SH_H * SH_C + 4 && chipShield(s.x, s.y, 1)) return false;
-          for (const b of bombs) if (Math.abs(b.x - s.x) < 5 && Math.abs(b.y - s.y) < 10) { b.y = H + 99; burst(s.x, s.y, '#e0a526', 5); return false; }
-          if (bonus && Math.abs(bonus.x - s.x) < 16 && Math.abs(s.y - (TOP + 14)) < 10) {
-            score += 100 * (1 + api.level); api.score(score); burst(bonus.x, TOP + 14, '#e05d8b', 14); api.sfx('power'); bonus = null; bonusT = 18; return false;
+      function movePlayer(dt) {
+        const d = (held.r ? 1 : 0) - (held.l ? 1 : 0);
+        px = Math.max(14, Math.min(W - 14, px + d * 66 * dt));
+      }
+      function moveShot(dt) {
+        if (!shot) return;
+        let dist = 240 * dt;
+        while (shot && dist > 0) {
+          const s = Math.min(1, dist); dist -= s; shot.y -= s;
+          const x = shot.x, y = shot.y;
+          if (y < TOP_LIMIT) { effects.push({ k: 'pmask', x: x - 3, y: TOP_LIMIT - 2, t: 0, life: 0.25 }); shot = null; break; }
+          if (ufo && x >= ufo.x && x < ufo.x + 16 && y >= UFO_Y && y < UFO_Y + 7) {
+            const val = UFO_TABLE[shotCount % 15];
+            addScore(val); api.sfx('power');
+            effects.push({ k: 'ufoScore', x: ufo.x, y: UFO_Y, val, t: 0, life: 1.1 });
+            ufo = null; ufoT = cfg.ufoEvery; shot = null; break;
           }
-          if (state !== 'play') return true;
-          for (let i = 0; i < total; i++) {
+          const bi = bombs.findIndex(b => Math.abs(b.x + 1 - x) <= 1 && y >= b.y && y < b.y + 7);
+          if (bi >= 0) { effects.push({ k: 'amask', x: x - 2, y: y - 4, t: 0, life: 0.2 }); bombs.splice(bi, 1); shot = null; break; }
+          const sh = shieldHit(x, y);
+          if (sh) { erode(sh, x, y, 'pmask', -3, -5); shot = null; break; }
+          for (let i = 0; i < TOTAL; i++) {
             if (!alive[i]) continue;
-            const p = enemyPos(i);
-            if (Math.abs(p.x - s.x) < 13 && Math.abs(p.y - s.y) < 11) {
-              alive[i] = 0; const k = KINDS[Math.floor(i / COLS) + (5 - rows)];
-              score += k.pts; api.score(score); api.sfx('click'); burst(p.x, p.y, k.color, 10);
-              if (!aliveCount()) { state = 'clear'; waveAt = clock; bombs = []; api.sfx('line'); api.toast(`Wave ${wave + 1}`); }
-              return false;
+            const a = alienBox(i);
+            if (x >= a.x && x < a.x + a.w && y >= a.y && y < a.y + a.h) {
+              alive[i] = 0; left--; shot = null;
+              addScore(POINTS[a.k]); api.sfx('hit');
+              effects.push({ k: 'boom', x: a.x + a.w / 2 - 6.5, y: a.y, t: 0, life: 0.27, freeze: true });
+              if (!left) { phase = 'clear'; phaseT = 0; bombs = []; ufo = null; api.sfx('line'); api.toast(`Wave ${wave + 1}`); }
+              break;
             }
           }
-          return true;
-        });
+        }
+      }
+      function march(dt) {
+        if (!effects.some(e => e.freeze)) {           // the march pauses while a raider explodes
+          stepT += dt;
+          let n = 0;
+          while (stepT >= stepInterval() && n++ < 3) { stepT -= stepInterval(); marchStep(); }
+        }
+        const b = bounds();
+        if (b.bot > SH_Y) {
+          for (let i = 0; i < TOTAL; i++) if (alive[i]) { const a = alienBox(i); if (a.y + a.h > SH_Y) eraseBox(a.x, a.y, a.x + a.w, a.y + a.h); }
+        }
+        if (b.bot >= PY) killPlayer(true);
+      }
+      function alienFire(dt) {
+        fireCd -= dt;
+        if (fireCd > 0 || bombs.length >= cfg.maxBombs) return;
+        const kind = BOMB_ORDER[rr]; rr = (rr + 1) % 3;
+        if (bombs.some(b => b.k === kind)) return;
+        if (kind === 'plunger' && left === 1) return;
+        if (kind === 'squiggly' && ufo) return;
+        let c;
+        if (kind === 'rolling' || Math.random() < cfg.aim) c = nearestColumn();
+        else if (kind === 'plunger') { c = PLUNGER_COLS[plIdx]; plIdx = (plIdx + 1) % PLUNGER_COLS.length; }
+        else { c = SQUIGGLY_COLS[sqIdx]; sqIdx = (sqIdx + 1) % SQUIGGLY_COLS.length; }
+        const i = c >= 0 ? lowestInColumn(c) : -1;
+        if (i < 0) return;
+        const a = alienBox(i);
+        bombs.push({ k: kind, x: Math.round(a.x + a.w / 2) - 1, y: a.y + a.h });
+        fireCd = reload();
+      }
+      function moveBombs(dt) {
+        const speed = cfg.bombSpeed * (left <= 8 ? 1.25 : 1);
+        for (let j = bombs.length - 1; j >= 0; j--) {
+          const b = bombs[j];
+          let dist = speed * dt, gone = false;
+          while (dist > 0 && !gone) {
+            const s = Math.min(1, dist); dist -= s; b.y += s;
+            const tx = b.x + 1, ty = b.y + 7;
+            const sh = shieldHit(tx, ty);
+            if (sh) { erode(sh, tx, ty, 'amask', -2, -2); gone = true; break; }
+            if (tx >= px - 6.5 && tx < px + 6.5 && ty >= PY + 1 && ty < PY + 8) { killPlayer(false); return; }
+            if (ty >= GROUND) { effects.push({ k: 'amask', x: b.x - 1, y: GROUND - 8, t: 0, life: 0.2 }); gone = true; }
+          }
+          if (gone) bombs.splice(j, 1);
+        }
+      }
+      function moveUfo(dt) {
+        if (ufo) {
+          ufo.x += ufo.d * 48 * dt;
+          if (ufo.x < -18 || ufo.x > W + 2) { ufo = null; ufoT = cfg.ufoEvery; }
+          return;
+        }
+        ufoT -= dt;
+        if (ufoT <= 0 && left >= 8 && !bombs.some(b => b.k === 'squiggly')) {
+          const fromLeft = shotCount % 2 === 0;
+          ufo = { x: fromLeft ? -16 : W, d: fromLeft ? 1 : -1 };
+        }
       }
 
       // ---------- input ----------
-      const toX = e => { const r = canvas.getBoundingClientRect(); return (e.clientX - r.left - lay.ox) / lay.s; };
-      api.on(canvas, 'pointermove', e => { targetX = toX(e); });
-      api.on(canvas, 'pointerdown', e => { targetX = toX(e); if (e.button === 0) fire(); });
       api.keys(e => {
         const k = e.key;
         if (k === 'ArrowLeft' || k === 'a' || k === 'A') held.l = true;
         else if (k === 'ArrowRight' || k === 'd' || k === 'D') held.r = true;
-        else if ((k === ' ' || k === 'ArrowUp' || k === 'w' || k === 'W') && !e.repeat) fire();
+        else if (k === ' ' && !e.repeat) fire();
       });
       api.keysUp(e => {
         const k = e.key;
@@ -241,83 +361,96 @@
 
       // ---------- render ----------
       function render() {
-        const col = api.colors(), { w, h } = view;
+        const col = api.colors(), P = palette(col), { w, h } = view;
         ctx.clearRect(0, 0, w, h);
-        lay.s = Math.min(w / W, h / H); lay.ox = (w - W * lay.s) / 2; lay.oy = (h - H * lay.s) / 2;
-        ctx.save(); ctx.translate(lay.ox, lay.oy); ctx.scale(lay.s, lay.s);
-        // soft stars
-        ctx.fillStyle = col.dark ? 'rgba(255,245,230,0.18)' : 'rgba(120,90,50,0.13)';
-        for (let i = 0; i < 26; i++) { const sx = (i * 97) % W, sy = TOP + ((i * 61 + clock * (6 + (i % 3) * 4)) % (H - TOP - 60)); ctx.beginPath(); ctx.arc(sx, sy, 1 + (i % 3) * 0.4, 0, Math.PI * 2); ctx.fill(); }
+        const s = Math.min(w / W, h / H), ox = (w - W * s) / 2, oy = Math.max(0, (h - H * s) * 0.2);
+        ctx.save(); ctx.translate(ox, oy); ctx.scale(s, s); ctx.imageSmoothingEnabled = false;
+        const img = (name, f, color, x, y) => { const c = spr(name, f, color); ctx.drawImage(c, Math.round(x), Math.round(y)); };
         // HUD
-        for (let i = 0; i < 3; i++) D.spark(ctx, 18 + i * 20, 16, 6.5, i < lives ? col.accent : col.line, 0);
-        D.text(ctx, `Wave ${wave}`, W - 14, 16, 13, col.ink2, 700, 'right');
-        ctx.fillStyle = col.line; ctx.fillRect(10, TOP - 4, W - 20, 1);
-        // bonus kite
-        if (bonus) {
-          ctx.save(); ctx.translate(bonus.x, TOP + 14); ctx.rotate(Math.sin(clock * 6) * 0.15);
-          ctx.fillStyle = '#e05d8b'; ctx.beginPath(); ctx.moveTo(0, -9); ctx.lineTo(13, 0); ctx.lineTo(0, 9); ctx.lineTo(-13, 0); ctx.closePath(); ctx.fill();
-          D.spark(ctx, 0, 0, 4.5, '#fffaf2', clock * 4); ctx.restore();
+        D.spark(ctx, 10, 13, 4.6, col.accent, 0);
+        D.text(ctx, 'SCORE', 19, 8, 7, col.ink3, 700, 'left');
+        D.text(ctx, pad4(score), 19, 18, 10, col.ink, 750, 'left');
+        D.text(ctx, 'HI-SCORE', W / 2, 8, 7, col.ink3, 700);
+        D.text(ctx, pad4(Math.max(api.best || 0, score)), W / 2, 18, 10, col.ink, 750);
+        D.text(ctx, 'WAVE', W - 8, 8, 7, col.ink3, 700, 'right');
+        D.text(ctx, String(wave), W - 8, 18, 10, col.ink, 750, 'right');
+        // mystery ship
+        if (ufo) img('ufo', 0, P.ufo, ufo.x, UFO_Y);
+        // raiders (drawn in one by one, bottom row first, at the start of a wave)
+        const shown = phase === 'enter' ? Math.floor(phaseT * 60) : TOTAL;
+        for (let i = 0; i < TOTAL; i++) {
+          if (!alive[i]) continue;
+          const a = alienBox(i);
+          if ((ROWS - 1 - a.r) * COLS + a.c >= shown) continue;
+          img(a.k, frame, P[a.k], a.x, a.y);
         }
-        // raiders (dimmed once the run is over)
-        const fade = state === 'over' ? 0.55 : 1;
-        ctx.globalAlpha = fade;
-        alive.forEach((a, i) => {
-          if (!a) return;
-          const p = enemyPos(i), row = Math.floor(i / COLS) + (5 - rows);
-          const born = api.reduceMotion ? 1 : Math.min(1, (clock - waveAt - (i % COLS) * 0.03 - Math.floor(i / COLS) * 0.05) / 0.3);
-          if (born <= 0) return;
-          ctx.save(); ctx.translate(p.x, p.y); ctx.scale(born, born);
-          drawRaider(ctx, row, 0, 0, frame, KINDS[row].color);
-          ctx.restore();
+        // shields (each kept as a tiny bitmap, redrawn only when it erodes)
+        shields.forEach(sh => {
+          if (sh.dirty || sh.color !== P.shield) {
+            const g = sh.cv.getContext('2d'); g.clearRect(0, 0, SH_W, SH_H); g.fillStyle = P.shield;
+            sh.cells.forEach((on, j) => { if (on) g.fillRect(j % SH_W, Math.floor(j / SH_W), 1, 1); });
+            sh.dirty = false; sh.color = P.shield;
+          }
+          ctx.drawImage(sh.cv, sh.x, SH_Y);
         });
-        ctx.globalAlpha = 1;
-        // shields
-        ctx.fillStyle = col.dark ? '#b48a5e' : '#d2a774';
-        shields.forEach(sh => sh.cells.forEach((on, j) => {
-          if (!on) return;
-          ctx.fillRect(sh.x + (j % SH_W) * SH_C, SH_Y + Math.floor(j / SH_W) * SH_C, SH_C + 0.8, SH_C + 0.8);
-        }));
+        // effects
+        effects.forEach(e => {
+          if (e.k === 'boom') img('boom', 0, col.ink2, e.x, e.y);
+          else if (e.k === 'ufoScore') D.text(ctx, String(e.val), e.x + 8, e.y + 4, 8, P.ufo, 800);
+          else img(e.k, 0, e.k === 'pmask' ? col.accent : P.bomb, e.x, e.y);
+        });
         // shots
-        ctx.fillStyle = col.accent;
-        shots.forEach(s => { D.roundRect(ctx, s.x - 1.8, s.y - 7, 3.6, 12, 1.8); ctx.fill(); });
-        bombs.forEach(b => {
-          ctx.strokeStyle = col.dark ? '#f0c060' : '#c4633f'; ctx.lineWidth = 2.4; ctx.lineCap = 'round';
-          ctx.beginPath(); for (let k = 0; k <= 4; k++) { const yy = b.y - 10 + k * 3, xx = b.x + Math.sin(b.wob + clock * 18 + k) * 2.2; ctx[k ? 'lineTo' : 'moveTo'](xx, yy); } ctx.stroke();
-        });
-        // player (blinks while safe after a hit)
-        const inv = clock - hitAt < 1.5 && state !== 'over';
-        ctx.globalAlpha = inv && Math.floor(clock * 8) % 2 === 0 ? 0.35 : 1;
-        drawShip(ctx, px, PY, col, state === 'over', clock);
-        ctx.globalAlpha = 1;
-        parts.forEach(p => { ctx.globalAlpha = Math.max(0, p.life); ctx.fillStyle = p.color; ctx.fillRect(p.x - 1.5, p.y - 1.5, 3, 3); });
-        ctx.globalAlpha = 1;
-        if (state === 'clear') D.text(ctx, `Wave ${wave} cleared`, W / 2, H * 0.42, 18, col.ink, 750);
-        if (state === 'over') D.text(ctx, `${score} points`, W / 2, TOP + 14, 13, col.ink2, 700);
+        if (shot) { ctx.fillStyle = col.accent; ctx.fillRect(shot.x, Math.round(shot.y), 1, 4); }
+        bombs.forEach(b => img(b.k, Math.floor(b.y / 3) % 4, P.bomb, b.x, b.y));
+        // cannon, or its explosion (frozen on the board at the end of the run)
+        if (phase === 'dying' || phase === 'over') img('pboom', Math.floor((clock - deadAt) * 10) % 2, P.cannon, px - 8, PY);
+        else img('cannon', 0, P.cannon, px - 6.5, PY);
+        // ground line and spare cannons
+        ctx.fillStyle = col.line; ctx.fillRect(0, GROUND, W, 1);
+        D.text(ctx, String(lives), 9, 248, 9, col.ink, 750, 'center');
+        for (let i = 0; i < Math.min(6, lives - 1); i++) img('cannon', 0, P.cannon, 20 + i * 16, 244);
         ctx.restore();
       }
 
       // ---------- save / restore ----------
+      const okBits = (str, n) => typeof str === 'string' && str.length === n && /^[01]+$/.test(str);
       function restore(s) {
-        if (!s || s.v !== 1 || s.rows !== rows || typeof s.alive !== 'string' || s.alive.length !== total || !Array.isArray(s.shields) || s.shields.length !== 4) return false;
-        if (!(s.lives >= 1 && s.lives <= 3) || !(s.wave >= 1)) return false;
+        if (!s || s.v !== 2 || !okBits(s.alive, TOTAL) || !Array.isArray(s.shields) || s.shields.length !== 4) return false;
+        if (!s.shields.every(b => okBits(b, SH_W * SH_H))) return false;
+        if (!(s.lives >= 1 && s.lives <= 9) || !(s.wave >= 1) || ![s.fx, s.fy, s.px, s.score].every(Number.isFinite)) return false;
         reset();
-        wave = s.wave | 0; score = s.score | 0; lives = s.lives | 0; px = +s.px || W / 2;
-        fx = +s.fx; fy = +s.fy; dir = s.dir === -1 ? -1 : 1;
-        alive = s.alive.split('').map(Number);
-        shields.forEach((sh, i) => { if (typeof s.shields[i] === 'string' && s.shields[i].length === SH_W * SH_H) sh.cells = s.shields[i].split('').map(Number); });
-        if (!aliveCount()) startWave(wave + 1);
-        waveAt = -9;
+        startWave(s.wave | 0);
+        score = Math.max(0, s.score | 0); lives = s.lives | 0; bonusGiven = !!s.bonusGiven;
+        alive = s.alive.split('').map(Number); left = alive.reduce((a, b) => a + b, 0);
+        fx = s.fx; fy = s.fy; dir = s.dir === -1 ? -1 : 1; frame = s.frame ? 1 : 0; stepT = +s.stepT || 0;
+        px = Math.max(14, Math.min(W - 14, s.px));
+        shields = s.shields.map((b, i) => newShield(i, b));
+        shot = s.shot && Number.isFinite(s.shot.x) && Number.isFinite(s.shot.y) ? { x: s.shot.x, y: s.shot.y } : null;
+        bombs = Array.isArray(s.bombs) ? s.bombs.filter(b => b && BOMB_ORDER.includes(b.k) && Number.isFinite(b.x) && Number.isFinite(b.y)).slice(0, 3).map(b => ({ k: b.k, x: b.x, y: b.y })) : [];
+        ufo = s.ufo && Number.isFinite(s.ufo.x) ? { x: s.ufo.x, d: s.ufo.d === -1 ? -1 : 1 } : null;
+        ufoT = Number.isFinite(s.ufoT) ? s.ufoT : cfg.ufoEvery; fireCd = Number.isFinite(s.fireCd) ? s.fireCd : 1;
+        rr = (s.rr | 0) % 3; plIdx = (s.plIdx | 0) % PLUNGER_COLS.length; sqIdx = (s.sqIdx | 0) % SQUIGGLY_COLS.length; shotCount = s.shotCount | 0;
+        phase = ['play', 'dying', 'clear', 'enter'].includes(s.phase) ? s.phase : 'play'; phaseT = +s.phaseT || 0;
+        if (!left) { phase = 'clear'; phaseT = 0; }
+        if (phase === 'dying') deadAt = clock - phaseT;
+        api.score(score);
         return true;
       }
       const restored = !!(api.saved && restore(api.saved));
       if (!restored) reset();
-      api.score(score);
       api.loop(dt => { update(dt); render(); });
+      const r2 = n => Math.round(n * 100) / 100;
       return {
         save() {
-          if (state === 'over' || (!restored && !api.touched)) return null;   // nothing played yet
-          return { v: 1, rows, wave, score, lives, px: Math.round(px), fx: Math.round(fx * 10) / 10, fy, dir, alive: alive.join(''), shields: shields.map(sh => sh.cells.join('')) };
-        }
+          if (phase === 'over' || (!restored && !api.touched)) return null;   // nothing played yet
+          return {
+            v: 2, level: api.level, wave, score, lives, bonusGiven, alive: alive.join(''), fx, fy, dir, frame, stepT: r2(stepT), px: r2(px),
+            shields: shields.map(sh => sh.cells.join('')), shot: shot && { x: shot.x, y: r2(shot.y) },
+            bombs: bombs.map(b => ({ k: b.k, x: b.x, y: r2(b.y) })), ufo: ufo && { x: r2(ufo.x), d: ufo.d }, ufoT: r2(ufoT), fireCd: r2(fireCd),
+            rr, plIdx, sqIdx, shotCount, phase, phaseT: r2(phaseT)
+          };
+        },
+        destroy() { if (actx) { try { actx.close(); } catch (e) { /* already closed */ } actx = null; } }
       };
     }
   });

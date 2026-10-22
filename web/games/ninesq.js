@@ -183,15 +183,15 @@
         ctx.beginPath(); ctx.moveTo(ox + 2, oy + k * s); ctx.lineTo(ox + S - 2, oy + k * s); ctx.stroke();
       }
       ctx.fillStyle = 'rgba(255,255,255,0.22)'; D.roundRect(ctx, ox + s + 3, oy + 3, s - 6, s - 6, 5); ctx.fill();
-      D.spark(ctx, ox + s / 2, oy + s / 2, s * 0.34, '#fff');
-      D.spark(ctx, ox + s * 1.5, oy + s * 1.5, s * 0.34, '#fff');
+      const X = (x, y, r, lw) => { ctx.strokeStyle = '#fff'; ctx.lineWidth = lw; ctx.beginPath(); ctx.moveTo(x - r, y - r); ctx.lineTo(x + r, y + r); ctx.moveTo(x + r, y - r); ctx.lineTo(x - r, y + r); ctx.stroke(); };
+      ctx.lineWidth = 3; X(ox + s / 2, oy + s / 2, s * 0.22, 3); X(ox + s * 1.5, oy + s * 1.5, s * 0.22, 3);
       ctx.strokeStyle = '#1d3566'; ctx.lineWidth = 3;
       [[2, 0], [0, 2]].forEach(([c, r]) => { ctx.beginPath(); ctx.arc(ox + c * s + s / 2, oy + r * s + s / 2, s * 0.27, 0, Math.PI * 2); ctx.stroke(); });
       const m = s / 3;
       ctx.lineWidth = 1.6;
       [[0, 0, 1], [1, 1, 2], [2, 2, 1], [0, 2, 2]].forEach(([c, r, who]) => {
         const x = ox + s + c * m + m / 2, y = oy + r * m + m / 2;
-        if (who === 1) D.spark(ctx, x, y, m * 0.3, '#fff'); else { ctx.beginPath(); ctx.arc(x, y, m * 0.24, 0, Math.PI * 2); ctx.stroke(); }
+        if (who === 1) X(x, y, m * 0.2, 1.6); else { ctx.beginPath(); ctx.arc(x, y, m * 0.24, 0, Math.PI * 2); ctx.stroke(); }
       });
     },
     create(stage, api) {
@@ -275,12 +275,37 @@
       }
 
       // ---------- drawing ----------
-      function markO(x, y, r, col, k, alpha) {
+      // Marks draw themselves in: X = two rounded strokes one after the other, O = one circular stroke.
+      function markX(x, y, r, c, k, alpha, lw) {
+        if (k <= 0) return;
         ctx.save(); ctx.globalAlpha = alpha == null ? 1 : alpha;
-        ctx.strokeStyle = col.ink; ctx.lineWidth = Math.max(2, r * 0.3); ctx.lineCap = 'round';
-        ctx.beginPath(); ctx.arc(x, y, r * 0.78, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * k); ctx.stroke();
+        ctx.strokeStyle = c; ctx.lineWidth = lw || Math.max(2, r * 0.3); ctx.lineCap = 'round';
+        const d = r * 0.62, a = D.ease.outCubic(Math.min(1, k * 2)), b = D.ease.outCubic(Math.max(0, k * 2 - 1));
+        ctx.beginPath(); ctx.moveTo(x - d, y - d); ctx.lineTo(x - d + 2 * d * a, y - d + 2 * d * a); ctx.stroke();
+        if (b > 0) { ctx.beginPath(); ctx.moveTo(x + d, y - d); ctx.lineTo(x + d - 2 * d * b, y - d + 2 * d * b); ctx.stroke(); }
         ctx.restore();
       }
+      function markO(x, y, r, c, k, alpha, lw) {
+        if (k <= 0) return;
+        ctx.save(); ctx.globalAlpha = alpha == null ? 1 : alpha;
+        ctx.strokeStyle = c; ctx.lineWidth = lw || Math.max(2, r * 0.3); ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.arc(x, y, r * 0.72, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * D.ease.outCubic(k)); ctx.stroke();
+        ctx.restore();
+      }
+      // Thin rounded line drawn from p to q (k = 0..1), with a soft glow in its own colour.
+      function glowLine(x1, y1, x2, y2, c, lw, k, alpha) {
+        if (k <= 0) return;
+        const e = D.ease.inOut(Math.min(1, k)), x = D.lerp(x1, x2, e), y = D.lerp(y1, y2, e);
+        ctx.save(); ctx.lineCap = 'round'; ctx.strokeStyle = c; ctx.globalAlpha = alpha == null ? 1 : alpha;
+        ctx.shadowColor = c; ctx.shadowBlur = lw * 4; ctx.lineWidth = lw;
+        ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x, y); ctx.stroke();
+        ctx.shadowBlur = 0; ctx.globalAlpha *= 0.55; ctx.strokeStyle = '#fff'; ctx.lineWidth = Math.max(1, lw * 0.35);
+        ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x, y); ctx.stroke();
+        ctx.restore();
+      }
+      // the three cells or boards of a line, stretched a little past both ends
+      function lineEnds(p, q, ext) { const dx = q[0] - p[0], dy = q[1] - p[1], L2 = Math.hypot(dx, dy) || 1; return [p[0] - dx / L2 * ext, p[1] - dy / L2 * ext, q[0] + dx / L2 * ext, q[1] + dy / L2 * ext]; }
+      const markCol = (who, col) => who === P ? col.accent : col.ink;
       function hud(col) {
         const ended = phase !== 'play';
         const n = who => { let k = 0; for (let b = 0; b < 9; b++) if (s.smalls[b] === who) k++; return k + (k === 1 ? ' board' : ' boards'); };
@@ -309,6 +334,13 @@
           ctx.fillStyle = live && s.turn === P ? (col.dark ? 'rgba(217,119,87,0.13)' : 'rgba(217,119,87,0.10)') : col.surface;
           if (live && s.turn === C) ctx.fillStyle = col.dark ? 'rgba(255,255,255,0.06)' : col.surface2;
           D.roundRect(ctx, bx, by, bs, bs, 10); ctx.fill();
+          if (winSet.has(b) && s.winner && s.winner !== DRAW) {
+            const hk = api.reduceMotion ? 1 : Math.max(0, Math.min(1, (now - Math.max(...s.line.map(x => claimT[x])) - 650) / 500));
+            ctx.save(); ctx.globalAlpha = hk;
+            ctx.fillStyle = s.winner === P ? 'rgba(217,119,87,0.14)' : (col.dark ? 'rgba(255,255,255,0.08)' : 'rgba(32,28,23,0.06)'); D.roundRect(ctx, bx, by, bs, bs, 10); ctx.fill();
+            ctx.strokeStyle = markCol(s.winner, col); ctx.lineWidth = 1.5; ctx.globalAlpha = hk * 0.45; D.roundRect(ctx, bx + 0.75, by + 0.75, bs - 1.5, bs - 1.5, 10); ctx.stroke();
+            ctx.restore();
+          }
           if (live) {
             ctx.strokeStyle = s.turn === P ? col.accent : col.ink3; ctx.lineWidth = 2;
             ctx.globalAlpha = s.turn === P ? 0.6 + 0.3 * Math.sin(now / 300) : 0.5; D.roundRect(ctx, bx + 1, by + 1, bs - 2, bs - 2, 10); ctx.stroke(); ctx.globalAlpha = 1;
@@ -320,41 +352,44 @@
             ctx.beginPath(); ctx.moveTo(bx + cs * 0.18, by + k * cs); ctx.lineTo(bx + bs - cs * 0.18, by + k * cs); ctx.stroke();
           }
           const claimed = s.smalls[b];
+          const smallLine = claimed === P || claimed === C ? L.lineOf(k => s.cells[b * 9 + k], claimed) : null;
+          const winCells = new Set(smallLine || []);
+          const cel = api.reduceMotion ? 9 : (now - claimT[b]) / 1000, ct = Math.min(1, cel / 0.32) * (cel < 0.7 ? 1 : Math.max(0.45, 1 - (cel - 0.7) * 1.5));
+          if (smallLine) smallLine.forEach(k => { const [x, y] = cellXY(b * 9 + k); ctx.fillStyle = claimed === P ? 'rgba(217,119,87,' + (0.14 * ct) + ')' : (col.dark ? 'rgba(255,255,255,' : 'rgba(32,28,23,') + (0.06 * ct) + ')'; D.roundRect(ctx, x - cs * 0.42, y - cs * 0.42, cs * 0.84, cs * 0.84, 6); ctx.fill(); });
           for (let k = 0; k < 9; k++) {
             const i = b * 9 + k, v = s.cells[i]; if (!v) continue;
             const [x, y] = cellXY(i);
-            const t = api.reduceMotion ? 1 : Math.min(1, (now - placedT[i]) / 260);
-            const a = claimed ? 0.28 : 1;
+            const t = api.reduceMotion ? 1 : Math.min(1, (now - placedT[i]) / 280);
+            const a = claimed ? (claimed !== DRAW && winCells.has(k) ? 0.5 : 0.22) : 1;
             if (i === last) { ctx.fillStyle = v === P ? 'rgba(217,119,87,0.18)' : (col.dark ? 'rgba(255,255,255,0.08)' : 'rgba(32,28,23,0.07)'); D.roundRect(ctx, x - cs * 0.44, y - cs * 0.44, cs * 0.88, cs * 0.88, 6); ctx.fill(); }
-            ctx.globalAlpha = a;
-            if (v === P) D.spark(ctx, x, y, cs * 0.3 * D.ease.outBack(t), col.accent, (1 - t) * 1.2);
-            else markO(x, y, cs * 0.34, col, D.ease.outCubic(t), a);
-            ctx.globalAlpha = 1;
+            if (v === P) markX(x, y, cs * 0.34, col.accent, t, a);
+            else markO(x, y, cs * 0.34, col.ink, t, a);
           }
           // claimed overlay
           if (claimed) {
-            const t = api.reduceMotion ? 1 : Math.min(1, (now - claimT[b]) / 380);
+            const el = api.reduceMotion ? 9 : (now - claimT[b]) / 1000;
             const cxm = bx + bs / 2, cym = by + bs / 2;
-            if (winSet.has(b)) { ctx.fillStyle = s.winner === P ? 'rgba(217,119,87,0.22)' : (col.dark ? 'rgba(255,255,255,0.10)' : 'rgba(32,28,23,0.08)'); D.roundRect(ctx, bx, by, bs, bs, 10); ctx.fill(); }
-            if (claimed === P) D.spark(ctx, cxm, cym, bs * 0.36 * D.ease.outBack(t), col.accent, (1 - t) * 1.5);
-            else if (claimed === C) D.avatar(ctx, cxm, cym, Math.max(1, bs * 0.34 * Math.max(0.05, D.ease.outBack(t))), 'bot', col);
+            if (smallLine) {
+              const p = cellXY(b * 9 + smallLine[0]), q = cellXY(b * 9 + smallLine[2]), e = lineEnds(p, q, cs * 0.3);
+              glowLine(e[0], e[1], e[2], e[3], markCol(claimed, col), Math.max(1.6, cs * 0.07), el / 0.3, el < 0.5 ? 0.9 : Math.max(0.3, 0.9 - (el - 0.5) * 2));
+            }
+            const mk = Math.min(1, Math.max(0, (el - 0.22) / 0.45)), lw = Math.max(2.5, bs * 0.055);
+            if (claimed === P) markX(cxm, cym, bs * 0.38, col.accent, mk, 1, lw);
+            else if (claimed === C) markO(cxm, cym, bs * 0.4, col.ink, mk, 0.85, lw);
             else D.text(ctx, 'Draw', cxm, cym, bs * 0.16, col.ink3, 700);
           }
         }
         if (s.line && s.winner && s.winner !== DRAW) {
-          const a = boardXY(s.line[0]), b = boardXY(s.line[2]), k = api.reduceMotion ? 1 : Math.min(1, (now - claimT[s.line[2]] - 300) / 420);
-          if (k > 0) {
-            ctx.strokeStyle = s.winner === P ? col.accent : (col.dark ? '#cfd5de' : '#4a5260'); ctx.lineWidth = Math.max(4, bs * 0.07); ctx.lineCap = 'round'; ctx.globalAlpha = 0.85;
-            const x1 = a[0] + bs / 2, y1 = a[1] + bs / 2, x2 = b[0] + bs / 2, y2 = b[1] + bs / 2;
-            ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(D.lerp(x1, x2, k), D.lerp(y1, y2, k)); ctx.stroke(); ctx.globalAlpha = 1;
-            s.line.forEach(b => { const [bx, by] = boardXY(b); if (s.winner === P) D.spark(ctx, bx + bs / 2, by + bs / 2, bs * 0.36, col.accent, 0); else D.avatar(ctx, bx + bs / 2, by + bs / 2, bs * 0.34, 'bot', col); });
-          }
+          const tEnd = Math.max(...s.line.map(b => claimT[b])), k = api.reduceMotion ? 1 : (now - tEnd - 650) / 560;
+          const c = markCol(s.winner, col), a = boardXY(s.line[0]), b = boardXY(s.line[2]);
+          const e = lineEnds([a[0] + bs / 2, a[1] + bs / 2], [b[0] + bs / 2, b[1] + bs / 2], bs * 0.42);
+          glowLine(e[0], e[1], e[2], e[3], c, Math.max(2.5, bs * 0.035), k, 0.95);
         }
         // hover / cursor preview
         const target = useCursor ? cur : hover;
         if (phase === 'play' && s.turn === P && target >= 0) {
           const [x, y] = cellXY(target);
-          if (legal.has(target)) { ctx.globalAlpha = 0.4; D.spark(ctx, x, y, cs * 0.28, col.accent); ctx.globalAlpha = 1; }
+          if (legal.has(target)) markX(x, y, cs * 0.34, col.accent, 1, 0.35);
           if (useCursor) { ctx.strokeStyle = legal.has(target) ? col.accent : col.ink3; ctx.lineWidth = 2; D.roundRect(ctx, x - cs * 0.45, y - cs * 0.45, cs * 0.9, cs * 0.9, 6); ctx.stroke(); }
         }
         // thinking cue: soft scan across live boards

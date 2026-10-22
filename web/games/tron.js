@@ -2,7 +2,7 @@
    Best of 5 rounds; a crash at the same moment is a drawn round. Each round is a little faster. */
 (function () {
   const D = Ludus.draw;
-  const COLS = 30, ROWS = 36, CELL = 12, W = COLS * CELL, H = ROWS * CELL, FIRST_TO = 3, COUNT = 1.8;
+  const PCOLS = 30, PROWS = 36, LROWS = 24, MAX_COLS = 64, CELL = 12, FIRST_TO = 3, COUNT = 1.8;
   const DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
   const OPP = { up: 'down', down: 'up', left: 'right', right: 'left' };
 
@@ -40,7 +40,7 @@
   }
 
   // One simultaneous step for both riders. Pure, for tests. Returns { crashed: { p1, p2 } }.
-  function stepRiders(grid, riders) {
+  function stepRiders(grid, riders, COLS = PCOLS, ROWS = PROWS) {
     const next = riders.map(r => ({ x: r.x + DIRS[r.dir][0], y: r.y + DIRS[r.dir][1] }));
     const out = (n) => n.x < 0 || n.y < 0 || n.x >= COLS || n.y >= ROWS;
     const crashed = next.map(n => out(n) || grid[n.y * COLS + n.x] !== 0);
@@ -50,9 +50,9 @@
   }
 
   Ludus.register({
-    id: 'tron', name: 'Light Trails', tag: '2 Player', tint: '#2a9d9f',
+    id: 'tron', name: 'Light Trails', tag: '2 Player', wide: true, tint: '#2a9d9f',
     hint: '<b>P1</b> <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> turn · <b>P2</b> <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> turn · don\'t hit walls or trails',
-    _rules: { stepRiders, COLS, ROWS },
+    _rules: { stepRiders, COLS: PCOLS, ROWS: PROWS },
     art(ctx, w, h) {
       ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.lineWidth = h * 0.05;
       ctx.strokeStyle = '#fff8f2'; ctx.beginPath(); ctx.moveTo(w * 0.15, h * 0.85); ctx.lineTo(w * 0.15, h * 0.4); ctx.lineTo(w * 0.45, h * 0.4); ctx.lineTo(w * 0.45, h * 0.2); ctx.stroke();
@@ -60,8 +60,20 @@
       D.spark(ctx, w * 0.45, h * 0.2, h * 0.08, '#fff8f2', 0); D.spark(ctx, w * 0.55, h * 0.78, h * 0.08, '#5b8def', 0);
     },
     create(stage, api) {
-      const view = api.canvas();
+      const view = api.canvas(onResize);
       const { ctx } = view;
+      // Arena size follows the stage: portrait keeps the classic 30 x 36 grid; landscape gets 24 rows
+      // and as many square cells across as fit the width.
+      const gridFor = (w, h) => {
+        if (w <= h) return [PCOLS, PROWS];
+        const s = Math.max(1, h - 64) / (LROWS * CELL + 6);
+        return [Math.max(PCOLS, Math.min(MAX_COLS, Math.floor(((w - 16) / s - 6) / CELL))), LROWS];
+      };
+      let COLS, ROWS, W, H;
+      const layout = g => { COLS = g[0]; ROWS = g[1]; W = COLS * CELL; H = ROWS * CELL; };
+      // Untransformed stage size (the panel's slide-in scale would skew getBoundingClientRect).
+      const dims = () => [stage.clientWidth || view.w, stage.clientHeight || view.h];
+      layout(gridFor(...dims()));
       const BASE = [0.1, 0.082, 0.066][api.level];
       let grid, riders, queues, wins, round, phase, phaseT, acc, interval, crash, clock = 0, parts = [], overCalled = false, result = null;
       const pads = makePads(api, (who, k) => {
@@ -72,7 +84,11 @@
       function startMatch() { wins = { p1: 0, p2: 0 }; round = 0; api.score(0); startRound(); }
       function startRound() {
         grid = new Array(COLS * ROWS).fill(0);
-        riders = [
+        // portrait: P1 starts low heading up, P2 high heading down; landscape: P1 left heading right, P2 right heading left
+        riders = COLS > ROWS ? [
+          { id: 'p1', x: Math.floor(COLS * 0.2), y: Math.floor(ROWS * 0.68), dir: 'right', trail: [] },
+          { id: 'p2', x: Math.floor(COLS * 0.8) - 1, y: Math.floor(ROWS * 0.32), dir: 'left', trail: [] }
+        ] : [
           { id: 'p1', x: Math.floor(COLS * 0.25), y: Math.floor(ROWS * 0.72), dir: 'up', trail: [] },
           { id: 'p2', x: Math.floor(COLS * 0.75) - 1, y: Math.floor(ROWS * 0.28), dir: 'down', trail: [] }
         ];
@@ -92,7 +108,7 @@
 
       function tick() {
         riders.forEach(turn);
-        const { next, crashed } = stepRiders(grid, riders);
+        const { next, crashed } = stepRiders(grid, riders, COLS, ROWS);
         if (crashed.p1 || crashed.p2) {
           crash = { p1: crashed.p1 ? next[0] : null, p2: crashed.p2 ? next[1] : null };
           ['p1', 'p2'].forEach((id, i) => { if (crashed[id]) burst(next[i].x, next[i].y, i === 0 ? api.colors().accent : D.P2); });
@@ -191,10 +207,11 @@
           D.text(ctx, String(n), W / 2, H / 2, 54, col.accent, 800);
           D.text(ctx, `Round ${round + 1}`, W / 2, H / 2 + 40, 13, col.ink2, 700);
           riders.forEach((r, i) => {
-            const x = (r.x + 0.5) * CELL, y = (r.y + 0.5 + DIRS[r.dir][1] * 2.2) * CELL;
+            const [dx, dy] = DIRS[r.dir];
+            const x = (r.x + 0.5 + dx * 2.2) * CELL, y = (r.y + 0.5 + dy * 2.2) * CELL;
             ctx.strokeStyle = i ? D.P2 : col.accent; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
-            const d = DIRS[r.dir][1];
-            ctx.beginPath(); ctx.moveTo(x - 6, y - d * 4); ctx.lineTo(x, y + d * 3); ctx.lineTo(x + 6, y - d * 4); ctx.stroke();
+            // chevron pointing along (dx, dy)
+            ctx.beginPath(); ctx.moveTo(x - dx * 4 - dy * 6, y - dy * 4 - dx * 6); ctx.lineTo(x + dx * 3, y + dy * 3); ctx.lineTo(x - dx * 4 + dy * 6, y - dy * 4 + dx * 6); ctx.stroke();
           });
         }
         if (phase === 'end' || phase === 'over') {
@@ -211,12 +228,14 @@
       // ---------- save / restore ----------
       function save() {
         if (phase === 'over' || api.ended || (!restored && !api.touched)) return null;
-        return { v: 1, wins: { ...wins }, round, phase, phaseT, acc, result, crash, interval,
+        return { v: 1, cols: COLS, rows: ROWS, wins: { ...wins }, round, phase, phaseT, acc, result, crash, interval,
           riders: riders.map(r => ({ dir: r.dir, trail: r.trail.map(c => c.slice()) })) };
       }
       function restore(s) {
         const num = v => typeof v === 'number' && isFinite(v);
-        if (!s || s.v !== 1 || !s.wins || !num(s.wins.p1) || !num(s.wins.p2) || s.wins.p1 >= FIRST_TO || s.wins.p2 >= FIRST_TO) return false;
+        // A save from an arena of another size (e.g. an old portrait session) starts fresh.
+        if (!s || (s.cols === undefined ? PCOLS : s.cols) !== COLS || (s.rows === undefined ? PROWS : s.rows) !== ROWS) return false;
+        if (s.v !== 1 || !s.wins || !num(s.wins.p1) || !num(s.wins.p2) || s.wins.p1 >= FIRST_TO || s.wins.p2 >= FIRST_TO) return false;
         if (!num(s.round) || !['count', 'play', 'end'].includes(s.phase) || !num(s.phaseT) || !num(s.acc)) return false;
         if (!Array.isArray(s.riders) || s.riders.length !== 2) return false;
         const g = new Array(COLS * ROWS).fill(0);
@@ -241,7 +260,13 @@
       // A restored match counts as in progress; a fresh one only once a player has pressed something.
       const restored = !!(api.saved && restore(api.saved));
       if (!restored) startMatch();
-      if (window.ludusDebug) window.ludusDebug.tron = () => ({ phase, wins: { ...wins }, round, result, riders: riders.map(r => ({ x: r.x, y: r.y, dir: r.dir, len: r.trail.length })), interval });
+      // The panel may still be turning landscape when the game starts: re-fit an untouched match.
+      function onResize(w, h) {
+        const g = gridFor(...dims());
+        if ((g[0] === COLS && g[1] === ROWS) || restored || api.touched || round || wins.p1 || wins.p2 || phase !== 'count') return;
+        layout(g); startMatch();
+      }
+      if (window.ludusDebug) window.ludusDebug.tron = () => ({ COLS, ROWS, phase, wins: { ...wins }, round, result, riders: riders.map(r => ({ x: r.x, y: r.y, dir: r.dir, len: r.trail.length })), interval });
       api.loop(dt => { update(dt); render(); });
       return { save, pause() { pads.clear(); }, resume() { pads.clear(); } };
     }

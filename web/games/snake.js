@@ -245,15 +245,34 @@
         }
         ctx.restore();
 
-        if (!started && !dead) {
-          const a = api.reduceMotion ? 1 : 0.65 + Math.sin(t * 3) * 0.25;
-          ctx.globalAlpha = a;
-          const ty = lay.oy + cell * rows * 0.78;
-          ctx.fillStyle = col.dark ? 'rgba(42,38,33,0.9)' : 'rgba(255,252,247,0.92)';
-          D.roundRect(ctx, w / 2 - 110, ty - 15, 220, 30, 15); ctx.fill();
-          D.text(ctx, 'Any arrow key or click to start', w / 2, ty + 1, 12.5, col.ink2, 650);
-          ctx.globalAlpha = 1;
-        }
+        if (!started && !dead) drawStartKeys(w, col, t);
+      }
+
+      // Start prompt: a small arrow-key diamond under the snake. The key the snake faces breathes
+      // softly (council pick); nothing else moves or fades, and it goes away on the first turn.
+      function drawStartKeys(w, col, t) {
+        const k = Math.max(24, Math.min(32, lay.cell * 1.25)), gap = 5, r = 7;
+        const cx = w / 2, top = lay.oy + lay.cell * rows * 0.7;
+        const keys = [['up', cx - k / 2, top], ['left', cx - k * 1.5 - gap, top + k + gap],
+          ['down', cx - k / 2, top + k + gap], ['right', cx + k / 2 + gap, top + k + gap]];
+        const cardW = k * 3 + gap * 2 + 28, cardH = k * 2 + gap + 46;
+        ctx.fillStyle = col.dark ? 'rgba(34,30,26,0.94)' : 'rgba(255,252,247,0.95)';
+        ctx.shadowColor = col.dark ? 'rgba(0,0,0,0.4)' : 'rgba(80,50,30,0.14)'; ctx.shadowBlur = 14; ctx.shadowOffsetY = 3;
+        D.roundRect(ctx, cx - cardW / 2, top - 14, cardW, cardH, 16); ctx.fill();
+        ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+        const facing = Object.keys(DIRS).find(n => DIRS[n] === dir) || 'right';
+        const breath = api.reduceMotion ? 0.6 : 0.45 + Math.sin(t * Math.PI) * 0.35;
+        const arrow = { up: '\u2191', down: '\u2193', left: '\u2190', right: '\u2192' };
+        keys.forEach(([n, x, y]) => {
+          const on = n === facing;
+          if (on) { ctx.fillStyle = rgba(col.accent, 0.28 * breath); D.roundRect(ctx, x - 4, y - 4, k + 8, k + 8, r + 3); ctx.fill(); }
+          ctx.fillStyle = col.dark ? '#3a342d' : '#ece3d6';
+          D.roundRect(ctx, x, y + 2, k, k, r); ctx.fill();
+          ctx.fillStyle = on ? col.accent : (col.dark ? '#2c2722' : '#fffaf3');
+          D.roundRect(ctx, x, y, k, k, r); ctx.fill();
+          D.text(ctx, arrow[n], x + k / 2, y + k / 2 + 1, k * 0.46, on ? '#fff8f2' : col.ink2, 700);
+        });
+        D.text(ctx, 'to start', cx, top + k * 2 + gap + 18, 12, col.ink2, 650);
       }
 
       reset();

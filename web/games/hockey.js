@@ -1,8 +1,10 @@
-/* Air Puck: air hockey for two people on one keyboard. P1 guards the bottom goal, P2 the top one.
-   Mallets glide with smooth acceleration; first to 5 goals wins. */
+/* Air Puck: air hockey for two people on one keyboard. P1 guards the bottom goal, P2 the top one
+   (on a landscape stage the rink is drawn turned on its side: P1 left, P2 right).
+   Mallets glide with smooth acceleration; first to 5 goals wins.
+   Physics always run in rink space: x across (0..W), y along (0 = P2 goal, H = P1 goal). */
 (function () {
   const D = Ludus.draw;
-  const W = 300, H = 440, GOAL = 112, MR = 21, PR = 12, TARGET = 5;
+  const W = 300, PH = 440, MAX_H = 680, GOAL = 112, MR = 21, PR = 12, TARGET = 5;
   const ACC = 2600, MAX_M = 410, SUB = 4;
 
   // Two people, one keyboard: P1 = WASD (+F / left Shift), P2 = arrows (+ / , right Shift, Enter).
@@ -43,8 +45,8 @@
   }
 
   Ludus.register({
-    id: 'hockey', name: 'Air Puck', tag: '2 Player', tint: '#e05d8b',
-    hint: '<b>P1</b> (bottom) <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move · <b>P2</b> (top) <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> move',
+    id: 'hockey', name: 'Air Puck', tag: '2 Player', wide: true, tint: '#e05d8b',
+    hint: '<b>P1</b> (left) <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move · <b>P2</b> (right) <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> move',
     _rules: { strike },
     art(ctx, w, h) {
       ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = 2;
@@ -55,9 +57,19 @@
       ctx.fillStyle = '#3b2418'; ctx.beginPath(); ctx.arc(w * 0.52, h * 0.56, h * 0.07, 0, Math.PI * 2); ctx.fill();
     },
     create(stage, api) {
-      const view = api.canvas();
+      const view = api.canvas(onResize);
       const { ctx } = view;
       const pads = makePads(api);
+      // Rink length follows the stage: portrait keeps the classic 300 x 440 rink; landscape lays it on
+      // its side and stretches it to fill the width (P1 goal left, P2 goal right).
+      const lengthFor = (w, h) => w > h ? Math.max(PH, Math.min(MAX_H, Math.round((W + 16) * (w - 16) / Math.max(1, h - 64) - 16))) : PH;
+      // Untransformed stage size (the panel's slide-in scale would skew getBoundingClientRect).
+      const dims = () => [stage.clientWidth || view.w, stage.clientHeight || view.h];
+      let H = lengthFor(...dims());
+      const flat = () => view.w > view.h;
+      // Keys in rink space. On the side-on rink, screen right is towards P2's goal (rink up),
+      // screen up is rink left, so WASD and the arrows still move each mallet the way they point.
+      const dirs = p => flat() ? { up: p.right, down: p.left, left: p.up, right: p.down } : p;
       const MAX_P = [520, 600, 690][api.level];
       let score, mallets, puck, phase, phaseT, clock = 0, parts = [], trail = [], lastGoal = null, overCalled = false, hitFx = { p1: -9, p2: -9 };
 
@@ -69,7 +81,7 @@
       }
 
       function moveMallet(id, dt) {
-        const m = mallets[id], p = pads[id], live = phase === 'play' || phase === 'ready';
+        const m = mallets[id], p = dirs(pads[id]), live = phase === 'play' || phase === 'ready';
         let ax = live ? (p.right ? 1 : 0) - (p.left ? 1 : 0) : 0, ay = live ? (p.down ? 1 : 0) - (p.up ? 1 : 0) : 0;
         if (ax && ay) { ax *= Math.SQRT1_2; ay *= Math.SQRT1_2; }
         const damp = Math.exp(-9 * dt);
@@ -182,15 +194,21 @@
         const col = api.colors();
         const { w, h } = view;
         ctx.clearRect(0, 0, w, h);
+        const side = flat();
         D.duelHeader(ctx, 10, 8, w - 20, {
-          left: { who: 'p1', label: 'P1 bottom', score: score.p1 }, right: { who: 'p2', label: 'P2 top', score: score.p2 },
+          left: { who: 'p1', label: side ? 'P1 left' : 'P1 bottom', score: score.p1 }, right: { who: 'p2', label: side ? 'P2 right' : 'P2 top', score: score.p2 },
           turn: null, status: phase === 'goal' ? 'Goal' : ''
         }, col);
-        const top = 56, avail = h - top - 8, s = Math.min((w - 16) / (W + 16), avail / (H + 16));
-        const ox = (w - W * s) / 2, oy = top + 8 * s + Math.max(0, (avail - (H + 16) * s) / 2) * 0.3;
+        // RW x RH = the rink as it appears on screen
+        const RW = side ? H : W, RH = side ? W : H;
+        const top = 56, avail = h - top - 8, s = Math.min((w - 16) / (RW + 16), avail / (RH + 16));
+        const ox = (w - RW * s) / 2, oy = top + 8 * s + Math.max(0, (avail - (RH + 16) * s) / 2) * 0.3;
         ctx.save(); ctx.translate(ox, oy); ctx.scale(s, s);
-        // rim + ice
-        ctx.fillStyle = col.dark ? '#3a332b' : '#e4d6c2'; D.roundRect(ctx, -8, -8, W + 16, H + 16, 26); ctx.fill();
+        ctx.fillStyle = col.dark ? '#3a332b' : '#e4d6c2'; D.roundRect(ctx, -8, -8, RW + 16, RH + 16, 26); ctx.fill();
+        ctx.save();
+        // side-on: rink (x, y) is drawn at screen (H - y, x), a quarter turn
+        if (side) ctx.transform(0, 1, -1, 0, H, 0);
+        // ice
         ctx.fillStyle = col.dark ? '#23211f' : '#fbf8f3'; D.roundRect(ctx, 0, 0, W, H, 20); ctx.fill();
         ctx.save(); D.roundRect(ctx, 0, 0, W, H, 20); ctx.clip();
         ctx.fillStyle = col.dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.035)';
@@ -224,18 +242,20 @@
         drawMallet(mallets.p1, col.accent, col);
         parts.forEach(q => { ctx.globalAlpha = Math.max(0, q.life / 0.9); ctx.fillStyle = q.color; ctx.beginPath(); ctx.arc(q.x, q.y, 2.4, 0, Math.PI * 2); ctx.fill(); });
         ctx.globalAlpha = 1;
+        ctx.restore();
+        // text stays upright: drawn in screen-rink space (RW x RH)
         if (phase === 'goal' || phase === 'over') {
           const who = lastGoal.who, label = who === 'p1' ? 'P1' : 'P2';
           const big = phase === 'over' ? `${label} wins the match` : `${label} scores`;
-          const k = api.reduceMotion ? 1 : D.ease.outBack(Math.min(1, (clock - lastGoal.t) * 4)), bw = 220, by = H / 2;
-          ctx.save(); ctx.translate(W / 2, by); ctx.scale(k, k);
+          const k = api.reduceMotion ? 1 : D.ease.outBack(Math.min(1, (clock - lastGoal.t) * 4)), bw = 220, by = RH / 2;
+          ctx.save(); ctx.translate(RW / 2, by); ctx.scale(k, k);
           ctx.fillStyle = col.surface; ctx.shadowColor = 'rgba(0,0,0,0.22)'; ctx.shadowBlur = 16; ctx.shadowOffsetY = 5;
           D.roundRect(ctx, -bw / 2, -26, bw, 52, 16); ctx.fill(); ctx.shadowColor = 'transparent';
           D.text(ctx, big, 0, -6, 15, col.ink, 800);
           D.text(ctx, `${score.p1} : ${score.p2}`, 0, 13, 11.5, col.ink2, 700);
           ctx.restore();
         } else if (phase === 'ready') {
-          ctx.globalAlpha = 0.5 + 0.5 * Math.sin(clock * 9); D.text(ctx, 'Ready', W / 2, H / 2 - 54, 13, col.ink2, 700); ctx.globalAlpha = 1;
+          ctx.globalAlpha = 0.5 + 0.5 * Math.sin(clock * 9); D.text(ctx, 'Ready', RW / 2, RH / 2 - 54, 13, col.ink2, 700); ctx.globalAlpha = 1;
         }
         ctx.restore();
       }
@@ -243,14 +263,19 @@
       // ---------- save / restore ----------
       function save() {
         if (phase === 'over' || api.ended || (!restored && !api.touched)) return null;
-        return { v: 1, score: { ...score }, m1: { ...mallets.p1 }, m2: { ...mallets.p2 }, puck: { ...puck }, phase, phaseT, lastGoal: lastGoal ? { who: lastGoal.who } : null };
+        return { v: 1, W, H, score: { ...score }, m1: { ...mallets.p1 }, m2: { ...mallets.p2 }, puck: { ...puck }, phase, phaseT, lastGoal: lastGoal ? { who: lastGoal.who } : null };
       }
       function restore(s) {
         const num = v => typeof v === 'number' && isFinite(v);
         const pt = o => o && ['x', 'y', 'vx', 'vy'].every(k => num(o[k]));
-        if (!s || s.v !== 1 || !s.score || !num(s.score.p1) || !num(s.score.p2) || s.score.p1 >= TARGET || s.score.p2 >= TARGET) return false;
+        // A save from a rink of another length (e.g. an old portrait session) starts fresh.
+        // A side-on save may come back on a slightly different wide stage: keep its rink length and scale it.
+        const sh = s && s.H === undefined ? PH : s && s.H;
+        if (!s || (s.W === undefined ? W : s.W) !== W || typeof sh !== 'number' || sh < PH || sh > MAX_H || (sh > PH) !== (H > PH)) return false;
+        if (s.v !== 1 || !s.score || !num(s.score.p1) || !num(s.score.p2) || s.score.p1 >= TARGET || s.score.p2 >= TARGET) return false;
         if (!pt(s.m1) || !pt(s.m2) || !pt(s.puck) || !['ready', 'play', 'goal'].includes(s.phase) || !num(s.phaseT)) return false;
         if (s.phase === 'goal' && !(s.lastGoal && (s.lastGoal.who === 'p1' || s.lastGoal.who === 'p2'))) return false;
+        H = sh;
         score = { p1: s.score.p1, p2: s.score.p2 };
         mallets = { p1: { ...s.m1 }, p2: { ...s.m2 } }; puck = { ...s.puck };
         phase = s.phase; phaseT = s.phaseT;
@@ -262,7 +287,13 @@
       // A restored match counts as in progress; a fresh one only once a player has pressed something.
       const restored = !!(api.saved && restore(api.saved));
       if (!restored) reset();
-      if (window.ludusDebug) window.ludusDebug.hockey = () => ({ phase, score: { ...score }, puck: { ...puck }, m1: { ...mallets.p1 }, m2: { ...mallets.p2 } });
+      // The panel may still be turning landscape when the game starts: re-fit an untouched match.
+      function onResize(w, h) {
+        const nh = lengthFor(...dims());
+        if (nh === H || restored || api.touched || score.p1 || score.p2 || phase !== 'ready') return;
+        H = nh; reset();
+      }
+      if (window.ludusDebug) window.ludusDebug.hockey = () => ({ W, H, flat: flat(), phase, score: { ...score }, puck: { ...puck }, m1: { ...mallets.p1 }, m2: { ...mallets.p2 } });
       api.loop(dt => { update(dt); render(); });
       return { save, pause() { pads.clear(); }, resume() { pads.clear(); } };
     }

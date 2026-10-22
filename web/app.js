@@ -123,6 +123,8 @@
     $('hint').innerHTML = S.hints ? (g.hint || '') : '';
     hideOver();
     $('pauseSheet').hidden = true;
+    // Wide games (Tag, Rally...) get a landscape panel while they are open; every other game uses the normal size.
+    L.native('wide', { on: !!g.wide });
     show('game');
     L.sfx('tap');
     // The card that was clicked keeps keyboard focus otherwise, and Enter in a game would click it again.
@@ -220,7 +222,7 @@
     $('pauseSheet').hidden = true;
     current.run.resume(); current.instance && current.instance.resume && current.instance.resume();
   }
-  function goHome() { persist(); stop(); hideOver(); show('home'); renderCards(); L.native('playing', { id: null }); }
+  function goHome() { persist(); stop(); hideOver(); $('pauseSheet').hidden = true; show('home'); renderCards(); L.native('playing', { id: null }); L.native('wide', { on: false }); }
 
   $('backBtn').onclick = goHome;
   $('quitBtn').onclick = goHome;
@@ -307,7 +309,6 @@
       row('Sound', null, sw(S.sound, v => { S.sound = v; L.save(); if (v) L.sfx('score'); }, 'Sound')),
       row('Volume', null, vol),
       row('Show controls under games', null, sw(S.hints, v => { S.hints = v; L.save(); }, 'Show controls')),
-      row('Open on', 'What you see when the panel opens', seg([['home', 'All games'], ['last', 'Last game']], S.startOn, v => { S.startOn = v; L.save(); }))
     ]));
     const appRows = [];
     if (window.__LUDUS_NATIVE__) {
@@ -336,20 +337,33 @@
   window.ludusOpened = () => {
     // The panel taking keyboard focus must not draw a focus ring on the first button.
     if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
-    if (view === 'home') replayCards();
-    if (view === 'game' && current && !$('pauseSheet').hidden) { /* stay paused until the player resumes */ }
+    // Ludus always opens on All games, wherever it was left. A game left open is saved and waits
+    // in the "Continue" card at the top.
+    if (view !== 'home') { root.classList.add('instant'); goHome(); }   // safety net; normally done on close
+    if (S.filter !== 'All') { S.filter = 'All'; L.save(); renderFilters(); renderCards(); }
+    root.classList.remove('instant');
+    replayCards();
   };
-  window.ludusClosed = () => { if (view === 'game') { persist(); pause(); } L.save(true); };
+  // Go back to All games while the panel is closing, with transitions off, so the next open shows
+  // the finished home screen straight away instead of the game flashing and sliding out.
+  window.ludusClosed = () => {
+    if (view !== 'home') {
+      root.classList.add('instant');
+      if (view === 'game') goHome(); else { show('home'); renderCards(); }
+    }
+    if (S.filter !== 'All') { S.filter = 'All'; renderFilters(); renderCards(); }
+    L.save(true);
+  };
   window.ludusOpenGame = id => start(id);
   // Test helper: end the current run as if the game called api.over (used by QA/shell-test.js).
   window.ludusTestOver = score => { if (current) current.run.api.over({ score }); };
   window.ludusState = () => JSON.stringify({ view, game: current && current.game.id, score: $('scoreNow').textContent, paused: !$('pauseSheet').hidden, over: overShown(), revealing: revealing(), games: L.games.length, theme: root.dataset.theme, saved: Object.keys(S.saves) });
 
   // ---------- boot ----------
+  if (S.filter !== 'All') { S.filter = 'All'; L.save(); }   // Ludus always opens on the All tab
   if (S.hidden.length) { S.hidden = []; L.save(); }   // the "Games shown" setting is gone: every game shows
   if (!ACCENTS.includes(S.accent)) { S.accent = ACCENTS[0]; L.save(); }   // e.g. the removed second orange
   applyTheme();
   renderFilters();
   renderCards();
-  if (S.startOn === 'last' && S.last && L.games.some(g => g.id === S.last)) start(S.last);
 })();

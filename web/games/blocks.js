@@ -1,4 +1,5 @@
-/* Blocks: falling tetrominoes. 7-bag, SRS rotation with wall kicks, ghost, hold, next queue. */
+/* Blocks: falling tetrominoes, Tetris Guideline rules: 7-bag, SRS wall kicks, ghost, hold once per piece,
+   0.5 s lock delay with 15 move resets, guideline gravity and scoring (T-spins, back-to-back). */
 (function () {
   const COLS = 10, ROWS = 20, HIDDEN = 2, H = ROWS + HIDDEN;
   const SHAPES = {
@@ -26,6 +27,10 @@
     '3>0': [[0, 0], [1, 0], [-2, 0], [1, -2], [-2, 1]], '0>3': [[0, 0], [-1, 0], [2, 0], [-1, -2], [2, 1]]
   };
   const LINE_SCORE = [0, 100, 300, 500, 800];
+  const TSPIN_SCORE = [400, 800, 1200, 1600], TSPIN_MINI_SCORE = [100, 200, 400];
+  const LOCK_DELAY = 0.5, MAX_RESETS = 15;
+  // T-spin front corners (relative to the 3x3 box) for each rotation; the back corners are the other two.
+  const T_FRONT = [[[0, 0], [2, 0]], [[2, 0], [2, 2]], [[0, 2], [2, 2]], [[0, 0], [0, 2]]];
 
   function rotateMatrix(m, times) {
     let r = m;
@@ -47,9 +52,10 @@
     if (p.type === 'O') return null;
     const to = (p.rot + dir + 4) % 4, key = p.rot + '>' + to;
     const kicks = (p.type === 'I' ? KI : KJ)[key];
-    for (const [kx, ky] of kicks) {
+    for (let i = 0; i < kicks.length; i++) {
+      const [kx, ky] = kicks[i];
       const q = { type: p.type, rot: to, x: p.x + kx, y: p.y - ky };
-      if (fits(board, q)) return q;
+      if (fits(board, q)) return { piece: q, kick: i };
     }
     return null;
   }
@@ -64,13 +70,29 @@
     for (let i = b.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [b[i], b[j]] = [b[j], b[i]]; }
     return b;
   }
+  function filledAt(board, x, y) { return x < 0 || x >= COLS || y >= H || (y >= 0 && !!board[y][x]); }
+  // 3-corner rule: 'full', 'mini' or null. Only call when a T piece locks right after a rotation.
+  function tSpinKind(board, p, kick) {
+    if (p.type !== 'T') return null;
+    const corners = [[0, 0], [2, 0], [0, 2], [2, 2]].filter(([cx, cy]) => filledAt(board, p.x + cx, p.y + cy)).length;
+    if (corners < 3) return null;
+    const front = T_FRONT[p.rot].filter(([cx, cy]) => filledAt(board, p.x + cx, p.y + cy)).length;
+    return front === 2 || kick === 4 ? 'full' : 'mini';
+  }
+  // Points for a lock: lines cleared, T-spin kind, current level, and whether back-to-back applies.
+  function clearPoints(n, spin, level, b2bActive) {
+    const base = spin === 'full' ? TSPIN_SCORE[n] : spin === 'mini' ? TSPIN_MINI_SCORE[Math.min(n, 2)] : LINE_SCORE[n];
+    const difficult = n === 4 || (spin && n > 0);
+    const b2b = difficult && b2bActive;
+    return { points: Math.floor(base * level * (b2b ? 1.5 : 1)), difficult, b2b };
+  }
   function gravity(level) { return Math.pow(Math.max(0.05, 0.8 - (level - 1) * 0.007), level - 1); }
   function emptyBoard() { return Array.from({ length: H }, () => Array(COLS).fill(null)); }
 
   Ludus.register({
     id: 'blocks', name: 'Blocks', tag: 'Arcade', tint: '#5b8def',
-    hint: '<kbd>←</kbd><kbd>→</kbd> move <kbd>↑</kbd> rotate <kbd>↓</kbd> soft drop <kbd>Space</kbd> hard drop <kbd>C</kbd> hold · click: rotate or move, swipe down: drop',
-    _test: { rotateMatrix, cellsOf, fits, tryRotate, fullRows, clearRows, makeBag, gravity, emptyBoard, LINE_SCORE, COLS, H },
+    hint: '<kbd>←</kbd><kbd>→</kbd> move <kbd>↑</kbd> rotate <kbd>Z</kbd> rotate back <kbd>↓</kbd> soft drop <kbd>Space</kbd> hard drop <kbd>C</kbd> hold · click: rotate or move, swipe down: drop',
+    _test: { rotateMatrix, cellsOf, fits, tryRotate, fullRows, clearRows, makeBag, gravity, emptyBoard, tSpinKind, clearPoints, LINE_SCORE, COLS, H, LOCK_DELAY, MAX_RESETS },
     art(ctx, w, h) {
       const s = Math.min(w / 9, h / 5.2), ox = (w - s * 8) / 2, oy = h - s * 4.4;
       const cells = [[0, 3, 'I'], [1, 3, 'I'], [2, 3, 'I'], [3, 3, 'I'], [4, 3, 'O'], [5, 3, 'O'], [4, 2, 'O'], [5, 2, 'O'],
@@ -92,7 +114,8 @@
       const { ctx } = view;
       let board = emptyBoard(), bag = [], queue = [], cur = null, hold = null, holdUsed = false;
       const startLevel = [1, 4, 7][api.level];
-      let level = startLevel, lines = 0, score = 0, fallT = 0, lockT = 0, lockResets = 0, dead = false;
+      let level = startLevel, lines = 0, score = 0, fallT = 0, lockT = 0, lockResets = 0, lowestY = 0, dead = false;
+      let lastWasRot = false, lastKick = 0, b2b = false;
       let clearing = null, particles = [], shake = 0, pops = [], landFx = null, lastRot = 0;
       const held = { left: false, right: false, down: false }; let das = 0, arr = 0, dasDir = 0;
       let layout = null, deadAt = 0;
@@ -106,31 +129,42 @@
         if (p.type === 'O') p.x = 4;
         if (!fits(board, p)) { cur = p; return gameOver(); }
         p.spawnT = performance.now();
-        cur = p; fallT = 0; lockT = 0; lockResets = 0;
+        cur = p; fallT = 0; lockT = 0; lockResets = 0; lastWasRot = false;
         if (fits(board, Object.assign({}, p, { y: p.y + 1 }))) cur.y += 1; // enter the visible area quickly
+        lowestY = cur.y;
       }
+      function isGrounded() { return !!cur && !fits(board, Object.assign({}, cur, { y: cur.y + 1 })); }
+      // Guideline extended placement: reaching a new lowest row clears the lock timer and the reset counter.
+      function noteRow() { if (cur && cur.y > lowestY) { lowestY = cur.y; lockResets = 0; lockT = 0; } }
       function gameOver() {
         if (dead) return; dead = true; deadAt = performance.now(); api.sfx('over');
         if (!api.reduceMotion) shake = 6;
         api.timeout(() => api.over({ score, title: 'Stacked out', message: 'Level ' + level + ', ' + lines + ' lines' }), 650);
       }
+      // Move reset: a successful move or rotation while grounded restarts the lock timer, at most MAX_RESETS times.
       function moved(q) {
         if (!q || !fits(board, q)) return false;
-        const wasGrounded = !fits(board, Object.assign({}, cur, { y: cur.y + 1 }));
-        cur = Object.assign(q, { spawnT: cur.spawnT });
-        if (wasGrounded && lockResets < 15) { lockT = 0; lockResets++; }
+        const wasGrounded = isGrounded();
+        cur = { type: q.type, rot: q.rot, x: q.x, y: q.y, spawnT: cur.spawnT };
+        noteRow();
+        if ((wasGrounded || isGrounded()) && lockResets < MAX_RESETS) { lockT = 0; lockResets++; }
         return true;
       }
-      function shift(dx) { if (!cur || clearing || dead) return false; const ok = moved(Object.assign({}, cur, { x: cur.x + dx })); if (ok) api.sfx('move'); return ok; }
+      function shift(dx) {
+        if (!cur || clearing || dead) return false;
+        const ok = moved(Object.assign({}, cur, { x: cur.x + dx }));
+        if (ok) { api.sfx('move'); lastWasRot = false; }
+        return ok;
+      }
       function rotate(dir) {
         if (!cur || clearing || dead) return;
-        const q = tryRotate(board, cur, dir);
-        if (q && moved(q)) { api.sfx('click'); lastRot = performance.now(); }
+        const r = tryRotate(board, cur, dir);
+        if (r && moved(r.piece)) { api.sfx('click'); lastRot = performance.now(); lastWasRot = true; lastKick = r.kick; }
       }
       function softDrop() {
         if (!cur || clearing || dead) return false;
         const q = Object.assign({}, cur, { y: cur.y + 1 });
-        if (fits(board, q)) { cur.y++; fallT = 0; score += 1; api.score(score); return true; }
+        if (fits(board, q)) { cur.y++; fallT = 0; score += 1; api.score(score); lastWasRot = false; noteRow(); return true; }
         return false;
       }
       function ghostY() { let y = cur.y; while (fits(board, Object.assign({}, cur, { y: y + 1 }))) y++; return y; }
@@ -138,6 +172,7 @@
         if (!cur || clearing || dead) return;
         const gy = ghostY(), d = gy - cur.y;
         cur.y = gy; score += d * 2; api.score(score);
+        if (d > 0) lastWasRot = false;
         if (!api.reduceMotion) shake = Math.min(4, 1.5 + d * 0.15);
         lock(true);
       }
@@ -148,18 +183,23 @@
       }
       function lock(hard) {
         const cells = cellsOf(cur);
+        const spin = lastWasRot ? tSpinKind(board, cur, lastKick) : null;
         if (cells.every(([, y]) => y < HIDDEN)) { cells.forEach(([x, y]) => { if (y >= 0) board[y][x] = cur.type; }); return gameOver(); }
         cells.forEach(([x, y]) => { if (y >= 0) board[y][x] = cur.type; });
         landFx = { cells, t: performance.now() };
         api.sfx(hard ? 'drop' : 'tap');
-        cur = null; holdUsed = false;
-        const rows = fullRows(board);
+        const lockRow = Math.min(...cells.map(c => c[1]));
+        cur = null; holdUsed = false; lastWasRot = false;
+        const rows = fullRows(board), n = rows.length;
+        const pts = clearPoints(n, spin, level, b2b);
+        if (pts.points) { score += pts.points; api.score(score); }
+        const name = (spin ? (spin === 'mini' ? 'T-Spin Mini' : 'T-Spin') + (n ? ' ' : '') : '') + ['', 'Single', 'Double', 'Triple', 'Tetris'][n];
+        if (spin && !n && layout) pops.push({ text: name + ' +' + pts.points, y: Math.max(HIDDEN + 1, lockRow), t: performance.now() });
+        if (n) b2b = pts.difficult;
         if (rows.length) {
           clearing = { rows, t: performance.now() };
-          const n = rows.length;
-          score += LINE_SCORE[n] * level; api.score(score);
           api.sfx('line');
-          if (layout) pops.push({ text: ['', 'Single', 'Double', 'Triple', 'Tetris'][n] + ' +' + LINE_SCORE[n] * level, y: rows[0], t: performance.now() });
+          if (layout) pops.push({ text: (pts.b2b ? 'B2B ' : '') + name + ' +' + pts.points, y: rows[0], t: performance.now() });
           if (!api.reduceMotion && layout) {
             if (n === 4) shake = 6;
             rows.forEach(r => { for (let x = 0; x < COLS; x++) for (let k = 0; k < 2; k++) {
@@ -185,17 +225,18 @@
         const dir = held.left && !held.right ? -1 : held.right && !held.left ? 1 : 0;
         if (dir !== dasDir) { dasDir = dir; das = 0; arr = 0; }
         if (dir) { das += dt; if (das > 0.16) { arr += dt; while (arr > 0.045) { arr -= 0.045; if (!shift(dir)) { arr = 0; break; } } } }
+        if (!cur) return;
         let g = gravity(level);
         if (held.down) g = Math.min(g, 0.035);
-        const grounded = !fits(board, Object.assign({}, cur, { y: cur.y + 1 }));
-        if (grounded) {
+        if (isGrounded()) {
+          // Lock delay: 0.5 s on the ground; once the resets are used up the piece locks as soon as it touches down.
           lockT += dt;
-          if (lockT >= 0.5) lock(false);
+          if (lockT >= LOCK_DELAY || lockResets >= MAX_RESETS) lock(false);
         } else {
           fallT += dt;
           while (fallT >= g && cur) {
             fallT -= g;
-            if (held.down) { if (!softDrop()) break; } else if (fits(board, Object.assign({}, cur, { y: cur.y + 1 }))) cur.y++; else break;
+            if (held.down) { if (!softDrop()) break; } else if (!isGrounded()) { cur.y++; lastWasRot = false; noteRow(); } else break;
           }
         }
       }
@@ -300,12 +341,16 @@
           const born = Math.min(1, (now - (cur.spawnT || 0)) / 140);
           const rotK = Math.min(1, (now - lastRot) / 120);
           const squash = api.reduceMotion ? 1 : D.lerp(0.9, 1, D.ease.outBack(rotK));
+          // Lock cue: a grounded piece dims and gently pulses as its lock timer runs out.
+          const lockK = isGrounded() ? Math.min(1, lockResets >= MAX_RESETS ? 1 : lockT / LOCK_DELAY) : 0;
+          const pulse = api.reduceMotion ? 0 : 0.06 * Math.sin(now / 70) * lockK;
+          const pieceAlpha = 1 - 0.42 * lockK + pulse;
           pc.forEach(([x, y]) => {
             if (y < HIDDEN) return;
             const px = L.ox + x * c, py = L.oy + (y - HIDDEN) * c;
             ctx.save(); ctx.translate(px + c / 2, py + c / 2);
             const s = (api.reduceMotion ? 1 : D.ease.outBack(born)) * squash; ctx.scale(s, s);
-            block(-c / 2, -c / 2, c, COLORS[cur.type], 1, x === pivot[0] && y === pivot[1] ? now / 900 : 0);
+            block(-c / 2, -c / 2, c, COLORS[cur.type], pieceAlpha, x === pivot[0] && y === pivot[1] ? now / 900 : 0);
             ctx.restore();
           });
         }
@@ -399,10 +444,14 @@
           if (v.hold !== null && !TYPES.includes(v.hold)) return false;
           board = v.board.map(r => r.slice()); queue = v.queue.slice(); bag = v.bag.slice();
           hold = v.hold; holdUsed = !!v.holdUsed;
-          level = Math.max(startLevel, v.level | 0); lines = v.lines | 0; score = v.score;
-          if (v.cur && TYPES.includes(v.cur.type) && fits(board, v.cur)) {
-            cur = { type: v.cur.type, rot: v.cur.rot & 3, x: v.cur.x | 0, y: v.cur.y | 0, spawnT: 0 };
-            fallT = 0; lockT = 0; lockResets = 0;
+          level = Math.max(startLevel, v.level | 0); lines = v.lines | 0; score = v.score; b2b = !!v.b2b;
+          const vc = v.cur && TYPES.includes(v.cur.type) ? { type: v.cur.type, rot: v.cur.rot & 3, x: v.cur.x | 0, y: v.cur.y | 0 } : null;
+          if (vc && fits(board, vc)) {
+            cur = Object.assign(vc, { spawnT: 0 });
+            fallT = 0;
+            lockResets = Math.min(MAX_RESETS, Math.max(0, v.lockResets | 0));
+            lockT = Number.isFinite(v.lockT) ? Math.min(LOCK_DELAY, Math.max(0, v.lockT)) : 0;
+            lowestY = Number.isFinite(v.lowestY) ? Math.max(cur.y, v.lowestY | 0) : cur.y;
           } else {
             const nt = queue[0] || 'T';
             if (!fits(board, { type: nt, rot: 0, x: nt === 'O' ? 4 : 3, y: 0 })) return false;
@@ -429,7 +478,8 @@
           return {
             board: b.map(r => r.slice()), queue: queue.slice(), bag: bag.slice(), hold, holdUsed,
             cur: piece ? { type: piece.type, rot: piece.rot, x: piece.x, y: piece.y } : null,
-            level: lv, lines: ln, score
+            lockT: piece ? Math.round(lockT * 1000) / 1000 : 0, lockResets: piece ? lockResets : 0, lowestY: piece ? lowestY : 0,
+            level: lv, lines: ln, score, b2b
           };
         }
       };

@@ -2,7 +2,7 @@
    every return is a little faster, first to 7 points wins. */
 (function () {
   const D = Ludus.draw;
-  const W = 360, H = 440, PAD_X = 20, PAD_W = 10, PAD_H = 72, BALL_R = 6.5, TARGET = 7;
+  const PW = 360, H = 440, MAX_W = 1000, PAD_X = 20, PAD_W = 10, PAD_H = 72, BALL_R = 6.5, TARGET = 7;
   const MAX_V = 430, ACC = 3400, MAX_ANGLE = 58 * Math.PI / 180;
 
   // Two people, one keyboard: P1 = WASD (+F / left Shift), P2 = arrows (+ / , right Shift, Enter).
@@ -48,7 +48,7 @@
   }
 
   Ludus.register({
-    id: 'pong', name: 'Rally', tag: '2 Player', tint: '#3f8fb5',
+    id: 'pong', name: 'Rally', tag: '2 Player', wide: true, tint: '#3f8fb5',
     hint: '<b>P1</b> <kbd>W</kbd><kbd>S</kbd> move <kbd>F</kbd> power hit · <b>P2</b> <kbd>↑</kbd><kbd>↓</kbd> move <kbd>/</kbd> power hit',
     _rules: { paddleBounce, TARGET },
     art(ctx, w, h) {
@@ -60,10 +60,22 @@
       D.spark(ctx, w * 0.62, h * 0.38, h * 0.07, '#fff8f2', 0.4);
     },
     create(stage, api) {
-      const view = api.canvas();
+      const view = api.canvas(onResize);
       const { ctx } = view;
       const pads = makePads(api);
-      const START = [240, 280, 320][api.level], TOP = START * 2.1;
+      // Court width follows the stage: portrait keeps the classic 360 x 440 court, a landscape stage
+      // gets a wide court of the same height. Ball and paddle speeds scale so a crossing feels the same.
+      const widthFor = (w, h) => w > h ? Math.max(PW, Math.min(MAX_W, Math.round(H * (w - 16) / Math.max(1, h - 64)))) : PW;
+      let W, START, TOP, padMax, padAcc;
+      function layout(width) {
+        W = width;
+        const k = 1 + (W / PW - 1) * 0.6;
+        START = [240, 280, 320][api.level] * k; TOP = START * 2.1;
+        padMax = MAX_V * Math.sqrt(k); padAcc = ACC * Math.sqrt(k);
+      }
+      // Untransformed stage size (the panel's slide-in scale would skew getBoundingClientRect).
+      const dims = () => [stage.clientWidth || view.w, stage.clientHeight || view.h];
+      layout(widthFor(...dims()));
       let score, paddles, ball, phase, serveT, serveDir, rally, clock = 0, trail = [], parts = [], flash = null, overCalled = false, lastScorer = null;
 
       function reset() {
@@ -89,9 +101,9 @@
         p.power = Math.max(0, p.power - dt);
         const live = phase !== 'over';
         const dir = live ? (pad.down ? 1 : 0) - (pad.up ? 1 : 0) : 0;
-        if (dir) p.v += dir * ACC * dt * (p.v * dir < 0 ? 1.8 : 1);
-        else p.v -= Math.sign(p.v) * Math.min(Math.abs(p.v), ACC * 1.3 * dt);
-        p.v = Math.max(-MAX_V, Math.min(MAX_V, p.v));
+        if (dir) p.v += dir * padAcc * dt * (p.v * dir < 0 ? 1.8 : 1);
+        else p.v -= Math.sign(p.v) * Math.min(Math.abs(p.v), padAcc * 1.3 * dt);
+        p.v = Math.max(-padMax, Math.min(padMax, p.v));
         p.y += p.v * dt;
         const lim = PAD_H / 2 + 4;
         if (p.y < lim) { p.y = lim; p.v = 0; }
@@ -101,7 +113,7 @@
       function hitPaddle(id) {
         const p = paddles[id], dirX = id === 'p1' ? 1 : -1;
         const b = paddleBounce(ball.y, p.y, dirX);
-        ball.vx = b.vx; ball.vy = b.vy + p.v / 1400;   // a moving paddle adds a little spin
+        ball.vx = b.vx; ball.vy = b.vy + p.v / (1400 * padMax / MAX_V);   // a moving paddle adds a little spin
         const m = Math.hypot(ball.vx, ball.vy); ball.vx /= m; ball.vy /= m;
         if (Math.abs(ball.vx) < 0.5) { ball.vx = 0.5 * dirX; ball.vy = Math.sign(ball.vy) * Math.sqrt(0.75); }
         rally++;
@@ -236,14 +248,19 @@
       // ---------- save / restore ----------
       function save() {
         if (phase === 'over' || api.ended || (!restored && !api.touched)) return null;
-        return { v: 1, score: { ...score }, p: ['p1', 'p2'].map(id => [paddles[id].y, paddles[id].v]), ball: { ...ball }, phase, serveT, serveDir, rally };
+        return { v: 1, W, H, score: { ...score }, p: ['p1', 'p2'].map(id => [paddles[id].y, paddles[id].v]), ball: { ...ball }, phase, serveT, serveDir, rally };
       }
       function restore(s) {
         const num = v => typeof v === 'number' && isFinite(v);
-        if (!s || s.v !== 1 || !s.score || !num(s.score.p1) || !num(s.score.p2) || s.score.p1 >= TARGET || s.score.p2 >= TARGET) return false;
+        // A save from a court of another shape (e.g. an old portrait session) starts fresh.
+        // A wide save may come back on a slightly different wide stage: keep its court and scale it.
+        const sw = s && s.W === undefined ? PW : s && s.W;
+        if (!s || (s.H === undefined ? H : s.H) !== H || typeof sw !== 'number' || sw < PW || sw > MAX_W || (sw > PW) !== (W > PW)) return false;
+        if (s.v !== 1 || !s.score || !num(s.score.p1) || !num(s.score.p2) || s.score.p1 >= TARGET || s.score.p2 >= TARGET) return false;
         if (!Array.isArray(s.p) || s.p.length !== 2 || !s.p.every(a => Array.isArray(a) && num(a[0]) && num(a[1]))) return false;
         const b = s.ball; if (!b || !['x', 'y', 'vx', 'vy', 'speed'].every(k => num(b[k]))) return false;
         if (!['serve', 'play'].includes(s.phase) || !num(s.serveT) || !num(s.serveDir) || !num(s.rally)) return false;
+        layout(sw);
         score = { p1: s.score.p1, p2: s.score.p2 };
         paddles = { p1: { y: s.p[0][0], v: s.p[0][1], hitAt: -9, power: 0 }, p2: { y: s.p[1][0], v: s.p[1][1], hitAt: -9, power: 0 } };
         ball = { x: b.x, y: b.y, vx: b.vx, vy: b.vy, speed: b.speed };
@@ -255,7 +272,13 @@
       // A restored match counts as in progress; a fresh one only once a player has pressed something.
       const restored = !!(api.saved && restore(api.saved));
       if (!restored) reset();
-      if (window.ludusDebug) window.ludusDebug.pong = () => ({ phase, score: { ...score }, ball: { ...ball }, p1: paddles.p1.y, p2: paddles.p2.y, rally });
+      // The panel may still be turning landscape when the game starts: re-fit an untouched match.
+      function onResize(w, h) {
+        const nw = widthFor(...dims());
+        if (nw === W || restored || api.touched || score.p1 || score.p2 || phase !== 'serve') return;
+        layout(nw); reset();
+      }
+      if (window.ludusDebug) window.ludusDebug.pong = () => ({ W, H, phase, score: { ...score }, ball: { ...ball }, p1: paddles.p1.y, p2: paddles.p2.y, rally });
       api.loop(dt => { update(dt); render(); });
       return { save, pause() { pads.clear(); }, resume() { pads.clear(); } };
     }

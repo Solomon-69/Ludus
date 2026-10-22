@@ -118,11 +118,11 @@
       const view = api.canvas();
       const { ctx } = view;
       let clock = 0, matches = 0, starter = YOU;
-      let board, turn, moves, last, swapped, winner, path, placeT, job, hover = -1, banner = null, parts = [], kc = 24, useKeys = false;
+      let board, turn, moves, last, lastBy, swapped, winner, path, pathArr, winT, placeT, job, hover = -1, banner = null, parts = [], kc = 24, useKeys = false;
       api.score(0);
 
       function newGame(quiet) {
-        board = new Int8Array(NN); turn = starter; moves = 0; last = -1; swapped = false; winner = 0; path = null;
+        board = new Int8Array(NN); turn = starter; moves = 0; last = -1; lastBy = [-1, -1, -1]; swapped = false; winner = 0; path = null; pathArr = null; winT = 0;
         placeT = new Float64Array(NN).fill(-9); job = null;
         if (turn === CPU && !quiet) think();
       }
@@ -143,14 +143,14 @@
       const canSteal = () => !winner && turn === YOU && moves === 1 && !swapped && board.some(v => v === CPU);
 
       function place(i, s) {
-        board[i] = s; moves++; last = i; placeT[i] = clock; api.sfx(s === YOU ? 'drop' : 'click');
+        board[i] = s; moves++; last = i; lastBy[s] = i; placeT[i] = clock; api.sfx(s === YOU ? 'drop' : 'click');
         const p = winPath(board, s);
-        if (p) { winner = s; path = new Set(p); endGame(); return; }
+        if (p) { winner = s; pathArr = p.slice().reverse(); path = new Set(p); winT = clock; endGame(); return; }
         turn = s === YOU ? CPU : YOU;
         if (turn === CPU) think();
       }
       function doSwap(by) {
-        const r = swapBoard(board); board = Int8Array.from(r.board); swapped = true; moves = 1; last = r.cell; placeT[r.cell] = clock;
+        const r = swapBoard(board); board = Int8Array.from(r.board); swapped = true; moves = 1; last = r.cell; lastBy = [-1, -1, -1]; lastBy[board[r.cell]] = r.cell; placeT[r.cell] = clock;
         api.sfx('power'); banner = { title: by === CPU ? 'Stolen' : 'You stole it', sub: by === CPU ? 'The bot took your opening stone' : 'The bot opening is yours now', t: clock, small: true };
         api.timeout(() => { if (banner && banner.small) banner = null; }, 1100);
         turn = by === YOU ? CPU : YOU;
@@ -241,6 +241,61 @@
         for (let k = 0; k < 6; k++) { const a = Math.PI / 180 * (60 * k - 30); ctx.lineTo(x + s * Math.cos(a), y + s * Math.sin(a)); }
         ctx.closePath();
       }
+      const botColor = col => col.dark ? '#8fa3c2' : '#5a6f8f';
+      // A stone: pops in with a slight overshoot, flat side colour, soft top light. Yours carry a faint spark.
+      function drawStone(i, x, y, v, R, col, BOTC) {
+        const t = clock - placeT[i], s = t < 0.34 && !api.reduceMotion ? D.ease.outBack(Math.max(0, t / 0.34)) : 1;
+        if (s <= 0) return;
+        ctx.globalAlpha = winner && path && !path.has(i) ? 0.35 : 1;
+        hexPath(x, y, (R - 2.5) * s);
+        ctx.fillStyle = v === YOU ? col.accent : BOTC; ctx.fill();
+        hexPath(x, y - R * 0.12 * s, (R - 2.5) * 0.62 * s);
+        ctx.fillStyle = 'rgba(255,255,255,0.13)'; ctx.fill();
+        if (v === YOU) { ctx.globalAlpha *= 0.55; D.spark(ctx, x, y, R * 0.3 * s, '#fff8f2', 0); }
+        ctx.globalAlpha = 1;
+      }
+      // Soft ring that breathes out from the newest stone of each side.
+      function pulseRing(G, i, c) {
+        const r = Math.floor(i / N), cc = i % N, x = G.cx(r, cc), y = G.cy(r);
+        ctx.save(); ctx.strokeStyle = c; ctx.lineWidth = 2;
+        if (api.reduceMotion) { ctx.globalAlpha = 0.6; ctx.beginPath(); ctx.arc(x, y, G.R * 0.98, 0, Math.PI * 2); ctx.stroke(); ctx.restore(); return; }
+        const age = clock - placeT[i];
+        for (let k = 0; k < 2; k++) {
+          const ph = ((age + k * 0.8) % 1.6) / 1.6;
+          ctx.globalAlpha = 0.55 * (1 - ph) * Math.min(1, age / 0.3);
+          ctx.beginPath(); ctx.arc(x, y, G.R * (0.8 + 0.55 * D.ease.outCubic(ph)), 0, Math.PI * 2); ctx.stroke();
+        }
+        ctx.restore();
+      }
+      // Winning chain: a glowing line drawn stone to stone, then a light that keeps running along it.
+      function drawWinPath(G, c, col, BOTC) {
+        // stones light up one by one as the line reaches them (halo first, then the stone again on top)
+        pathArr.forEach((i, j) => {
+          const g = api.reduceMotion ? 1 : Math.max(0, Math.min(1, (clock - winT - 0.75 * j / Math.max(1, pathArr.length - 1)) / 0.25));
+          if (g <= 0) return;
+          const x = G.cx(Math.floor(i / N), i % N), y = G.cy(Math.floor(i / N));
+          ctx.save(); ctx.shadowColor = c; ctx.shadowBlur = G.R * 1.1 * g; ctx.globalAlpha = 0.9 * g; hexPath(x, y, G.R - 2.5); ctx.fillStyle = c; ctx.fill(); ctx.restore();
+        });
+        pathArr.forEach(i => drawStone(i, G.cx(Math.floor(i / N), i % N), G.cy(Math.floor(i / N)), board[i], G.R, col, BOTC));
+        const pts = pathArr.map(i => [G.cx(Math.floor(i / N), i % N), G.cy(Math.floor(i / N))]);
+        const lens = [0]; for (let k = 1; k < pts.length; k++) lens.push(lens[k - 1] + Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]));
+        const total = lens[lens.length - 1] || 1, age = clock - winT;
+        const k = api.reduceMotion ? 1 : D.ease.inOut(Math.min(1, age / 0.75));
+        const at = d => { let j = 1; while (j < pts.length - 1 && lens[j] < d) j++; const seg = (lens[j] - lens[j - 1]) || 1, u = Math.max(0, Math.min(1, (d - lens[j - 1]) / seg)); return [D.lerp(pts[j - 1][0], pts[j][0], u), D.lerp(pts[j - 1][1], pts[j][1], u)]; };
+        const reach = total * k;
+        ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        const line = () => { ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]); for (let j = 1; j < pts.length && lens[j] <= reach; j++) ctx.lineTo(pts[j][0], pts[j][1]); const e = at(reach); ctx.lineTo(e[0], e[1]); ctx.stroke(); };
+        ctx.shadowColor = c; ctx.shadowBlur = G.R * 0.9; ctx.strokeStyle = c; ctx.globalAlpha = 0.55; ctx.lineWidth = Math.max(4, G.R * 0.34); line();
+        ctx.shadowColor = '#fff'; ctx.shadowBlur = G.R * 0.5; ctx.strokeStyle = '#fff'; ctx.globalAlpha = 0.8; ctx.lineWidth = Math.max(1.5, G.R * 0.09); line();
+        if (pts.length === 1 || reach <= 0) { ctx.restore(); return; }
+        if (!api.reduceMotion && k >= 1) {
+          const p = at(((age - 0.75) * total / 0.9) % total);
+          const gr = ctx.createRadialGradient(p[0], p[1], 0, p[0], p[1], G.R * 0.7);
+          gr.addColorStop(0, 'rgba(255,255,255,0.95)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+          ctx.shadowBlur = 0; ctx.globalAlpha = 1; ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(p[0], p[1], G.R * 0.7, 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.restore();
+      }
       function render() {
         const col = api.colors(), G = geo(), { w, h, R, W } = G;
         ctx.clearRect(0, 0, w, h);
@@ -260,7 +315,7 @@
         // edges
         const off = R * 1.15;
         const edge = (c, pts) => { ctx.strokeStyle = c; ctx.lineWidth = Math.max(4, R * 0.3); ctx.lineCap = 'round'; ctx.beginPath(); pts.forEach(([x, y], k) => (k ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.stroke(); };
-        const BOTC = col.dark ? '#7d8592' : '#4a5260';
+        const BOTC = botColor(col);
         edge(BOTC, [[G.cx(0, 0) - W / 2, G.cy(0) - off * 0.7], [G.cx(0, N - 1) + W / 2, G.cy(0) - off * 0.7]]);
         edge(BOTC, [[G.cx(N - 1, 0) - W / 2, G.cy(N - 1) + off * 0.7], [G.cx(N - 1, N - 1) + W / 2, G.cy(N - 1) + off * 0.7]]);
         edge(col.accent, [[G.cx(0, 0) - off, G.cy(0)], [G.cx(N - 1, 0) - off, G.cy(N - 1)]]);
@@ -274,25 +329,10 @@
           if (!v && (useKeys ? i === kc : i === hover) && turn === YOU && !winner && !job) {
             hexPath(x, y, R * 0.62); ctx.fillStyle = col.accent; ctx.globalAlpha = 0.3; ctx.fill(); ctx.globalAlpha = 1;
           }
-          if (v) {
-            const t = clock - placeT[i], s = t < 0.3 && !api.reduceMotion ? D.ease.outBack(Math.max(0, t / 0.3)) : 1;
-            const dim = winner && path && !path.has(i);
-            ctx.globalAlpha = dim ? 0.35 : 1;
-            hexPath(x, y, (R - 2.5) * s);
-            ctx.fillStyle = v === YOU ? col.accent : BOTC; ctx.fill();
-            if (winner && path && path.has(i)) {
-              ctx.strokeStyle = col.dark ? '#fff' : col.ink; ctx.lineWidth = 2; ctx.globalAlpha = 0.5 + 0.4 * Math.sin(clock * 5 - i * 0.3); ctx.stroke();
-            }
-            ctx.globalAlpha = 1;
-            if (v === YOU) D.spark(ctx, x, y, R * 0.42 * s, 'rgba(255,248,242,0.9)', 0);
-            else if (s > 0.2) D.avatar(ctx, x, y, R * 0.46 * s, 'bot', col);
-          }
+          if (v) drawStone(i, x, y, v, R, col, BOTC);
         }
-        if (last >= 0) {
-          const r = Math.floor(last / N), c = last % N;
-          ctx.strokeStyle = col.dark ? '#fff' : col.ink; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(G.cx(r, c), G.cy(r), R * 0.62, 0, Math.PI * 2);
-          ctx.globalAlpha = 0.7; ctx.stroke(); ctx.globalAlpha = 1;
-        }
+        [YOU, CPU].forEach(sd => { if (lastBy[sd] >= 0 && board[lastBy[sd]] === sd && !winner) pulseRing(G, lastBy[sd], sd === YOU ? col.accent : BOTC); });
+        if (winner && pathArr) drawWinPath(G, winner === YOU ? col.accent : BOTC, col, BOTC);
         if (useKeys && turn === YOU && !winner) {
           const r = Math.floor(kc / N), c = kc % N; hexPath(G.cx(r, c), G.cy(r), R - 1);
           ctx.strokeStyle = col.accent; ctx.lineWidth = 2; ctx.stroke();
@@ -331,6 +371,8 @@
         board = b; turn = sv.turn === CPU ? CPU : YOU; moves = Math.max(0, sv.moves | 0); swapped = !!sv.swapped;
         last = Number.isInteger(sv.last) && sv.last >= 0 && sv.last < NN ? sv.last : -1;
         kc = Number.isInteger(sv.kc) && sv.kc >= 0 && sv.kc < NN ? sv.kc : 24;
+        [YOU, CPU].forEach(sd => { const v = sd === YOU ? sv.ly : sv.lc; lastBy[sd] = Number.isInteger(v) && v >= 0 && v < NN && board[v] === sd ? v : -1; });
+        if (last >= 0 && board[last] && lastBy[board[last]] < 0) lastBy[board[last]] = last;
         if (turn === CPU) think();
         return true;
       }
@@ -348,7 +390,7 @@
           if (winner === CPU) return { v: 1, dead: true };
           if (winner === YOU) return { v: 1, fresh: true, matches, starter: starter === YOU ? CPU : YOU };
           if (!moves && !matches) return null;
-          return { v: 1, board: Array.from(board), turn, moves, swapped, last, matches, starter, kc };
+          return { v: 1, board: Array.from(board), turn, moves, swapped, last, matches, starter, kc, ly: lastBy[YOU], lc: lastBy[CPU] };
         }
       };
     }

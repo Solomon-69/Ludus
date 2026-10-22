@@ -2,7 +2,7 @@
    Last tank standing takes the round; first to 3 rounds wins. */
 (function () {
   const D = Ludus.draw;
-  const MC = 6, MRW = 7, C = 56, W = MC * C, H = MRW * C, WT = 4, TR = 10, SR = 3;
+  const PMC = 6, PMRW = 7, LROWS = 5, MAX_MC = 14, C = 56, WT = 4, TR = 10, SR = 3;
   const FIRST_TO = 3, MAX_SHELLS = 5, RELOAD = 0.3, SHELL_LIFE = 7, GRACE = 0.25, READY = 1.2, AFTER = 1.8;
 
   // Two people, one keyboard: P1 = WASD (+F / left Shift), P2 = arrows (+ / , right Shift, Enter).
@@ -42,7 +42,7 @@
 
   // Maze: h[r][c] = wall above cell (r,c) (r 0..MRW), v[r][c] = wall left of cell (r,c) (c 0..MC).
   // Depth-first carve, then knock out some extra walls so there are loops to fight around. Pure, for tests.
-  function makeMaze(rnd) {
+  function makeMaze(rnd, MC = PMC, MRW = PMRW) {
     rnd = rnd || Math.random;
     const h = Array.from({ length: MRW + 1 }, () => Array(MC).fill(1));
     const v = Array.from({ length: MRW }, () => Array(MC + 1).fill(1));
@@ -69,9 +69,9 @@
   }
 
   Ludus.register({
-    id: 'tanks', name: 'Tank Duel', tag: '2 Player', tint: '#c98a3a',
+    id: 'tanks', name: 'Tank Duel', tag: '2 Player', wide: true, tint: '#c98a3a',
     hint: '<b>P1</b> <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> drive <kbd>F</kbd> fire · <b>P2</b> <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> drive <kbd>/</kbd> fire',
-    _rules: { makeMaze, wallRects, MC, MRW },
+    _rules: { makeMaze, wallRects, MC: PMC, MRW: PMRW },
     art(ctx, w, h) {
       ctx.fillStyle = 'rgba(255,255,255,0.35)';
       [[0.1, 0.12, 0.8, 0.04], [0.1, 0.84, 0.8, 0.04], [0.48, 0.12, 0.04, 0.4], [0.1, 0.12, 0.03, 0.76], [0.87, 0.12, 0.03, 0.76], [0.25, 0.5, 0.3, 0.04]].forEach(([x, y, ww, hh]) => { D.roundRect(ctx, w * x, h * y, w * ww, h * hh, 2); ctx.fill(); });
@@ -80,16 +80,28 @@
       ctx.fillStyle = '#2b2018'; ctx.beginPath(); ctx.arc(w * 0.5, h * 0.62, h * 0.02, 0, Math.PI * 2); ctx.fill();
     },
     create(stage, api) {
-      const view = api.canvas();
+      const view = api.canvas(onResize);
       const { ctx } = view;
       const pads = makePads(api);
+      // Maze size follows the stage: portrait keeps the classic 6 x 7 grid; landscape gets 5 rows and
+      // as many square cells across as fit the width.
+      const gridFor = (w, h) => {
+        if (w <= h) return [PMC, PMRW];
+        const s = Math.max(1, h - 64) / (LROWS * C + 12);
+        return [Math.max(PMC, Math.min(MAX_MC, Math.floor(((w - 16) / s - 12) / C))), LROWS];
+      };
+      let MC, MRW, W, H;
+      const layout = g => { MC = g[0]; MRW = g[1]; W = MC * C; H = MRW * C; };
+      // Untransformed stage size (the panel's slide-in scale would skew getBoundingClientRect).
+      const dims = () => [stage.clientWidth || view.w, stage.clientHeight || view.h];
+      layout(gridFor(...dims()));
       const SPD = [0.9, 1, 1.12][api.level];
       const FWD = 88 * SPD, BACK = 62 * SPD, ROT = 3.1, SHELL_V = 150 * SPD;
       let maze, rects, tanks, shells, wins, round, phase, phaseT, clock = 0, parts = [], scorches = [], overCalled = false, result = null, shake = 0;
 
       function startMatch() { wins = { p1: 0, p2: 0 }; round = 0; api.score(0); startRound(); }
       function startRound() {
-        maze = makeMaze(); rects = wallRects(maze);
+        maze = makeMaze(Math.random, MC, MRW); rects = wallRects(maze);
         const cell = (c0, c1, r0, r1) => [api.randInt(c0, c1), api.randInt(r0, r1)];
         const a = cell(0, 1, MRW - 2, MRW - 1), b = cell(MC - 2, MC - 1, 0, 1);
         const ang = () => api.randInt(0, 3) * Math.PI / 2;
@@ -268,7 +280,7 @@
       // ---------- save / restore ----------
       function save() {
         if (phase === 'over' || api.ended || (!restored && !api.touched)) return null;
-        return { v: 1, wins: { ...wins }, round, phase, phaseT, result,
+        return { v: 1, mc: MC, mr: MRW, wins: { ...wins }, round, phase, phaseT, result,
           maze: { h: maze.h.map(r => r.join('')), v: maze.v.map(r => r.join('')) },
           tanks: tanks.map(t => ({ x: t.x, y: t.y, a: t.a, dead: t.dead, cool: t.cool })),
           shells: shells.map(s => ({ x: s.x, y: s.y, vx: s.vx, vy: s.vy, life: s.life, owner: s.owner, age: s.age })),
@@ -276,7 +288,9 @@
       }
       function restore(s) {
         const num = v => typeof v === 'number' && isFinite(v);
-        if (!s || s.v !== 1 || !s.wins || !num(s.wins.p1) || !num(s.wins.p2) || s.wins.p1 >= FIRST_TO || s.wins.p2 >= FIRST_TO) return false;
+        // A save from a maze of another size (e.g. an old portrait session) starts fresh.
+        if (!s || (s.mc === undefined ? PMC : s.mc) !== MC || (s.mr === undefined ? PMRW : s.mr) !== MRW) return false;
+        if (s.v !== 1 || !s.wins || !num(s.wins.p1) || !num(s.wins.p2) || s.wins.p1 >= FIRST_TO || s.wins.p2 >= FIRST_TO) return false;
         if (!num(s.round) || !['ready', 'play', 'end', 'result'].includes(s.phase) || !num(s.phaseT)) return false;
         const bits = (arr, n, len) => Array.isArray(arr) && arr.length === n && arr.every(r => typeof r === 'string' && r.length === len && /^[01]+$/.test(r));
         if (!s.maze || !bits(s.maze.h, MRW + 1, MC) || !bits(s.maze.v, MRW, MC + 1)) return false;
@@ -296,7 +310,13 @@
       // A restored match counts as in progress; a fresh one only once a player has pressed something.
       const restored = !!(api.saved && restore(api.saved));
       if (!restored) startMatch();
-      if (window.ludusDebug) window.ludusDebug.tanks = () => ({ phase, wins: { ...wins }, round, result, shells: shells.length, tanks: tanks.map(t => ({ x: t.x, y: t.y, a: t.a, dead: t.dead })), rects: rects.map(r => [r.x, r.y, r.w, r.h]) });
+      // The panel may still be turning landscape when the game starts: re-fit an untouched match.
+      function onResize(w, h) {
+        const g = gridFor(...dims());
+        if ((g[0] === MC && g[1] === MRW) || restored || api.touched || round || wins.p1 || wins.p2 || phase !== 'ready') return;
+        layout(g); startMatch();
+      }
+      if (window.ludusDebug) window.ludusDebug.tanks = () => ({ MC, MRW, phase, wins: { ...wins }, round, result, shells: shells.length, tanks: tanks.map(t => ({ x: t.x, y: t.y, a: t.a, dead: t.dead })), rects: rects.map(r => [r.x, r.y, r.w, r.h]) });
       api.loop(dt => { update(dt); render(); });
       return { save, pause() { pads.clear(); }, resume() { pads.clear(); } };
     }

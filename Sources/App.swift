@@ -26,6 +26,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
     private var invisible: Bool { UserDefaults.standard.bool(forKey: invisibleKey) }
     private static let compact = NSSize(width: 400, height: 600)
     private static let large = NSSize(width: 520, height: 740)
+    // Landscape panel used only while a wide game (Tag, Rally, Air Puck, Tank Duel, Light Trails) is open.
+    private static let wideCompact = NSSize(width: 760, height: 500)
+    private static let wideLarge = NSSize(width: 900, height: 600)
+    private var wide = false
     private let testNotification = Notification.Name("com.solomon.Ludus.test")
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -124,6 +128,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
         case "size":
             UserDefaults.standard.set(body["size"] as? String ?? "compact", forKey: sizeKey)
             resizePopover()
+        case "wide":
+            let on = body["on"] as? Bool ?? false
+            if on != wide { wide = on; resizePopover() }
         case "theme":
             // Light or Dark picked in Ludus wins over the Mac's own look, panel background included.
             themeAppearance = switch body["mode"] as? String {
@@ -169,7 +176,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
     }
 
     private func currentSize() -> NSSize {
-        UserDefaults.standard.string(forKey: sizeKey) == "large" ? Self.large : Self.compact
+        let isLarge = UserDefaults.standard.string(forKey: sizeKey) == "large"
+        if wide { return isLarge ? Self.wideLarge : Self.wideCompact }
+        return isLarge ? Self.large : Self.compact
     }
 
     private func setLogin(_ on: Bool) {
@@ -261,6 +270,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
     private func openPopover() {
         guard let button = popoverAnchor() else { return }
         bounceIcon()
+        wide = false   // Ludus always opens on All games, so never at a wide game's landscape size
         popover.contentViewController?.preferredContentSize = currentSize()
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         applyThemeAppearance()
@@ -270,7 +280,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
             window.makeKey()
             window.makeFirstResponder(webView)
         }
-        webView.evaluateJavaScript("window.ludusOpened && ludusOpened()")
+        // The web view still holds its last picture (often the game that was open) until it repaints.
+        // Keep it hidden until the home screen has really been drawn, then fade it in, so opening is clean.
+        webView.alphaValue = 0
+        let reveal: () -> Void = { [weak self] in
+            guard let self, self.webView.alphaValue < 1 else { return }
+            NSAnimationContext.runAnimationGroup { ctx in
+                ctx.duration = 0.12
+                self.webView.animator().alphaValue = 1
+            }
+        }
+        webView.callAsyncJavaScript(
+            "window.ludusOpened && ludusOpened(); await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));",
+            arguments: [:], in: nil, in: .page) { _ in reveal() }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: reveal)   // never stay hidden
         clickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
             Task { @MainActor in self?.closePopover() }
         }

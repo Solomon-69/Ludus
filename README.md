@@ -1,6 +1,6 @@
 # Ludus
 
-**Little games for little breaks.**
+**Take a little break.**
 
 Ludus is a small panel of games that lives in the Mac menu bar or the Windows system tray.
 Click the controller icon, play a quick round, click anywhere else and it tucks itself away,
