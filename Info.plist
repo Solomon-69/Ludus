@@ -5,6 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key><string>en</string>
 	<key>CFBundleExecutable</key><string>Ludus</string>
 	<key>CFBundleIconFile</key><string>Ludus</string>
+	<key>CFBundleIconName</key><string>Ludus</string>
 	<key>CFBundleIdentifier</key><string>com.solomon.Ludus</string>
 	<key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
 	<key>CFBundleName</key><string>Ludus</string>

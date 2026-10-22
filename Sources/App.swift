@@ -347,7 +347,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
         webView.evaluateJavaScript("window.ludusClosed && ludusClosed()")
     }
 
-    /// Menu bar icon: the Ludus mark, a solid controller with the d-pad and a spark of face buttons cut out
+    /// Menu bar icon: the Ludus mark, a solid controller with the d-pad and a diamond of four face buttons cut out
     /// (same silhouette as the app icon; template, so it adapts to the menu bar).
     private static func menuBarIcon() -> NSImage {
         let image = NSImage(size: NSSize(width: 20, height: 16), flipped: true) { _ in
@@ -392,20 +392,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
         return p
     }
 
-    /// D-pad and a bold four-line spark for the face buttons (bolder than the app icon's, to read at 18 px).
+    /// D-pad and four round face buttons in a diamond, a touch bigger and wider apart than the
+    /// app icon's so they stay separate at 18 pt.
     private static func controllerCutouts() -> CGPath {
         let d = CGPoint(x: 30.5, y: 45)
         let plus = CGMutablePath()
         plus.addRoundedRect(in: CGRect(x: d.x - 9, y: d.y - 3.3, width: 18, height: 6.6), cornerWidth: 1.5, cornerHeight: 1.5)
         plus.addRoundedRect(in: CGRect(x: d.x - 3.3, y: d.y - 9, width: 6.6, height: 18), cornerWidth: 1.5, cornerHeight: 1.5)
         var holes = plus.union(CGPath(rect: .zero, transform: nil))
-        let c = CGPoint(x: 69.5, y: 45)
-        for i in 0..<4 {
-            let a = CGFloat(i) * .pi / 4
-            let ray = CGMutablePath()
-            ray.move(to: CGPoint(x: c.x - cos(a) * 9, y: c.y - sin(a) * 9))
-            ray.addLine(to: CGPoint(x: c.x + cos(a) * 9, y: c.y + sin(a) * 9))
-            holes = holes.union(ray.copy(strokingWithWidth: i % 2 == 0 ? 5.6 : 4.2, lineCap: .round, lineJoin: .round, miterLimit: 1))
+        let c = CGPoint(x: 69.5, y: 45), offset: CGFloat = 6.5, radius: CGFloat = 3.4
+        for (dx, dy) in [(0, -offset), (offset, 0), (0, offset), (-offset, 0)] as [(CGFloat, CGFloat)] {
+            let button = CGRect(x: c.x + dx - radius, y: c.y + dy - radius, width: radius * 2, height: radius * 2)
+            holes = holes.union(CGPath(ellipseIn: button, transform: nil))
         }
         return holes
     }

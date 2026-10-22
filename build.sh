@@ -11,11 +11,27 @@ APP="$OUT/Ludus.app"
 SIGN_ID="${SIGN_ID:--}"
 rm -rf "$OUT"; mkdir -p "$OUT"
 
-if [ ! -f "$REPO/assets/Ludus.icns" ]; then
+# Icons: delete assets/Ludus.icns (and assets/Ludus.icon) to redraw them from make-icon.swift.
+if [ ! -f "$REPO/assets/Ludus.icns" ] || [ ! -d "$REPO/assets/Ludus.icon" ]; then
   mkdir -p "$REPO/assets"
   swiftc -O -framework AppKit "$REPO/make-icon.swift" -o "$OUT/mkicon"
   "$OUT/mkicon" "$OUT"
   iconutil -c icns "$OUT/Ludus.iconset" -o "$REPO/assets/Ludus.icns"
+  rm -rf "$REPO/assets/Ludus.icon"; cp -R "$OUT/Ludus.icon" "$REPO/assets/Ludus.icon"
+fi
+
+# Light/dark app icon for macOS 26+: compile the Icon Composer file into Assets.car (CFBundleIconName).
+# Needs full Xcode (actool). Without it, or on older macOS, the Ludus.icns above is used.
+HAVE_CAR=0
+if xcrun --find actool >/dev/null 2>&1; then
+  mkdir -p "$OUT/car"
+  if xcrun actool "$REPO/assets/Ludus.icon" --compile "$OUT/car" --platform macosx \
+       --minimum-deployment-target 14.0 --app-icon Ludus \
+       --output-partial-info-plist "$OUT/car/partial.plist" >/dev/null && [ -f "$OUT/car/Assets.car" ]; then
+    HAVE_CAR=1
+  else
+    echo "Note: actool could not compile the light/dark icon; using Ludus.icns only." >&2
+  fi
 fi
 
 # Local builds include the UI test hook; release builds (RELEASE=1, used by CI) leave it out.
@@ -29,6 +45,7 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$REPO/Info.plist" "$APP/Contents/Info.plist"
 cp "$OUT/Ludus" "$APP/Contents/MacOS/Ludus"
 cp "$REPO/assets/Ludus.icns" "$APP/Contents/Resources/Ludus.icns"
+[ "$HAVE_CAR" = "1" ] && cp "$OUT/car/Assets.car" "$APP/Contents/Resources/Assets.car"
 rsync -a --exclude '.DS_Store' --exclude '.harness-*' "$REPO/web/" "$APP/Contents/Resources/web/"
 xattr -cr "$APP"
 codesign --force --deep --sign "$SIGN_ID" "$APP" 2>/dev/null || codesign --force --deep --sign - "$APP"

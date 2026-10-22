@@ -28,6 +28,9 @@
   // Logo: the controller mark (not the old plain spark) next to "Ludus", in the accent colour.
   const logo = document.querySelector('.brand svg.logo use');
   check('controller logo', logo && logo.getAttribute('href') === '#ludus-mark' && document.getElementById('ludus-mark') && !document.getElementById('spark'));
+  // Face buttons: four round buttons in a diamond (two arcs each), not the old spark rays.
+  const markD = (document.querySelector('#ludus-mark path') || {}).getAttribute?.('d') || '';
+  check('logo diamond buttons', (markD.match(/A3\.1 3\.1 0 1 0/g) || []).length === 8 && !/M66\.7 36L66\.7 39\.2/.test(markD));
   const probe = document.createElement('span'); probe.style.color = 'var(--accent)'; document.body.appendChild(probe);
   const logoEl = document.querySelector('.brand svg.logo');
   check('logo uses accent', getComputedStyle(logoEl).color === getComputedStyle(probe).color && logoEl.getBoundingClientRect().width > 20);
