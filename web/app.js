@@ -265,41 +265,35 @@
     t.textContent = text; t.classList.add('show');
     clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), 1600);
   }
-  /* Volume: elastic slider (after React Bits' Elastic Slider). Quiet and loud speaker on each side,
-     a slim bar with no knob that thickens while touched, and a rubber-band stretch past either end
-     that springs back. Keyboard: arrows, Home, End. */
+  /* Volume: elastic slider (after React Bits' Elastic Slider). A slim bar with no knob that thickens
+     while touched, and a rubber-band stretch past either end that springs back. Keyboard: arrows, Home, End. */
   function volumeSlider(value, onInput, onDone) {
-    const ICON_LO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 9.5a3.5 3.5 0 0 1 0 5"/></svg>';
-    const ICON_HI = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 9.5a3.5 3.5 0 0 1 0 5"/><path d="M18.5 6.5a8 8 0 0 1 0 11"/></svg>';
     const wrap = el('div', 'vol');
-    const lo = el('span', 'vol-ico lo', ICON_LO), hi = el('span', 'vol-ico hi', ICON_HI);
     const track = el('div', 'vol-track'), bar = el('div', 'vol-fill');
     track.appendChild(bar);
     track.tabIndex = 0;
     track.setAttribute('role', 'slider'); track.setAttribute('aria-label', 'Volume');
     track.setAttribute('aria-valuemin', '0'); track.setAttribute('aria-valuemax', '100');
-    wrap.append(lo, track, hi);
+    wrap.append(track);
     let v = Math.min(1, Math.max(0, +value || 0));
     const STEP = 0.05, MAX_STRETCH = 10;   // px the bar may stretch past an end
     const paint = () => {
       bar.style.width = (v * 100) + '%';
       track.setAttribute('aria-valuenow', String(Math.round(v * 100)));
-      wrap.classList.toggle('is-mute', v === 0);
     };
     const set = nv => { nv = Math.round(Math.min(1, Math.max(0, nv)) / STEP) * STEP; if (nv !== v) { v = nv; paint(); onInput(v); } };
     // Overshoot past an end, eased so it resists more the further you pull (sigmoid decay).
     const stretch = over => MAX_STRETCH * (2 / (1 + Math.exp(-over / 40)) - 1);
-    const pull = (dx, side) => {
+    const pull = dx => {
       wrap.style.setProperty('--sx', (1 + Math.abs(dx) / track.offsetWidth).toFixed(3));
       wrap.style.setProperty('--tx', (dx / 2).toFixed(1) + 'px');
-      wrap.dataset.pull = side || '';
     };
     let dragging = false;
     const at = e => {
       const r = track.getBoundingClientRect();
       const x = e.clientX - r.left;
       set(x / r.width);
-      if (x < 0) pull(-stretch(-x), 'lo'); else if (x > r.width) pull(stretch(x - r.width), 'hi'); else pull(0);
+      pull(x < 0 ? -stretch(-x) : x > r.width ? stretch(x - r.width) : 0);
     };
     track.addEventListener('pointerdown', e => {
       dragging = true; try { track.setPointerCapture(e.pointerId); } catch (err) { /* synthetic events */ } wrap.classList.add('is-active'); at(e);
