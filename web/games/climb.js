@@ -514,7 +514,8 @@
           ctx.beginPath(); ctx.moveTo(fx, fy); ctx.lineTo(fx, fy - 30 * k); ctx.stroke();
           ctx.fillStyle = on ? col.accent : (d ? 'rgba(255,245,230,0.3)' : 'rgba(90,74,58,0.3)');
           ctx.beginPath(); ctx.moveTo(fx, fy - 30 * k); ctx.lineTo(fx + 14 * k, fy - 25 * k); ctx.lineTo(fx, fy - 20 * k); ctx.fill();
-          ctx.globalAlpha = 0.75; D.text(ctx, m.name, fx + 4 * k, fy - 40 * k, 10.5, col.ink2, 700, 'left'); ctx.globalAlpha = 1;
+          // no label on the start flag: the pot sits under it and the section pill already names it
+          if (i > 0) { ctx.globalAlpha = 0.75; D.text(ctx, m.name, fx + 4 * k, fy - 40 * k, 10.5, col.ink2, 700, 'left'); ctx.globalAlpha = 1; }
         });
         // summit flag
         const fp = toScreen(world.deco.flag[0], world.deco.flag[1]);
