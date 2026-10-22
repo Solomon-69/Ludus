@@ -393,5 +393,10 @@ svg { display: block; }
 
 /* Wide / tall switch for the .io games, next to Pause */
 .bar-right { display: flex; gap: 8px; align-items: center; }
+#orientBtn[hidden] { display: none; }
 #orientBtn svg { transition: transform 0.35s var(--spring); }
 #orientBtn.is-wide svg { transform: rotate(90deg); }
+
+.card.found { outline: 2px solid var(--accent); outline-offset: 2px; animation: cardIn 0.45s var(--spring) both, foundGlow 1.6s ease-out 0.2s 1; }
+@keyframes foundGlow { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent); } 100% { box-shadow: 0 0 0 18px transparent; } }
+@media (prefers-reduced-motion: reduce) { .card.found { animation: none; } }

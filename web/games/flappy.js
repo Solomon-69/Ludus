@@ -54,7 +54,7 @@
       let state = 'ready', t = 0, deadT = 0;
       let bird = { x: 0, y: WH * 0.45, vy: 0, rot: 0, spin: 0, squash: 0 };
       let pipes = [], score = 0, scroll = 0, shake = 0, flash = 0;
-      let puffs = [], pops = [], hit = null;
+      let puffs = [], pops = [], smoke = [], hit = null, landed = false, kx = 0, tumble = 0;
 
       function worldW() { return view.w / (view.h / WH); }
       function speed() { return cfg.speed + Math.min(60, score * 1.6); }
@@ -72,32 +72,52 @@
         api.sfx('jump');
         if (!api.reduceMotion) for (let i = 0; i < 5; i++) puffs.push({ x: bird.x - 6, y: bird.y + 6, vx: api.rand(-90, -30), vy: api.rand(-20, 60), life: api.rand(0.25, 0.45), age: 0, r: api.rand(2, 4) });
       }
-      // The run freezes on the spot where the spark hit, marked with a red ring.
+      function puffSmoke(x, y, n, big) {
+        for (let i = 0; i < n; i++) smoke.push({ x: x + api.rand(-8, 8), y: y + api.rand(-6, 6), vx: api.rand(-50, 50) * (big ? 1.4 : 1), vy: api.rand(-90, -25), life: api.rand(0.5, 1.0), age: 0, r: api.rand(4, big ? 11 : 8), tone: api.rand(0, 1) });
+      }
+      // The spark crashes into the pipe, is knocked back, tumbles down to the ground and lands in a puff of smoke.
       function die(hx, hy) {
         if (state === 'dead') return;
-        state = 'dead'; deadT = 0; api.sfx('hit');
-        if (!api.reduceMotion) { shake = 7; flash = 1; }
+        state = 'dead'; deadT = 0; api.sfx('hit'); landed = false;
         hit = { x: hx === undefined ? bird.x : hx, y: hy === undefined ? bird.y : hy };
-        bird.vy = 0;
-        api.timeout(() => api.over({ score, title: score ? score + (score === 1 ? ' gap' : ' gaps') : 'Bonk', message: score >= 10 ? 'Nice flying' : 'Aim for the middle of each gap' }), 900);
+        if (!api.reduceMotion) { shake = 7; flash = 1; puffSmoke(hit.x, hit.y, 12, false); }
+        const onGround = bird.y >= WH - GROUND - BIRD_R - 1;
+        bird.vy = onGround ? 0 : -140;
+        tumble = bird.vy === 0 ? 0 : (Math.random() < 0.5 ? -1 : 1) * api.rand(5, 9);
+        if (onGround) { landed = true; finish(); }
+      }
+      function finish() {
+        api.timeout(() => api.over({ score, title: score ? score + (score === 1 ? ' gap' : ' gaps') : 'Bonk', message: score >= 10 ? 'Nice flying' : 'Aim for the middle of each gap' }), 800);
       }
 
       function update(dt) {
         t += dt;
         const W = worldW();
-        bird.x = Math.min(W * 0.3, 140);
+        bird.x = Math.min(W * 0.3, 140) + kx;
         if (state === 'ready') {
           bird.y = WH * 0.45 + Math.sin(t * 3) * 7;
           bird.rot = Math.sin(t * 2) * 0.15; bird.spin += dt * 1.2;
           scroll += dt * cfg.speed * 0.6;
         } else {
           if (state === 'play') { bird.vy = Math.min(MAXFALL, bird.vy + GRAV * dt); bird.y += bird.vy * dt; }
+          if (state === 'dead' && !landed) {
+            bird.vy = Math.min(MAXFALL, bird.vy + GRAV * dt); bird.y += bird.vy * dt;
+            kx = Math.max(-60, kx - 90 * dt); bird.spin += tumble * dt; bird.rot += tumble * 0.35 * dt;
+          }
           const target = Math.max(-0.5, Math.min(1.25, bird.vy / 520));
-          bird.rot += (target - bird.rot) * Math.min(1, dt * 10);
+          if (state !== 'dead') bird.rot += (target - bird.rot) * Math.min(1, dt * 10);
           if (state === 'play') bird.spin += dt * 1.5;
           if (bird.y < BIRD_R) { bird.y = BIRD_R; bird.vy = Math.max(0, bird.vy); }
           const floor = WH - GROUND - BIRD_R;
-          if (bird.y >= floor) { bird.y = floor; bird.vy = 0; if (state === 'play') die(bird.x, floor + BIRD_R); }
+          if (bird.y >= floor) {
+            bird.y = floor; bird.vy = 0;
+            if (state === 'play') die(bird.x, floor + BIRD_R);
+            else if (state === 'dead' && !landed) {
+              landed = true; api.sfx('lose'); bird.rot = 0.5 * Math.sign(tumble || 1);
+              if (!api.reduceMotion) { shake = 5; puffSmoke(bird.x, floor + BIRD_R - 4, 14, true); }
+              finish();
+            }
+          }
         }
         if (state === 'play') {
           const sp = speed();
@@ -127,6 +147,9 @@
         puffs = puffs.filter(p => (p.age += dt) < p.life);
         puffs.forEach(p => { p.x += p.vx * dt; p.y += p.vy * dt; });
         pops = pops.filter(p => (p.t += dt) < 0.7);
+        smoke = smoke.filter(p => (p.age += dt) < p.life);
+        smoke.forEach(p => { p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 0.98; });
+        if (state === 'dead' && !landed && !api.reduceMotion && Math.random() < dt * 30) puffSmoke(bird.x, bird.y, 1, false);
       }
 
       function hills(W, base, amp, freq, par, color) {
@@ -197,15 +220,14 @@
         ctx.beginPath(); ctx.arc(0, 0, BIRD_R + 5, 0, Math.PI * 2); ctx.fill();
         D.spark(ctx, 0, 0, BIRD_R + 3, col.accent, bird.spin);
         ctx.restore();
-        // where it went wrong
-        if (hit) {
-          const k = api.reduceMotion ? 1 : Math.min(1, deadT / 0.3);
-          ctx.strokeStyle = col.bad; ctx.lineWidth = 3;
-          ctx.beginPath(); ctx.arc(hit.x, hit.y, 8 + 10 * D.ease.outCubic(k), 0, Math.PI * 2); ctx.stroke();
-          ctx.globalAlpha = 0.5 * (1 - k * 0.6);
-          ctx.beginPath(); ctx.arc(hit.x, hit.y, 26 * D.ease.outCubic(k) + 4, 0, Math.PI * 2); ctx.stroke();
-          ctx.globalAlpha = 1;
-        }
+        // crash smoke
+        smoke.forEach(p => {
+          const k = p.age / p.life;
+          ctx.globalAlpha = (1 - k) * 0.7;
+          ctx.fillStyle = p.tone > 0.5 ? (col.dark ? '#8a8279' : '#9a928a') : (col.dark ? '#c9c1b6' : '#6f6860');
+          ctx.beginPath(); ctx.arc(p.x, p.y, p.r * (1 + k * 1.8), 0, Math.PI * 2); ctx.fill();
+        });
+        ctx.globalAlpha = 1;
         // score pops
         pops.forEach(p => {
           const k = p.t / 0.7;

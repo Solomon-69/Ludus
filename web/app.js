@@ -88,24 +88,32 @@
   function renderCards() {
     const grid = $('grid'); grid.innerHTML = '';
     const list = visibleGames();
-    const lastGame = !norm(query) && S.filter === 'All' && L.games.find(g => g.id === S.last && !S.hidden.includes(g.id));
+    const searching = !!norm(query);
+    const lastGame = !searching && S.filter === 'All' && L.games.find(g => g.id === S.last && !S.hidden.includes(g.id));
     const rest = list.filter(g => g !== lastGame);
     // In "All", the games for two people on one keyboard get their own section at the end.
-    const all = S.filter === 'All' && !norm(query);
+    const all = S.filter === 'All' && !searching;
     const solo = all ? rest.filter(g => g.tag !== TWO) : rest;
     const duo = all ? rest.filter(g => g.tag === TWO) : [];
-    const ordered = [...(lastGame ? [lastGame] : []), ...solo, ...duo];
+    // Searching: the best match leads as a highlighted card, then similar games fill the screen.
+    const best0 = searching ? list[0] : null;
+    const related = searching && best0 ? L.games.filter(g => !S.hidden.includes(g.id) && !list.includes(g)).sort((x, y) => {
+      const sc = g => (g.tag === best0.tag ? 3 : 0) + (!!g.versus === !!best0.versus ? 1 : 0) + (g.tag === 'Puzzle' && best0.tag === 'Puzzle' ? 1 : 0);
+      return sc(y) - sc(x);
+    }).slice(0, 8) : [];
+    const ordered = searching ? [...list, ...related] : [...(lastGame ? [lastGame] : []), ...solo, ...duo];
     ordered.forEach((g, i) => {
       if (duo.length && g === duo[0]) grid.appendChild(el('div', 'section-label', '2 players, one keyboard'));
+      if (searching && related.length && g === related[0]) grid.appendChild(el('div', 'section-label', 'Related games'));
       const b = document.createElement('button');
-      const feature = lastGame && i === 0;
-      b.className = 'card' + (feature ? ' feature' : '');
+      const found = searching && best0 && g === best0, feature = (lastGame && i === 0) || found;
+      b.className = 'card' + (feature ? ' feature' : '') + (found ? ' found' : '');
       b.style.setProperty('--i', i);
       b.style.setProperty('--tint', g.tint);
       b.dataset.id = g.id;
       const best = S.best[g.id] || 0;
       b.innerHTML = `<div class="art"><canvas></canvas></div>
-        <div><div class="tag">${feature ? 'Continue' : g.tag}${S.saves[g.id] ? '<i class="saved-dot">In progress</i>' : ''}</div>
+        <div><div class="tag">${found ? 'Best match' : feature ? 'Continue' : g.tag}${S.saves[g.id] ? '<i class="saved-dot">In progress</i>' : ''}</div>
         <div class="card-name">${g.name}</div>
         <div class="card-meta"><span>${g.tag === TWO ? 'Played' : g.tag === 'Duel' ? 'Wins' : 'Best'}</span><b>${fmt(g.tag === TWO ? (S.plays[g.id] || 0) : best)}</b></div></div>`;
       b.onclick = () => start(g.id);
