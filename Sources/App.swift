@@ -19,10 +19,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
     private let stateKey = "ludusState"
     private let sizeKey = "ludusSize"
     private let invisibleKey = "ludusInvisible"
-    // Status item names: macOS remembers a menu bar position per name. The invisible item gets its own
-    // name, and its remembered position is cleared each time, so it is always created at the far left.
-    private let visibleItemName = "Ludus"
-    private let invisibleItemName = "LudusInvisible"
+    private let dockKey = "ludusShowInDock"
+    // One status item under one name for both modes, so macOS keeps a single remembered position and
+    // the panel opens in the same place whether the icon is drawn or not.
+    private let itemName = "Ludus"
     private var invisible: Bool { UserDefaults.standard.bool(forKey: invisibleKey) }
     private static let compact = NSSize(width: 400, height: 600)
     private static let large = NSSize(width: 520, height: 740)
@@ -39,6 +39,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
         if SMAppService.mainApp.status == .enabled { try? SMAppService.mainApp.register() }
 
         statusItem = makeStatusItem()
+        applyDockPolicy()
 
         setUpWebView()
         let controller = NSViewController()
@@ -86,6 +87,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
         window.__LUDUS_STATE__ = \(savedStateLiteral());
         window.__LUDUS_LOGIN__ = \(login);
         window.__LUDUS_INVISIBLE__ = \(invisible);
+        window.__LUDUS_DOCK__ = \(UserDefaults.standard.bool(forKey: dockKey));
         window.__LUDUS_DARK__ = \(isDark());
         """
     }
@@ -147,6 +149,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
             setLogin(body["on"] as? Bool ?? false)
         case "invisible":
             setInvisible(body["on"] as? Bool ?? false)
+        case "dock":
+            UserDefaults.standard.set(body["on"] as? Bool ?? false, forKey: dockKey)
+            applyDockPolicy()
         case "quit":
             // Let the panel fold away with its normal animation, then quit (popoverDidClose).
             // Write the running game's snapshot first, then fold the panel away and quit.
@@ -197,50 +202,67 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
 
     // MARK: - Status item
 
-    /// The menu bar item. Invisible mode keeps the same width and click target but draws nothing.
+    /// The menu bar item. Invisible mode keeps the same item, width and click target but draws nothing.
     private func makeStatusItem() -> NSStatusItem {
-        let hidden = invisible
-        let name = hidden ? invisibleItemName : visibleItemName
-        if hidden { UserDefaults.standard.removeObject(forKey: "NSStatusItem Preferred Position \(name)") }
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        item.autosaveName = name
+        item.autosaveName = itemName
         if let button = item.button {
-            button.image = hidden ? Self.emptyIcon() : Self.menuBarIcon()
             button.wantsLayer = true
             button.target = self
             button.action = #selector(statusClicked)
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
             button.setAccessibilityLabel("Ludus games")
-            if hidden {
-                // No pressed pill while invisible: clicks land on a clear view above the button, so the
-                // button itself is never pressed and the spot stays empty before, during and after a click.
-                let catcher = ClickCatcher(frame: button.bounds)
-                catcher.autoresizingMask = [.width, .height]
-                catcher.onClick = { [weak self] in self?.statusClicked() }
-                button.addSubview(catcher)
-            }
         }
+        applyInvisible(to: item)
         return item
     }
 
-    /// Swaps the menu bar item. A new item is the leftmost of the menu bar extras, which is where the
-    /// invisible spot should sit. An open panel moves to the new item before the old one goes away.
+    /// Draws or blanks the icon in place. The item is never recreated, so it never moves in the menu bar
+    /// (recreating it on each switch made macOS shift it, and the panel with it, a little further each time).
+    private func applyInvisible(to item: NSStatusItem) {
+        guard let button = item.button else { return }
+        let hidden = invisible
+        button.image = hidden ? Self.emptyIcon() : Self.menuBarIcon()
+        button.subviews.filter { $0 is ClickCatcher }.forEach { $0.removeFromSuperview() }
+        if hidden {
+            // No pressed pill while invisible: clicks land on a clear view above the button, so the
+            // button itself is never pressed and the spot stays empty before, during and after a click.
+            let catcher = ClickCatcher(frame: button.bounds)
+            catcher.autoresizingMask = [.width, .height]
+            catcher.onClick = { [weak self] in self?.statusClicked() }
+            button.addSubview(catcher)
+        }
+    }
+
     private func setInvisible(_ on: Bool) {
         if on != invisible {
             UserDefaults.standard.set(on, forKey: invisibleKey)
-            let old = statusItem!
-            statusItem = makeStatusItem()
-            if popover.isShown, let anchor = popoverAnchor() {
+            applyInvisible(to: statusItem)
+            // Move the open panel's arrow to the new anchor without its open animation, so it doesn't
+            // blink. The item never moves, so the panel stays in the same place; only the pill changes.
+            if popover.isShown, !on {
+                // Back to visible while open: keep the panel on its clear anchor (re-anchoring to the
+                // real icon makes macOS fade the panel out and in). Light the pill by hand instead.
+                statusItem.button?.highlight(true)
+            } else if popover.isShown, let anchor = popoverAnchor() {
+                popover.animates = false
                 popover.show(relativeTo: anchor.bounds, of: anchor, preferredEdge: .minY)
+                DispatchQueue.main.async { [weak self] in self?.popover.animates = true }
             }
-            NSStatusBar.system.removeStatusItem(old)
         }
         webView.evaluateJavaScript("window.__LUDUS_INVISIBLE__ = \(invisible)")
     }
 
+    /// Dock icon only when "Show in Dock" is on. Off (the default), Ludus lives in the menu bar alone.
+    private func applyDockPolicy() {
+        let policy: NSApplication.ActivationPolicy = UserDefaults.standard.bool(forKey: dockKey) ? .regular : .accessory
+        if NSApp.activationPolicy() != policy { NSApp.setActivationPolicy(policy) }
+    }
+
     /// Safety net: opening Ludus again from Finder or Spotlight while the icon is invisible opens the panel.
+    /// With the Dock icon shown, clicking it opens the panel too.
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        if invisible && !popover.isShown { openPopover() }
+        if (invisible || UserDefaults.standard.bool(forKey: dockKey)) && !popover.isShown { openPopover() }
         return false
     }
 
@@ -338,6 +360,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
 
     func popoverDidClose(_ notification: Notification) {
         anchorWindow?.orderOut(nil)
+        statusItem.button?.highlight(false)
         if let monitor = clickMonitor { NSEvent.removeMonitor(monitor); clickMonitor = nil }
         if quitting {
             // The save message from ludusClosed was already handled; give the bridge a moment, then quit.
@@ -440,6 +463,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
             }
         case "invisible:on": setInvisible(true)
         case "invisible:off": setInvisible(false)
+        case "dock:on", "dock:off":
+            UserDefaults.standard.set(command == "dock:on", forKey: dockKey); applyDockPolicy()
         case "click":
             // Same path as a real click on the menu bar spot (the clear catcher view while invisible).
             if let catcher = statusItem.button?.subviews.first(where: { $0 is ClickCatcher }) as? ClickCatcher {
@@ -453,7 +478,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
             let frame = statusItem.button?.window?.frame ?? .zero
             let line = "\(Date()) status invisible=\(invisible) shown=\(popover.isShown) frame=\(NSStringFromRect(frame)) "
                 + "image=\(statusItem.button?.image.map { NSStringFromSize($0.size) } ?? "nil") "
-                + "catcher=\(statusItem.button?.subviews.contains { $0 is ClickCatcher } ?? false)\n"
+                + "catcher=\(statusItem.button?.subviews.contains { $0 is ClickCatcher } ?? false) "
+                + "anchor=\(NSStringFromRect(anchorWindow?.frame ?? .zero)) panel=\(NSStringFromRect(popover.contentViewController?.view.window?.frame ?? .zero))\n"
             appendLog(line)
         case "state":
             webView.evaluateJavaScript("window.ludusState && ludusState()") { [weak self] result, _ in

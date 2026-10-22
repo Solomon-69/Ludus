@@ -305,7 +305,9 @@
       sw8.appendChild(b);
     });
     const vol = el('input', 'range'); vol.type = 'range'; vol.min = 0; vol.max = 1; vol.step = 0.05; vol.value = S.volume;
-    vol.oninput = () => { S.volume = +vol.value; L.save(); }; vol.onchange = () => L.sfx('score');
+    const fill = () => vol.style.setProperty('--p', (vol.value * 100) + '%');
+    fill();
+    vol.oninput = () => { S.volume = +vol.value; fill(); L.save(); }; vol.onchange = () => L.sfx('score');
     body.appendChild(group('Look', [
       row('Appearance', null, seg(THEMES, S.theme, v => { S.theme = v; L.save(); applyTheme(); })),
       row('Accent colour', null, sw8),
@@ -327,6 +329,8 @@
         : 'Hidden in the menu bar. Click the empty space at the far left of your menu bar icons to open';
       if (typeof window.__LUDUS_INVISIBLE__ === 'boolean') appRows.push(row('Invisible icon', invisibleHelp,
         sw(!!window.__LUDUS_INVISIBLE__, v => { window.__LUDUS_INVISIBLE__ = v; L.native('invisible', { on: v }); }, 'Invisible icon')));
+      if (typeof window.__LUDUS_DOCK__ === 'boolean') appRows.push(row('Show in Dock', 'Off: Ludus stays in the menu bar only',
+        sw(!!window.__LUDUS_DOCK__, v => { window.__LUDUS_DOCK__ = v; L.native('dock', { on: v }); }, 'Show in Dock')));
     }
     const reset = el('button', 'small-btn bad', 'Reset');
     reset.onclick = () => {
