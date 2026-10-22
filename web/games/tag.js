@@ -21,10 +21,11 @@
       '##################', '#.....*...........', '#...------........', '#.................', '#.............*...', '#..........-------',
       '#.................', '#...*.............', '#.------..........', '#.................', '#..........*......', '#.......------....',
       '..................', '....*.............', '...-----.......---', '..................', '..1.........^.....', '##################'] },
-    { name: 'Rooftops', note: 'Lifts, gaps', top: '#d97757', sky: ['#f4ece3', '#22232b'], block: ['#bcb0a4', '#41414c'], decor: 'city', rows: [
-      '..................', '..................', '.......*..........', '....------........', '..................', '..............*...',
+    // Rooftops: the gaps between buildings are one block deep, so nobody can fall through the city.
+    { name: 'Rooftops', note: 'Doors, springs', top: '#d97757', sky: ['#f4ece3', '#22232b'], block: ['#bcb0a4', '#41414c'], decor: 'city', rows: [
+      '##################', '..................', '.......*..........', '....------........', '..................', '..............*...',
       '............------', '..*...............', '-----.............', '..........O.......', '.......#####......', '.1O............^..',
-      '#####..#####..####', '#####..#####..####', '#####..#####..####', '#####..#####..####', '#####..#####..####', '#####..#####..####'] },
+      '#####..#####..####', '##################', '##################', '##################', '##################', '##################'] },
     { name: 'Ice cave', note: 'Slippery', top: '#e9f7fc', sky: ['#e7f3f7', '#1c2a31'], block: ['#a8d6e6', '#3f6878'], decor: 'ice', rows: [
       '##################', '#.................', '#.....*...........', '#...~~~~~~........', '#.................', '#.............*...',
       '#..........~~~~~~~', '#.................', '#.*...............', '#~~~~~~...........', '#.................', '..........*.......',
@@ -239,17 +240,17 @@
       function menuLayout() {
         const w = view.w, h = view.h, pad = 12, chips = [];
         const groups = [{ label: 'Round', opts: TIMES.map(t => t + 's'), cw: 46, key: 'time' }, { label: 'First to', opts: ROUNDS.map(String), cw: 36, key: 'rounds' }];
-        const gw = gr => 60 + gr.opts.length * (gr.cw + 6);
-        const one = gw(groups[0]) + gw(groups[1]) + 20 <= w - pad * 2;
-        let y = 44;
-        const place = (gr, gi, x0, yy) => gr.opts.forEach((o, k) => chips.push({ x: x0 + 60 + k * (gr.cw + 6), y: yy, w: gr.cw, h: 26, text: o, key: gr.key, val: k, glabel: k === 0 ? gr.label : null, gx: x0 }));
-        if (one) { const tw = gw(groups[0]) + gw(groups[1]) + 20, x0 = (w - tw) / 2; place(groups[0], 0, x0, y); place(groups[1], 1, x0 + gw(groups[0]) + 20, y); y += 26; }
-        else { place(groups[0], 0, (w - gw(groups[0])) / 2, y); place(groups[1], 1, (w - gw(groups[1])) / 2, y + 32); y += 58; }
-        const top = y + 12, availH = h - top - 10, availW = w - pad * 2, n = MAPS.length + 1, gap = 10;
+        const gw = gr => 72 + gr.opts.length * (gr.cw + 8);
+        const one = gw(groups[0]) + gw(groups[1]) + 28 <= w - pad * 2;
+        let y = 48;
+        const place = (gr, gi, x0, yy) => gr.opts.forEach((o, k) => chips.push({ x: x0 + 72 + k * (gr.cw + 8), y: yy, w: gr.cw, h: 28, text: o, key: gr.key, val: k, glabel: k === 0 ? gr.label : null, gx: x0 }));
+        if (one) { const tw = gw(groups[0]) + gw(groups[1]) + 28, x0 = (w - tw) / 2; place(groups[0], 0, x0, y); place(groups[1], 1, x0 + gw(groups[0]) + 28, y); y += 28; }
+        else { place(groups[0], 0, (w - gw(groups[0])) / 2, y); place(groups[1], 1, (w - gw(groups[1])) / 2, y + 36); y += 64; }
+        const top = y + 16, availH = h - top - 12, availW = w - pad * 2, n = MAPS.length + 1, gap = 12;
         let best = null; [3, 4, 5].forEach(gc => {
           const gr = Math.ceil(n / gc);
           let tw = (availW - (gc - 1) * gap) / gc, th = (availH - (gr - 1) * gap) / gr;
-          tw = Math.min(tw, (th - 34) * 2 + 10, 230); th = (tw - 10) / 2 + 34;
+          tw = Math.min(tw, (th - 46) * 2 + 12, 230); th = (tw - 12) / 2 + 46;
           if (!best || tw > best.tw) best = { gc, gr, tw, th };
         });
         const { gc, gr, tw, th } = best, tiles = [], gy = top + Math.max(0, (availH - (gr * th + (gr - 1) * gap)) * 0.3);
@@ -298,7 +299,7 @@
         const key = tw + ':' + col.dark + ':' + view.dpr;
         if (!thumbs || thumbs.key !== key) thumbs = { key, list: [] };
         if (thumbs.list[i]) return thumbs.list[i];
-        const cw = tw - 10, ch = cw / 2, cv = document.createElement('canvas');
+        const cw = tw - 12, ch = cw / 2, cv = document.createElement('canvas');
         cv.width = Math.max(1, Math.round(cw * view.dpr)); cv.height = Math.max(1, Math.round(ch * view.dpr));
         const g = cv.getContext('2d'), m = BUILT[i];
         g.scale(cv.width / W, cv.height / H); sky(g, m, col);
@@ -307,13 +308,13 @@
       }
       function drawMenu(col) {
         const L = menuLayout(), w = view.w, f = focusItem(L);
-        D.text(ctx, 'Choose a scene', w / 2, 20, 16, col.ink, 800);
+        D.text(ctx, 'Choose a scene', w / 2, 22, 17, col.ink, 800);
         L.chips.forEach(c => {
-          if (c.glabel) D.text(ctx, c.glabel, c.gx + 54, c.y + c.h / 2, 11.5, col.ink2, 700, 'right');
+          if (c.glabel) D.text(ctx, c.glabel, c.gx + 62, c.y + c.h / 2, 12, col.ink2, 700, 'right');
           const on = sel[c.key] === c.val, foc = c === f;
-          D.roundRect(ctx, c.x, c.y, c.w, c.h, 13); ctx.fillStyle = on ? col.accent : (col.dark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)'); ctx.fill();
+          D.roundRect(ctx, c.x, c.y, c.w, c.h, 14); ctx.fillStyle = on ? col.accent : (col.dark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)'); ctx.fill();
           if (foc) { ctx.strokeStyle = col.ink; ctx.lineWidth = 2; ctx.stroke(); }
-          D.text(ctx, c.text, c.x + c.w / 2, c.y + c.h / 2 + 0.5, 12, on ? '#fffaf3' : col.ink, 750);
+          D.text(ctx, c.text, c.x + c.w / 2, c.y + c.h / 2 + 0.5, 12.5, on ? '#fffaf3' : col.ink, 750);
         });
         L.tiles.forEach(t => {
           const foc = t === f, lift = foc && !api.reduceMotion ? 1 + 0.02 * Math.sin(clock * 5) : 1;
@@ -321,17 +322,17 @@
           ctx.shadowColor = 'rgba(0,0,0,0.16)'; ctx.shadowBlur = foc ? 14 : 6; ctx.shadowOffsetY = foc ? 4 : 2;
           D.roundRect(ctx, 0, 0, t.w, t.h, 12); ctx.fillStyle = col.surface || (col.dark ? '#2f2a25' : '#fff'); ctx.fill(); ctx.shadowColor = 'transparent';
           if (foc) { ctx.strokeStyle = col.accent; ctx.lineWidth = 2.5; ctx.stroke(); }
-          const tw = t.w - 10, th = tw / 2;
-          if (t.map >= 0) ctx.drawImage(thumb(t.map, L.tw, col), 5, 5, tw, th);
+          const tw = t.w - 12, th = tw / 2;
+          if (t.map >= 0) ctx.drawImage(thumb(t.map, L.tw, col), 6, 6, tw, th);
           else {
-            ctx.save(); D.roundRect(ctx, 5, 5, tw, th, 6); ctx.clip();
-            MAPS.forEach((m, k) => { ctx.fillStyle = m.top; ctx.fillRect(5 + k * tw / MAPS.length, 5, tw / MAPS.length + 1, th); });
-            ctx.fillStyle = col.dark ? 'rgba(0,0,0,0.35)' : 'rgba(255,255,255,0.3)'; ctx.fillRect(5, 5, tw, th); ctx.restore();
-            D.spark(ctx, 5 + tw / 2, 5 + th / 2, th * 0.3, '#fffaf3', api.reduceMotion ? 0 : clock);
+            ctx.save(); D.roundRect(ctx, 6, 6, tw, th, 6); ctx.clip();
+            MAPS.forEach((m, k) => { ctx.fillStyle = m.top; ctx.fillRect(6 + k * tw / MAPS.length, 6, tw / MAPS.length + 1, th); });
+            ctx.fillStyle = col.dark ? 'rgba(0,0,0,0.35)' : 'rgba(255,255,255,0.3)'; ctx.fillRect(6, 6, tw, th); ctx.restore();
+            D.spark(ctx, 6 + tw / 2, 6 + th / 2, th * 0.3, '#fffaf3', api.reduceMotion ? 0 : clock);
           }
           const name = t.map >= 0 ? MAPS[t.map].name : 'Random', note = t.map >= 0 ? MAPS[t.map].note : 'New map each round';
-          D.text(ctx, name, t.w / 2, th + 15, Math.min(12.5, t.w / 9), col.ink, 750);
-          D.text(ctx, note, t.w / 2, th + 28, Math.min(10, t.w / 11), col.ink2, 600);
+          D.text(ctx, name, t.w / 2, th + 21, Math.min(13, t.w / 8.5), col.ink, 750);
+          D.text(ctx, note, t.w / 2, th + 37, Math.min(10.5, t.w / 10.5), col.ink2, 600);
           if (sel.map === t.map && !foc) { ctx.fillStyle = col.accent; ctx.beginPath(); ctx.arc(t.w - 12, 13, 4, 0, 7); ctx.fill(); }
           ctx.restore();
         });
