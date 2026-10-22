@@ -50,7 +50,7 @@
   }
 
   Ludus.register({
-    id: 'tron', name: 'Light Trails', tag: '2 Player', wide: true, tint: '#2a9d9f',
+    id: 'tron', name: 'Tron', aka: 'Light Trails', tag: '2 Player', wide: true, tint: '#2a9d9f',
     hint: '<b>P1</b> <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> turn · <b>P2</b> <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> turn · don\'t hit walls or trails',
     _rules: { stepRiders, COLS: PCOLS, ROWS: PROWS },
     art(ctx, w, h) {

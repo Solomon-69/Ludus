@@ -101,7 +101,7 @@
   }
 
   Ludus.register({
-    id: 'decider', name: 'The Decider', tag: 'Duel', tint: PINK, versus: true,
+    id: 'decider', name: 'Rock Paper Scissors', aka: 'The Decider', tag: 'Duel', tint: PINK, versus: true,
     hint: 'Pick with <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd>, <kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> or a click. Rock beats scissors, scissors beat paper, paper beats rock. First to 3. vs Friend: secret picks, Player 1 <kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>, Player 2 <kbd>J</kbd><kbd>K</kbd><kbd>L</kbd>',
     _rules: { makeBrain, outcome, BEATS, COUNTER },
     art(ctx, w, h) {

@@ -45,7 +45,7 @@
   }
 
   Ludus.register({
-    id: 'hockey', name: 'Air Puck', tag: '2 Player', wide: true, tint: '#e05d8b',
+    id: 'hockey', name: 'Air Hockey', aka: 'Air Puck', tag: '2 Player', wide: true, tint: '#e05d8b',
     hint: '<b>P1</b> (left) <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move · <b>P2</b> (right) <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> move',
     _rules: { strike },
     art(ctx, w, h) {

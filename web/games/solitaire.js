@@ -54,7 +54,7 @@
   }
 
   Ludus.register({
-    id: 'patience', name: 'Patience', tag: 'Puzzle', tint: '#2e7a5f',
+    id: 'patience', name: 'Solitaire', aka: 'Patience Klondike', tag: 'Puzzle', tint: '#2e7a5f',
     hint: 'Click a card then its spot, or drag · double-click or <kbd>Enter</kbd>: to suit pile · <kbd>←↑→↓</kbd> <kbd>Space</kbd> pick/drop · <kbd>D</kbd> draw · <kbd>Z</kbd> undo',
     _rules: { deal, canFound, canTab },
     art(ctx, w, h) {

@@ -98,7 +98,7 @@
   }
 
   Ludus.register({
-    id: 'crossing', name: 'The Crossing', tag: 'Duel', tint: PURPLE, versus: true,
+    id: 'crossing', name: 'Hex', aka: 'The Crossing', tag: 'Duel', tint: PURPLE, versus: true,
     hint: 'Click a hex, or <kbd>←</kbd><kbd>↑</kbd><kbd>→</kbd><kbd>↓</kbd> + <kbd>Space</kbd>. Link your left and right edges with a chain. <kbd>S</kbd> steals the bot opening stone. vs Friend: take turns, Player 2 joins top to bottom, first to 3 games',
     _rules: { winPath, cpuConnects, swapBoard, winningCell, bridgeReply, makeSearch, N, YOU, CPU },
     art(ctx, w, h) {

@@ -69,7 +69,7 @@
   }
 
   Ludus.register({
-    id: 'tanks', name: 'Tank Duel', tag: '2 Player', wide: true, tint: '#c98a3a',
+    id: 'tanks', name: 'Tank Trouble', aka: 'Tank Duel', tag: '2 Player', wide: true, tint: '#c98a3a',
     hint: '<b>P1</b> <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> drive <kbd>F</kbd> fire · <b>P2</b> <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> drive <kbd>/</kbd> fire',
     _rules: { makeMaze, wallRects, MC: PMC, MRW: PMRW },
     art(ctx, w, h) {

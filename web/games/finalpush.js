@@ -23,7 +23,7 @@
   const PADS = [{ a: 'left' }, { a: 'right' }, { a: 'up' }, { a: 'down' }, { a: 'atk', l: 'Thrust' }];
 
   Ludus.register({
-    id: 'finalpush', name: 'Right of Way', tag: 'Duel', tint: RUST,
+    id: 'finalpush', name: 'Nidhogg', aka: 'Right of Way', tag: 'Duel', tint: RUST,
     hint: '<kbd>←</kbd><kbd>→</kbd> walk · <kbd>↑</kbd><kbd>↓</kbd> spear high / middle / low · <kbd>Space</kbd> thrust (or the buttons). Same height blocks. Kill the bot, then run right to your gate',
     art(ctx, w, h) {
       const f = h * 0.84;

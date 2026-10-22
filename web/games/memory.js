@@ -51,7 +51,7 @@
   function fmtTime(s) { s = Math.floor(s); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; }
 
   Ludus.register({
-    id: 'pairs', name: 'Pairs', tag: 'Puzzle', tint: '#c06c9a',
+    id: 'pairs', name: 'Memory', aka: 'Pairs', tag: 'Puzzle', tint: '#c06c9a',
     hint: 'Click two cards, or <kbd>←</kbd><kbd>↑</kbd><kbd>→</kbd><kbd>↓</kbd> to choose and <kbd>Space</kbd> to flip',
     _layout: layout, _sizes: SIZES,
     art(ctx, w, h) {

@@ -50,7 +50,12 @@
   }
 
   // ---------- home ----------
+  // Search box: matches a game's name, its group and its older Ludus name, ignoring case and accents.
+  let query = '';
+  const norm = t => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+  const matches = g => { const q = norm(query); return !q || q.split(' ').every(w => norm([g.name, g.tag, g.aka, g.id].join(' ')).includes(w)); };
   function visibleGames() {
+    if (norm(query)) return L.games.filter(g => !S.hidden.includes(g.id) && matches(g));
     return L.games.filter(g => !S.hidden.includes(g.id) && (S.filter === 'All' || g.tag === S.filter || (S.filter === TWO && g.versus)));
   }
   function renderFilters() {
@@ -67,11 +72,12 @@
   function renderCards() {
     const grid = $('grid'); grid.innerHTML = '';
     const list = visibleGames();
-    const lastGame = S.filter === 'All' && L.games.find(g => g.id === S.last && !S.hidden.includes(g.id));
+    const lastGame = !norm(query) && S.filter === 'All' && L.games.find(g => g.id === S.last && !S.hidden.includes(g.id));
     const rest = list.filter(g => g !== lastGame);
     // In "All", the games for two people on one keyboard get their own section at the end.
-    const solo = S.filter === 'All' ? rest.filter(g => g.tag !== TWO) : rest;
-    const duo = S.filter === 'All' ? rest.filter(g => g.tag === TWO) : [];
+    const all = S.filter === 'All' && !norm(query);
+    const solo = all ? rest.filter(g => g.tag !== TWO) : rest;
+    const duo = all ? rest.filter(g => g.tag === TWO) : [];
     const ordered = [...(lastGame ? [lastGame] : []), ...solo, ...duo];
     ordered.forEach((g, i) => {
       if (duo.length && g === duo[0]) grid.appendChild(el('div', 'section-label', '2 players, one keyboard'));
@@ -89,7 +95,7 @@
       b.onclick = () => start(g.id);
       grid.appendChild(b);
     });
-    if (!ordered.length) grid.innerHTML = '<div class="foot" style="grid-column:span 2">No games here yet.</div>';
+    if (!ordered.length) grid.innerHTML = `<div class="foot" style="grid-column:span 2">${norm(query) ? 'No games match \u201c' + query.replace(/[<>&]/g, '') + '\u201d' : 'No games here yet.'}</div>`;
     requestAnimationFrame(drawCards);
   }
   function drawCards() {
@@ -271,7 +277,14 @@
   $('againBtn').onclick = restart;
   $('overHideBtn').onclick = () => { $('overSheet').hidden = true; $('overPeek').hidden = false; };
   $('overPeek').onclick = () => { $('overPeek').hidden = true; $('overSheet').hidden = false; overAt = performance.now(); };
+  const search = $('search');
+  search.addEventListener('input', () => { query = search.value; $('filters').classList.toggle('is-dim', !!norm(query)); renderCards(); });
+  search.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); search.value = ''; query = ''; $('filters').classList.remove('is-dim'); renderCards(); search.blur(); }
+    else if (e.key === 'Enter') { const first = visibleGames()[0]; if (first) { e.preventDefault(); start(first.id); } }
+  });
   window.addEventListener('keydown', e => {
+    if (view === 'home' && document.activeElement !== search && (e.key === '/' || ((e.metaKey || e.ctrlKey) && (e.key === 'f' || e.key === 'k')))) { e.preventDefault(); search.focus(); search.select(); return; }
     if (view === 'game') {
       if (revealing()) { if (e.key === 'Escape') e.preventDefault(); return; }
       if (overShown()) {

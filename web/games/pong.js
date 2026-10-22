@@ -48,7 +48,7 @@
   }
 
   Ludus.register({
-    id: 'pong', name: 'Rally', tag: '2 Player', wide: true, tint: '#3f8fb5',
+    id: 'pong', name: 'Pong', aka: 'Rally', tag: '2 Player', wide: true, tint: '#3f8fb5',
     hint: '<b>P1</b> <kbd>W</kbd><kbd>S</kbd> move <kbd>F</kbd> power hit · <b>P2</b> <kbd>↑</kbd><kbd>↓</kbd> move <kbd>/</kbd> power hit',
     _rules: { paddleBounce, TARGET },
     art(ctx, w, h) {

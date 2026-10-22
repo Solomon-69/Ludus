@@ -98,7 +98,7 @@
   }
 
   Ludus.register({
-    id: 'garden', name: 'Garden Guard', tag: 'Arcade', tint: '#6f9a4a',
+    id: 'garden', name: 'Plants vs. Zombies', aka: 'Garden Guard', tag: 'Arcade', tint: '#6f9a4a',
     hint: 'Click a plant card, then a tile · click suns to collect · right-click digs up · <kbd>←↑→↓</kbd> move, <kbd>1</kbd>-<kbd>4</kbd> pick, <kbd>Space</kbd> plant, <kbd>X</kbd> dig',
     _rules: { waveSize, foeFor, PLANTS, FOES, DIFF },
     art(ctx, w, h) {

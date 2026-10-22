@@ -159,7 +159,7 @@
   }
 
   Ludus.register({
-    id: 'climb', name: 'Hammer Climb', tag: 'Arcade', tint: '#7d6a58',
+    id: 'climb', name: 'Getting Over It', aka: 'Hammer Climb', tag: 'Arcade', tint: '#7d6a58',
     hint: 'Mouse moves the hammer head. Press it on rock, keep moving to lever yourself · <kbd>←</kbd><kbd>→</kbd> swing <kbd>↑</kbd><kbd>↓</kbd> reach',
     _rules: { makeWorld, step, newState, clampArm, probe, START, SUMMIT, HL, HMIN, PR, HR, STEP, WW },
     art(ctx, w, h) {

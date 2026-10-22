@@ -260,6 +260,23 @@
       ctx.fillStyle = color; ctx.font = `${weight || 650} ${size}px ui-rounded, "SF Pro Rounded", "Segoe UI Variable Display", system-ui, sans-serif`;
       ctx.textAlign = align || 'center'; ctx.textBaseline = 'middle'; ctx.fillText(s, x, y);
     },
+    // Text kept inside maxW: shrinks to minSize, then splits onto two lines, then trims with an ellipsis.
+    fitText(ctx, s, x, y, maxW, size, color, weight, minSize) {
+      const font = sz => `${weight || 650} ${sz}px ui-rounded, "SF Pro Rounded", "Segoe UI Variable Display", system-ui, sans-serif`;
+      const min = minSize || Math.max(9, size * 0.8);
+      let sz = size; ctx.font = font(sz);
+      while (sz > min && ctx.measureText(s).width > maxW) { sz -= 0.5; ctx.font = font(sz); }
+      if (ctx.measureText(s).width <= maxW) { draw.text(ctx, s, x, y, sz, color, weight); return; }
+      const words = s.split(' ');
+      let best = null;
+      for (let i = 1; i < words.length; i++) {
+        const a = words.slice(0, i).join(' '), b = words.slice(i).join(' '), m = Math.max(ctx.measureText(a).width, ctx.measureText(b).width);
+        if (!best || m < best.m) best = { a, b, m };
+      }
+      const clip = t => { if (ctx.measureText(t).width <= maxW) return t; while (t.length > 1 && ctx.measureText(t + '\u2026').width > maxW) t = t.slice(0, -1); return t + '\u2026'; };
+      if (best) { draw.text(ctx, clip(best.a), x, y - sz * 0.6, sz, color, weight); draw.text(ctx, clip(best.b), x, y + sz * 0.6, sz, color, weight); }
+      else draw.text(ctx, clip(s), x, y, sz, color, weight);
+    },
     ease: {
       // Clamped at 0: a tiny negative result (floating point at t = 0) sizing an arc throws and stops a game's loop.
       outBack: t => { const c = 1.7; return Math.max(0, 1 + (c + 1) * Math.pow(t - 1, 3) + c * Math.pow(t - 1, 2)); },
@@ -324,7 +341,7 @@
       };
       side(opts.left, x, false);
       side(opts.right, x + w - pw, true);
-      if (opts.status) draw.text(ctx, opts.status, x + w / 2, y + h / 2, 12, c.accent, 650);
+      if (opts.status) draw.fitText(ctx, opts.status, x + w / 2, y + h / 2, Math.max(40, w - 2 * pw - 16), 12, c.accent, 650, 10);
       return h;
     }
   };

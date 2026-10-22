@@ -73,7 +73,7 @@
   function freshGrid() { return MAP.map(r => r.replace('P', ' ').split('')); }
 
   Ludus.register({
-    id: 'chomp', name: 'Chomp', tag: 'Arcade', tint: '#2f2a24',
+    id: 'chomp', name: 'Pac-Man', aka: 'Chomp', tag: 'Arcade', tint: '#2f2a24',
     hint: '<kbd>←</kbd><kbd>↑</kbd><kbd>→</kbd><kbd>↓</kbd> or WASD, swipe or click a direction',
     _test: { MAP, W, H, cellAt, isWallFor, chaseTarget, chooseDir, countPellets, freshGrid, OPP, DIRS },
     art(ctx, w, h) {

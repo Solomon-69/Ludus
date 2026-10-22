@@ -41,7 +41,7 @@
   }
 
   Ludus.register({
-    id: 'crates', name: 'Crates', tag: 'Puzzle', tint: '#b5894f',
+    id: 'crates', name: 'Sokoban', aka: 'Crates', tag: 'Puzzle', tint: '#b5894f',
     hint: '<kbd>←</kbd><kbd>↑</kbd><kbd>→</kbd><kbd>↓</kbd> or click to walk and push · <kbd>Z</kbd> undo · <kbd>R</kbd> restart level · <kbd>B</kbd>/<kbd>N</kbd> previous/next level',
     _levels: LEVELS.map(l => l.m),
     art(ctx, w, h) {

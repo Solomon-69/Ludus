@@ -26,7 +26,7 @@
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/showcase/ludus-1-dark.png">
-  <img src="docs/showcase/ludus-1-light.png" width="880" alt="The Ludus panel open under the menu bar with 2048 and Sky Raiders beside it">
+  <img src="docs/showcase/ludus-1-light.png" width="880" alt="The Ludus panel open under the menu bar with 2048 and Space Invaders beside it">
 </picture>
 
 </div>
@@ -58,48 +58,48 @@ Ludus puts 33 small, polished games one click away. Here is what is inside.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/showcase/ludus-2-dark.png">
-  <img src="docs/showcase/ludus-2-light.png" width="880" alt="Four Up in vs Friend mode next to a two-player game of Tag">
+  <img src="docs/showcase/ludus-2-light.png" width="880" alt="Connect Four in vs Friend mode next to a two-player game of Tag">
 </picture>
 
 ### Play a friend on one keyboard
 
 Every board game has a <b>vs Bot / vs Friend</b> switch at the top. Pick Friend and you take turns on the same keyboard, with Player 2 in blue. The real-time games in the 2 Player group give each of you your own keys, so you can both play at once.
 
-- <b>Turn-based with a friend:</b> Four Up, Box It, Nine Squared, The Crossing and Dead Centre.
-- <b>Secret picks:</b> in The Decider, Player 1 picks with <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> and Player 2 with <kbd>J</kbd> <kbd>K</kbd> <kbd>L</kbd>. Both hands show only once you have both locked in.
-- <b>Real time:</b> Air Puck, Light Trails, Rally, Tag and Tank Duel, with one player on <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> and the other on the arrow keys.
+- <b>Turn-based with a friend:</b> Connect Four, Dots and Boxes, Ultimate Tic-Tac-Toe, Hex and Dead Centre.
+- <b>Secret picks:</b> in Rock Paper Scissors, Player 1 picks with <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> and Player 2 with <kbd>J</kbd> <kbd>K</kbd> <kbd>L</kbd>. Both hands show only once you have both locked in.
+- <b>Real time:</b> Air Hockey, Tron, Rally, Tag and Tank Trouble, with one player on <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> and the other on the arrow keys.
 - All of them are in the <b>2 Player</b> tab. The panel widens by itself when a game needs the room.
 
 <br>
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/showcase/ludus-3-dark.png">
-  <img src="docs/showcase/ludus-3-light.png" width="880" alt="Sky Raiders, Stack and Chomp side by side">
+  <img src="docs/showcase/ludus-3-light.png" width="880" alt="Space Invaders, Stack and Chomp side by side">
 </picture>
 
 ### Arcade classics that feel right
 
 Eleven arcade games built to play smoothly at 60 frames a second, each with its own best score to beat.
 
-- <b>Sky Raiders</b>: waves of invaders, shields and a mystery ship.
+- <b>Space Invaders</b>: waves of invaders, shields and a mystery ship.
 - <b>Stack</b>: drop each block in 3D and line it up perfectly for a combo.
-- <b>Chomp</b>: a maze, four ghosts and power pellets.
-- Plus Blocks (falling blocks with proper locking), Breakout, Drift, Flappy Spark, Garden Guard, Hammer Climb, Snake and Spark Hop.
+- <b>Pac-Man</b>: a maze, four ghosts and power pellets.
+- Plus Blocks (falling blocks with proper locking), Breakout, Drift, Flappy Bird, Plants vs. Zombies, Getting Over It, Snake and Doodle Jump.
 - Three difficulty levels change the speed and how clever the computer is.
 
 <br>
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/showcase/ludus-4-dark.png">
-  <img src="docs/showcase/ludus-4-light.png" width="880" alt="2048, Five Letters and Sudoku side by side">
+  <img src="docs/showcase/ludus-4-light.png" width="880" alt="2048, Wordle and Sudoku side by side">
 </picture>
 
 ### Puzzles for a quick think
 
 Eight calm puzzle games for a two-minute break or a longer think. Close the panel at any point and the game is saved exactly as it was.
 
-- <b>2048</b>, <b>Five Letters</b> (guess the word in six tries), <b>Sudoku</b> with notes and undo.
-- <b>Minesweeper</b>, <b>Patience</b>, <b>Pairs</b>, <b>Crates</b> and <b>Spark Match</b>.
+- <b>2048</b>, <b>Wordle</b> (guess the word in six tries), <b>Sudoku</b> with notes and undo.
+- <b>Minesweeper</b>, <b>Solitaire</b>, <b>Memory</b>, <b>Sokoban</b> and <b>Candy Crush</b>.
 - Keyboard first, but every puzzle also works with clicks.
 
 <br>
@@ -178,12 +178,12 @@ brew install --cask ludus   # not available yet
 
 | Group | Games |
 | --- | --- |
-| **Arcade** (beat your best) | Blocks, Breakout, Chomp, Drift, Flappy Spark, Garden Guard, Hammer Climb, Sky Raiders, Snake, Spark Hop, Stack |
-| **Puzzle** | 2048, Crates, Five Letters, Minesweeper, Pairs, Patience, Spark Match, Sudoku |
-| **Duel** (you against the computer) | Box It, Dead Centre, Four Up, Last Wire, Nine Squared, Right of Way, The Crossing, The Decider, Wall Run |
-| **2 Player** (one keyboard) | Air Puck, Light Trails, Rally, Tag, Tank Duel |
+| **Arcade** (beat your best) | Tetris, Breakout, Pac-Man, Asteroids, Flappy Bird, Plants vs. Zombies, Getting Over It, Space Invaders, Snake, Doodle Jump, Stack |
+| **Puzzle** | 2048, Sokoban, Wordle, Minesweeper, Memory, Solitaire, Candy Crush, Sudoku |
+| **Duel** (you against the computer) | Dots and Boxes, Dead Centre, Connect Four, Last Wire, Ultimate Tic-Tac-Toe, Nidhogg, Hex, Rock Paper Scissors, Quoridor |
+| **2 Player** (one keyboard) | Air Hockey, Tron, Pong, Tag, Tank Trouble |
 
-Four Up, Box It, Nine Squared, The Crossing, The Decider and Dead Centre also have a **vs Friend** mode, so they show up in the 2 Player tab too.
+Connect Four, Dots and Boxes, Ultimate Tic-Tac-Toe, Hex, Rock Paper Scissors and Dead Centre also have a **vs Friend** mode, so they show up in the 2 Player tab too.
 
 Each game lives in its own file in [`web/games/`](web/games).
 
@@ -196,7 +196,7 @@ it and pauses the game. A right-click on the icon works too.
 | --- | --- |
 | Moving | <kbd>&larr;</kbd> <kbd>&uarr;</kbd> <kbd>&rarr;</kbd> <kbd>&darr;</kbd> or <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> in most games |
 | Act, jump, drop, fire | <kbd>Space</kbd> |
-| Pause | <kbd>Esc</kbd> or <kbd>P</kbd> (in Five Letters, <kbd>P</kbd> types a letter, so use <kbd>Esc</kbd>) |
+| Pause | <kbd>Esc</kbd> or <kbd>P</kbd> (in Wordle, <kbd>P</kbd> types a letter, so use <kbd>Esc</kbd>) |
 | After a game | <kbd>Enter</kbd>, <kbd>Space</kbd> or <kbd>R</kbd> to play again, <kbd>Esc</kbd> for all games |
 | Settings | <kbd>Esc</kbd> to go back |
 | 2 Player games | One player on <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd>, the other on the arrow keys |

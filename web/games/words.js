@@ -38,7 +38,7 @@
   const FLIP = 0.28, STAGGER = 0.22;
 
   Ludus.register({
-    id: 'fiveletters', name: 'Five Letters', tag: 'Puzzle', tint: '#4f9d69',
+    id: 'fiveletters', name: 'Wordle', aka: 'Five Letters', tag: 'Puzzle', tint: '#4f9d69',
     hint: 'Type a word, <kbd>Enter</kbd> to guess, <kbd>⌫</kbd> to delete, or click the keys · <kbd>Esc</kbd> pauses',
     _rules: { grade, isWord, hardViolation, ANSWERS },
     art(ctx, w, h) {
