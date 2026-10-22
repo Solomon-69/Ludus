@@ -265,6 +265,63 @@
     t.textContent = text; t.classList.add('show');
     clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), 1600);
   }
+  /* Volume: elastic slider (after React Bits' Elastic Slider). Quiet and loud speaker on each side,
+     a slim bar with no knob that thickens while touched, and a rubber-band stretch past either end
+     that springs back. Keyboard: arrows, Home, End. */
+  function volumeSlider(value, onInput, onDone) {
+    const ICON_LO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 9.5a3.5 3.5 0 0 1 0 5"/></svg>';
+    const ICON_HI = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 9.5a3.5 3.5 0 0 1 0 5"/><path d="M18.5 6.5a8 8 0 0 1 0 11"/></svg>';
+    const wrap = el('div', 'vol');
+    const lo = el('span', 'vol-ico lo', ICON_LO), hi = el('span', 'vol-ico hi', ICON_HI);
+    const track = el('div', 'vol-track'), bar = el('div', 'vol-fill');
+    track.appendChild(bar);
+    track.tabIndex = 0;
+    track.setAttribute('role', 'slider'); track.setAttribute('aria-label', 'Volume');
+    track.setAttribute('aria-valuemin', '0'); track.setAttribute('aria-valuemax', '100');
+    wrap.append(lo, track, hi);
+    let v = Math.min(1, Math.max(0, +value || 0));
+    const STEP = 0.05, MAX_STRETCH = 10;   // px the bar may stretch past an end
+    const paint = () => {
+      bar.style.width = (v * 100) + '%';
+      track.setAttribute('aria-valuenow', String(Math.round(v * 100)));
+      wrap.classList.toggle('is-mute', v === 0);
+    };
+    const set = nv => { nv = Math.round(Math.min(1, Math.max(0, nv)) / STEP) * STEP; if (nv !== v) { v = nv; paint(); onInput(v); } };
+    // Overshoot past an end, eased so it resists more the further you pull (sigmoid decay).
+    const stretch = over => MAX_STRETCH * (2 / (1 + Math.exp(-over / 40)) - 1);
+    const pull = (dx, side) => {
+      wrap.style.setProperty('--sx', (1 + Math.abs(dx) / track.offsetWidth).toFixed(3));
+      wrap.style.setProperty('--tx', (dx / 2).toFixed(1) + 'px');
+      wrap.dataset.pull = side || '';
+    };
+    let dragging = false;
+    const at = e => {
+      const r = track.getBoundingClientRect();
+      const x = e.clientX - r.left;
+      set(x / r.width);
+      if (x < 0) pull(-stretch(-x), 'lo'); else if (x > r.width) pull(stretch(x - r.width), 'hi'); else pull(0);
+    };
+    track.addEventListener('pointerdown', e => {
+      dragging = true; try { track.setPointerCapture(e.pointerId); } catch (err) { /* synthetic events */ } wrap.classList.add('is-active'); at(e);
+    });
+    track.addEventListener('pointermove', e => { if (dragging) at(e); });
+    const end = () => {
+      if (!dragging) return;
+      dragging = false; wrap.classList.remove('is-active'); pull(0); onDone();
+    };
+    track.addEventListener('pointerup', end);
+    track.addEventListener('pointercancel', end);
+    track.addEventListener('keydown', e => {
+      const k = e.key;
+      const nv = k === 'ArrowRight' || k === 'ArrowUp' ? v + STEP : k === 'ArrowLeft' || k === 'ArrowDown' ? v - STEP
+        : k === 'Home' ? 0 : k === 'End' ? 1 : null;
+      if (nv === null) return;
+      e.preventDefault(); set(nv); onDone();
+    });
+    paint();
+    return wrap;
+  }
+
   function el(tag, cls, html) { const e = document.createElement(tag); if (cls) e.className = cls; if (html !== undefined) e.innerHTML = html; return e; }
   function row(title, sub, control, extra) {
     const r = el('div', 'row' + (extra ? ' ' + extra : ''));
@@ -304,10 +361,7 @@
       b.onclick = () => { S.accent = c; L.save(); applyTheme(); sw8.querySelectorAll('.swatch').forEach(x => x.classList.toggle('is-on', x === b)); L.sfx('click'); };
       sw8.appendChild(b);
     });
-    const vol = el('input', 'range'); vol.type = 'range'; vol.min = 0; vol.max = 1; vol.step = 0.05; vol.value = S.volume;
-    const fill = () => vol.style.setProperty('--p', (vol.value * 100) + '%');
-    fill();
-    vol.oninput = () => { S.volume = +vol.value; fill(); L.save(); }; vol.onchange = () => L.sfx('score');
+    const vol = volumeSlider(S.volume, v => { S.volume = v; L.save(); }, () => L.sfx('score'));
     body.appendChild(group('Look', [
       row('Appearance', null, seg(THEMES, S.theme, v => { S.theme = v; L.save(); applyTheme(); })),
       row('Accent colour', null, sw8),
