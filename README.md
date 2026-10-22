@@ -10,19 +10,16 @@
 <p><b>33 little games in your menu bar. Take a little break.</b></p>
 
 <p>
-  <a href="https://github.com/Solomon-69/Ludus/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/Solomon-69/Ludus?style=flat-square&color=d97757&label=release"></a>
-  <a href="https://github.com/Solomon-69/Ludus/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/Solomon-69/Ludus/total?style=flat-square&color=d97757"></a>
+  <a href="https://github.com/Solomon-69/Ludus/releases/latest"><img alt="Version 1.5.0" src="https://img.shields.io/badge/version-1.5.0-d97757?style=flat-square"></a>
   <img alt="macOS 14 or later" src="https://img.shields.io/badge/macOS-14%2B-1f1d1a?style=flat-square&logo=apple&logoColor=white">
   <img alt="Windows 10 or 11" src="https://img.shields.io/badge/Windows-10%20%7C%2011-1f1d1a?style=flat-square">
-  <a href="LICENSE"><img alt="MIT licence" src="https://img.shields.io/github/license/Solomon-69/Ludus?style=flat-square&color=5b8a5a"></a>
+  <a href="LICENSE"><img alt="MIT licence" src="https://img.shields.io/badge/licence-MIT-5b8a5a?style=flat-square"></a>
 </p>
 
 <p>
   <a href="https://github.com/Solomon-69/Ludus/releases/latest/download/Ludus.dmg"><b>Download for Mac</b></a>
   &nbsp;&middot;&nbsp;
   <a href="https://github.com/Solomon-69/Ludus/releases/latest/download/Ludus-windows.zip"><b>Download for Windows</b></a>
-  &nbsp;&middot;&nbsp;
-  <a href="https://solomon-69.github.io/Ludus/">Website</a>
 </p>
 
 <br>
