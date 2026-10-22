@@ -93,6 +93,15 @@
   }
 
   // ---------- per-run api ----------
+  function versusMode(game) {
+    return game.versus && state.vs && state.vs[game.id] === 'friend' ? 'friend' : 'bot';
+  }
+  function savedFor(game) {
+    const snap = (state.saves && state.saves[game.id]) || null;
+    if (snap && game.versus && (snap.vsMode || 'bot') !== versusMode(game)) return null;
+    return snap;
+  }
+
   function makeApi(game, stage, hooks) {
     const cleanups = [];
     const loops = new Set();
@@ -108,8 +117,13 @@
       level: { easy: 0, normal: 1, hard: 2 }[state.difficulty] ?? 1,
       reduceMotion: state.reduceMotion || matchMedia('(prefers-reduced-motion: reduce)').matches,
       best: state.best[game.id] || 0,
+      // Board games with a bot can also be played by two people on one keyboard ("versus: true").
+      // 'bot' or 'friend'; api.friend is the shortcut.
+      vs: versusMode(game),
+      get friend() { return api.vs === 'friend'; },
       // The snapshot this game returned from save() last time, or null. Restore from it in create().
-      saved: (state.saves && state.saves[game.id]) || null,
+      // A snapshot from the other mode (bot vs friend) is not resumed.
+      saved: savedFor(game),
       get ended() { return ended; },
       get touched() { return touched; },
       get paused() { return paused; },

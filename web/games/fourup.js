@@ -1,4 +1,4 @@
-/* Four Up: Connect Four against the computer. 7 x 6, first to three games takes the match. */
+/* Four Up: Connect Four against the computer, or a friend on the same keyboard. 7 x 6, first to three games takes the match. */
 (function () {
   const COLS = 7, ROWS = 6, P = 1, C = 2, TARGET = 3;
   const ORDER = [3, 2, 4, 1, 5, 0, 6];
@@ -90,8 +90,8 @@
   };
 
   Ludus.register({
-    id: 'fourup', name: 'Four Up', tag: 'Duel', tint: '#c4633f',
-    hint: 'Click a column, or <kbd>←</kbd><kbd>→</kbd> + <kbd>Space</kbd> (or <kbd>1</kbd>-<kbd>7</kbd>). Four in a row wins a game. First to 3 games',
+    id: 'fourup', name: 'Four Up', tag: 'Duel', versus: true, tint: '#c4633f',
+    hint: 'Click a column, or <kbd>←</kbd><kbd>→</kbd> + <kbd>Space</kbd> (or <kbd>1</kbd>-<kbd>7</kbd>). Four in a row wins a game. First to 3 games. vs Friend: take turns',
     _logic: logic,
     art(ctx, w, h) {
       const D = Ludus.draw;
@@ -114,6 +114,9 @@
       const view = api.canvas();
       const { ctx } = view;
       const L = logic;
+      // vs Friend: both players take turns on this keyboard; 'C' is Player 2 and the bot never moves.
+      const friend = api.friend;
+      const nameOf = who => (who === P ? 'Player 1' : 'Player 2');
       let board, discs, turn, wins = { p: 0, c: 0 }, starter = P, winLine = null, lastIdx = -1;
       let phase = 'play', cursor = 3, hoverCol = -1, thinking = false, banner = null, shake = 0, flashT = 0;
       let geo = null, gameNo = 0, sparks = [];
@@ -121,7 +124,7 @@
       function newGame() {
         board = L.newBoard(); discs = []; winLine = null; lastIdx = -1; banner = null; sparks = [];
         turn = starter; phase = 'play'; gameNo++;
-        if (turn === C) cpuTurn();
+        if (turn === C && !friend) cpuTurn();
       }
 
       function dropTime(r) { return api.reduceMotion ? 0.12 : 0.34 + r * 0.045; }
@@ -132,7 +135,7 @@
         board[i] = who; lastIdx = i;
         const d = dropTime(r);
         discs.push({ i, r, c, who, t0: performance.now(), dur: d * 1000 });
-        api.sfx(who === P ? 'tap' : 'click');
+        api.sfx(who === P || friend ? 'tap' : 'click');
         phase = 'anim';
         api.timeout(() => { api.sfx('drop'); }, d * 360);
         api.timeout(() => afterMove(who), d * 1000 + 20);
@@ -145,14 +148,17 @@
           winLine = line; phase = 'end';
           const pk = who === P ? 'p' : 'c';
           wins[pk]++;
-          if (who === P) { api.score(wins.p); api.sfx('line'); } else api.sfx('hit');
+          if (who === P) { api.score(wins.p); api.sfx('line'); } else api.sfx(friend ? 'line' : 'hit');
           if (!api.reduceMotion) { shake = 0.25; burst(line, who); }
           flashT = performance.now();
           const matchOver = wins[pk] >= TARGET;
-          banner = { text: who === P ? 'Four in a row' : 'Bot has four', sub: matchOver ? '' : (who === P ? 'Game to you. Next game coming' : 'Game to the bot. Next game coming'), t0: performance.now() };
+          banner = friend
+            ? { text: nameOf(who) + ' has four', sub: matchOver ? '' : 'Game to ' + nameOf(who) + '. Next game coming', t0: performance.now() }
+            : { text: who === P ? 'Four in a row' : 'Bot has four', sub: matchOver ? '' : (who === P ? 'Game to you. Next game coming' : 'Game to the bot. Next game coming'), t0: performance.now() };
           api.timeout(() => {
             if (matchOver) {
-              api.over({ score: wins.p, won: who === P, title: who === P ? 'You win' : 'Bot wins',
+              if (friend) api.over({ score: Math.max(wins.p, wins.c), won: true, title: nameOf(who) + ' wins', message: `Match ${wins.p} to ${wins.c}` });
+              else api.over({ score: wins.p, won: who === P, title: who === P ? 'You win' : 'Bot wins',
                 message: `Match ${wins.p} to ${wins.c}` });
             } else { starter = starter === P ? C : P; newGame(); }
           }, matchOver ? 1500 : 1900);
@@ -166,7 +172,7 @@
         }
         turn = who === P ? C : P;
         phase = 'play';
-        if (turn === C) cpuTurn();
+        if (turn === C && !friend) cpuTurn();
       }
 
       function cpuTurn() {
@@ -180,10 +186,10 @@
       }
 
       function playerDrop(c) {
-        if (phase !== 'play' || turn !== P || c < 0 || c >= COLS) return;
+        if (phase !== 'play' || (turn !== P && !friend) || c < 0 || c >= COLS) return;
         if (L.openRow(board, c) < 0) { api.sfx('hit'); return; }
         cursor = c;
-        place(c, P);
+        place(c, turn);
       }
 
       function burst(line, who) {
@@ -225,7 +231,7 @@
         return n * (t -= 2.625 / d) * t + 0.984375;
       }
 
-      const botInk = col => (col.dark ? '#6b7380' : '#4a5260');
+      const botInk = col => (friend ? D.P2 : col.dark ? '#6b7380' : '#4a5260');
       function disc(x, y, rad, who, col, alpha, glow) {
         ctx.save(); ctx.globalAlpha = alpha;
         ctx.beginPath(); ctx.arc(x, y, rad, 0, Math.PI * 2);
@@ -235,6 +241,7 @@
         ctx.beginPath(); ctx.arc(x, y, rad * 0.78, 0, Math.PI * 2);
         ctx.fillStyle = who === P ? col.accent : botInk(col); ctx.fill();
         if (who === P) D.spark(ctx, x, y, rad * 0.5, 'rgba(255,248,242,0.92)');
+        else if (friend) D.spark(ctx, x, y, rad * 0.5, 'rgba(255,255,255,0.92)');
         else D.avatar(ctx, x, y, rad * 0.56, 'bot', col);
         if (glow) {
           ctx.lineWidth = Math.max(2, rad * 0.14); ctx.strokeStyle = col.dark ? '#fff4e6' : '#fffaf3';
@@ -247,11 +254,13 @@
         const ended = phase === 'end' || api.ended;
         let status = '';
         if (ended) status = banner ? banner.text : '';
+        else if (friend) status = phase === 'play' ? nameOf(turn) + '\u2019s move' : '';
         else if (turn === P) status = phase === 'play' ? 'Your move' : '';
         else status = 'Bot is thinking';
         D.duelHeader(ctx, 8, 8, view.w - 16, {
-          left: { who: 'you', pips: wins.p, of: TARGET }, right: { who: 'bot', pips: wins.c, of: TARGET },
-          turn: ended ? null : (turn === P ? 'left' : 'right'), status, thinking: !ended && turn === C
+          left: { who: 'you', label: friend ? 'Player 1' : undefined, pips: wins.p, of: TARGET },
+          right: friend ? { who: 'p2', label: 'Player 2', pips: wins.c, of: TARGET } : { who: 'bot', pips: wins.c, of: TARGET },
+          turn: ended ? null : (turn === P ? 'left' : 'right'), status, thinking: !ended && turn === C && !friend
         }, col);
       }
 
@@ -268,13 +277,14 @@
 
         // hover / thinking ghost disc
         let gc = -1, gw = P;
-        if (phase === 'play' && turn === P) gc = hoverCol >= 0 ? hoverCol : cursor;
+        if (phase === 'play' && (turn === P || friend)) { gc = hoverCol >= 0 ? hoverCol : cursor; gw = turn; }
         else if (thinking) { gc = 3 + Math.sin(now / 420) * 2.6; gw = C; }
         if (gc !== -1) {
           const x = geo.x0 + gc * cell + cell / 2;
           const bob = api.reduceMotion ? 0 : Math.sin(now / 260) * 2;
-          disc(x, oy - cell * 0.5 + bob, rad, gw, col, gw === P ? 0.9 : 0.35);
-          if (gw === P && phase === 'play') {
+          const mine = phase === 'play' && (gw === P || friend);
+          disc(x, oy - cell * 0.5 + bob, rad, gw, col, mine ? 0.9 : 0.35);
+          if (mine) {
             ctx.fillStyle = col.dark ? 'rgba(255,255,255,0.04)' : 'rgba(217,119,87,0.07)';
             D.roundRect(ctx, geo.x0 + gc * cell + 2, oy + 4, cell - 4, bh - 8, cell * 0.45); ctx.fill();
           }
@@ -315,12 +325,12 @@
           const d = discs[discs.length - 1];
           if (d && now - d.t0 > d.dur) {
             ctx.beginPath(); ctx.arc(cx(d.c), cy(d.r), cell * 0.47, 0, Math.PI * 2);
-            ctx.strokeStyle = d.who === P ? col.accent : col.ink2; ctx.lineWidth = 2; ctx.globalAlpha = 0.7; ctx.stroke(); ctx.globalAlpha = 1;
+            ctx.strokeStyle = d.who === P ? col.accent : friend ? D.P2 : col.ink2; ctx.lineWidth = 2; ctx.globalAlpha = 0.7; ctx.stroke(); ctx.globalAlpha = 1;
           }
         }
         // keyboard cursor under board
-        if (phase === 'play' && turn === P && hoverCol < 0) {
-          ctx.fillStyle = col.accent;
+        if (phase === 'play' && (turn === P || friend) && hoverCol < 0) {
+          ctx.fillStyle = turn === P ? col.accent : D.P2;
           D.roundRect(ctx, cx(cursor) - cell * 0.18, oy + bh + 5, cell * 0.36, 4, 2); ctx.fill();
         }
         // particles
@@ -329,7 +339,7 @@
           s.x += s.vx * dt; s.y += s.vy * dt; s.vy += 160 * dt;
           const r = Math.floor(s.i / COLS), c = s.i % COLS;
           ctx.globalAlpha = Math.max(0, s.life / 0.7);
-          ctx.fillStyle = s.who === P ? col.accent : col.ink2;
+          ctx.fillStyle = s.who === P ? col.accent : friend ? D.P2 : col.ink2;
           ctx.beginPath(); ctx.arc(cx(c) + s.x, cy(r) + s.y, 2.4, 0, Math.PI * 2); ctx.fill();
         });
         ctx.globalAlpha = 1;
@@ -367,7 +377,7 @@
         cursor = Math.max(0, Math.min(COLS - 1, sv.cursor | 0));
         if (sv.phase === 'anim' && lastIdx >= 0) { phase = 'anim'; afterMove(board[lastIdx]); return true; }
         turn = sv.turn === C ? C : P; phase = 'play';
-        if (turn === C) cpuTurn();
+        if (turn === C && !friend) cpuTurn();
         return true;
       }
 

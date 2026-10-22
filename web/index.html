@@ -35,9 +35,13 @@
       </button>
       <div class="game-title">
         <div class="game-name" id="gameName"></div>
-        <div class="scores">
+        <div class="scores" id="gameScores">
           <span>Score <b id="scoreNow">0</b></span>
           <span>Best <b id="scoreBest">0</b></span>
+        </div>
+        <div class="vs-toggle" id="vsToggle" role="group" aria-label="Opponent" hidden>
+          <button type="button" data-vs="bot">vs Bot</button>
+          <button type="button" data-vs="friend">vs Friend</button>
         </div>
       </div>
       <button class="icon-btn" id="pauseBtn" aria-label="Pause">

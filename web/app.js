@@ -51,7 +51,7 @@
 
   // ---------- home ----------
   function visibleGames() {
-    return L.games.filter(g => !S.hidden.includes(g.id) && (S.filter === 'All' || g.tag === S.filter));
+    return L.games.filter(g => !S.hidden.includes(g.id) && (S.filter === 'All' || g.tag === S.filter || (S.filter === TWO && g.versus)));
   }
   function renderFilters() {
     const f = $('filters'); f.innerHTML = '';
@@ -122,7 +122,11 @@
     $('gameName').textContent = g.name;
     $('scoreNow').textContent = '0';
     $('scoreBest').textContent = fmt(S.best[id] || 0);
+    if (!S.vs) S.vs = {};
+    // Opened from the 2 Player tab: a board game starts with a friend.
+    if (g.versus && S.filter === TWO && S.vs[id] !== 'friend') { S.vs[id] = 'friend'; L.save(); }
     $('scoreBest').parentElement.hidden = g.tag === TWO;   // no high score between two people
+    renderVsToggle(g);
     $('hint').innerHTML = S.hints ? (g.hint || '') : '';
     hideOver();
     $('pauseSheet').hidden = true;
@@ -151,6 +155,31 @@
     launchTimer = setTimeout(go, inApp ? RESIZE_WAIT_MS : SLIDE_MS);
     L.native('playing', { id });
   }
+  /* Bot / Friend switch in the game's top bar for board games (game.versus). It takes the place of the
+     score line; switching starts a fresh game in the other mode. */
+  function renderVsToggle(g) {
+    const box = $('vsToggle');
+    $('gameScores').hidden = !!g.versus;
+    box.hidden = !g.versus;
+    if (!g.versus) return;
+    const mode = (S.vs && S.vs[g.id]) === 'friend' ? 'friend' : 'bot';
+    box.querySelectorAll('button').forEach(b => {
+      const on = b.dataset.vs === mode;
+      b.classList.toggle('is-on', on); b.setAttribute('aria-pressed', String(on));
+      b.onclick = () => {
+        if (on) return;
+        S.vs[g.id] = b.dataset.vs; forget(g.id); L.save(); L.sfx('click');
+        renderVsToggle(g);
+        if (!current || current.game !== g) return;
+        stop(); hideOver(); $('pauseSheet').hidden = true;
+        $('scoreNow').textContent = '0';
+        launch(g);
+        toast(b.dataset.vs === 'friend' ? 'Two players: take turns on this keyboard' : 'Playing the bot');
+        if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+      };
+    });
+  }
+
   function launch(g) {
     const stage = $('stage'); stage.innerHTML = '';
     clearTimeout(revealTimer);
@@ -176,7 +205,7 @@
     try {
       const snap = current.instance.save();
       // null means "nothing to resume" (not started, or already lost): drop any older snapshot.
-      if (snap) { S.saves[id] = snap; L.save(); } else forget(id);
+      if (snap) { S.saves[id] = current.game.versus ? Object.assign({}, snap, { vsMode: current.run.api.vs }) : snap; L.save(); } else forget(id);
     } catch (e) { forget(id); }   // a game that cannot snapshot starts fresh next time
   }
   function forget(id) { if (S.saves[id]) { delete S.saves[id]; L.save(); } }
@@ -192,13 +221,14 @@
   }
   function finish(g, res) {
     const prev = S.best[g.id] || 0;
-    const record = res.score > prev && g.tag !== TWO;
+    const friends = g.tag === TWO || (g.versus && current && current.run.api.friend);
+    const record = res.score > prev && !friends;
     if (record) { S.best[g.id] = res.score; $('scoreBest').textContent = fmt(res.score); }
     forget(g.id); L.save();
     $('overTitle').textContent = res.title || (res.won ? 'You win' : 'Game over');
     $('overScore').textContent = res.score;
     const best = $('overBest');
-    best.textContent = record && res.score > 0 ? 'New best' : (res.message || (g.tag === TWO ? '' : `Best ${fmt(Math.max(prev, res.score))}`));
+    best.textContent = record && res.score > 0 ? 'New best' : (res.message || (friends ? '' : `Best ${fmt(Math.max(prev, res.score))}`));
     best.classList.toggle('record', record && res.score > 0);
     L.sfx(res.won || record ? 'win' : 'over');
     // Let the final board play out (bombs revealed, last move shown) before the result bar comes up.

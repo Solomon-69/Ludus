@@ -101,8 +101,8 @@
   }
 
   Ludus.register({
-    id: 'decider', name: 'The Decider', tag: 'Duel', tint: PINK,
-    hint: 'Pick with <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd>, <kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> or a click. Rock beats scissors, scissors beat paper, paper beats rock. First to 3',
+    id: 'decider', name: 'The Decider', tag: 'Duel', tint: PINK, versus: true,
+    hint: 'Pick with <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd>, <kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> or a click. Rock beats scissors, scissors beat paper, paper beats rock. First to 3. vs Friend: secret picks, Player 1 <kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>, Player 2 <kbd>J</kbd><kbd>K</kbd><kbd>L</kbd>',
     _rules: { makeBrain, outcome, BEATS, COUNTER },
     art(ctx, w, h) {
       const r = Math.min(w, h) * 0.34;
@@ -115,6 +115,8 @@
       const view = api.canvas();
       const { ctx } = view;
       const brain = makeBrain(api.level);
+      const friend = api.friend, nameOf = left => (left ? 'Player 1' : 'Player 2');
+      let p1 = null, p2 = null;
       let clock = 0, matches = 0, round = 1;
       let pts = { you: 0, cpu: 0 };
       let phase = 'pick', phaseT = 0, lockT = 0;
@@ -123,12 +125,24 @@
       const log = [], history = [];
       api.score(0);
 
-      function newRound() { phase = 'pick'; phaseT = clock; lockT = clock + api.rand(0.35, 0.7); you = cpu = null; }
+      function newRound() { phase = 'pick'; phaseT = clock; lockT = friend ? clock : clock + api.rand(0.35, 0.7); you = cpu = null; p1 = p2 = null; }
+      // vs Friend: each player locks a secret pick; the hands show only when both are in
+      function lockPick(first, k) {
+        if (phase !== 'pick') return;
+        if (first ? p1 : p2) return;
+        if (first) p1 = k; else p2 = k;
+        api.sfx('tap');
+        if (p1 && p2) shakeOut(p1, p2, -1);
+      }
       function choose(k) {
         if (phase !== 'pick') return;
+        if (friend) { lockPick(!p1, k); return; }
         lockT = Math.min(lockT, clock);
-        you = k; cpu = brain.choose();
-        pressed = MOVES.indexOf(k); pressT = clock;
+        shakeOut(k, brain.choose(), MOVES.indexOf(k));
+      }
+      function shakeOut(a, b, pi) {
+        you = a; cpu = b;
+        pressed = pi; pressT = clock;
         phase = 'shake'; phaseT = clock; api.sfx('click');
         const dur = api.reduceMotion ? 0.25 : 0.95;
         if (!api.reduceMotion) { api.timeout(() => api.sfx('tick'), 300); api.timeout(() => api.sfx('tick'), 610); }
@@ -137,14 +151,20 @@
       function reveal() {
         phase = 'reveal'; phaseT = clock;
         result = outcome(you, cpu);
-        brain.record(you, cpu); history.push([you, cpu]);
+        if (!friend) brain.record(you, cpu); history.push([you, cpu]);
         log.unshift({ you, cpu, result }); if (log.length > 4) log.pop();
         if (result > 0) { pts.you++; api.sfx('score'); burst(0.3); }
-        else if (result < 0) { pts.cpu++; api.sfx('hit'); if (!api.reduceMotion) shake = 0.25; }
+        else if (result < 0) { pts.cpu++; if (friend) { api.sfx('score'); burst(0.7); } else { api.sfx('hit'); if (!api.reduceMotion) shake = 0.25; } }
         else api.sfx('tap');
         api.timeout(afterReveal, 1100);
       }
       function afterReveal() {
+        if (friend && (pts.you >= TARGET || pts.cpu >= TARGET)) {
+          const left = pts.you >= TARGET;
+          phase = 'done'; api.sfx('win'); burst(left ? 0.3 : 0.7);
+          api.timeout(() => api.over({ score: TARGET, won: true, title: nameOf(left) + ' wins', message: 'Match ' + pts.you + ' to ' + pts.cpu }), 900);
+          return;
+        }
         if (pts.you >= TARGET) {
           matches++; api.score(matches); api.sfx('win');
           banner = { title: 'Match won', sub: matches === 1 ? 'Next match. The bot is learning you' : matches + ' in a row', t: clock };
@@ -159,7 +179,8 @@
       function burst(xf) {
         if (api.reduceMotion) return;
         const x = view.w * xf, y = view.h * 0.42;
-        for (let i = 0; i < 22; i++) parts.push({ x, y, vx: api.rand(-160, 160), vy: api.rand(-260, -40), life: api.rand(0.5, 0.9), s: api.rand(2, 4.5) });
+        const c = friend && xf > 0.5 ? D.P2 : null;
+        for (let i = 0; i < 22; i++) parts.push({ x, y, vx: api.rand(-160, 160), vy: api.rand(-260, -40), life: api.rand(0.5, 0.9), s: api.rand(2, 4.5), c });
       }
 
       // ---------- layout ----------
@@ -180,6 +201,13 @@
       api.on(view.canvas, 'pointermove', e => { hover = hitBtn(e); view.canvas.style.cursor = hover >= 0 && phase === 'pick' ? 'pointer' : 'default'; });
       api.on(view.canvas, 'pointerleave', () => { hover = -1; });
       api.keys(e => {
+        if (friend) {
+          const key = e.key.toLowerCase();
+          const a = { a: 'rock', s: 'paper', d: 'scissors', 1: 'rock', 2: 'paper', 3: 'scissors' }[key];
+          const b = { j: 'rock', k: 'paper', l: 'scissors', 8: 'rock', 9: 'paper', 0: 'scissors' }[key];
+          if (a) lockPick(true, a); else if (b) lockPick(false, b);
+          return;
+        }
         const k = { 1: 'rock', 2: 'paper', 3: 'scissors', ArrowLeft: 'rock', ArrowDown: 'paper', ArrowUp: 'paper', ArrowRight: 'scissors' }[e.key];
         if (k) choose(k);
       });
@@ -192,6 +220,13 @@
           ctx.beginPath(); ctx.arc(px, y, 4.5, 0, Math.PI * 2); ctx.fill();
         }
       }
+      // small green tick on an avatar: that side has locked in a pick
+      function lockBadge(r) {
+        const col = api.colors();
+        ctx.fillStyle = col.good || col.accent; ctx.beginPath(); ctx.arc(r * 0.5, r * 0.5, r * 0.2, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = Math.max(2, r * 0.06); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        ctx.beginPath(); ctx.moveTo(r * 0.41, r * 0.5); ctx.lineTo(r * 0.48, r * 0.58); ctx.lineTo(r * 0.6, r * 0.43); ctx.stroke();
+      }
       function render() {
         const col = api.colors(), L = layout(), { w, h } = L;
         ctx.clearRect(0, 0, w, h);
@@ -199,11 +234,12 @@
         if (shake > 0) ctx.translate(api.rand(-1, 1) * shake * 14, api.rand(-1, 1) * shake * 8);
         // header
         D.duelHeader(ctx, 8, 8, w - 16, {
-          left: { who: 'you', pips: pts.you, of: TARGET }, right: { who: 'bot', pips: pts.cpu, of: TARGET },
-          turn: phase === 'pick' ? (clock < lockT ? 'right' : 'left') : null,
-          status: phase === 'done' ? 'Bot wins' : 'Round ' + round, thinking: phase === 'pick' && clock < lockT
+          left: friend ? { who: 'you', label: 'Player 1', pips: pts.you, of: TARGET } : { who: 'you', pips: pts.you, of: TARGET },
+          right: friend ? { who: 'p2', label: 'Player 2', pips: pts.cpu, of: TARGET } : { who: 'bot', pips: pts.cpu, of: TARGET },
+          turn: friend ? null : phase === 'pick' ? (clock < lockT ? 'right' : 'left') : null,
+          status: phase === 'done' ? (friend ? nameOf(pts.you >= TARGET) + ' wins' : 'Bot wins') : 'Round ' + round, thinking: !friend && phase === 'pick' && clock < lockT
         }, col);
-        const BOTC = col.dark ? '#aab2bf' : '#5d6573';
+        const BOTC = friend ? D.P2 : col.dark ? '#aab2bf' : '#5d6573';
 
         // arena
         const ay = L.arenaY, r = L.r, lx = w * 0.27, rx = w * 0.73;
@@ -224,14 +260,14 @@
           ctx.save(); ctx.translate(x, ay + bob); ctx.scale(s * (won && revealed ? 1.08 : 1), s * (won && revealed ? 1.08 : 1));
           if (revealed && m) drawHand(ctx, m, 0, 0, r, c, col.ink, flip);
           else if (shaking) drawHand(ctx, 'rock', 0, 0, r, c, col.ink, flip);
+          else if (friend) {
+            D.avatar(ctx, 0, 0, r * 0.62, i === 0 ? 'you' : 'p2', col);
+            if (i === 0 ? p1 : p2) lockBadge(r);
+          }
           else if (i === 0) D.avatar(ctx, 0, 0, r * 0.62, 'you', col);
           else {
             D.avatar(ctx, 0, 0, r * 0.62, 'bot', col);
-            if (clock >= lockT) {
-              ctx.fillStyle = col.good || c; ctx.beginPath(); ctx.arc(r * 0.5, r * 0.5, r * 0.2, 0, Math.PI * 2); ctx.fill();
-              ctx.strokeStyle = '#fff'; ctx.lineWidth = Math.max(2, r * 0.06); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-              ctx.beginPath(); ctx.moveTo(r * 0.41, r * 0.5); ctx.lineTo(r * 0.48, r * 0.58); ctx.lineTo(r * 0.6, r * 0.43); ctx.stroke();
-            }
+            if (clock >= lockT) lockBadge(r);
           }
           ctx.restore();
         });
@@ -239,12 +275,13 @@
 
         // status line
         let msg = '';
-        if (phase === 'pick') msg = clock < lockT ? 'Bot is choosing' : 'Bot locked in. Your pick';
+        if (phase === 'pick' && friend) msg = p1 ? 'Player 1 locked in. Player 2: J K L' : p2 ? 'Player 2 locked in. Player 1: A S D' : 'Secret picks: A S D  vs  J K L';
+        else if (phase === 'pick') msg = clock < lockT ? 'Bot is choosing' : 'Bot locked in. Your pick';
         else if (phase === 'shake') msg = ['Rock', 'Paper', 'Scissors'][Math.min(2, Math.floor(st / 0.32))] + '...';
         else if (phase === 'reveal' || phase === 'between' || phase === 'done') {
-          msg = result === 0 ? 'Same pick. No point' : result > 0 ? LABEL[you] + ' beats ' + LABEL[cpu] + '. Your point' : LABEL[cpu] + ' beats ' + LABEL[you] + '. Bot point';
+          msg = result === 0 ? 'Same pick. No point' : result > 0 ? LABEL[you] + ' beats ' + LABEL[cpu] + (friend ? '. Player 1 point' : '. Your point') : LABEL[cpu] + ' beats ' + LABEL[you] + (friend ? '. Player 2 point' : '. Bot point');
         }
-        D.text(ctx, msg, w / 2, ay + r * 1.05 + 24, 14, result > 0 && phase === 'reveal' ? col.accent : col.ink, 680);
+        D.text(ctx, msg, w / 2, ay + r * 1.05 + 24, 14, phase === 'reveal' && result > 0 ? col.accent : phase === 'reveal' && result < 0 && friend ? D.P2 : col.ink, 680);
         // recent rounds
         log.forEach((g, i) => {
           const x = w / 2 + (i - (log.length - 1) / 2) * 26, y = ay + r * 1.05 + 48;
@@ -259,7 +296,7 @@
           const can = phase === 'pick';
           const hov = can && hover === i;
           const pt = clock - pressT, press = pressed === i && pt < 0.25 ? 1 - Math.sin(pt / 0.25 * Math.PI) * 0.06 : 1;
-          const chosen = you === b.m && phase !== 'pick';
+          const chosen = you === b.m && phase !== 'pick' && !friend;
           ctx.save(); ctx.translate(b.x + b.w / 2, b.y + b.h / 2 - (hov ? 2 : 0)); ctx.scale(press, press);
           ctx.globalAlpha = can || chosen ? 1 : 0.5;
           ctx.fillStyle = chosen ? col.accent : col.surface2;
@@ -267,12 +304,12 @@
           ctx.strokeStyle = hov ? col.accent : col.line; ctx.lineWidth = hov ? 2 : 1; ctx.stroke();
           const ic = chosen ? '#fff8f2' : col.ink;
           drawHand(ctx, b.m, 0, -b.h * 0.12, b.h * 0.3, ic, chosen ? col.accent : col.surface2, false);
-          D.text(ctx, (i + 1) + '  ' + LABEL[b.m], 0, b.h * 0.32, 11, chosen ? '#fff8f2' : col.ink2, 650);
+          D.text(ctx, (friend ? 'ASD'[i] + ' ' + 'JKL'[i] : i + 1) + '  ' + LABEL[b.m], 0, b.h * 0.32, 11, chosen ? '#fff8f2' : col.ink2, 650);
           ctx.restore();
         });
 
         // particles
-        parts.forEach(p => { ctx.globalAlpha = Math.max(0, Math.min(1, p.life * 2)); ctx.fillStyle = col.accent; ctx.fillRect(p.x, p.y, p.s, p.s); });
+        parts.forEach(p => { ctx.globalAlpha = Math.max(0, Math.min(1, p.life * 2)); ctx.fillStyle = p.c || col.accent; ctx.fillRect(p.x, p.y, p.s, p.s); });
         ctx.globalAlpha = 1;
         ctx.restore();
 
@@ -316,7 +353,7 @@
       return {
         save() {
           if (api.ended) return null;
-          if (phase === 'done' || pts.cpu >= TARGET) return { v: 1, dead: true };
+          if (phase === 'done' || pts.cpu >= TARGET || (friend && pts.you >= TARGET)) return { v: 1, dead: true };
           let r = round, p = { you: pts.you, cpu: pts.cpu };
           if (phase === 'between' || pts.you >= TARGET) { r = 1; p = { you: 0, cpu: 0 }; }
           else if (phase === 'reveal') r = round + 1;

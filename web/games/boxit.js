@@ -125,8 +125,8 @@
   };
 
   Ludus.register({
-    id: 'boxit', name: 'Box It', tag: 'Duel', tint: '#e0a526',
-    hint: 'Click a gap between two dots, or <kbd>←</kbd><kbd>↑</kbd><kbd>→</kbd><kbd>↓</kbd> + <kbd>Space</kbd>. Close a box to score and go again. Most boxes wins',
+    id: 'boxit', name: 'Box It', tag: 'Duel', versus: true, tint: '#e0a526',
+    hint: 'Click a gap between two dots, or <kbd>←</kbd><kbd>↑</kbd><kbd>→</kbd><kbd>↓</kbd> + <kbd>Space</kbd>. Close a box to score and go again. Most boxes wins. vs Friend: take turns',
     _logic: logic,
     art(ctx, w, h) {
       const D = Ludus.draw, n = 4, s = Math.min(w / 6.2, h / 4.8);
@@ -147,6 +147,9 @@
     },
     create(stage, api) {
       const D = Ludus.draw, L = logic;
+      // vs Friend: two people take turns on this keyboard; C is Player 2 and the bot never moves.
+      const friend = api.friend;
+      const nameOf = who => (who === P ? 'Player 1' : 'Player 2');
       const view = api.canvas();
       const { ctx } = view;
       let st = L.newState(), turn = P, phase = 'play', thinking = false, last = -1;
@@ -159,25 +162,26 @@
       function doMove(e, who) {
         if (st.edges[e]) return;
         const done = L.play(st, e, who);
-        last = e; edgeT[e] = performance.now(); again = done.length > 0 && who === P;
+        last = e; edgeT[e] = performance.now(); again = done.length > 0 && (who === P || friend);
         if (done.length) {
           done.forEach(b => { boxT[b] = performance.now(); if (!api.reduceMotion) burst(b, who); });
-          api.sfx(who === P ? 'score' : 'merge');
+          api.sfx(who === P || friend ? 'score' : 'merge');
           if (who === P) api.score(count(P));
-        } else api.sfx(who === P ? 'tap' : 'click');
+        } else api.sfx(who === P || friend ? 'tap' : 'click');
         if (!L.free(st.edges).length) return finish();
         if (!done.length) turn = who === P ? C : P;
-        if (turn === C) cpuStep(done.length > 0);
+        if (turn === C && !friend) cpuStep(done.length > 0);
       }
 
       function finish() {
         phase = 'end';
         const p = count(P), c = count(C);
         const won = p > c;
-        endBanner = { text: won ? 'You win' : p === c ? 'Draw' : 'Bot wins' };
-        if (!won && !api.reduceMotion) shake = 0.2;
-        api.sfx(won ? 'win' : p === c ? 'over' : 'lose');
-        api.timeout(() => api.over({ score: p, won, title: won ? 'You win' : p === c ? 'Draw' : 'Bot wins', message: `Boxes ${p} to ${c}` }), 1400);
+        const title = p === c ? 'Draw' : friend ? nameOf(p > c ? P : C) + ' wins' : won ? 'You win' : 'Bot wins';
+        endBanner = { text: title };
+        if (!won && !friend && !api.reduceMotion) shake = 0.2;
+        api.sfx(won || (friend && p !== c) ? 'win' : p === c ? 'over' : 'lose');
+        api.timeout(() => api.over({ score: friend ? Math.max(p, c) : p, won: friend ? p !== c : won, title, message: `Boxes ${p} to ${c}` }), 1400);
       }
 
       function cpuStep(chain) {
@@ -191,8 +195,8 @@
       }
 
       function playerMove(e) {
-        if (phase !== 'play' || turn !== P || thinking || e < 0 || st.edges[e]) return;
-        doMove(e, P);
+        if (phase !== 'play' || (turn !== P && !friend) || thinking || e < 0 || st.edges[e]) return;
+        doMove(e, turn);
       }
 
       function burst(b, who) {
@@ -244,11 +248,15 @@
       // ---------- drawing ----------
       function hud(col) {
         const ended = phase !== 'play';
+        const status = ended ? (endBanner ? endBanner.text : '')
+          : friend ? nameOf(turn) + (again ? ' goes again' : '\u2019s move')
+          : turn === P ? (again ? 'Go again' : 'Your move') : 'Bot is thinking';
         D.duelHeader(ctx, 8, 8, view.w - 16, {
-          left: { who: 'you', score: count(P) }, right: { who: 'bot', score: count(C) },
+          left: { who: 'you', label: friend ? 'Player 1' : undefined, score: count(P) },
+          right: friend ? { who: 'p2', label: 'Player 2', score: count(C) } : { who: 'bot', score: count(C) },
           turn: ended ? null : (turn === P ? 'left' : 'right'),
-          status: ended ? (endBanner ? endBanner.text : '') : turn === P ? (again ? 'Go again' : 'Your move') : 'Bot is thinking',
-          thinking: !ended && turn === C
+          status,
+          thinking: !ended && turn === C && !friend
         }, col);
       }
 
@@ -266,9 +274,10 @@
           const r = Math.floor(b / N), c = b % N;
           const k = api.reduceMotion ? 1 : Math.max(0.01, D.ease.outBack(Math.max(0, Math.min(1, (now - boxT[b]) / 320))));
           const x = ox + c * s + s / 2, y = oy + r * s + s / 2, sz = (s - 8) * k;
-          ctx.fillStyle = who === P ? (col.dark ? 'rgba(217,119,87,0.30)' : 'rgba(217,119,87,0.20)') : (col.dark ? 'rgba(243,237,227,0.12)' : 'rgba(32,28,23,0.09)');
+          ctx.fillStyle = who === P ? (col.dark ? 'rgba(217,119,87,0.30)' : 'rgba(217,119,87,0.20)') : friend ? 'rgba(91,141,239,0.24)' : (col.dark ? 'rgba(243,237,227,0.12)' : 'rgba(32,28,23,0.09)');
           D.roundRect(ctx, x - sz / 2, y - sz / 2, sz, sz, s * 0.16); ctx.fill();
           if (who === P) D.spark(ctx, x, y, s * 0.2 * k, col.accent, (now - boxT[b]) / 2000);
+          else if (friend) D.spark(ctx, x, y, s * 0.2 * k, D.P2, (now - boxT[b]) / 2000);
           else D.avatar(ctx, x, y, s * 0.24 * k, 'bot', col);
         }
         // guide lines + drawn edges
@@ -279,8 +288,8 @@
           const x1 = ox + p.x1 * s, y1 = oy + p.y1 * s, x2 = ox + p.x2 * s, y2 = oy + p.y2 * s;
           const who = st.edges[e];
           if (!who) {
-            const hot = e === target && phase === 'play' && turn === P;
-            ctx.strokeStyle = hot ? col.accent : col.line; ctx.globalAlpha = hot ? 0.55 : 1;
+            const hot = e === target && phase === 'play' && (turn === P || friend);
+            ctx.strokeStyle = hot ? (turn === P ? col.accent : D.P2) : col.line; ctx.globalAlpha = hot ? 0.55 : 1;
             ctx.lineWidth = hot ? 5 : 2; ctx.setLineDash(hot ? [] : [2, 5]);
             ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
             ctx.setLineDash([]); ctx.globalAlpha = 1;
@@ -288,7 +297,7 @@
           }
           const k = api.reduceMotion ? 1 : D.ease.outCubic(Math.min(1, (now - edgeT[e]) / 180));
           const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
-          ctx.strokeStyle = who === P ? col.accent : col.ink;
+          ctx.strokeStyle = who === P ? col.accent : friend ? D.P2 : col.ink;
           ctx.lineWidth = e === last ? 5.5 : 4.5;
           ctx.beginPath(); ctx.moveTo(D.lerp(mx, x1, k), D.lerp(my, y1, k)); ctx.lineTo(D.lerp(mx, x2, k), D.lerp(my, y2, k)); ctx.stroke();
           if (e === last) {
@@ -305,7 +314,7 @@
         pops.forEach(p => {
           p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 0.96; p.vy *= 0.96;
           const r = Math.floor(p.b / N), c = p.b % N;
-          ctx.globalAlpha = p.life / 0.6; ctx.fillStyle = p.who === P ? col.accent : col.ink2;
+          ctx.globalAlpha = p.life / 0.6; ctx.fillStyle = p.who === P ? col.accent : friend ? D.P2 : col.ink2;
           ctx.beginPath(); ctx.arc(ox + c * s + s / 2 + p.x, oy + r * s + s / 2 + p.y, 2.2, 0, Math.PI * 2); ctx.fill();
         });
         ctx.globalAlpha = 1;
@@ -335,7 +344,7 @@
         turn = sv.turn === C ? C : P; last = Number.isInteger(sv.last) ? sv.last : -1;
         if (sv.cur && Number.isInteger(sv.cur.r) && Number.isInteger(sv.cur.c)) cur = { r: sv.cur.r, c: sv.cur.c };
         api.score(count(P));
-        if (turn === C) cpuStep(false);
+        if (turn === C && !friend) cpuStep(false);
         return true;
       }
 

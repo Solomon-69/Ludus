@@ -32,8 +32,8 @@
   };
 
   Ludus.register({
-    id: 'deadcentre', name: 'Dead Centre', tag: 'Duel', tint: TEAL,
-    hint: '<kbd>Space</kbd> or a click stops the needle on your turn. Closer to the line than the bot wins the round. First to 3',
+    id: 'deadcentre', name: 'Dead Centre', tag: 'Duel', tint: TEAL, versus: true,
+    hint: '<kbd>Space</kbd> or a click stops the needle on your turn. Closer to the line than the bot wins the round. First to 3. vs Friend: take turns, Space stops for whoever is up',
     _rules: { stepNeedle, cpuError, judge, modeOf },
     art(ctx, w, h) {
       const D = Ludus.draw, bx = w * 0.12, bw = w * 0.76, by = h * 0.36, bh = h * 0.3;
@@ -46,6 +46,7 @@
       const D = Ludus.draw;
       const view = api.canvas();
       const { ctx } = view;
+      const friend = api.friend, nameOf = k => (k === 'you' ? 'Player 1' : 'Player 2');
       let clock = 0, matches = 0, roundNo = 1, starter = 'you';
       let pts = { you: 0, cpu: 0 }, shot = { you: -1, cpu: -1 }, landT = { you: -9, cpu: -9 };
       let target = 50, turn = 'you', phase = 'ready', phaseT = 0, roundRes = 0;
@@ -65,7 +66,7 @@
         needle.phase = Math.random() * 3; needle.flipIn = 0.6;
         api.timeout(() => {
           phase = 'run'; phaseT = clock; prevPos = needle.pos;
-          if (turn === 'cpu') { cpuAim = Math.max(0.5, Math.min(99.5, target + cpuError(api.level, roundNo, Math.random))); cpuMinT = clock + api.rand(0.7, 1.5); }
+          if (turn === 'cpu' && !friend) { cpuAim = Math.max(0.5, Math.min(99.5, target + cpuError(api.level, roundNo, Math.random))); cpuMinT = clock + api.rand(0.7, 1.5); }
         }, api.reduceMotion ? 250 : 550);
       }
       function stopAt(who) {
@@ -82,9 +83,15 @@
         roundRes = judge(shot.you, shot.cpu, target);
         phase = 'result'; phaseT = clock;
         if (roundRes > 0) { pts.you++; api.sfx('score'); }
-        else if (roundRes < 0) { pts.cpu++; api.sfx('hit'); if (!api.reduceMotion) shake = 0.22; }
+        else if (roundRes < 0) { pts.cpu++; if (friend) api.sfx('score'); else { api.sfx('hit'); if (!api.reduceMotion) shake = 0.22; } }
         else api.sfx('tap');
         api.timeout(() => {
+          if (friend && (pts.you >= TARGET || pts.cpu >= TARGET)) {
+            const w = pts.you >= TARGET ? 'you' : 'cpu';
+            phase = 'done'; api.sfx('win');
+            api.timeout(() => api.over({ score: TARGET, won: true, title: nameOf(w) + ' wins', message: 'Match ' + pts.you + ' to ' + pts.cpu }), 900);
+            return;
+          }
           if (pts.you >= TARGET) {
             matches++; counted = true; api.score(matches); api.sfx('win');
             banner = { title: 'Match won', sub: matches + (matches === 1 ? ' match' : ' matches') + ' in a row', t: clock };
@@ -108,8 +115,10 @@
         btn.x = (w - btn.w) / 2; btn.y = h - btn.h - 16;
         return { w, h, bx, bw, bh, by, btn };
       }
-      api.on(view.canvas, 'pointerdown', () => stopAt('you'));
-      api.keys(e => { if (e.key === ' ' || e.key === 'Enter') stopAt('you'); });
+      // vs Friend: Space, Enter or a click stops the needle for whoever is up
+      const stopper = () => (friend ? turn : 'you');
+      api.on(view.canvas, 'pointerdown', () => stopAt(stopper()));
+      api.keys(e => { if (e.key === ' ' || e.key === 'Enter') stopAt(stopper()); });
 
       function pips(x, y, n, col, line, left) {
         for (let i = 0; i < TARGET; i++) {
@@ -123,12 +132,13 @@
         ctx.save();
         if (shake > 0) ctx.translate(api.rand(-1, 1) * shake * 12, 0);
         // header
-        const mode = modeOf(roundNo), BOTC = '#c9cdd6';
+        const mode = modeOf(roundNo), BOTC = friend ? D.P2 : '#c9cdd6';
         const going = phase === 'ready' || phase === 'run';
         D.duelHeader(ctx, 8, 8, w - 16, {
-          left: { who: 'you', pips: pts.you, of: TARGET }, right: { who: 'bot', pips: pts.cpu, of: TARGET },
+          left: friend ? { who: 'you', label: 'Player 1', pips: pts.you, of: TARGET } : { who: 'you', pips: pts.you, of: TARGET },
+          right: friend ? { who: 'p2', label: 'Player 2', pips: pts.cpu, of: TARGET } : { who: 'bot', pips: pts.cpu, of: TARGET },
           turn: going ? (turn === 'you' ? 'left' : 'right') : null,
-          status: phase === 'done' ? 'Bot wins' : 'Round ' + roundNo, thinking: going && turn === 'cpu'
+          status: phase === 'done' ? (friend ? nameOf(pts.you >= TARGET ? 'you' : 'cpu') + ' wins' : 'Bot wins') : 'Round ' + roundNo, thinking: going && turn === 'cpu' && !friend
         }, col);
         D.text(ctx, mode === 'Steady' ? 'Steady needle' : mode === 'Surging' ? 'Surging needle' : 'Erratic needle', w / 2, 64, 11, mode === 'Steady' ? col.ink3 : mode === 'Surging' ? TEAL : col.bad, 650);
 
@@ -155,7 +165,7 @@
           const mh = (bh - 28) * sy;
           ctx.fillStyle = c; D.roundRect(ctx, X(shot[k]) - 3, by + bh / 2 - mh / 2, 6, mh, 3); ctx.fill();
           if (k === 'you') D.avatar(ctx, X(shot[k]), by - 14, 10, 'you', col);
-          else D.avatar(ctx, X(shot[k]), by + bh + 14, 10, 'bot', col);
+          else D.avatar(ctx, X(shot[k]), by + bh + 14, 10, friend ? 'p2' : 'bot', col);
         });
         // needle
         const live = phase === 'run' || phase === 'ready';
@@ -168,7 +178,7 @@
 
         // readouts
         const ry = by + bh + 34, cw = (bw - 10) / 2;
-        [['you', 'You off by', col.accent, bx], ['cpu', 'Bot off by', col.ink2, bx + cw + 10]].forEach(([k, label, c, x]) => {
+        [['you', friend ? 'Player 1 off by' : 'You off by', col.accent, bx], ['cpu', friend ? 'Player 2 off by' : 'Bot off by', friend ? D.P2 : col.ink2, bx + cw + 10]].forEach(([k, label, c, x]) => {
           const best = (phase === 'result' || phase === 'done') && ((roundRes > 0 && k === 'you') || (roundRes < 0 && k === 'cpu'));
           ctx.fillStyle = col.surface2; D.roundRect(ctx, x, ry, cw, 46, 12); ctx.fill();
           if (best || (turn === k && (phase === 'ready' || phase === 'run' || phase === 'stopped'))) { ctx.strokeStyle = best ? c : col.line; ctx.lineWidth = best ? 2 : 1.5; ctx.stroke(); }
@@ -178,20 +188,27 @@
 
         // status
         let msg = '';
-        if (phase === 'result' || phase === 'done') msg = roundRes === 0 ? 'Dead heat. No point' : roundRes > 0 ? (Math.abs(shot.you - target) < 0.1 ? 'Bullseye. ' : '') + 'Your point' : 'Bot was closer. Bot point';
+        if (friend) {
+          const other = turn === 'you' ? 'cpu' : 'you';
+          if (phase === 'result' || phase === 'done') msg = roundRes === 0 ? 'Dead heat. No point' : (Math.abs((roundRes > 0 ? shot.you : shot.cpu) - target) < 0.1 ? 'Bullseye. ' : '') + nameOf(roundRes > 0 ? 'you' : 'cpu') + ' point';
+          else if (phase === 'ready') msg = nameOf(turn) + '\u2019s shot. Get ready';
+          else if (phase === 'stopped') msg = nameOf(turn) + ' stopped';
+          else msg = nameOf(turn) + ': stop it on the line.' + (shot[other] >= 0 ? ' Beat ' + Math.abs(shot[other] - target).toFixed(1) : '');
+        }
+        else if (phase === 'result' || phase === 'done') msg = roundRes === 0 ? 'Dead heat. No point' : roundRes > 0 ? (Math.abs(shot.you - target) < 0.1 ? 'Bullseye. ' : '') + 'Your point' : 'Bot was closer. Bot point';
         else if (turn === 'you') {
           const o = shot.cpu >= 0 ? ' Beat ' + Math.abs(shot.cpu - target).toFixed(1) : '';
           msg = phase === 'ready' ? 'Your shot. Get ready' : 'Stop it on the line.' + o;
         } else msg = phase === 'stopped' ? 'Bot stopped' : 'Bot is aiming';
-        D.text(ctx, msg, w / 2, ry + 72, 14, roundRes > 0 && phase === 'result' ? col.accent : col.ink, 680);
+        D.text(ctx, msg, w / 2, ry + 72, 14, phase === 'result' && roundRes > 0 ? col.accent : phase === 'result' && roundRes < 0 && friend ? D.P2 : col.ink, 680);
 
         // stop button
-        const b = L.btn, can = turn === 'you' && phase === 'run';
+        const b = L.btn, can = (turn === 'you' || friend) && phase === 'run';
         ctx.globalAlpha = can ? 1 : 0.4;
         const pulse = can && !api.reduceMotion ? 1 + Math.sin(clock * 6) * 0.015 : 1;
         ctx.save(); ctx.translate(b.x + b.w / 2, b.y + b.h / 2); ctx.scale(pulse, pulse);
         ctx.fillStyle = col.ink; D.roundRect(ctx, -b.w / 2, -b.h / 2, b.w, b.h, 14); ctx.fill();
-        D.text(ctx, 'Stop', 0, 1, 16, col.bg, 750);
+        D.text(ctx, friend ? 'Stop: ' + nameOf(turn) : 'Stop', 0, 1, 16, col.bg, 750);
         ctx.restore(); ctx.globalAlpha = 1;
 
         parts.forEach(p => { ctx.globalAlpha = Math.max(0, Math.min(1, p.life * 2)); ctx.fillStyle = '#5fd6c4'; ctx.fillRect(p.x, p.y, p.s, p.s); });
@@ -233,7 +250,7 @@
         if (phase === 'run') {
           prevPos = needle.pos;
           stepNeedle(needle, roundNo, dt * [0.88, 1, 1.06][api.level], Math.random);
-          if (turn === 'cpu' && clock >= cpuMinT) {
+          if (turn === 'cpu' && !friend && clock >= cpuMinT) {
             const a = prevPos, b = needle.pos;
             const crossed = (a - cpuAim) * (b - cpuAim) <= 0 && Math.abs(a - b) < 50;
             if (crossed || clock - cpuMinT > 4) { needle.pos = crossed ? cpuAim : needle.pos; stopAt('cpu'); }
@@ -255,7 +272,7 @@
             else { done = true; const res = judge(shot.you, shot.cpu, target); if (res > 0) p.you++; else if (res < 0) p.cpu++; }
           }
           if (done) {
-            if (p.cpu >= TARGET) return { v: 1, dead: true };
+            if (p.cpu >= TARGET || (friend && p.you >= TARGET)) return { v: 1, dead: true };
             if (p.you >= TARGET) { m = matches + (counted ? 0 : 1); p = { you: 0, cpu: 0 }; r = 1; } else r = roundNo + 1;
             sta = starter === 'you' ? 'cpu' : 'you';
             return { v: 1, fresh: true, matches: m, roundNo: r, starter: sta, pts: p, shot: {} };

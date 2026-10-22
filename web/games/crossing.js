@@ -98,8 +98,8 @@
   }
 
   Ludus.register({
-    id: 'crossing', name: 'The Crossing', tag: 'Duel', tint: PURPLE,
-    hint: 'Click a hex, or <kbd>←</kbd><kbd>↑</kbd><kbd>→</kbd><kbd>↓</kbd> + <kbd>Space</kbd>. Link your left and right edges with a chain. <kbd>S</kbd> steals the bot opening stone',
+    id: 'crossing', name: 'The Crossing', tag: 'Duel', tint: PURPLE, versus: true,
+    hint: 'Click a hex, or <kbd>←</kbd><kbd>↑</kbd><kbd>→</kbd><kbd>↓</kbd> + <kbd>Space</kbd>. Link your left and right edges with a chain. <kbd>S</kbd> steals the bot opening stone. vs Friend: take turns, Player 2 joins top to bottom, first to 3 games',
     _rules: { winPath, cpuConnects, swapBoard, winningCell, bridgeReply, makeSearch, N, YOU, CPU },
     art(ctx, w, h) {
       const R = h * 0.13, W = Math.sqrt(3) * R, n = 4;
@@ -117,6 +117,8 @@
       const D = Ludus.draw;
       const view = api.canvas();
       const { ctx } = view;
+      const friend = api.friend, nameOf = sd => (sd === YOU ? 'Player 1' : 'Player 2'), TARGET = 3;
+      const wins = [0, 0, 0];
       let clock = 0, matches = 0, starter = YOU;
       let board, turn, moves, last, lastBy, swapped, winner, path, pathArr, winT, placeT, job, hover = -1, banner = null, parts = [], kc = 24, useKeys = false;
       api.score(0);
@@ -124,7 +126,7 @@
       function newGame(quiet) {
         board = new Int8Array(NN); turn = starter; moves = 0; last = -1; lastBy = [-1, -1, -1]; swapped = false; winner = 0; path = null; pathArr = null; winT = 0;
         placeT = new Float64Array(NN).fill(-9); job = null;
-        if (turn === CPU && !quiet) think();
+        if (turn === CPU && !quiet && !friend) think();
       }
       function geo() {
         const w = view.w, h = view.h, top = 50, bottom = 58;
@@ -140,23 +142,32 @@
         return bi;
       }
       function stealBtn() { const G = geo(); return { x: G.w / 2 - 70, y: G.h - 46, w: 140, h: 34 }; }
-      const canSteal = () => !winner && turn === YOU && moves === 1 && !swapped && board.some(v => v === CPU);
+      const canSteal = () => !winner && (turn === YOU || friend) && moves === 1 && !swapped && board.some(v => v && v !== turn);
 
       function place(i, s) {
         board[i] = s; moves++; last = i; lastBy[s] = i; placeT[i] = clock; api.sfx(s === YOU ? 'drop' : 'click');
         const p = winPath(board, s);
         if (p) { winner = s; pathArr = p.slice().reverse(); path = new Set(p); winT = clock; endGame(); return; }
         turn = s === YOU ? CPU : YOU;
-        if (turn === CPU) think();
+        if (turn === CPU && !friend) think();
       }
       function doSwap(by) {
         const r = swapBoard(board); board = Int8Array.from(r.board); swapped = true; moves = 1; last = r.cell; lastBy = [-1, -1, -1]; lastBy[board[r.cell]] = r.cell; placeT[r.cell] = clock;
-        api.sfx('power'); banner = { title: by === CPU ? 'Stolen' : 'You stole it', sub: by === CPU ? 'The bot took your opening stone' : 'The bot opening is yours now', t: clock, small: true };
+        api.sfx('power'); banner = friend ? { title: nameOf(by) + ' stole it', sub: 'The opening stone changes sides', t: clock, small: true }
+          : { title: by === CPU ? 'Stolen' : 'You stole it', sub: by === CPU ? 'The bot took your opening stone' : 'The bot opening is yours now', t: clock, small: true };
         api.timeout(() => { if (banner && banner.small) banner = null; }, 1100);
         turn = by === YOU ? CPU : YOU;
-        if (turn === CPU) think();
+        if (turn === CPU && !friend) think();
       }
       function endGame() {
+        if (friend) {
+          wins[winner]++; api.sfx('win'); burstPath(winner === YOU ? col0().accent : D.P2);
+          const done = wins[winner] >= TARGET;
+          api.timeout(() => { banner = { title: nameOf(winner) + ' crossed', sub: done ? 'Match ' + wins[YOU] + ' to ' + wins[CPU] : 'Games ' + wins[YOU] + ' to ' + wins[CPU] + '. First to ' + TARGET, t: clock }; }, 700);
+          if (done) api.timeout(() => api.over({ score: Math.max(wins[YOU], wins[CPU]), won: true, title: nameOf(winner) + ' wins', message: 'Match ' + wins[YOU] + ' to ' + wins[CPU] }), 2200);
+          else api.timeout(() => { banner = null; starter = starter === YOU ? CPU : YOU; newGame(); }, 2400);
+          return;
+        }
         if (winner === YOU) {
           matches++; api.score(matches); api.sfx('win'); burstPath(col0().accent);
           api.timeout(() => { banner = { title: 'You crossed', sub: matches + (matches === 1 ? ' game' : ' games') + ' in a row', t: clock }; }, 700);
@@ -217,19 +228,19 @@
 
       // ---------- input ----------
       function tryPlay(i) {
-        if (winner || turn !== YOU || job || i < 0 || board[i]) return;
-        place(i, YOU);
+        if (winner || (turn !== YOU && !friend) || job || i < 0 || board[i]) return;
+        place(i, turn);
       }
       api.on(view.canvas, 'pointerdown', e => {
         const rect = view.canvas.getBoundingClientRect(), x = e.clientX - rect.left, y = e.clientY - rect.top, b = stealBtn();
-        if (canSteal() && x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h) { doSwap(YOU); return; }
+        if (canSteal() && x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h) { doSwap(turn); return; }
         tryPlay(cellAt(e));
       });
-      api.on(view.canvas, 'pointermove', e => { hover = cellAt(e); if (hover >= 0) useKeys = false; view.canvas.style.cursor = hover >= 0 && !board[hover] && turn === YOU && !winner ? 'pointer' : 'default'; });
+      api.on(view.canvas, 'pointermove', e => { hover = cellAt(e); if (hover >= 0) useKeys = false; view.canvas.style.cursor = hover >= 0 && !board[hover] && (turn === YOU || friend) && !winner ? 'pointer' : 'default'; });
       api.on(view.canvas, 'pointerleave', () => { hover = -1; });
       api.keys(e => {
         const k = e.key;
-        if ((k === 's' || k === 'S') && canSteal()) { doSwap(YOU); return; }
+        if ((k === 's' || k === 'S') && canSteal()) { doSwap(turn); return; }
         const d = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] }[k];
         if (d) { const r = Math.max(0, Math.min(N - 1, Math.floor(kc / N) + d[0])), c = Math.max(0, Math.min(N - 1, kc % N + d[1])); kc = r * N + c; useKeys = true; hover = -1; api.sfx('tick'); return; }
         if (k === ' ' || k === 'Enter') { useKeys = true; tryPlay(kc); }
@@ -241,7 +252,7 @@
         for (let k = 0; k < 6; k++) { const a = Math.PI / 180 * (60 * k - 30); ctx.lineTo(x + s * Math.cos(a), y + s * Math.sin(a)); }
         ctx.closePath();
       }
-      const botColor = col => col.dark ? '#8fa3c2' : '#5a6f8f';
+      const botColor = col => friend ? D.P2 : col.dark ? '#8fa3c2' : '#5a6f8f';
       // A stone: pops in with a slight overshoot, flat side colour, soft top light. Yours carry a faint spark.
       function drawStone(i, x, y, v, R, col, BOTC) {
         const t = clock - placeT[i], s = t < 0.34 && !api.reduceMotion ? D.ease.outBack(Math.max(0, t / 0.34)) : 1;
@@ -302,14 +313,16 @@
         // header
         const yourTurn = turn === YOU && !winner, cpuTurn = turn === CPU && !winner;
         let msg;
-        if (winner) msg = winner === YOU ? 'You crossed' : 'Bot crossed';
+        if (friend) msg = winner ? nameOf(winner) + ' crossed' : canSteal() ? nameOf(turn) + ': steal it or play' : nameOf(turn) + (moves === 0 ? '\u2019s opening' : '\u2019s move');
+        else if (winner) msg = winner === YOU ? 'You crossed' : 'Bot crossed';
         else if (cpuTurn) msg = 'Bot is thinking';
         else if (moves === 0) msg = 'Your opening';
         else if (canSteal()) msg = 'Steal it or play';
         else msg = 'Your move';
         D.duelHeader(ctx, 8, 8, w - 16, {
-          left: { who: 'you', score: 'Left to right' }, right: { who: 'bot', score: 'Top to bottom' },
-          turn: winner ? null : (yourTurn ? 'left' : 'right'), status: msg, thinking: cpuTurn
+          left: friend ? { who: 'you', label: 'Player 1 \u00b7 ' + wins[YOU], score: 'Left to right' } : { who: 'you', score: 'Left to right' },
+          right: friend ? { who: 'p2', label: wins[CPU] + ' \u00b7 Player 2', score: 'Top to bottom' } : { who: 'bot', score: 'Top to bottom' },
+          turn: winner ? null : (yourTurn ? 'left' : 'right'), status: msg, thinking: cpuTurn && !friend
         }, col);
 
         // edges
@@ -326,16 +339,16 @@
           hexPath(x, y, R - 1);
           ctx.fillStyle = col.dark ? '#3d3730' : '#efe6d8'; ctx.fill();
           ctx.strokeStyle = col.dark ? 'rgba(255,255,255,0.06)' : 'rgba(32,28,23,0.08)'; ctx.lineWidth = 1; ctx.stroke();
-          if (!v && (useKeys ? i === kc : i === hover) && turn === YOU && !winner && !job) {
-            hexPath(x, y, R * 0.62); ctx.fillStyle = col.accent; ctx.globalAlpha = 0.3; ctx.fill(); ctx.globalAlpha = 1;
+          if (!v && (useKeys ? i === kc : i === hover) && (turn === YOU || friend) && !winner && !job) {
+            hexPath(x, y, R * 0.62); ctx.fillStyle = turn === YOU ? col.accent : BOTC; ctx.globalAlpha = 0.3; ctx.fill(); ctx.globalAlpha = 1;
           }
           if (v) drawStone(i, x, y, v, R, col, BOTC);
         }
         [YOU, CPU].forEach(sd => { if (lastBy[sd] >= 0 && board[lastBy[sd]] === sd && !winner) pulseRing(G, lastBy[sd], sd === YOU ? col.accent : BOTC); });
         if (winner && pathArr) drawWinPath(G, winner === YOU ? col.accent : BOTC, col, BOTC);
-        if (useKeys && turn === YOU && !winner) {
+        if (useKeys && (turn === YOU || friend) && !winner) {
           const r = Math.floor(kc / N), c = kc % N; hexPath(G.cx(r, c), G.cy(r), R - 1);
-          ctx.strokeStyle = col.accent; ctx.lineWidth = 2; ctx.stroke();
+          ctx.strokeStyle = turn === YOU ? col.accent : BOTC; ctx.lineWidth = 2; ctx.stroke();
         }
         if (canSteal()) {
           const b = stealBtn(), p = api.reduceMotion ? 1 : 1 + Math.sin(clock * 5) * 0.02;
@@ -363,6 +376,7 @@
       function restore(sv) {
         if (!sv || sv.v !== 1 || sv.dead) return false;
         matches = Math.max(0, sv.matches | 0); starter = sv.starter === CPU ? CPU : YOU; api.score(matches);
+        if (friend && Array.isArray(sv.w)) { wins[YOU] = Math.min(TARGET - 1, Math.max(0, sv.w[0] | 0)); wins[CPU] = Math.min(TARGET - 1, Math.max(0, sv.w[1] | 0)); }
         if (sv.fresh) { newGame(); return true; }
         if (!Array.isArray(sv.board) || sv.board.length !== NN || !sv.board.every(v => v === 0 || v === YOU || v === CPU)) return false;
         const b = Int8Array.from(sv.board);
@@ -373,7 +387,7 @@
         kc = Number.isInteger(sv.kc) && sv.kc >= 0 && sv.kc < NN ? sv.kc : 24;
         [YOU, CPU].forEach(sd => { const v = sd === YOU ? sv.ly : sv.lc; lastBy[sd] = Number.isInteger(v) && v >= 0 && v < NN && board[v] === sd ? v : -1; });
         if (last >= 0 && board[last] && lastBy[board[last]] < 0) lastBy[board[last]] = last;
-        if (turn === CPU) think();
+        if (turn === CPU && !friend) think();
         return true;
       }
 
@@ -387,10 +401,12 @@
       return {
         save() {
           if (api.ended) return null;
+          const w = [wins[YOU], wins[CPU]];
+          if (friend && winner) return wins[winner] >= TARGET ? { v: 1, dead: true } : { v: 1, fresh: true, matches, starter: starter === YOU ? CPU : YOU, w };
           if (winner === CPU) return { v: 1, dead: true };
           if (winner === YOU) return { v: 1, fresh: true, matches, starter: starter === YOU ? CPU : YOU };
-          if (!moves && !matches) return null;
-          return { v: 1, board: Array.from(board), turn, moves, swapped, last, matches, starter, kc, ly: lastBy[YOU], lc: lastBy[CPU] };
+          if (!moves && !matches && !w[0] && !w[1]) return null;
+          return { v: 1, board: Array.from(board), turn, moves, swapped, last, matches, starter, kc, ly: lastBy[YOU], lc: lastBy[CPU], w };
         }
       };
     }

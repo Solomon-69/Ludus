@@ -14,7 +14,7 @@
   for (const f of ['Arcade', 'Puzzle', 'Duel', '2 Player', 'All'].filter(f => f === 'All' || Ludus.games.some(g => g.tag === f))) {
     [...document.querySelectorAll('.chip')].find(c => c.textContent === f).click(); await wait(120);
     const ids = cards();
-    const ok = f === 'All' ? ids.length === Ludus.games.length : ids.every(id => Ludus.games.find(g => g.id === id).tag === f);
+    const ok = f === 'All' ? ids.length === Ludus.games.length : ids.every(id => { const g = Ludus.games.find(x => x.id === id); return g.tag === f || (f === '2 Player' && g.versus); });
     check('filter ' + f, ok && ids.length > 0, ids.length);
   }
   // H3 thumbnails drawn (non-blank canvases)

@@ -172,8 +172,8 @@
   };
 
   Ludus.register({
-    id: 'ninesq', name: 'Nine Squared', tag: 'Duel', tint: '#5b8def',
-    hint: 'Click a square, or <kbd>←</kbd><kbd>↑</kbd><kbd>→</kbd><kbd>↓</kbd> + <kbd>Space</kbd>. The square you pick sends the bot to that board. Win 3 boards in a row',
+    id: 'ninesq', name: 'Nine Squared', tag: 'Duel', tint: '#5b8def', versus: true,
+    hint: 'Click a square, or <kbd>←</kbd><kbd>↑</kbd><kbd>→</kbd><kbd>↓</kbd> + <kbd>Space</kbd>. The square you pick sends the bot to that board. Win 3 boards in a row. vs Friend: take turns',
     _logic: logic,
     art(ctx, w, h) {
       const D = Ludus.draw, S = Math.min(w, h) * 0.86, s = S / 3, ox = (w - S) / 2, oy = (h - S) / 2;
@@ -196,6 +196,7 @@
     },
     create(stage, api) {
       const D = Ludus.draw, L = logic;
+      const friend = api.friend, nameOf = who => (who === P ? 'Player 1' : 'Player 2');
       const view = api.canvas();
       const { ctx } = view;
       let s = L.newState(), phase = 'play', thinking = false, last = -1, hover = -1, cur = 40, useCursor = false;
@@ -208,9 +209,9 @@
         L.apply(s, i);
         last = i; placedT[i] = performance.now();
         if (!before && s.smalls[b]) { claimT[b] = performance.now(); api.sfx(s.smalls[b] === DRAW ? 'move' : who === P ? 'score' : 'merge'); }
-        else api.sfx(who === P ? 'tap' : 'click');
+        else api.sfx(who === P || friend ? 'tap' : 'click');
         if (s.winner) return finish();
-        if (s.turn === C) cpuTurn(); else snapCursor();
+        if (s.turn === C && !friend) cpuTurn(); else snapCursor();
       }
       // keep the keyboard cursor inside the board you are allowed to play in
       function snapCursor() {
@@ -221,6 +222,13 @@
 
       function finish() {
         phase = 'end';
+        if (friend) {
+          const w = s.winner === DRAW ? '' : nameOf(s.winner) + ' wins';
+          banner = { text: w || 'Draw', t0: performance.now() };
+          api.sfx(w ? 'line' : 'over');
+          api.timeout(() => api.over({ score: w ? 1 : 0, won: !!w, title: w || 'Draw', message: w ? 'Three boards in a row' : 'No line left to make' }), 1500);
+          return;
+        }
         const won = s.winner === P;
         banner = { text: won ? 'You win' : s.winner === DRAW ? 'Draw' : 'Bot wins', t0: performance.now() };
         if (won) api.score(1); else if (!api.reduceMotion && s.winner === C) shake = 0.22;
@@ -239,7 +247,7 @@
       }
 
       function playerMove(i) {
-        if (phase !== 'play' || s.turn !== P || thinking || i < 0) return;
+        if (phase !== 'play' || (s.turn !== P && !friend) || thinking || i < 0) return;
         if (!L.moves(s).includes(i)) { api.sfx('hit'); return; }
         doMove(i);
       }
@@ -305,15 +313,16 @@
       }
       // the three cells or boards of a line, stretched a little past both ends
       function lineEnds(p, q, ext) { const dx = q[0] - p[0], dy = q[1] - p[1], L2 = Math.hypot(dx, dy) || 1; return [p[0] - dx / L2 * ext, p[1] - dy / L2 * ext, q[0] + dx / L2 * ext, q[1] + dy / L2 * ext]; }
-      const markCol = (who, col) => who === P ? col.accent : col.ink;
+      const markCol = (who, col) => who === P ? col.accent : friend ? D.P2 : col.ink;
       function hud(col) {
         const ended = phase !== 'play';
         const n = who => { let k = 0; for (let b = 0; b < 9; b++) if (s.smalls[b] === who) k++; return k + (k === 1 ? ' board' : ' boards'); };
         D.duelHeader(ctx, 8, 8, view.w - 16, {
-          left: { who: 'you', score: n(P) }, right: { who: 'bot', score: n(C) },
+          left: friend ? { who: 'you', label: 'Player 1', score: n(P) } : { who: 'you', score: n(P) },
+          right: friend ? { who: 'p2', label: 'Player 2', score: n(C) } : { who: 'bot', score: n(C) },
           turn: ended ? null : (s.turn === P ? 'left' : 'right'),
-          status: ended ? (banner ? banner.text : '') : s.turn === P ? (s.force >= 0 && !s.smalls[s.force] ? 'Your move' : 'Play anywhere') : 'Bot is thinking',
-          thinking: !ended && s.turn === C
+          status: ended ? (banner ? banner.text : '') : friend ? nameOf(s.turn) + (s.force >= 0 && !s.smalls[s.force] ? '\u2019s move' : ': play anywhere') : s.turn === P ? (s.force >= 0 && !s.smalls[s.force] ? 'Your move' : 'Play anywhere') : 'Bot is thinking',
+          thinking: !ended && s.turn === C && !friend
         }, col);
       }
 
@@ -332,7 +341,7 @@
           const [bx, by] = boardXY(b);
           const live = liveBoards.has(b);
           ctx.fillStyle = live && s.turn === P ? (col.dark ? 'rgba(217,119,87,0.13)' : 'rgba(217,119,87,0.10)') : col.surface;
-          if (live && s.turn === C) ctx.fillStyle = col.dark ? 'rgba(255,255,255,0.06)' : col.surface2;
+          if (live && s.turn === C) ctx.fillStyle = friend ? (col.dark ? 'rgba(91,141,239,0.15)' : 'rgba(91,141,239,0.11)') : col.dark ? 'rgba(255,255,255,0.06)' : col.surface2;
           D.roundRect(ctx, bx, by, bs, bs, 10); ctx.fill();
           if (winSet.has(b) && s.winner && s.winner !== DRAW) {
             const hk = api.reduceMotion ? 1 : Math.max(0, Math.min(1, (now - Math.max(...s.line.map(x => claimT[x])) - 650) / 500));
@@ -342,8 +351,8 @@
             ctx.restore();
           }
           if (live) {
-            ctx.strokeStyle = s.turn === P ? col.accent : col.ink3; ctx.lineWidth = 2;
-            ctx.globalAlpha = s.turn === P ? 0.6 + 0.3 * Math.sin(now / 300) : 0.5; D.roundRect(ctx, bx + 1, by + 1, bs - 2, bs - 2, 10); ctx.stroke(); ctx.globalAlpha = 1;
+            ctx.strokeStyle = s.turn === P ? col.accent : friend ? D.P2 : col.ink3; ctx.lineWidth = 2;
+            ctx.globalAlpha = s.turn === P || friend ? 0.6 + 0.3 * Math.sin(now / 300) : 0.5; D.roundRect(ctx, bx + 1, by + 1, bs - 2, bs - 2, 10); ctx.stroke(); ctx.globalAlpha = 1;
           }
           // inner grid
           ctx.strokeStyle = col.line; ctx.lineWidth = 1.5; ctx.lineCap = 'round';
@@ -363,7 +372,7 @@
             const a = claimed ? (claimed !== DRAW && winCells.has(k) ? 0.5 : 0.22) : 1;
             if (i === last) { ctx.fillStyle = v === P ? 'rgba(217,119,87,0.18)' : (col.dark ? 'rgba(255,255,255,0.08)' : 'rgba(32,28,23,0.07)'); D.roundRect(ctx, x - cs * 0.44, y - cs * 0.44, cs * 0.88, cs * 0.88, 6); ctx.fill(); }
             if (v === P) markX(x, y, cs * 0.34, col.accent, t, a);
-            else markO(x, y, cs * 0.34, col.ink, t, a);
+            else markO(x, y, cs * 0.34, markCol(C, col), t, a);
           }
           // claimed overlay
           if (claimed) {
@@ -375,7 +384,7 @@
             }
             const mk = Math.min(1, Math.max(0, (el - 0.22) / 0.45)), lw = Math.max(2.5, bs * 0.055);
             if (claimed === P) markX(cxm, cym, bs * 0.38, col.accent, mk, 1, lw);
-            else if (claimed === C) markO(cxm, cym, bs * 0.4, col.ink, mk, 0.85, lw);
+            else if (claimed === C) markO(cxm, cym, bs * 0.4, markCol(C, col), mk, 0.85, lw);
             else D.text(ctx, 'Draw', cxm, cym, bs * 0.16, col.ink3, 700);
           }
         }
@@ -387,10 +396,10 @@
         }
         // hover / cursor preview
         const target = useCursor ? cur : hover;
-        if (phase === 'play' && s.turn === P && target >= 0) {
-          const [x, y] = cellXY(target);
-          if (legal.has(target)) markX(x, y, cs * 0.34, col.accent, 1, 0.35);
-          if (useCursor) { ctx.strokeStyle = legal.has(target) ? col.accent : col.ink3; ctx.lineWidth = 2; D.roundRect(ctx, x - cs * 0.45, y - cs * 0.45, cs * 0.9, cs * 0.9, 6); ctx.stroke(); }
+        if (phase === 'play' && (s.turn === P || friend) && target >= 0) {
+          const [x, y] = cellXY(target), tc = markCol(s.turn, col);
+          if (legal.has(target)) { if (s.turn === P) markX(x, y, cs * 0.34, tc, 1, 0.35); else markO(x, y, cs * 0.34, tc, 1, 0.35); }
+          if (useCursor) { ctx.strokeStyle = legal.has(target) ? tc : col.ink3; ctx.lineWidth = 2; D.roundRect(ctx, x - cs * 0.45, y - cs * 0.45, cs * 0.9, cs * 0.9, 6); ctx.stroke(); }
         }
         // thinking cue: soft scan across live boards
         if (thinking && !api.reduceMotion) {
@@ -428,7 +437,7 @@
         if (L.lineOf(x => n.smalls[x], P) || L.lineOf(x => n.smalls[x], C) || !L.moves(n).length) return false;
         s = n; last = Number.isInteger(sv.last) ? sv.last : -1;
         cur = Number.isInteger(sv.cur) && sv.cur >= 0 && sv.cur < 81 ? sv.cur : 40;
-        if (s.turn === C) cpuTurn(); else snapCursor();
+        if (s.turn === C && !friend) cpuTurn(); else snapCursor();
         return true;
       }
 
