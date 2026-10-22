@@ -9,8 +9,8 @@
    World units, y grows upward. Fixed 240 Hz position-based solver, so it feels the same at any frame rate. */
 (function () {
   const D = Ludus.draw;
-  const G = -1450, PR = 16, HR = 6, HL = 124, HMIN = 22, STEP = 1 / 240, VIEW = 360;
-  const SPRING = 26, HSPD = 720, VMAX = 1000, FLING = 580, REACT = 0.06, BOUNCE = 0.18, STICK = 1.5, STICKV = 380;
+  const G = -1450, PR = 16, HR = 6, HL = 80, HMIN = 18, STEP = 1 / 240, VIEW = 360;
+  const SPRING = 26, HSPD = 720, VMAX = 1000, FLING = 580, REACT = 0.06, BOUNCE = 0.18, STICK = 1.5, STICKV = 380, SUP = 0.25;
   // Materials: head slip (share of sideways drag that slides), pot friction.
   const MAT = {
     rock: { slip: 0, mu: 0.9 }, orange: { slip: 0, mu: 0.8 }, wall: { slip: 1, mu: 0.3 }, wood: { slip: 0.03, mu: 0.8 },
@@ -214,18 +214,32 @@
     // 1. the hammer offset chases the target: stiff spring, capped speed (wild flicks cannot teleport it)
     let ox = (T.x - s.o.x) * SPRING, oy = (T.y - s.o.y) * SPRING;
     const ol = Math.hypot(ox, oy); if (ol > HSPD) { ox *= HSPD / ol; oy *= HSPD / ol; }
-    const mx = ox * dt, my = oy * dt, no = clampArm(s.o.x + mx, s.o.y + my);
+    const mx = ox * dt, my = oy * dt;
     // 2. the pot falls; swinging a free hammer in the air nudges it a little the other way
     s.v.y += G * dt;
     let px = s.p.x + s.v.x * dt, py = s.p.y + s.v.y * dt;
     if (!s.hc && !s.ground) { px -= mx * REACT; py -= my * REACT; }
-    // 3. the head: free, it goes where the arm puts it; pressed into terrain, it holds and the pot moves instead
+    // 2b. only a head resting ON TOP of something (normal up) holds the pot up: it stays put while the pot hangs from it.
+    //     Free or against a wall/ceiling the head just rides along with the pot (so gravity wins and the pot falls).
+    const sup = s.hc && s.hn.y >= SUP;
+    let qx = s.o.x, qy = s.o.y, a0 = { hit: false };
+    if (!sup) {
+      const cq = clampArm(s.h.x - s.p.x, s.h.y - s.p.y); qx = cq.x; qy = cq.y;
+      a0 = probe(world, px + qx, py + qy, HR);
+      if (a0.hit) {
+        if (a0.ny >= SUP) { px += a0.x - (px + qx); py += a0.y - (py + qy); }
+        else { const cl = clampArm(a0.x - px, a0.y - py); qx = cl.x; qy = cl.y; }
+      }
+      s.h.x = px + qx; s.h.y = py + qy;
+    }
+    const no = clampArm(s.o.x + mx, s.o.y + my);
+    // 3. the mouse moves the head: free, it goes where the arm puts it; pressed into terrain, it holds and the pot moves instead
     const hx = px + no.x, hy = py + no.y;
     let c = probe(world, hx, hy, HR);
-    // a planted head clings on through slow moves; only a quick shove (or pulling clearly away) breaks it free
+    // a planted head clings on through slow moves (never to a ceiling); only a quick shove breaks it free
     if (!c.hit && s.hc && Math.hypot(s.v.x, s.v.y) < STICKV) {
       const a = probe(world, hx, hy, HR + STICK);
-      if (a.hit) c = { x: a.x - a.nx * STICK, y: a.y - a.ny * STICK, hit: true, nx: a.nx, ny: a.ny, sh: a.sh };
+      if (a.hit && a.ny > -0.3) c = { x: a.x - a.nx * STICK, y: a.y - a.ny * STICK, hit: true, nx: a.nx, ny: a.ny, sh: a.sh };
     }
     let nhx = hx, nhy = hy;
     if (c.hit) {
@@ -239,7 +253,7 @@
       px += nhx - hx; py += nhy - hy;
       s.hn.x = c.nx; s.hn.y = c.ny;
     }
-    s.hc = c.hit; s.o.x = no.x; s.o.y = no.y;
+    s.hc = c.hit || a0.hit; s.o.x = no.x; s.o.y = no.y;
     // 4. the pot against the terrain: slide with friction, bounce a touch on hard hits
     let vx = (px - px0) / dt, vy = (py - py0) / dt;
     const b = probe(world, px, py, PR);
@@ -643,8 +657,7 @@
           const t = toScreen(s.p.x + Math.cos(aim.a) * aim.l, s.p.y + Math.sin(aim.a) * aim.l);
           ctx.strokeStyle = col.ink3; ctx.globalAlpha = 0.6; ctx.lineWidth = 1.2;
           ctx.beginPath(); ctx.arc(t.x, t.y, 4.5, 0, Math.PI * 2); ctx.stroke(); ctx.globalAlpha = 1;
-          ctx.save(); ctx.setLineDash([2, 6]); ctx.globalAlpha = 0.18; ctx.strokeStyle = col.ink3;
-          ctx.beginPath(); ctx.arc(pc.x, pc.y, HL * k, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+
         }
       }
 
