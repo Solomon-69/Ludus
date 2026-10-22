@@ -5,8 +5,16 @@
   const $ = id => document.getElementById(id);
   const root = document.documentElement;
   const ACCENTS = ['#d97757', '#5b8def', '#4f9d69', '#9b6dd6', '#e0a526', '#e05d8b', '#3aa6a6'];
-  const FILTERS = ['All', 'Arcade', 'Puzzle', 'Duel', '2 Player'];
+  const FILTERS = ['All', 'Arcade', 'Puzzle', 'Duel', '2 Player', '3-4 Player'];
   const TWO = '2 Player';
+  const PARTY = '3-4 Player';              // games that 3 or 4 people can play together (online, some also on one keyboard)
+  const party = g => !!(g.online && g.online.max >= 3);
+  // ---------- custom game names (Settings > Rename games) ----------
+  // Off: every name is the original. On: a name the player typed (kept in S.names, also while switched off) replaces it.
+  const NAME_MAX = 24;
+  const customName = g => (S.renameGames && S.names && typeof S.names[g.id] === 'string' && S.names[g.id].trim()) || '';
+  const dispName = g => customName(g) || g.name;
+  L.displayName = dispName;
   const REVEAL_MS = 1200;   // how long the final board stays on screen before the result bar slides up
   const SAVE_EVERY_MS = 4000;
   const SLIDE_MS = 60;          // the game screen's slide-in, before a game is started
@@ -70,10 +78,10 @@
   // Search box: matches a game's name, its group and its older Ludus name, ignoring case and accents.
   let query = '';
   const norm = t => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
-  const matches = g => { const q = norm(query); return !q || q.split(' ').every(w => norm([g.name, g.tag, g.aka, g.id].join(' ')).includes(w)); };
+  const matches = g => { const q = norm(query); return !q || q.split(' ').every(w => norm([g.name, customName(g), g.tag, g.aka, g.id].join(' ')).includes(w)); };
   function visibleGames() {
     if (norm(query)) return L.games.filter(g => !S.hidden.includes(g.id) && matches(g));
-    return L.games.filter(g => !S.hidden.includes(g.id) && (S.filter === 'All' || g.tag === S.filter || (S.filter === TWO && g.versus)));
+    return L.games.filter(g => !S.hidden.includes(g.id) && (S.filter === 'All' || g.tag === S.filter || (S.filter === TWO && g.versus) || (S.filter === PARTY && party(g))));
   }
   function renderFilters() {
     const f = $('filters'); f.innerHTML = '';
@@ -115,13 +123,64 @@
       const best = S.best[g.id] || 0;
       b.innerHTML = `<div class="art"><canvas></canvas></div>
         <div><div class="tag">${found ? 'Best match' : feature ? 'Continue' : g.tag}${S.saves[g.id] ? '<i class="saved-dot">In progress</i>' : ''}</div>
-        <div class="card-name">${g.name}</div>
+        <div class="card-name"></div>
         <div class="card-meta"><span>${g.tag === TWO ? 'Played' : g.tag === 'Duel' ? 'Wins' : 'Best'}</span><b>${fmt(g.tag === TWO ? (S.plays[g.id] || 0) : best)}</b></div></div>`;
+      fillName(b.querySelector('.card-name'), g, () => renderCards());
       b.onclick = () => start(g.id);
       grid.appendChild(b);
     });
     if (!ordered.length) grid.innerHTML = `<div class="foot" style="grid-column:span 2">${norm(query) ? 'No games match \u201c' + query.replace(/[<>&]/g, '') + '\u201d' : 'No games here yet.'}</div>`;
     requestAnimationFrame(drawCards);
+  }
+  // Puts the game's name in el. In rename mode the name is a small button that opens the rename sheet
+  // (a click on it never opens the game); after a save, done() redraws whatever shows the name.
+  function fillName(el, g, done) {
+    el.textContent = ''; el.title = '';
+    root.classList.toggle('renaming', !!S.renameGames);
+    if (!S.renameGames) { el.textContent = g.name; return; }
+    const n = document.createElement('span');
+    n.className = 'rename-name'; n.textContent = dispName(g); n.setAttribute('role', 'button'); n.tabIndex = 0;
+    n.title = customName(g) ? g.name + ' \u00b7 click to rename' : 'Click to rename';
+    n.setAttribute('aria-label', 'Rename ' + dispName(g));
+    const open = e => { e.preventDefault(); e.stopPropagation(); openRename(g, done); };
+    n.addEventListener('click', open);
+    n.addEventListener('pointerdown', e => e.stopPropagation());
+    n.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') open(e); });
+    el.appendChild(n);
+  }
+  let renameSheet = null;
+  function openRename(g, done) {
+    if (!renameSheet) {
+      renameSheet = document.createElement('div'); renameSheet.className = 'sheet rename-sheet'; renameSheet.setAttribute('role', 'dialog'); renameSheet.setAttribute('aria-modal', 'true'); renameSheet.setAttribute('aria-label', 'Rename game');
+      document.body.appendChild(renameSheet);
+    }
+    const sh = renameSheet; sh.innerHTML = ''; sh.hidden = false;
+    const card = document.createElement('div'); card.className = 'lobby-card rename-card';
+    const t = document.createElement('div'); t.className = 'sheet-title'; t.textContent = 'Rename game'; card.appendChild(t);
+    const sub = document.createElement('p'); sub.className = 'lobby-sub'; sub.textContent = 'Original name: ' + g.name; card.appendChild(sub);
+    const input = document.createElement('input'); input.type = 'text'; input.maxLength = NAME_MAX; input.value = dispName(g); input.placeholder = g.name;
+    input.autocomplete = 'off'; input.spellcheck = false; input.setAttribute('aria-label', 'New name for ' + g.name);
+    card.appendChild(input);
+    const count = document.createElement('div'); count.className = 'rename-count'; card.appendChild(count);
+    const upd = () => { count.textContent = input.value.length + ' / ' + NAME_MAX; };
+    input.addEventListener('input', upd); upd();
+    const close = () => { sh.hidden = true; sh.innerHTML = ''; document.removeEventListener('keydown', esc, true); };
+    const finish = v => {
+      const clean = String(v || '').replace(/\s+/g, ' ').trim().slice(0, NAME_MAX);
+      S.names = Object.assign({}, S.names);
+      if (!clean || clean === g.name) delete S.names[g.id]; else S.names[g.id] = clean;
+      L.save(); close(); L.sfx('click'); if (done) done();
+    };
+    const save = document.createElement('button'); save.className = 'btn primary'; save.type = 'button'; save.textContent = 'Save'; save.onclick = () => finish(input.value);
+    const reset = document.createElement('button'); reset.className = 'btn'; reset.type = 'button'; reset.textContent = 'Reset to original'; reset.onclick = () => finish('');
+    const cancel = document.createElement('button'); cancel.className = 'btn ghost'; cancel.type = 'button'; cancel.textContent = 'Cancel'; cancel.onclick = close;
+    card.appendChild(save); card.appendChild(reset); card.appendChild(cancel);
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); finish(input.value); } });
+    function esc(e) { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); } }
+    document.addEventListener('keydown', esc, true);
+    sh.onclick = e => { if (e.target === sh) close(); };
+    sh.appendChild(card);
+    setTimeout(() => { try { input.focus({ preventScroll: true }); input.select(); } catch (e) {} }, 30);
   }
   function drawCards() {
     const c = L.colors();
@@ -151,7 +210,7 @@
     if (!keepRoom) leaveOnline();
     stop();
     S.last = id; S.plays[id] = (S.plays[id] || 0) + 1; L.save();
-    $('gameName').textContent = g.name;
+    fillName($('gameName'), g, () => { fillName($('gameName'), g); });
     $('scoreNow').textContent = '0';
     $('scoreBest').textContent = fmt(S.best[id] || 0);
     if (!S.vs) S.vs = {};
@@ -538,6 +597,7 @@
       row('Sound', null, sw(S.sound, v => { S.sound = v; L.save(); if (v) L.sfx('score'); }, 'Sound')),
       row('Volume', null, vol),
       row('Show controls under games', null, sw(S.hints, v => { S.hints = v; L.save(); }, 'Show controls')),
+      row('Rename games', 'Click a game\u2019s name to give it your own', sw(!!S.renameGames, v => { S.renameGames = v; L.save(); }, 'Rename games')),
     ]));
     const appRows = [];
     if (window.__LUDUS_NATIVE__) {
@@ -641,7 +701,7 @@
                   : 'Click the controller icon at the top of your screen to open it. Click outside to put it away.',
         items: [
           [ic('M6 5h4v14H6zM14 5h4v14h-4z'), 'Close it mid-game', 'Every game saves itself and waits for you'],
-          [ic('M4 6h16M4 12h10M4 18h7'), 'Pick a tab', 'All, Arcade, Puzzle, Duel or 2 Player'],
+          [ic('M4 6h16M4 12h10M4 18h7'), 'Pick a tab', 'All, Arcade, Puzzle, Duel, 2 Player or 3-4 Player'],
           [ic('M11 4a2 2 0 1 1 2 0v1a7 7 0 0 1 5 6.7V15l2 3H4l2-3v-3.3A7 7 0 0 1 11 5z'), 'Make it yours', 'Colours, sound and light or dark in Settings'],
         ] },
       { art: ic('M8 5v14l11-7z'), title: 'Ready to play', text: 'Start with something quick. Your best scores are kept on this computer only.' },

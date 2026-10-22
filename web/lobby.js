@@ -41,7 +41,7 @@
     return c;
   }
   function avatars(count, max) {
-    const row = el('div', 'seats');
+    const row = el('div', 'seats' + (max > 2 ? ' many' : ''));   // 3 or 4 seats: two columns, so the card stays short
     const mine = session ? session.seat : -1;
     for (let i = 0; i < max; i++) {
       const p = session && session.roster.get(i);
@@ -83,7 +83,7 @@
     const live = el('div', 'lobby-live'); live.setAttribute('aria-live', 'polite');
     if (screen === 'choose') {
       title('Play online');
-      card.appendChild(el('p', 'lobby-sub', 'Play ' + game.name + ' with someone in another place. One of you makes a room and shares the code.'));
+      card.appendChild(el('p', 'lobby-sub', 'Play ' + (L.displayName ? L.displayName(game) : game.name) + ' with someone in another place. One of you makes a room and shares the code.'));
       const f = el('label', 'field');
       f.appendChild(el('span', 'field-label', 'Your name (optional)'));
       const input = el('input'); input.type = 'text'; input.maxLength = 10; input.placeholder = 'Player'; input.value = nameValue();
@@ -132,7 +132,7 @@
       const row = el('div', 'lobby-row');
       const cl = el('span', '', copied ? 'Copied' : 'Copy invite');
       const cb = el('button', 'btn small', ''); cb.type = 'button'; cb.appendChild(cl);
-      cb.onclick = () => { L.sfx('click'); copyCode(L.net.inviteText(game.name, session.code), cl); };
+      cb.onclick = () => { L.sfx('click'); copyCode(L.net.inviteText(L.displayName ? L.displayName(game) : game.name, session.code), cl); };
       row.appendChild(cb); row.appendChild(connChip(session.conn));
       card.appendChild(row);
       const n = session.count(), mx = session.max;
@@ -140,7 +140,8 @@
       card.appendChild(live);
       card.appendChild(avatars(n, mx));
       if (host) {
-        const s = btn('Start game', 'primary', () => session && session.start());
+        // a room for more than two: the host may start once enough are in, without waiting for every seat
+        const s = btn(mx > 2 && n >= session.min && n < mx ? 'Start now' : 'Start game', 'primary', () => session && session.start());
         s.disabled = n < session.min;
         card.appendChild(s);
       }

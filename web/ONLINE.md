@@ -14,6 +14,7 @@ with `api.online` set.
 | `web/lobby.js` | The create / join / waiting sheet and error messages |
 | `web/app.js` | Online button, header chip + Leave button, rematch, room-closed handling |
 | `web/engine.js` | `makeApi(game, stage, hooks, online)` puts `api.online` on the game's api |
+| `web/rt.js` | `Ludus.rt(api, {...})`: the host-runs-it link for real-time games (see "Real-time games") |
 
 ## Invites and the ludus:// link
 
@@ -54,6 +55,8 @@ Only games with `online` (and `versus: true`) show the Online button.
 | `on(type, fn)` | `fn(data, fromSeat)` runs at once for that message type. Returns an unsubscribe function |
 | `queue(fn)` | **ordered** delivery for everything else: `fn(type, data, fromSeat)` is called in arrival order; return `false` to say "I am not ready for this yet" and it is offered again every 40 ms (dropped after 15 s); return anything else once handled or ignored. This is how the board games wait for an animation to finish. Register it *after* the game has set up its first state, because messages that arrived earlier are delivered the moment you call `queue` |
 | `rand()` | a **shared seeded** random number in `[0,1)`. Every screen gets the same stream, so call it in the same order everywhere (hidden wire, target line, who starts...). `randInt(a, b)` is the inclusive integer version |
+| `sendFast(type, data)` / `sendFastTo(seat, type, data)` | a **fast** message: not numbered, never sent again, dropped while offline, only reaches `on()` handlers. For state sent many times a second where only the newest copy matters |
+| `seats` | the seats taken right now, sorted (e.g. `[0, 1, 3]`) |
 | `onLeave(fn)` | `fn(seat, name, roomClosed)` when a player leaves. The app already ends the room and returns everyone to the menu with a message when fewer than `min` players are left; use this only for games that can carry on with fewer |
 
 Also: `api.vs` and `api.friend` read as `'friend'` / `true` online, so a game can reuse its friend-mode code
@@ -62,7 +65,26 @@ is always `null` online and the app never saves an online game.
 
 Everything registered with `on`, `queue` or `onLeave` is cleaned up automatically when the game exits.
 
-## The pattern the eight shipped games use
+## Rooms for 3 or 4
+
+`online: { min: 2, max: 4 }` makes a room with four seats. The room starts by itself when every seat is taken; before
+that the host sees **Start now** as soon as `min` players are in. Seats are 0-3 (host = 0); the colours are the
+accent, blue, green and purple. When a player leaves and at least `min` remain, the game goes on (use `onLeave`);
+below `min` the app ends the room. The home screen's **3-4 Player** tab lists every game with `online.max >= 3`.
+
+## Real-time games (Pong, Air Hockey, Tag, Paper.io, Hole.io)
+
+These use `web/rt.js`. **The host's screen runs the game** (physics, bots, scoring) and ~18 times a second sends a
+compact copy of the state with `sendFast('st', ...)`. Every guest sends only its controls (`sendFastTo(0, 'in', ...)`,
+on change and every 200 ms) and draws the host's copy, smoothed between the last two copies (`link.sample()`, drawn
+about 90 ms in the past). Things that must not be lost go over the normal numbered messages instead: Paper.io sends
+changed territory rows (`terr`, run-length coded), Hole.io sends eaten objects (`gone`) and new cars (`spawn`), every
+game sends the final result (`end`). Hole.io builds its city from the shared `rand()` stream, so every screen starts
+with the same city and only the changes travel. A guest validates every number it reads from a state copy.
+Known limits: the host's tab must stay in front (a hidden browser tab slows its timers); a guest sees the world
+about 0.1 s late; if the host leaves the room closes.
+
+## The pattern the turn-based games use
 
 1. Every screen runs the same deterministic game. A move is applied locally and sent as a small message
    (`on.send('drop', { c })`); the other screens apply the same move to the same state.
@@ -93,6 +115,6 @@ Everything registered with `on`, `queue` or `onLeave` is cleaned up automaticall
 
 ## Testing
 
-Run two pages against an in-memory broker (no internet needed): a tiny MQTT broker over a local WebSocket plus
+Run two to four pages against an in-memory broker (no internet needed): a tiny MQTT broker over a local WebSocket plus
 two headless pages, with `__LUDUS_BROKERS__` pointing at it. `Ludus.net.WebSocket` can also be replaced with a fake.
 `window.ludusSnapshot()` (the game's own `save()`) is handy for comparing the two boards.

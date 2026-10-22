@@ -107,9 +107,10 @@ svg { display: block; }
 .filters.is-dim { opacity: 0.35; pointer-events: none; transition: opacity 0.2s; }
 
 /* Filters */
-.filters { display: flex; gap: 6px; padding: 4px 14px 10px; flex: none; }
+.filters { display: flex; gap: 4px; padding: 4px 14px 10px; flex: none; overflow-x: auto; scrollbar-width: none; }
+.filters::-webkit-scrollbar { display: none; }
 .chip {
-  padding: 5px 11px; border-radius: 999px; font-weight: 560; font-size: 12px;
+  padding: 5px 9px; border-radius: 999px; font-weight: 560; font-size: 12px; flex: none; white-space: nowrap;
   color: var(--ink-2); background: transparent;
   transition: background 0.2s, color 0.2s, transform 0.25s var(--spring);
 }
@@ -148,6 +149,19 @@ svg { display: block; }
 }
 .art canvas { width: 100%; height: 100%; display: block; }
 .card-name { font: 640 13.5px/1.15 var(--font-round); }
+.renaming .card-name, .renaming .game-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Rename games (Settings): the name becomes a small button; long names end with an ellipsis */
+.rename-name { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom;
+  border-radius: 6px; padding: 0 3px; margin: 0 -3px; cursor: text; box-shadow: inset 0 -1.5px 0 color-mix(in srgb, var(--accent) 55%, transparent); transition: background 0.15s; }
+.rename-name:hover, .rename-name:focus-visible { background: color-mix(in srgb, var(--accent) 14%, transparent); outline: 0; }
+.sheet.rename-sheet { position: fixed; z-index: 20; padding: 12px; }
+.rename-card { width: min(300px, 100%); }
+.rename-card input {
+  width: 100%; height: 38px; border: 0; border-radius: 11px; padding: 0 12px; font: inherit; font-size: 14px; color: var(--ink); box-sizing: border-box;
+  background: var(--surface-2); outline: 0; user-select: text; -webkit-user-select: text; box-shadow: inset 0 0 0 1px var(--line); transition: box-shadow 0.2s;
+}
+.rename-card input:focus { box-shadow: inset 0 0 0 2px var(--accent); }
+.rename-count { font-size: 11px; color: var(--ink-3); text-align: right; margin-top: -4px; font-variant-numeric: tabular-nums; }
 .card-meta { display: flex; justify-content: space-between; align-items: baseline; color: var(--ink-3); font-size: 11px; margin-top: 2px; gap: 6px; }
 .card-meta b { color: var(--ink-2); font-weight: 600; font-variant-numeric: tabular-nums; }
 .tag { font-size: 10px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-3); }
@@ -423,6 +437,7 @@ svg { display: block; }
   animation: sheetIn 0.5s var(--spring); text-align: center; margin: auto;
 }
 .lobby-card::-webkit-scrollbar { display: none; }
+.lobby-card > * { flex-shrink: 0; }   /* a room with four seats scrolls instead of squashing the code boxes */
 .lobby-card .sheet-title { overflow-wrap: anywhere; }
 .lobby-sub { margin: 0; color: var(--ink-2); font-size: 12.5px; line-height: 1.4; overflow-wrap: anywhere; }
 .lobby-note { margin: 0; color: var(--ink-3); font-size: 11px; line-height: 1.35; }
@@ -454,6 +469,9 @@ svg { display: block; }
 .seat-dot { width: 26px; height: 26px; border-radius: 50%; flex: none; display: grid; place-items: center; background: var(--line); color: #fff; font: 700 12px/1 var(--font-round); }
 .seat-name { flex: 1; min-width: 0; font-weight: 600; font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .seat-tag { flex: none; font-size: 10px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-3); }
+.seats.many { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.seats.many .seat { padding: 6px 8px; gap: 7px; }
+.seats.many .seat-tag { font-size: 9px; }
 @media (max-height: 520px) {
   .lobby-card { padding: 12px 14px 10px; gap: 7px; }
   .code-ch { width: 34px; height: 42px; font-size: 21px; }

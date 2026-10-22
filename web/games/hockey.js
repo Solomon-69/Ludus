@@ -10,6 +10,7 @@
   // Two people, one keyboard: P1 = WASD (+F / left Shift), P2 = arrows (+ / , right Shift, Enter).
   function makePads(api) {
     const bot = !api.friend;   // vs Bot: both key sets drive P1
+    const mine = api.online ? (api.online.seat === 0 ? 'p1' : 'p2') : null;   // online: both key sets drive my own mallet
     const C1 = { KeyW: 'up', KeyS: 'down', KeyA: 'left', KeyD: 'right', KeyF: 'act', ShiftLeft: 'act' };
     const K1 = { w: 'up', s: 'down', a: 'left', d: 'right', f: 'act' };
     const C2 = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right', Slash: 'act', ShiftRight: 'act', Enter: 'act', NumpadEnter: 'act' };
@@ -18,7 +19,7 @@
     const pads = { p1: blank(), p2: blank() };
     function find(e) {
       const m = find0(e);
-      return m && bot ? ['p1', m[1]] : m;
+      return m && mine ? [mine, m[1]] : m && bot ? ['p1', m[1]] : m;
     }
     function find0(e) {
       if (e.key === 'Shift') {
@@ -51,6 +52,8 @@
 
   Ludus.register({
     id: 'hockey', name: 'Air Hockey', aka: 'Air Puck', tag: '2 Player', wide: true, tint: '#e05d8b', versus: true, defaultVs: 'friend',
+    online: { min: 2, max: 2 },
+    onlineHint: '<b>Online</b> <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or the arrow keys move your mallet · the host guards the orange goal',
     hint: '<b>vs Bot</b> <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> move · <b>vs Friend</b> P1 (left) <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> · P2 (right) <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd>',
     _rules: { strike },
     art(ctx, w, h) {
@@ -65,6 +68,9 @@
       const view = api.canvas(onResize);
       const { ctx } = view;
       const pads = makePads(api);
+      const on = api.online, guest = !!(on && !on.isHost);
+      const nameOf = id => Ludus.rt.seatName(api, id === 'p1' ? 0 : 1);
+      let net = null;   // host: the guest's mallet keys, already turned into rink directions
       // Rink length follows the stage: portrait keeps the classic 300 x 440 rink; landscape lays it on
       // its side and stretches it to fill the width (P1 goal left, P2 goal right).
       const lengthFor = (w, h) => w > h ? Math.max(PH, Math.min(MAX_H, Math.round((W + 16) * (w - 16) / Math.max(1, h - 64) - 16))) : PH;
@@ -113,7 +119,7 @@
         return [axisDir(m.x, m.vx, ai.tx), axisDir(m.y, m.vy, ai.ty)];
       }
       function moveMallet(id, dt) {
-        const m = mallets[id], p = dirs(pads[id]), live = phase === 'play' || phase === 'ready';
+        const m = mallets[id], p = net && id === 'p2' ? net : dirs(pads[id]), live = phase === 'play' || phase === 'ready';
         let ax = live ? (p.right ? 1 : 0) - (p.left ? 1 : 0) : 0, ay = live ? (p.down ? 1 : 0) - (p.up ? 1 : 0) : 0;
         if (id === 'p2' && !api.friend) { [ax, ay] = live ? botAxes(dt) : [0, 0]; }
         if (ax && ay) { ax *= Math.SQRT1_2; ay *= Math.SQRT1_2; }
@@ -208,6 +214,7 @@
           if (phaseT <= 0 && !overCalled) {
             overCalled = true;
             const win = score.p1 > score.p2 ? 'p1' : 'p2';
+            if (on) { on.send('end', { p1: score.p1, p2: score.p2 }); finishOnline(); return; }
             api.over({ score: score[win], won: api.friend || win === 'p1', title: api.friend ? (win === 'p1' ? 'P1' : 'P2') + ' wins' : win === 'p1' ? 'You win' : 'Bot wins', message: `${Math.max(score.p1, score.p2)} to ${Math.min(score.p1, score.p2)}` });
           }
         }
@@ -229,8 +236,8 @@
         ctx.clearRect(0, 0, w, h);
         const side = flat();
         D.duelHeader(ctx, 10, 8, w - 20, {
-          left: api.friend ? { who: 'p1', label: side ? 'P1 left' : 'P1 bottom', score: score.p1 } : { who: 'you', label: 'You', score: score.p1 },
-          right: api.friend ? { who: 'p2', label: side ? 'P2 right' : 'P2 top', score: score.p2 } : { who: 'bot', label: 'Bot', score: score.p2 },
+          left: on ? { who: 'p1', label: nameOf('p1'), score: score.p1 } : api.friend ? { who: 'p1', label: side ? 'P1 left' : 'P1 bottom', score: score.p1 } : { who: 'you', label: 'You', score: score.p1 },
+          right: on ? { who: 'p2', label: nameOf('p2'), score: score.p2 } : api.friend ? { who: 'p2', label: side ? 'P2 right' : 'P2 top', score: score.p2 } : { who: 'bot', label: 'Bot', score: score.p2 },
           turn: null, status: phase === 'goal' ? 'Goal' : ''
         }, col);
         // RW x RH = the rink as it appears on screen
@@ -279,13 +286,13 @@
         ctx.restore();
         // text stays upright: drawn in screen-rink space (RW x RH)
         if (phase === 'goal' || phase === 'over') {
-          const who = lastGoal.who, label = api.friend ? (who === 'p1' ? 'P1' : 'P2') : who === 'p1' ? 'You' : 'Bot';
-          const big = phase === 'over' ? `${label} ${label === 'You' ? 'win' : 'wins'} the match` : `${label} ${label === 'You' ? 'score' : 'scores'}`;
+          const who = lastGoal.who, label = on ? nameOf(who) : api.friend ? (who === 'p1' ? 'P1' : 'P2') : who === 'p1' ? 'You' : 'Bot';
+          const big = phase === 'over' ? (on ? `${label} wins` : `${label} ${label === 'You' ? 'win' : 'wins'} the match`) : `${label} ${label === 'You' ? 'score' : 'scores'}`;
           const k = api.reduceMotion ? 1 : D.ease.outBack(Math.min(1, (clock - lastGoal.t) * 4)), bw = 220, by = RH / 2;
           ctx.save(); ctx.translate(RW / 2, by); ctx.scale(k, k);
           ctx.fillStyle = col.surface; ctx.shadowColor = 'rgba(0,0,0,0.22)'; ctx.shadowBlur = 16; ctx.shadowOffsetY = 5;
           D.roundRect(ctx, -bw / 2, -26, bw, 52, 16); ctx.fill(); ctx.shadowColor = 'transparent';
-          D.text(ctx, big, 0, -6, 15, col.ink, 800);
+          D.fitText(ctx, big, 0, -6, bw - 24, 15, col.ink, 800, 11);
           D.text(ctx, `${score.p1} : ${score.p2}`, 0, 13, 11.5, col.ink2, 700);
           ctx.restore();
         } else if (phase === 'ready') {
@@ -324,12 +331,54 @@
       // The panel may still be turning landscape when the game starts: re-fit an untouched match.
       function onResize(w, h) {
         const nh = lengthFor(...dims());
-        if (nh === H || restored || api.touched || score.p1 || score.p2 || phase !== 'ready') return;
+        if (on || nh === H || restored || api.touched || score.p1 || score.p2 || phase !== 'ready') return;
         H = nh; reset();
       }
       if (window.ludusDebug) window.ludusDebug.hockey = () => ({ W, H, flat: flat(), phase, score: { ...score }, puck: { ...puck }, m1: { ...mallets.p1 }, m2: { ...mallets.p2 } });
-      api.loop(dt => { update(dt); render(); });
-      return { save, pause() { pads.clear(); }, resume() { pads.clear(); } };
+      // ---------- online: the host plays the match, the guest sends its mallet keys and draws the host's copy ----------
+      let link = null, ended = false;
+      function finishOnline() {
+        if (ended) return; ended = true;
+        const win = score.p1 > score.p2 ? 'p1' : 'p2', mineId = on.seat === 0 ? 'p1' : 'p2';
+        api.over({ score: score[mineId], won: win === mineId, title: nameOf(win) + ' wins', message: `${Math.max(score.p1, score.p2)} to ${Math.min(score.p1, score.p2)}` });
+      }
+      const num = v => typeof v === 'number' && isFinite(v);
+      if (on) {
+        if (on.isHost) net = { up: false, down: false, left: false, right: false };
+        const R1 = v => Math.round(v * 10) / 10;
+        link = Ludus.rt(api, {
+          hz: 20,
+          snapshot: () => ({ H, s: [score.p1, score.p2], m: [R1(mallets.p1.x), R1(mallets.p1.y), R1(mallets.p2.x), R1(mallets.p2.y)], p: [R1(puck.x), R1(puck.y)], ph: phase, g: lastGoal ? lastGoal.who : '' }),
+          input: () => { const d = dirs(pads.p2); return { u: d.up ? 1 : 0, d: d.down ? 1 : 0, l: d.left ? 1 : 0, r: d.right ? 1 : 0 }; },
+          onInput: (seat, d) => { if (seat === 1) { net.up = d.u === 1; net.down = d.d === 1; net.left = d.l === 1; net.right = d.r === 1; } },
+          onState: d => {
+            if (num(d.H) && d.H >= PH && d.H <= MAX_H) H = d.H;
+            if (Array.isArray(d.s) && d.s.length === 2 && d.s.every(Number.isInteger)) {
+              const who = d.s[0] > score.p1 ? 'p1' : d.s[1] > score.p2 ? 'p2' : null;
+              score = { p1: d.s[0], p2: d.s[1] }; api.score(Math.max(score.p1, score.p2));
+              if (who) { lastGoal = { who, x: W / 2, y: who === 'p1' ? 0 : H, t: clock }; api.sfx('score'); burst(puck.x, who === 'p1' ? 0 : H, 26, who === 'p1' ? api.colors().accent : D.P2); }
+            }
+            if ((d.g === 'p1' || d.g === 'p2') && !lastGoal) lastGoal = { who: d.g, x: W / 2, y: d.g === 'p1' ? 0 : H, t: clock };
+            if (['ready', 'play', 'goal', 'over'].includes(d.ph)) phase = d.ph;
+          }
+        });
+        if (guest) on.on('end', d => { if (d && Number.isInteger(d.p1) && Number.isInteger(d.p2)) { score = { p1: d.p1, p2: d.p2 }; phase = 'over'; if (!lastGoal) lastGoal = { who: d.p1 > d.p2 ? 'p1' : 'p2', x: W / 2, y: 0, t: clock }; finishOnline(); } });
+      }
+      function guestFrame(dt) {
+        clock += dt;
+        const sm = link.sample();
+        if (sm && Array.isArray(sm.a.m) && Array.isArray(sm.b.m) && Array.isArray(sm.a.p) && Array.isArray(sm.b.p) && sm.a.m.concat(sm.b.m, sm.a.p, sm.b.p).every(num) && sm.b.m.length === 4) {
+          const { a, b, t } = sm, M = Ludus.rt.mix;
+          mallets.p1.x = M(a.m[0], b.m[0], t); mallets.p1.y = M(a.m[1], b.m[1], t);
+          mallets.p2.x = M(a.m[2], b.m[2], t); mallets.p2.y = M(a.m[3], b.m[3], t);
+          puck.x = M(a.p[0], b.p[0], t, 80); puck.y = M(a.p[1], b.p[1], t, 80);
+        }
+        if (phase === 'play') { trail.unshift({ x: puck.x, y: puck.y }); if (trail.length > 7) trail.pop(); } else trail = [];
+        parts.forEach(q => { q.x += q.vx * dt; q.y += q.vy * dt; q.vx *= 0.95; q.vy *= 0.95; q.life -= dt; });
+        parts = parts.filter(q => q.life > 0);
+      }
+      api.loop(dt => { if (guest) guestFrame(dt); else update(dt); if (link) link.step(); render(); });
+      return { save: on ? () => ({ score: { ...score }, phase, m: [mallets.p1.x, mallets.p1.y, mallets.p2.x, mallets.p2.y].map(Math.round), puck: [Math.round(puck.x), Math.round(puck.y)] }) : save, pause() { pads.clear(); }, resume() { pads.clear(); } };
     }
   });
 })();

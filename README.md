@@ -67,7 +67,7 @@ Every board game has a <b>vs Bot / vs Friend</b> switch at the top. Pick Friend 
 
 - <b>Turn-based with a friend:</b> Connect Four, Dots and Boxes, Ultimate Tic-Tac-Toe, Hex and Dead Centre.
 - <b>Secret picks:</b> in Rock Paper Scissors, Player 1 picks with <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> and Player 2 with <kbd>J</kbd> <kbd>K</kbd> <kbd>L</kbd>. Both hands show only once you have both locked in.
-- <b>Real time:</b> Pong, Air Hockey, Rally, Tag, Nidhogg and Tank Trouble, with one player on <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> and the other on the arrow keys.
+- <b>Real time:</b> Pong, Air Hockey, Rally, Tag, Nidhogg and Tank Trouble, with one player on <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> and the other on the arrow keys. Tag takes up to four on one keyboard: P3 on <kbd>I</kbd> <kbd>J</kbd> <kbd>K</kbd> <kbd>L</kbd> (+<kbd>U</kbd>) and P4 on the number pad <kbd>8</kbd> <kbd>4</kbd> <kbd>5</kbd> <kbd>6</kbd> (+<kbd>0</kbd>).
 - All of them are in the <b>2 Player</b> tab. The panel widens by itself when a game needs the room.
 
 <br>
@@ -79,14 +79,14 @@ Every board game has a <b>vs Bot / vs Friend</b> switch at the top. Pick Friend 
 
 ### Play online with a room code
 
-Eight two-player games have an <b>Online</b> button next to vs Bot / vs Friend: Connect Four, Dots and Boxes, Ultimate Tic-Tac-Toe, Hex, Quoridor, Rock Paper Scissors, Dead Centre and Last Wire. One player taps <b>Create room</b> and gets a 5 character room code (with a <b>Copy invite</b> button that copies a message and a `ludus://join/CODE` link); the other taps <b>Join room</b> and types or pastes it, or just clicks the link. No account and no server of ours: the two copies of Ludus talk through a free public relay. Nothing is sent unless you use this. Anyone who knows the code can join, so it is not private. See [PRIVACY.md](PRIVACY.md) and [web/ONLINE.md](web/ONLINE.md).
+Thirteen games have an <b>Online</b> button next to vs Bot / vs Friend: the board games Connect Four, Dots and Boxes, Ultimate Tic-Tac-Toe, Hex, Quoridor, Rock Paper Scissors, Dead Centre and Last Wire, the two-player action games Pong and Air Hockey, and three games for <b>2 to 4 players</b>: Tag, Paper.io and Hole.io (all in the <b>3-4 Player</b> tab; the host can press <b>Start now</b> once two are in, or the room starts by itself when all four seats are taken). One player taps <b>Create room</b> and gets a 5 character room code (with a <b>Copy invite</b> button that copies a message and a `ludus://join/CODE` link); the other taps <b>Join room</b> and types or pastes it, or just clicks the link. No account and no server of ours: the two copies of Ludus talk through a free public relay. Nothing is sent unless you use this. Anyone who knows the code can join, so it is not private. See [PRIVACY.md](PRIVACY.md) and [web/ONLINE.md](web/ONLINE.md).
 
 ### Arcade classics that feel right
 
 Eleven arcade games built to play smoothly at 60 frames a second, each with its own best score to beat.
 
 - <b>Space Invaders</b>: waves of invaders, shields and a mystery ship.
-- <b>Stack</b>: drop each block in 3D and line it up perfectly for a combo.
+- <b>Stack</b>: drop each block in 3D and line it up perfectly for a combo. Press <kbd>B</kbd> (or the top-left button) for the silly <b>Brain rot</b> skin: every slab is a made-up character with a name and sound captions.
 - <b>Pac-Man</b>: a maze, four ghosts and power pellets.
 - Plus Blocks (falling blocks with proper locking), Breakout, Drift, Flappy Bird, Plants vs. Zombies, Getting Over It, Snake and Doodle Jump.
 - Three difficulty levels change the speed and how clever the computer is.
@@ -186,6 +186,7 @@ brew install --cask ludus   # not available yet
 | **Puzzle** | 2048, Sokoban, Wordle, Minesweeper, Memory, Solitaire, Candy Crush, Sudoku |
 | **Duel** (you against the computer) | Dots and Boxes, Dead Centre, Connect Four, Last Wire, Ultimate Tic-Tac-Toe, Nidhogg, Hex, Rock Paper Scissors, Quoridor |
 | **2 Player** (one keyboard) | Air Hockey, Pong, Tag, Tank Trouble |
+| **3-4 Player** (online, Tag also on one keyboard) | Tag, Paper.io, Hole.io |
 
 Connect Four, Dots and Boxes, Ultimate Tic-Tac-Toe, Hex, Rock Paper Scissors and Dead Centre also have a **vs Friend** mode, so they show up in the 2 Player tab too.
 
@@ -257,7 +258,7 @@ everything, quit Ludus and run `defaults delete com.solomon.Ludus`.
 <details>
 <summary><b>Does Ludus use the internet?</b></summary>
 
-Not unless you ask it to. Every game works the same with Wi-Fi off. The only time Ludus goes online is when you choose <b>Play online</b> for one of the eight online games.
+Not unless you ask it to. Every game works the same with Wi-Fi off. The only time Ludus goes online is when you choose <b>Play online</b> for one of the online games.
 </details>
 
 <details>

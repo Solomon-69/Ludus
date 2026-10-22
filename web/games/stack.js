@@ -63,6 +63,55 @@
     ctx.strokeStyle = dark ? 'rgba(255,240,220,0.22)' : 'rgba(255,255,255,0.55)'; ctx.lineWidth = 1; ctx.stroke();
     ctx.globalAlpha = 1;
   }
+  // ---------- "Brain rot" skin: every slab is a silly made-up character (drawn here, no pictures, all offline) ----------
+  const ROT_NAMES = ['Spaghettino Turbino', 'Formaggio Volante', 'Bananini Ballerini', 'Cappuccino Ninjino', 'Pizzarello Rocketto',
+    'Gnocchi Gigantoni', 'Lasagna Lunatica', 'Ravioli Razzetto', 'Mozzarella Motorella', 'Tortellino Tornado', 'Biscotto Bombastico',
+    'Gelato Galattico', 'Panino Pinguino', 'Risotto Robotto', 'Polpetta Pazzetta', 'Cannolo Canguro', 'Limoncello Laserone', 'Broccolo Bombolo'];
+  const ROT_SOUNDS = ['Bonk!', 'Mamma mia!', 'Brr brr!', 'Pa-pa-pow!', 'Tum tum tum!', 'Wheee!', 'Boing!', 'Zoom zoom!', 'Ta-daaa!', 'Splat!'];
+  const ROT_PERFECT = ['Perfetto!', 'Bellissimo!', 'Magnifico!', 'Che bello!'];
+  const ROT_HUES = [8, 48, 140, 190, 280, 330, 24, 95, 210, 300];
+  const rotHue = i => ROT_HUES[(i * 7 + 3) % ROT_HUES.length];
+  const rotName = i => ROT_NAMES[(i * 5 + 1) % ROT_NAMES.length];
+  function rotShade(h, dark, face) {
+    const l = (dark ? [60, 47, 36] : [72, 60, 49])[face];
+    return `hsl(${h} ${dark ? 62 : 78}% ${l}%)`;
+  }
+  // A tiny face on the slab's front-left side: googly eyes and a grin (or an O mouth), different per slab.
+  function rotSideFace(ctx, P, b, i) {
+    const y = (b.y0 + b.y1) / 2, z = b.z + b.d / 2, xm = b.x;
+    const c = P(xm, y, z), l = P(xm - 4, y, z), hgt = P(xm, b.y1, z)[1] - P(xm, b.y0, z)[1];
+    const k = Math.abs(hgt) / 14, dx = (c[0] - l[0]) / 4, dy = (c[1] - l[1]) / 4;   // one world unit along the face
+    if (k < 0.45) return;
+    const er = 2.6 * k, look = ((i * 13) % 5 - 2) * 0.35 * k;
+    [-5, 5].forEach(o => {
+      const ex = c[0] + dx * o, ey = c[1] + dy * o - 1.6 * k;
+      ctx.fillStyle = '#fffaf3'; ctx.beginPath(); ctx.arc(ex, ey, er, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#231a14'; ctx.beginPath(); ctx.arc(ex + look, ey + 0.4 * k, er * 0.5, 0, Math.PI * 2); ctx.fill();
+    });
+    ctx.strokeStyle = '#231a14'; ctx.lineWidth = Math.max(1, 1.1 * k); ctx.lineCap = 'round';
+    const mx = c[0] + dx * (i % 3 - 1), my = c[1] + dy * (i % 3 - 1) + 3.4 * k;
+    ctx.beginPath();
+    if (i % 4 === 1) ctx.arc(mx, my, 1.4 * k, 0, Math.PI * 2);
+    else { ctx.moveTo(mx - dx * 3.2, my - dy * 3.2); ctx.quadraticCurveTo(mx, my + 2.4 * k, mx + dx * 3.2, my + dy * 3.2); }
+    ctx.stroke();
+  }
+  // A big face painted flat on a slab's top: drawn in a unit square mapped onto the top face.
+  function rotTopFace(ctx, P, b, y, i, t) {
+    const a = P(b.x - b.w / 2, y, b.z - b.d / 2), bx = P(b.x + b.w / 2, y, b.z - b.d / 2), cz = P(b.x - b.w / 2, y, b.z + b.d / 2);
+    ctx.save();
+    ctx.transform(bx[0] - a[0], bx[1] - a[1], cz[0] - a[0], cz[1] - a[1], a[0], a[1]);
+    const wob = Math.sin(t * 6 + i) * 0.02;
+    ctx.fillStyle = '#fffaf3';
+    [[0.32, 0.36], [0.64, 0.32]].forEach(([u, v], k) => { ctx.beginPath(); ctx.ellipse(u, v + (k ? wob : -wob), 0.12, 0.12, 0, 0, Math.PI * 2); ctx.fill(); });
+    ctx.fillStyle = '#231a14';
+    [[0.35, 0.38], [0.6, 0.35]].forEach(([u, v]) => { ctx.beginPath(); ctx.ellipse(u, v, 0.05, 0.05, 0, 0, Math.PI * 2); ctx.fill(); });
+    ctx.strokeStyle = '#231a14'; ctx.lineWidth = 0.045; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(0.3, 0.66); ctx.quadraticCurveTo(0.5, 0.86 + wob * 3, 0.72, 0.62); ctx.stroke();
+    if (i % 3 === 0) { ctx.beginPath(); ctx.moveTo(0.38, 0.6); ctx.quadraticCurveTo(0.5, 0.56, 0.62, 0.58); ctx.stroke(); }   // a moustache
+    if (i % 3 === 1) { ctx.fillStyle = '#e05d8b'; ctx.beginPath(); ctx.ellipse(0.52, 0.78, 0.07, 0.05, 0, 0, Math.PI * 2); ctx.fill(); }   // a tongue
+    ctx.restore();
+  }
+
   // Outline of a slab's top face, grown by pad on each side (used for the perfect ripple).
   function diamond(ctx, P, b, y, pad) {
     const x0 = b.x - b.w / 2 - pad, x1 = b.x + b.w / 2 + pad, z0 = b.z - b.d / 2 - pad, z1 = b.z + b.d / 2 + pad;
@@ -73,7 +122,7 @@
 
   Ludus.register({
     id: 'stack', name: 'Stack', tag: 'Arcade', tint: '#3f8fb3',
-    hint: '<kbd>Space</kbd> <kbd>↓</kbd> or click / tap to drop · line it up exactly for a perfect',
+    hint: '<kbd>Space</kbd> <kbd>↓</kbd> or click / tap to drop · line it up exactly for a perfect · <kbd>B</kbd> or the top-left button: Brain rot skin',
     _rules: { cut, hueFromColor, layerHue },
     art(ctx, w, h, colors) {
       const base = hueFromColor((colors && colors.accent) || '#d97757'), dark = !!(colors && colors.dark);
@@ -88,6 +137,8 @@
     },
     create(stage, api) {
       const lv = api.level, rm = api.reduceMotion;
+      let rot = Ludus.state.stackSkin === 'rot';   // the Brain rot skin, remembered between games
+      let captions = [];                           // floating sound captions (Brain rot skin)
       const view = api.canvas(() => camera(0, true));
       const { ctx, canvas } = view;
       let layers, cur, combo, perfects, state, missAt = 0, clock = 0;
@@ -167,6 +218,7 @@
           fx.push({ b: nb, y: n * H, t: clock, perfect: true });
           burst(nb, n * H);
           api.sfx(grew ? 'line' : 'score');
+          caption(nb, n, ROT_PERFECT[perfects % ROT_PERFECT.length]);
           if (combo >= 2) api.toast(grew ? `Perfect x${combo} · slab grows` : `Perfect x${combo}`);
         } else {
           combo = 0;
@@ -174,6 +226,7 @@
           layers.push(nb);
           fx.push({ b: nb, y: n * H, t: clock, perfect: false });
           api.sfx('drop');
+          caption(nb, n, ROT_SOUNDS[(n * 3 + combo) % ROT_SOUNDS.length]);
         }
         api.score(score());
         spawn();
@@ -191,8 +244,20 @@
         }), 550);
       }
 
-      api.keys(e => { if (e.key === ' ' || e.key === 'Enter' || e.key === 'ArrowDown') { e.preventDefault(); drop(); } });
-      api.on(canvas, 'pointerdown', e => { if (e.button === 0 || e.pointerType === 'touch') drop(); });
+      function caption(b, n, text) { if (rot) captions.push({ b, y: n * H, t: clock, text }); }
+      function toggleSkin() { rot = !rot; Ludus.state.stackSkin = rot ? 'rot' : ''; Ludus.save(); captions = []; api.sfx('click'); }
+      const SKIN = { x: 10, y: 10, w: 92, h: 26 };
+      const onSkin = (x, y) => state === 'play' && x >= SKIN.x && x <= SKIN.x + SKIN.w && y >= SKIN.y && y <= SKIN.y + SKIN.h;
+      api.keys(e => {
+        if (e.key === 'b' || e.key === 'B') { e.preventDefault(); if (state === 'play') toggleSkin(); return; }
+        if (e.key === ' ' || e.key === 'Enter' || e.key === 'ArrowDown') { e.preventDefault(); drop(); }
+      });
+      api.on(canvas, 'pointerdown', e => {
+        if (!(e.button === 0 || e.pointerType === 'touch')) return;
+        const r = canvas.getBoundingClientRect(), sx = r.width ? view.w / r.width : 1;
+        if (onSkin((e.clientX - r.left) * sx, (e.clientY - r.top) * sx)) { toggleSkin(); return; }
+        drop();
+      });
 
       function update(dt) {
         if (state === 'play' && cur) {
@@ -209,6 +274,7 @@
         fx = fx.filter(f => clock - f.t < 0.8);
         sparks.forEach(p => { p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 240 * dt; });
         sparks = sparks.filter(p => clock - p.t < 0.7);
+        captions = captions.filter(c => clock - c.t < 1.1);
         camera(dt);
       }
 
@@ -231,14 +297,15 @@
         if (alpha <= 0) return;
         const q = P(c.x, (c.y0 + c.y1) / 2, c.z);
         ctx.save(); ctx.translate(q[0], q[1]); ctx.rotate(c.rot); ctx.translate(-q[0], -q[1]);
-        drawBox(ctx, P, c, layerHue(base, c.i), dark, alpha);
+        if (rot) { ctx.globalAlpha = alpha; drawRot(P, c, c.i, dark, alpha); ctx.globalAlpha = 1; }
+        else drawBox(ctx, P, c, layerHue(base, c.i), dark, alpha);
         ctx.restore();
       }
 
       function render() {
         const col = api.colors(), dark = col.dark, { w, h } = view;
         const base = hueFromColor(col.accent), n = score();
-        background(col, layerHue(base, n));
+        background(col, rot ? rotHue(n) : layerHue(base, n));
         const P = proj(), S = baseScale() * zoom, top = layers[n];
         const off = (y, lead) => cy + (-(y - camY) + lead) * S;
 
@@ -252,6 +319,7 @@
         for (let i = 0; i <= n; i++) {
           const bx = layerBox(layers[i], i);
           if (off(bx.y1, -70) > h + 4 || off(bx.y0, 70) < -4) continue;
+          if (rot) { drawRot(P, bx, i, dark); continue; }
           drawBox(ctx, P, bx, layerHue(base, i), dark);
         }
         // glow on freshly placed slabs
@@ -263,8 +331,10 @@
           ctx.globalAlpha = 1;
         });
         if (cur) {
-          drawBox(ctx, P, { x: cur.x, z: cur.z, w: cur.w, d: cur.d, y0: n * H, y1: (n + 1) * H }, layerHue(base, n + 1), dark);
-        }
+          const cb = { x: cur.x, z: cur.z, w: cur.w, d: cur.d, y0: n * H, y1: (n + 1) * H };
+          if (rot) { drawRot(P, cb, n + 1, dark); rotTopFace(ctx, P, cb, cb.y1, n + 1, clock); }
+          else drawBox(ctx, P, cb, layerHue(base, n + 1), dark);
+        } else if (rot && n > 0) rotTopFace(ctx, P, layers[n], n * H, n, clock);
         chips.filter(c => !behind(c)).forEach(c => drawChip(P, c, base, dark, S));
         // perfect ripple: rings expanding out from the top face
         fx.forEach(f => {
@@ -283,7 +353,26 @@
           ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
         });
         ctx.globalAlpha = 1;
+        if (rot) captions.forEach(c => {   // sound captions float up from the slab that just landed
+          const k = (clock - c.t) / 1.1, q = P(c.b.x, c.y, c.b.z), s = rm ? 1 : 0.8 + 0.2 * D.ease.outBack(Math.min(1, k * 4));
+          ctx.save(); ctx.globalAlpha = Math.max(0, Math.min(1, (1 - k) * 2.2)); ctx.translate(q[0] + 54, q[1] - 26 - k * 30); ctx.scale(s, s); ctx.rotate(-0.08);
+          const cw = Math.min(150, view.w * 0.36);   // soft pill behind the caption so it never reads over a slab
+          ctx.fillStyle = dark ? 'rgba(20,18,16,0.72)' : 'rgba(255,252,246,0.85)'; D.roundRect(ctx, -cw / 2 - 6, -12, cw + 12, 24, 12); ctx.fill();
+          D.fitText(ctx, c.text, 0, 0, cw, 15, `hsl(${rotHue(c.y / H)} 70% ${dark ? 70 : 42}%)`, 850, 11);
+          ctx.restore();
+        });
         hud(col, n);
+      }
+      // a Brain rot slab: brighter colours plus a face on its side
+      function drawRot(P, b, i, dark, alpha) {
+        const x0 = b.x - b.w / 2, x1 = b.x + b.w / 2, z0 = b.z - b.d / 2, z1 = b.z + b.d / 2, h = rotHue(i);
+        const poly = (pts, fill) => { ctx.beginPath(); pts.forEach((p, k) => { const q = P(p[0], p[1], p[2]); if (k) ctx.lineTo(q[0], q[1]); else ctx.moveTo(q[0], q[1]); }); ctx.closePath(); ctx.fillStyle = fill; ctx.fill(); ctx.strokeStyle = fill; ctx.lineWidth = 0.6; ctx.stroke(); };
+        ctx.globalAlpha = alpha == null ? 1 : alpha; ctx.lineJoin = 'round';
+        poly([[x0, b.y1, z1], [x1, b.y1, z1], [x1, b.y0, z1], [x0, b.y0, z1]], rotShade(h, dark, 1));
+        poly([[x1, b.y1, z0], [x1, b.y1, z1], [x1, b.y0, z1], [x1, b.y0, z0]], rotShade(h, dark, 2));
+        poly([[x0, b.y1, z0], [x1, b.y1, z0], [x1, b.y1, z1], [x0, b.y1, z1]], rotShade(h, dark, 0));
+        if (i > 0 && b.w > 18) rotSideFace(ctx, P, b, i);
+        ctx.globalAlpha = 1;
       }
 
       function hud(col, n) {
@@ -303,7 +392,16 @@
           D.spark(ctx, w / 2 - tw / 2 - 9, 62, 5.5, col.accent, rm ? 0 : clock * 1.2);
           D.text(ctx, label, w / 2 + 4, 62, 12, col.accent, 700);
         }
-        if (n === 0) D.text(ctx, 'Space or click to drop the slab', w / 2, h - 22, 12, col.ink3, 650);
+        if (n === 0 && !rot) D.fitText(ctx, 'Space or click to drop the slab', w / 2, h - 22, w - 24, 12, col.ink3, 650, 10);
+        if (rot && cur) {   // the falling slab's made-up name
+          ctx.save(); ctx.fillStyle = col.dark ? 'rgba(0,0,0,0.35)' : 'rgba(255,255,255,0.7)';
+          const cw = Math.min(w - 24, 260); D.roundRect(ctx, (w - cw) / 2, h - 40, cw, 28, 14); ctx.fill(); ctx.restore();
+          D.fitText(ctx, rotName(n + 1), w / 2, h - 26, cw - 20, 13, col.ink, 780, 10);
+        }
+        // skin switch, top left
+        ctx.save(); ctx.fillStyle = rot ? col.accent : (col.dark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.65)');
+        D.roundRect(ctx, SKIN.x, SKIN.y, SKIN.w, SKIN.h, 13); ctx.fill(); ctx.restore();
+        D.fitText(ctx, rot ? 'Brain rot on' : 'Brain rot', SKIN.x + SKIN.w / 2, SKIN.y + SKIN.h / 2 + 0.5, SKIN.w - 14, 11.5, rot ? '#fffaf3' : col.ink2, 720, 9);
       }
 
       api.loop(dt => { clock += dt; update(dt); render(); });

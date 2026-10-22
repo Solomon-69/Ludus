@@ -231,9 +231,10 @@
     this.subs.delete(topic);
     if (this.state === 'online') this._raw(P.unsubscribe(this.pid++ & 0xFFFF || 1, topic));
   };
-  Mqtt.prototype.publish = function (topic, text) {
+  Mqtt.prototype.publish = function (topic, text, volatile) {
     const p = P.publish(topic, text);
     if (this.state === 'online' && this._raw(p)) return true;
+    if (volatile) return false;                 // live game state: an old copy is worthless, never queue it
     this.outbox.push(p); if (this.outbox.length > QUEUE_LIMIT) this.outbox.shift();
     return false;
   };
@@ -410,6 +411,7 @@
       case 'nack': return this._onNack(m);
       case 'rematch': if (this.role === 'host') this._emit('rematch', { name: this._senderName(m.c) }); return;
       case 'g': return this._onGame(m);
+      case 'f': return this._onFast(m);
     }
   };
   Session.prototype._senderName = function (cid) {
@@ -514,6 +516,23 @@
     this.client.publish(topicOf(this.code), text);
     return true;
   };
+  // Fast messages: not numbered, never sent again, dropped when the line is down. For live action games that
+  // send their state many times a second, where only the newest copy matters (see ONLINE.md, "Real-time games").
+  Session.prototype.sendFast = function (type, data, to) {
+    if (this.over || !this.ready || !TYPE_RE.test(String(type))) return false;
+    const m = { t: 'f', k: String(type), d: data === undefined ? null : data, r: this.gen, v: 1, c: this.cid };
+    if (to !== undefined) m.to = to;
+    let text;
+    try { text = JSON.stringify(m); } catch (e) { return false; }
+    if (text.length > MAX_PACKET) return false;
+    return this.client.publish(topicOf(this.code), text, true);
+  };
+  Session.prototype._onFast = function (m) {
+    const seat = this._seatOf(m.c);
+    if (seat < 0 || typeof m.k !== 'string' || !TYPE_RE.test(m.k) || m.r !== this.gen || !this.active) return;
+    if (m.to !== undefined && m.to !== this.seat) return;
+    this.active._deliverFast({ type: m.k, data: m.d === undefined ? null : m.d, from: seat });
+  };
   Session.prototype._maybeNack = function (cid, theirLast) {
     const have = this.rxq[cid] || 0, now = Date.now();
     if (theirLast > have && now - (this.nackAt[cid] || 0) > 1500) {
@@ -570,6 +589,9 @@
       get connected() { return s.conn === 'online' && !s.over; },
       send(type, data) { return s.send(type, data); },
       sendTo(seat, type, data) { return Number.isInteger(seat) && seat >= 0 && seat < MAX_SEATS ? s.send(type, data, seat) : false; },
+      sendFast(type, data) { return s.sendFast(type, data); },
+      sendFastTo(seat, type, data) { return Number.isInteger(seat) && seat >= 0 && seat < MAX_SEATS ? s.sendFast(type, data, seat) : false; },
+      get seats() { return Array.from(s.roster.keys()).sort((a, b) => a - b); },
       on(type, fn) {
         (handlers[type] = handlers[type] || []).push(fn);
         return () => { handlers[type] = (handlers[type] || []).filter(f => f !== fn); };
@@ -585,6 +607,11 @@
         if (hs && hs.length) { hs.slice().forEach(fn => { try { fn(item.data, item.from); } catch (e) { setTimeout(() => { throw e; }); } }); return; }
         inbox.push({ type: item.type, data: item.data, from: item.from, at: Date.now() });
         pump();
+      },
+      // fast messages only go to on() handlers; with no handler they are dropped (never queued)
+      _deliverFast(item) {
+        if (disposed) return;
+        (handlers[item.type] || []).slice().forEach(fn => { try { fn(item.data, item.from); } catch (e) { setTimeout(() => { throw e; }); } });
       },
       _left(seat, name, closed) { if (disposed) return; leaves.slice().forEach(fn => { try { fn(seat, name, closed); } catch (e) { setTimeout(() => { throw e; }); } }); }
     };

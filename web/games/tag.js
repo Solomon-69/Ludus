@@ -1,5 +1,6 @@
-/* Tag: two players, one keyboard. Pick a scene, then one of you is "it": touch the other to pass it on
-   (no tag-backs for a moment). Whoever is "it" when the clock hits zero loses the round. */
+/* Tag: two to four players, one keyboard (or online). Pick a scene, then one of you is "it": touch someone to pass it on
+   (no tag-backs for a moment). Whoever is "it" when the clock hits zero loses the round; everyone else scores.
+   Online the host's screen runs the match and sends it to the others ~18 times a second (see ../rt.js). */
 (function () {
   const D = Ludus.draw;
   const T = 20, HALF = 18, COLS = 36, ROWS = 18, W = COLS * T, H = ROWS * T;
@@ -71,25 +72,32 @@
     return { i, name: def.name, top: def.top, def, grid, spawns, spots, doors, movers, grav: def.grav || 1, jumpK: def.jumpK || 1 };
   }
   const BUILT = MAPS.map((_, i) => buildMap(i)), solidT = t => '#~<>%'.indexOf(t) >= 0;
-  // Two people, one keyboard: P1 = WASD (+F), P2 = arrows (+ / or Enter). Against the bot both key sets drive P1. intercept() can swallow keys (scene menu).
-  function makePads(api, intercept) {
+  // One keyboard: P1 = WASD (+F), P2 = arrows (+ / or Enter), P3 = IJKL (+U), P4 = number pad 8 4 5 6 (+0).
+  // Against the bot both of the first two key sets drive P1; online every key set drives this screen's own player (mine()).
+  // intercept() can swallow keys (scene menu).
+  const IDS = ['p1', 'p2', 'p3', 'p4'];
+  function makePads(api, intercept, mine) {
     const friend = api.friend;
     const C1 = { KeyW: 'up', KeyS: 'down', KeyA: 'left', KeyD: 'right', KeyF: 'act' }, K1 = { w: 'up', s: 'down', a: 'left', d: 'right', f: 'act' };
     const C2 = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right', Slash: 'act', Enter: 'act', NumpadEnter: 'act' };
     const K2 = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right', '/': 'act', Enter: 'act' };
+    const C3 = { KeyI: 'up', KeyK: 'down', KeyJ: 'left', KeyL: 'right', KeyU: 'act' }, K3 = { i: 'up', k: 'down', j: 'left', l: 'right', u: 'act' };
+    const C4 = { Numpad8: 'up', Numpad5: 'down', Numpad4: 'left', Numpad6: 'right', Numpad0: 'act' };
     const blank = () => ({ up: false, down: false, left: false, right: false, act: false, hit: {} });
-    const pads = { p1: blank(), p2: blank() };
-    function find(e) {
+    const pads = { p1: blank(), p2: blank(), p3: blank(), p4: blank() };
+    function find0(e) {
       if (C1[e.code]) return ['p1', C1[e.code]]; if (C2[e.code]) return [friend ? 'p2' : 'p1', C2[e.code]];
+      if (C3[e.code]) return friend ? ['p3', C3[e.code]] : null; if (C4[e.code]) return friend ? ['p4', C4[e.code]] : null;
       const k = e.key && e.key.length === 1 ? e.key.toLowerCase() : e.key;
-      return K1[k] ? ['p1', K1[k]] : K2[k] ? [friend ? 'p2' : 'p1', K2[k]] : null;
+      return K1[k] ? ['p1', K1[k]] : K2[k] ? [friend ? 'p2' : 'p1', K2[k]] : K3[k] && friend ? ['p3', K3[k]] : null;
     }
+    function find(e) { const m = find0(e), me = mine && mine(); return m && me ? [me, m[1]] : m; }
     api.keys(e => {
       const m = !intercept(e) && find(e); if (!m) return;
       e.preventDefault(); const p = pads[m[0]]; if (!p[m[1]]) p.hit[m[1]] = true; p[m[1]] = true;
     });
     api.keysUp(e => { const m = find(e); if (m) pads[m[0]][m[1]] = false; });
-    pads.clear = () => { Object.assign(pads.p1, blank()); Object.assign(pads.p2, blank()); };
+    pads.clear = () => { IDS.forEach(id => Object.assign(pads[id], blank())); };
     pads.take = (who, k) => { const h = pads[who].hit[k]; pads[who].hit[k] = false; return !!h; };
     api.on(window, 'blur', pads.clear); return pads;
   }
@@ -199,8 +207,9 @@
   function sky(g, m, col) { g.fillStyle = m.def.sky[col.dark ? 1 : 0]; D.roundRect(g, 0, 0, W, H, 12); g.fill(); }
   BUILT.forEach(m => placeMovers(m, 0));
   Ludus.register({
-    id: 'tag', name: 'Tag', tag: '2 Player', wide: true, tint: '#6aa56b', versus: true, defaultVs: 'friend',
-    hint: '<b>You</b> <kbd>A</kbd><kbd>D</kbd> or <kbd>←</kbd><kbd>→</kbd> run, <kbd>W</kbd> or <kbd>↑</kbd> jump, <kbd>S</kbd> or <kbd>↓</kbd> drop, <kbd>F</kbd> or <kbd>/</kbd> power-up · vs Bot: the bot is P2 · vs Friend: P1 = <kbd>WASD</kbd> + <kbd>F</kbd>, P2 = <kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> + <kbd>/</kbd> or <kbd>Enter</kbd> · scenes: arrows/WASD, <kbd>Enter</kbd>/<kbd>Space</kbd> or click',
+    id: 'tag', name: 'Tag', tag: '2 Player', wide: true, tint: '#6aa56b', versus: true, defaultVs: 'friend', online: { min: 2, max: 4 },
+    hint: '<b>You</b> <kbd>A</kbd><kbd>D</kbd> or <kbd>←</kbd><kbd>→</kbd> run, <kbd>W</kbd>/<kbd>↑</kbd> jump, <kbd>S</kbd>/<kbd>↓</kbd> drop, <kbd>F</kbd>/<kbd>/</kbd> power-up · vs Friend (2 to 4): P1 <kbd>WASD</kbd>+<kbd>F</kbd>, P2 arrows+<kbd>/</kbd>, P3 <kbd>IJKL</kbd>+<kbd>U</kbd>, P4 number pad <kbd>8456</kbd>+<kbd>0</kbd> · scenes: arrows, <kbd>Enter</kbd> or click',
+    onlineHint: '<b>Online</b> 2 to 4 players · <kbd>A</kbd><kbd>D</kbd> or <kbd>←</kbd><kbd>→</kbd> run, <kbd>W</kbd> or <kbd>↑</kbd> jump, <kbd>S</kbd> or <kbd>↓</kbd> drop, <kbd>F</kbd> or <kbd>/</kbd> power-up · the host picks the scene',
     _rules: { MAPS, buildMap, T, COLS, ROWS, POWERS },
     art(ctx, w, h) {
       ctx.fillStyle = 'rgba(255,255,255,0.32)';
@@ -212,14 +221,23 @@
     },
     create(stage, api) {
       const view = api.canvas(), { ctx } = view, friend = api.friend;
-      const pads = makePads(api, e => phase === 'menu' && menuKey(e));
+      const on = api.online, guest = !!(on && !on.isHost), myId = on ? 'p' + (on.seat + 1) : null;
+      // guests never drive the scene menu (the host picks); they only send their keys
+      const pads = makePads(api, e => phase === 'menu' && (guest || menuKey(e)), () => myId);
       const BASE = [150, 162, 175][api.level];
-      let sel = { map: 0, time: 0, rounds: 1 }, focus = { row: 1, col: 0 }, clicked = null;
+      let sel = { map: 0, time: 0, rounds: 1, players: 0 }, focus = { row: 1, col: 0 }, clicked = null;
       let map = BUILT[0], mapIdx = 0, round = 0, wins = { p1: 0, p2: 0 }, it = 'p1', firstIt = 'p1', timer = 60, phase = 'menu', phaseT = 0;
+      // ids = who is playing: two against the bot, 2 to 4 friends (sel.players: 0 = two, 1 = three, 2 = four), or the room's seats online
+      let ids = on ? on.seats.map(st => 'p' + (st + 1)) : ['p1', 'p2'], itTime = {};
+      const roster = () => (on ? ids : IDS.slice(0, friend ? 2 + sel.players : 2));
       let items = [], itemT = 4, tagCool = 0, mt = 0, clock = 0, players = [], parts = [], floaters = [], springs = {};
-      let shake = 0, overCalled = false, lastTick = -1, flash = 0, thumbs = null;
-      const firstTo = () => ROUNDS[sel.rounds], other = id => (id === 'p1' ? 'p2' : 'p1'), P = id => players[id === 'p1' ? 0 : 1];
-      const label = id => (friend ? (id === 'p1' ? 'P1' : 'P2') : (id === 'p1' ? 'You' : 'Bot')), pcol = (id, col) => (id === 'p1' ? col.accent : D.P2);
+      let fieldS = 1, shake = 0, overCalled = false, lastTick = -1, flash = 0, thumbs = null;
+      const firstTo = () => ROUNDS[sel.rounds], other = id => ids.find(x => x !== id) || id, P = id => players.find(p => p.id === id) || players[0];
+      const PCOL = { p2: D.P2, p3: '#4f9d69', p4: '#9b6dd6' };
+      const label = id => (on ? Ludus.rt.seatName(api, IDS.indexOf(id)) : friend ? id.toUpperCase() : (id === 'p1' ? 'You' : 'Bot')), pcol = (id, col) => (id === 'p1' ? col.accent : PCOL[id] || D.P2);
+      const maxWins = () => Math.max(0, ...ids.map(id => wins[id] || 0));
+      // The match winner: most rounds, then the one who spent the least time being it.
+      const matchWinner = () => ids.slice().sort((a, b) => (wins[b] || 0) - (wins[a] || 0) || (itTime[a] || 0) - (itTime[b] || 0))[0];
       const itText = id => (friend ? label(id) + ' is it' : id === 'p1' ? 'You are it' : 'Bot is it');
       const wasIt = (id, tail) => (friend ? label(id) + ' was it ' : id === 'p1' ? 'You were it ' : 'Bot was it ') + tail;
       const takes = id => (friend ? label(id) + ' takes the round' : id === 'p1' ? 'You take the round' : 'Bot takes the round');
@@ -229,28 +247,47 @@
           coyote: 0, buffer: 0, lock: 0, dropT: 0, frozen: 0, speedT: 0, jumpT: 0, ghostT: 0, shrinkT: 0, shieldT: 0, hold: null, sq: 1, dead: false, bounce: false };
       }
       function startMatch() {
-        round = 0; wins = { p1: 0, p2: 0 }; firstIt = Math.random() < 0.5 ? 'p1' : 'p2'; overCalled = false;
+        ids = roster(); wins = {}; itTime = {}; ids.forEach(id => { wins[id] = 0; itTime[id] = 0; });
+        round = 0; firstIt = ids[Math.floor(Math.random() * ids.length)]; overCalled = false;
         api.score(0); startRound(); api.sfx('click');
       }
       function startRound() {
         if (sel.map >= 0) mapIdx = sel.map;
         else { let n = api.randInt(0, MAPS.length - 2); if (round > 0 && n >= mapIdx) n++; mapIdx = round > 0 ? n : api.randInt(0, MAPS.length - 1); }
         map = buildMap(mapIdx); mt = 0; placeMovers(map, mt);
-        it = round % 2 === 0 ? firstIt : other(firstIt); players = [newPlayer('p1'), newPlayer('p2')];
-        players.forEach(p => { p.x = map.spawns[p.id].x; p.y = map.spawns[p.id].y; });
+        it = ids[(ids.indexOf(firstIt) + round) % ids.length] || ids[0]; players = ids.map(newPlayer);
+        players.forEach(p => { const sp = spawnFor(p.id); p.x = sp.x; p.y = sp.y; });
         timer = TIMES[sel.time]; phase = 'count'; phaseT = COUNT; items = []; itemT = 4; tagCool = 0; lastTick = -1; parts = []; floaters = [];
         pads.clear(); if (!friend) resetBot();
+      }
+      // P1 and P2 start on the scene's marked spots; P3 and P4 on the power-up spot farthest from both, and its mirror.
+      function spawnFor(id) {
+        if (map.spawns[id]) return map.spawns[id];
+        const a = map.spawns.p1, b = map.spawns.p2, d = s => Math.min(Math.hypot(s.x - a.x, s.y - a.y), Math.hypot(s.x - b.x, s.y - b.y));
+        const left = map.spots.filter(s => s.x < W / 2).sort((u, v) => d(v) - d(u))[0] || { x: W / 4, y: H / 2 };
+        const s = id === 'p3' ? left : { x: W - left.x, y: left.y };
+        return { x: s.x - PW / 2, y: s.y + T / 2 - PH };
       }
       // ---------- scene menu ----------
       function menuLayout() {
         const w = view.w, h = view.h, pad = 12, chips = [];
         const groups = [{ label: 'Round', opts: TIMES.map(t => t + 's'), cw: 46, key: 'time' }, { label: 'First to', opts: ROUNDS.map(String), cw: 36, key: 'rounds' }];
-        const gw = gr => 72 + gr.opts.length * (gr.cw + 8);
-        const one = gw(groups[0]) + gw(groups[1]) + 28 <= w - pad * 2;
+        if (friend && !on) groups.push({ label: 'Players', opts: ['2', '3', '4'], cw: 36, key: 'players' });
+        // with three groups on a narrow stage the chips and gaps get a little tighter so they still take two lines
+        const tight = groups.length > 2 && w < 640, cg = tight ? 6 : 8, lw = tight ? 62 : 72;
+        if (tight) groups.forEach(gr => { gr.cw = gr.key === 'time' ? 42 : 30; });
+        const gw = gr => lw + gr.opts.length * (gr.cw + cg);
+        const place = (gr, x0, yy) => gr.opts.forEach((o, k) => chips.push({ x: x0 + lw + k * (gr.cw + cg), y: yy, w: gr.cw, h: 28, text: o, key: gr.key, val: k, glabel: k === 0 ? gr.label : null, gx: x0, lw }));
+        // option groups side by side while they fit, otherwise on more lines
+        const lines = [[]];
+        const gg = tight ? 16 : 28;
+        groups.forEach(gr => { const ln = lines[lines.length - 1], tw = ln.reduce((a, g) => a + gw(g) + gg, 0) + gw(gr); if (ln.length && tw > w - pad) lines.push([gr]); else ln.push(gr); });
         let y = 48;
-        const place = (gr, gi, x0, yy) => gr.opts.forEach((o, k) => chips.push({ x: x0 + 72 + k * (gr.cw + 8), y: yy, w: gr.cw, h: 28, text: o, key: gr.key, val: k, glabel: k === 0 ? gr.label : null, gx: x0 }));
-        if (one) { const tw = gw(groups[0]) + gw(groups[1]) + 28, x0 = (w - tw) / 2; place(groups[0], 0, x0, y); place(groups[1], 1, x0 + gw(groups[0]) + 28, y); y += 28; }
-        else { place(groups[0], 0, (w - gw(groups[0])) / 2, y); place(groups[1], 1, (w - gw(groups[1])) / 2, y + 36); y += 64; }
+        lines.forEach((ln, li) => {
+          const tw = ln.reduce((a, g) => a + gw(g), 0) + (ln.length - 1) * gg; let x0 = (w - tw) / 2;
+          ln.forEach(gr => { place(gr, x0, y); x0 += gw(gr) + gg; });
+          y += li < lines.length - 1 ? 36 : 28;
+        });
         const top = y + 22, availH = h - top - 16, availW = w - pad * 4, n = MAPS.length + 1, gap = 18, LAB = 54;
         // Eight scenes plus Random make nine tiles: a 3 x 3 grid unless it would make the tiles much smaller.
         const fit = gc => {
@@ -296,7 +333,7 @@
         return true;
       }
       api.on(view.canvas, 'pointerdown', e => {
-        if (phase !== 'menu') return;
+        if (phase !== 'menu' || guest) return;
         const r = view.canvas.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top, L = menuLayout();
         L.rows.forEach((row, ri) => row.forEach((item, ci) => {
           if (x >= item.x && x <= item.x + item.w && y >= item.y && y <= item.y + item.h) {
@@ -320,9 +357,14 @@
       }
       function drawMenu(col) {
         const L = menuLayout(), w = view.w, f = focusItem(L);
+        if (guest) {   // online: the host picks the scene
+          D.fitText(ctx, label('p1') + ' is choosing a scene', w / 2, view.h / 2 - 12, w - 40, 17, col.ink, 800, 12);
+          D.fitText(ctx, ids.length + ' players in the room', w / 2, view.h / 2 + 14, w - 40, 12, col.ink2, 650, 10);
+          return;
+        }
         D.text(ctx, 'Choose a scene', w / 2, 22, 17, col.ink, 800);
         L.chips.forEach(c => {
-          if (c.glabel) D.text(ctx, c.glabel, c.gx + 62, c.y + c.h / 2, 12, col.ink2, 700, 'right');
+          if (c.glabel) { ctx.font = '700 12px ui-rounded, system-ui, sans-serif'; const lx = c.gx + (c.lw || 72) - 10, lt = ctx.measureText(c.glabel).width; D.fitText(ctx, c.glabel, lx - Math.min(lt, (c.lw || 72) - 12) / 2, c.y + c.h / 2, (c.lw || 72) - 12, 12, col.ink2, 700, 10); }
           const on = sel[c.key] === c.val, foc = c === f;
           D.roundRect(ctx, c.x, c.y, c.w, c.h, 14); ctx.fillStyle = on ? col.accent : (col.dark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)'); ctx.fill();
           if (foc) { ctx.strokeStyle = col.ink; ctx.lineWidth = 2; ctx.stroke(); }
@@ -343,8 +385,8 @@
             D.spark(ctx, 6 + tw / 2, 6 + th / 2, th * 0.3, '#fffaf3', api.reduceMotion ? 0 : clock);
           }
           const name = t.map >= 0 ? MAPS[t.map].name : 'Random', note = t.map >= 0 ? MAPS[t.map].note : 'New map each round';
-          D.text(ctx, name, t.w / 2, th + 25, Math.min(13.5, t.w / 8.5), col.ink, 750);
-          D.text(ctx, note, t.w / 2, th + 43, Math.min(11, t.w / 10.5), col.ink2, 600);
+          D.fitText(ctx, name, t.w / 2, th + 25, t.w - 8, Math.max(9.5, Math.min(13.5, t.w / 8.5)), col.ink, 750, 8.5);
+          D.fitText(ctx, note, t.w / 2, th + 43, t.w - 8, Math.max(8.5, Math.min(11, t.w / 10.5)), col.ink2, 600, 8);
           if (sel.map === t.map && !foc) { ctx.fillStyle = col.accent; ctx.beginPath(); ctx.arc(t.w - 12, 13, 4, 0, 7); ctx.fill(); }
           ctx.restore();
         });
@@ -480,8 +522,8 @@
       }
       function checkTag() {
         if (tagCool > 0) return;
-        const a = P(it), b = P(other(it));
-        if (a.dead || b.dead || !touching(a, b)) return;
+        const a = P(it), b = players.find(q => q !== a && !q.dead && touching(a, q));
+        if (a.dead || !b) return;
         const push = Math.sign(wrapD(a.x - b.x, W)) || 1;
         if (b.shieldT > 0) {   // a shield soaks up one tag
           b.shieldT = 0; tagCool = 0.9; a.vx = push * 260; a.vy = Math.min(a.vy, -180); b.vx = -push * 200;
@@ -496,7 +538,8 @@
         floaters.push({ text: itText(it), x: b.x + b.w / 2, y: b.y - 14, t: 0, color: null });
       }
       function usePower(p) {
-        const o = P(other(p.id)), type = p.hold, pw = POWERS[type];
+        const dist = q => Math.hypot(wrapD(q.x - p.x, W), wrapD(q.y - p.y, H));
+        const o = players.filter(q => q !== p && !q.dead).sort((u, v) => dist(u) - dist(v))[0] || P(other(p.id)), type = p.hold, pw = POWERS[type];
         let text = pw.label; p.hold = null;
         if (type === 'speed') p.speedT = pw.time;
         else if (type === 'jump') p.jumpT = pw.time;
@@ -734,11 +777,12 @@
         if (ai.stuckT > 1) { ai.stuckT = 0; ai.path = []; ai.act = null; ai.replan = 0; jump(0.3); if (Math.random() < 0.5) go(Math.random() < 0.5 ? -1 : 1); }
       }
       function endRound() {
-        const loser = P(it), win = other(it);
-        timer = 0; wins[win]++; api.score(friend ? Math.max(wins.p1, wins.p2) : wins.p1); loser.dead = true;
+        const loser = P(it);
+        timer = 0; ids.forEach(id => { if (id !== it) wins[id] = (wins[id] || 0) + 1; });
+        api.score(friend ? maxWins() : wins.p1); loser.dead = true;
         burst(loser.x + loser.w / 2, loser.y + loser.h / 2, 34, pcol(loser.id, api.colors()));
         api.sfx('boom'); if (!api.reduceMotion) shake = 1;
-        phase = wins[win] >= firstTo() ? 'over' : 'end'; phaseT = phase === 'over' ? 1.0 : END_T; pads.clear();
+        phase = maxWins() >= firstTo() ? 'over' : 'end'; phaseT = phase === 'over' ? 1.0 : END_T; pads.clear();
       }
       function update(dt) {
         clock += dt; shake = Math.max(0, shake - dt * 2.5); flash = Math.max(0, flash - dt * 3);
@@ -753,7 +797,7 @@
           players.forEach(p => step(p, false, dt));
           if (phaseT <= 0) { phase = 'play'; api.sfx('score'); lastTick = -1; floaters.push({ text: 'Go', x: W / 2, y: H / 2, t: 0, color: null, big: true }); }
         } else if (phase === 'play') {
-          timer -= dt; tagCool = Math.max(0, tagCool - dt);
+          timer -= dt; tagCool = Math.max(0, tagCool - dt); itTime[it] = (itTime[it] || 0) + dt;
           const s = Math.ceil(timer);
           if (s <= 10 && s !== lastTick && s > 0) { lastTick = s; api.sfx('tick'); }
           players.forEach(p => step(p, true, dt));
@@ -768,13 +812,16 @@
           if (phase === 'end' && phaseT <= 0) { round++; startRound(); }
           if (phase === 'over' && phaseT <= 0 && !overCalled) {
             overCalled = true;
-            const win = wins.p1 > wins.p2 ? 'p1' : 'p2';
-            api.over({ score: friend || win === 'p1' ? wins[win] : 0, won: friend || win === 'p1', title: friend ? label(win) + ' wins' : win === 'p1' ? 'You win' : 'Bot wins', message: `Rounds ${Math.max(wins.p1, wins.p2)} to ${Math.min(wins.p1, wins.p2)}` });
+            const win = matchWinner(), msg = resultText();
+            if (on) { on.send('end', { win, w: ids.map(id => wins[id] || 0) }); finishOnline(win); }
+            else api.over({ score: friend || win === 'p1' ? wins[win] : 0, won: friend || win === 'p1', title: friend ? label(win) + ' wins' : win === 'p1' ? 'You win' : 'Bot wins', message: msg });
           }
         }
         items.forEach(i => { i.t += dt; }); floaters.forEach(f => { f.t += dt; }); floaters = floaters.filter(f => f.t < 1.1);
         parts.forEach(q => { q.x += q.vx * dt; q.y += q.vy * dt; q.vy += 500 * dt; q.life -= dt * 1.6; }); parts = parts.filter(q => q.life > 0);
       }
+      // "Rounds 3 to 1", or for three or four players "Rounds 3, 2, 1, 1"
+      const resultText = () => ids.length === 2 ? `Rounds ${maxWins()} to ${Math.min(...ids.map(id => wins[id] || 0))}` : 'Rounds ' + ids.map(id => wins[id] || 0).sort((a, b) => b - a).join(', ');
       function dust(x, y, n) {
         if (api.reduceMotion) return;
         for (let i = 0; i < n; i++) parts.push({ x, y, vx: (Math.random() - 0.5) * 80, vy: -Math.random() * 60, life: 0.5, size: 2 + Math.random() * 2, color: null });
@@ -886,13 +933,38 @@
         const bw = 290, bh = 92, x = W / 2 - bw / 2;
         ctx.fillStyle = col.surface || '#fff'; ctx.shadowColor = 'rgba(0,0,0,0.22)'; ctx.shadowBlur = 16; ctx.shadowOffsetY = 5;
         D.roundRect(ctx, x, y - bh / 2, bw, bh, 18); ctx.fill(); ctx.shadowColor = 'transparent';
-        D.text(ctx, big, W / 2, y - 28, 17, col.ink, 800);
-        D.text(ctx, small, W / 2, y - 9, 11.5, col.ink2, 650);
-        D.avatar(ctx, x + 40, y + 22, 13, friend ? 'p1' : 'you', col); D.avatar(ctx, x + bw - 40, y + 22, 13, friend ? 'p2' : 'bot', col);
-        D.text(ctx, label('p1'), x + 62, y + 22, 11, col.ink2, 700, 'left'); D.text(ctx, label('p2'), x + bw - 62, y + 22, 11, col.ink2, 700, 'right');
-        D.text(ctx, `${wins.p1}  :  ${wins.p2}`, W / 2, y + 22, 22, col.ink, 850);
+        D.fitText(ctx, big, W / 2, y - 28, bw - 24, 17, col.ink, 800, 12);
+        D.fitText(ctx, small, W / 2, y - 9, bw - 24, 11.5, col.ink2, 650, 9.5);
+        if (ids.length === 2) {
+          const [a, b] = ids;
+          avatarFor(x + 40, y + 22, 13, a, col); avatarFor(x + bw - 40, y + 22, 13, b, col);
+          clipText(label(a), x + 58, y + 22, 64, 11, col.ink2, 'left'); clipText(label(b), x + bw - 58, y + 22, 64, 11, col.ink2, 'right');
+          D.text(ctx, `${wins[a] || 0}  :  ${wins[b] || 0}`, W / 2, y + 22, 22, col.ink, 850);
+        } else {   // one chip per player: dot, name, rounds won
+          const cw = (bw - 20) / ids.length;
+          ids.forEach((id, k) => {
+            const cx = x + 10 + cw * k + cw / 2;
+            avatarFor(cx - cw / 2 + 12, y + 22, 8, id, col);
+            clipText(label(id), cx - cw / 2 + 23, y + 17, cw - 26, 9.5, col.ink2, 'left');
+            D.text(ctx, String(wins[id] || 0), cx - cw / 2 + 23, y + 29, 12, col.ink, 850, 'left');
+          });
+        }
         D.text(ctx, `first to ${firstTo()}`, W / 2, y + 39, 9, col.ink3, 650);
         ctx.restore();
+      }
+      // a player's round badge: a soft disc with a spark in the player's colour (robot face for the bot)
+      function avatarFor(x, y, r, id, col) {
+        if (!friend && !on) { D.avatar(ctx, x, y, r, id === 'p1' ? 'you' : 'bot', col); return; }
+        if (id === 'p1' || id === 'p2') { D.avatar(ctx, x, y, r, id, col); return; }
+        ctx.save(); ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fillStyle = col.dark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)'; ctx.fill();
+        D.spark(ctx, x, y, r * 0.66, pcol(id, col), 0); ctx.restore();
+      }
+      // one line of text trimmed to maxW (names can be up to 10 letters)
+      function clipText(t, x, y, maxW, size, color, align) {
+        let sz = size; const font = z => `700 ${z}px ui-rounded, "SF Pro Rounded", system-ui, sans-serif`; ctx.font = font(sz);
+        while (sz > 8.5 && ctx.measureText(t).width > maxW) { sz -= 0.5; ctx.font = font(sz); }
+        if (ctx.measureText(t).width > maxW) { while (t.length > 1 && ctx.measureText(t + '\u2026').width > maxW) t = t.slice(0, -1); t += '\u2026'; }
+        D.text(ctx, t, x, y, sz, color, 700, align);
       }
       function overlays(col) {
         if (phase === 'count') {
@@ -900,42 +972,67 @@
           const s = api.reduceMotion ? 1 : D.ease.outBack(Math.min(1, k * 3));
           ctx.fillStyle = col.dark ? 'rgba(0,0,0,0.25)' : 'rgba(255,250,243,0.35)'; ctx.fillRect(0, 0, W, H);
           ctx.save(); ctx.translate(W / 2, H * 0.4); ctx.scale(s, s); D.text(ctx, String(n), 0, 0, 64, col.accent, 800); ctx.restore();
-          D.text(ctx, itText(it), W / 2, H * 0.4 + 50, 17, pcol(it, col), 800);
-          D.text(ctx, `Round ${round + 1} · ${map.name} · ${MAPS[map.i].note}`, W / 2, H * 0.4 + 72, 12, col.ink2, 650);
+          // sizes in field units: on a small stage the field is scaled down, so keep these at least ~9.5 px on screen
+          const big = Math.max(17, 12 / fieldS), small = Math.max(12, 9.5 / fieldS);
+          D.fitText(ctx, itText(it), W / 2, H * 0.4 + 46 + big / 2, W - 40, big, pcol(it, col), 800, 12);
+          D.fitText(ctx, `Round ${round + 1} · ${map.name} · ${MAPS[map.i].note}`, W / 2, H * 0.4 + 52 + big + small / 2, W - 40, small, col.ink2, 650, 10);
         } else if (phase === 'play' && timer <= 10) {   // the last ten seconds count down big
           const n = Math.max(1, Math.ceil(timer)), f = n - timer, s = api.reduceMotion ? 1 : 1.25 - 0.25 * D.ease.outCubic(Math.min(1, f * 2.5));
           ctx.save(); ctx.globalAlpha = 0.28 + 0.12 * (1 - f); ctx.translate(W / 2, H / 2); ctx.scale(s, s);
           D.text(ctx, String(n), 0, 0, 150, col.bad || '#d9534f', 850); ctx.restore();
         } else if (phase === 'end') {
-          scoreCard(col, H * 0.42, takes(other(it)), wasIt(it, 'when time ran out'));
+          scoreCard(col, H * 0.42, ids.length === 2 ? takes(other(it)) : 'Everyone else scores', wasIt(it, 'when time ran out'));
         } else if (phase === 'over') {
-          const win = wins.p1 > wins.p2 ? 'p1' : 'p2', wp = P(win);
+          const win = matchWinner(), wp = P(win);
           if (!wp.dead) D.spark(ctx, wp.x + wp.w / 2, wp.y - 10 + Math.sin(clock * 5) * 1.5, 7, '#e0a526', clock * 2);
           scoreCard(col, H * 0.36, winsText(win), wasIt(it, 'at the final whistle'));
         }
       }
+      // Three or four players: one small panel each (dot, name, round pips, held power-up), the clock in the middle.
+      function drawMultiHeader(col) {
+        const w = view.w, n = ids.length, mid = 70, gap = 6, nl = Math.ceil(n / 2), pw = Math.min(150, (w - 20 - mid - gap * (n - 2)) / n);
+        ids.forEach((id, k) => {
+          const right = k >= nl, x = right ? w - 10 - (n - k) * pw - (n - k - 1) * gap : 10 + k * (pw + gap), y = 8, h = 40, p = P(id);
+          ctx.save();
+          D.roundRect(ctx, x, y, pw, h, 11); ctx.fillStyle = col.dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)'; ctx.fill();
+          if (id === it && (phase === 'play' || phase === 'count')) { ctx.strokeStyle = pcol(id, col); ctx.lineWidth = 1.5; ctx.stroke(); }
+          avatarFor(x + 13, y + 14, 8, id, col);
+          clipText(label(id), x + 24, y + 14, pw - 28, 10.5, col.ink, 'left');
+          const of = firstTo(), pip = Math.min(8, (pw - 30) / Math.max(1, of));
+          for (let i = 0; i < of; i++) { ctx.beginPath(); ctx.arc(x + 10 + i * pip, y + 30, Math.min(3, pip * 0.35), 0, Math.PI * 2); ctx.fillStyle = i < (wins[id] || 0) ? pcol(id, col) : col.line; ctx.fill(); }
+          if (p && p.hold) { const hx = x + pw - 11, hy = y + 29; ctx.fillStyle = POWERS[p.hold].color; ctx.beginPath(); ctx.arc(hx, hy, 7, 0, 7); ctx.fill(); powerIcon(ctx, p.hold, hx, hy, 4.8); }
+          ctx.restore();
+        });
+        const secs = Math.max(0, Math.ceil(timer)), hot = phase === 'play' && secs <= 10;
+        const ts = hot && !api.reduceMotion ? 1 + 0.12 * Math.max(0, Math.sin(clock * Math.PI * 2)) : 1;
+        const cx = 10 + nl * pw + (nl - 1) * gap + (w - 20 - n * pw - (n - 2) * gap) / 2;
+        D.text(ctx, `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`, cx, 22, 16 * ts, hot ? (col.bad || '#d9534f') : col.ink, 800);
+        D.fitText(ctx, map.name, cx, 40, mid - 6, 9.5, col.ink3, 650, 8);
+      }
       function drawHeader(col) {
         const w = view.w;
+        if (ids.length > 2) { drawMultiHeader(col); return; }
+        const [ia, ib] = ids;
         D.duelHeader(ctx, 10, 8, w - 20, {
-          left: { who: friend ? 'p1' : 'you', label: label('p1'), pips: wins.p1, of: firstTo() },
-          right: { who: friend ? 'p2' : 'bot', label: label('p2'), pips: wins.p2, of: firstTo() },
-          turn: phase === 'play' || phase === 'count' ? (it === 'p1' ? 'left' : 'right') : null
+          left: { who: friend ? (ia === 'p1' || ia === 'p2' ? ia : 'p1') : 'you', label: label(ia), pips: wins[ia] || 0, of: firstTo() },
+          right: { who: friend ? (ib === 'p1' || ib === 'p2' ? ib : 'p2') : 'bot', label: label(ib), pips: wins[ib] || 0, of: firstTo() },
+          turn: phase === 'play' || phase === 'count' ? (it === ia ? 'left' : 'right') : null
         }, col);
         const pw = Math.min(132, (w - 20) * 0.34);
         players.forEach(p => {   // held power-up slot next to each player's panel
-          const sx = p.id === 'p1' ? 10 + pw + 18 : w - 10 - pw - 18, sy = 28;
+          const left = p.id === ia, sx = left ? 10 + pw + 18 : w - 10 - pw - 18, sy = 28;
           ctx.save();
           if (p.hold) {
             ctx.fillStyle = POWERS[p.hold].color; ctx.beginPath(); ctx.arc(sx, sy, 11, 0, 7); ctx.fill();
             powerIcon(ctx, p.hold, sx, sy, 7.5);
-            if (friend || p.id === 'p1') D.text(ctx, p.id === 'p1' ? 'F' : '/', sx + (p.id === 'p1' ? 16 : -16), sy + 6, 9, col.ink3, 750);
+            if (on ? p.id === myId : friend || p.id === 'p1') D.text(ctx, on ? 'F' : p.id === 'p1' ? 'F' : '/', sx + (left ? 16 : -16), sy + 6, 9, col.ink3, 750);
           } else { ctx.strokeStyle = col.line; ctx.lineWidth = 1.5; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.arc(sx, sy, 10, 0, 7); ctx.stroke(); }
           ctx.restore();
         });
         const secs = Math.max(0, Math.ceil(timer)), hot = phase === 'play' && secs <= 10;
         const ts = hot && !api.reduceMotion ? 1 + 0.12 * Math.max(0, Math.sin(clock * Math.PI * 2)) : 1;
         D.text(ctx, `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`, w / 2, 22, 17 * ts, hot ? (col.bad || '#d9534f') : col.ink, 800);
-        D.text(ctx, map.name, w / 2, 40, 9.5, col.ink3, 650);
+        D.fitText(ctx, map.name, w / 2, 40, Math.max(40, w - 2 * pw - 90), 9.5, col.ink3, 650, 8);
       }
       function render() {
         const col = api.colors(), { w, h } = view; ctx.clearRect(0, 0, w, h);
@@ -943,6 +1040,7 @@
         drawHeader(col);
         const top = 54, avail = h - top - 8, s = Math.min((w - 16) / W, avail / H);
         const ox = (w - W * s) / 2, oy = top + Math.max(0, (avail - H * s) / 2) * 0.3;
+        fieldS = s;
         ctx.save(); ctx.translate(ox, oy); ctx.scale(s, s);
         if (shake > 0) ctx.translate((Math.random() - 0.5) * 6 * shake, (Math.random() - 0.5) * 6 * shake);
         drawField(col); ctx.restore();
@@ -952,8 +1050,8 @@
       function save() {
         if (phase === 'over' || api.ended || (!restored && !api.touched)) return null;
         if (phase === 'menu') return null;   // still picking a scene: nothing to resume
-        return { v: 2, phase, sel: { map: sel.map, time: sel.time, rounds: sel.rounds }, focus: { row: focus.row, col: focus.col },
-          mapIdx, round, wins: { p1: wins.p1, p2: wins.p2 }, it, firstIt, timer, phaseT, itemT, tagCool, mt,
+        return { v: 2, phase, sel: { map: sel.map, time: sel.time, rounds: sel.rounds, players: sel.players }, focus: { row: focus.row, col: focus.col },
+          mapIdx, round, wins: Object.assign({}, wins), itTime: Object.assign({}, itTime), it, firstIt, timer, phaseT, itemT, tagCool, mt,
           items: items.map(i => ({ x: i.x, y: i.y, type: i.type })),
           ps: players.map(p => { const o = { hold: p.hold, dead: p.dead, onM: p.onM }; PF.forEach(k => { o[k] = p[k]; }); return o; })
         };
@@ -962,22 +1060,23 @@
         const num = v => typeof v === 'number' && isFinite(v), int = (v, a, b) => Number.isInteger(v) && v >= a && v <= b;
         if (!s || s.v !== 2 || !s.sel || !int(s.sel.map, -1, MAPS.length - 1) || !int(s.sel.time, 0, 2) || !int(s.sel.rounds, 0, 2)) return false;
         if (!['menu', 'count', 'play', 'end'].includes(s.phase)) return false;
-        const sl = { map: s.sel.map, time: s.sel.time, rounds: s.sel.rounds }, fc = s.focus && int(s.focus.row, 0, 9) && int(s.focus.col, 0, 9) ? { row: s.focus.row, col: s.focus.col } : { row: 1, col: 0 };
+        const np = int(s.sel.players, 0, 2) && friend ? s.sel.players : 0, rid = IDS.slice(0, 2 + np);
+        const sl = { map: s.sel.map, time: s.sel.time, rounds: s.sel.rounds, players: np }, fc = s.focus && int(s.focus.row, 0, 9) && int(s.focus.col, 0, 9) ? { row: s.focus.row, col: s.focus.col } : { row: 1, col: 0 };
         if (s.phase !== 'menu') {
           const ft = ROUNDS[sl.rounds];
-          if (!int(s.mapIdx, 0, MAPS.length - 1) || !int(s.round, 0, 20) || !s.wins || !int(s.wins.p1, 0, ft - 1) || !int(s.wins.p2, 0, ft - 1)) return false;
-          if (!['p1', 'p2'].includes(s.it) || !['p1', 'p2'].includes(s.firstIt) || ![s.timer, s.phaseT, s.itemT, s.tagCool, s.mt].every(num)) return false;
-          if (!Array.isArray(s.ps) || s.ps.length !== 2 || !s.ps.every(p => p && PF.every(k => num(p[k])) && (p.hold === null || POWERS[p.hold])) || !Array.isArray(s.items)) return false;
+          if (!int(s.mapIdx, 0, MAPS.length - 1) || !int(s.round, 0, 20) || !s.wins || !rid.every(id => int(s.wins[id], 0, ft - 1))) return false;
+          if (!rid.includes(s.it) || !rid.includes(s.firstIt) || ![s.timer, s.phaseT, s.itemT, s.tagCool, s.mt].every(num)) return false;
+          if (!Array.isArray(s.ps) || s.ps.length !== rid.length || !s.ps.every(p => p && PF.every(k => num(p[k])) && (p.hold === null || POWERS[p.hold])) || !Array.isArray(s.items)) return false;
           mapIdx = s.mapIdx; map = buildMap(mapIdx); mt = s.mt; placeMovers(map, mt); map.movers.forEach(m => { m.ddx = 0; m.ddy = 0; });
-          round = s.round; wins = { p1: s.wins.p1, p2: s.wins.p2 }; it = s.it; firstIt = s.firstIt;
+          ids = rid; round = s.round; wins = {}; itTime = {}; rid.forEach(id => { wins[id] = s.wins[id]; itTime[id] = s.itTime && num(s.itTime[id]) ? s.itTime[id] : 0; }); it = s.it; firstIt = s.firstIt;
           timer = s.timer; phaseT = s.phaseT; itemT = s.itemT; tagCool = s.tagCool;
           items = s.items.filter(i => i && num(i.x) && num(i.y) && POWERS[i.type]).slice(0, 3).map(i => ({ x: i.x, y: i.y, type: i.type, t: 1 }));
-          players = ['p1', 'p2'].map((id, k) => {
+          players = rid.map((id, k) => {
             const p = newPlayer(id), q = s.ps[k]; PF.forEach(f => { p[f] = q[f]; });
             p.hold = q.hold || null; p.dead = !!q.dead; p.onM = int(q.onM, -1, map.movers.length - 1) ? q.onM : -1;
             p.w = p.shrinkT > 0 ? SW : PW; p.h = p.shrinkT > 0 ? SH : PH; p.door = doorAt(p); return p;
           });
-          api.score(Math.max(wins.p1, wins.p2));
+          api.score(maxWins());
         }
         sel = sl; focus = fc; phase = s.phase;
         return true;
@@ -988,8 +1087,110 @@
         items: items.map(i => ({ x: i.x, y: i.y, type: i.type })), menu: phase === 'menu' ? menuLayout().tiles.map(t => [t.x, t.y, t.w, t.h, t.map]) : null,
         ps: players.map(p => ({ x: p.x, y: p.y, w: p.w, vx: p.vx, vy: p.vy, ground: p.ground, surf: p.surf, onM: p.onM, frozen: p.frozen, hold: p.hold, dead: p.dead,
           speedT: p.speedT, jumpT: p.jumpT, ghostT: p.ghostT, shrinkT: p.shrinkT, shieldT: p.shieldT })) });
-      api.loop(dt => { if (!api.ended || phase === 'over') update(dt); render(); });
-      return { save, pause() { pads.clear(); }, resume() { pads.clear(); } };
+      // ---------- online: the host runs the match; guests send their keys and draw the host's copy ----------
+      let link = null, finished = false;
+      const r1 = v => Math.round(v * 10) / 10, num = v => typeof v === 'number' && isFinite(v);
+      function finishOnline(win) {
+        if (finished) return; finished = true;
+        api.over({ score: wins[myId] || 0, won: win === myId, title: label(win) + ' wins', message: resultText() });
+      }
+      if (on) {
+        const seen = {};   // host: the last press counts each guest sent (jump / power-up / drop)
+        const snapshot = () => ({
+          ph: phase, mi: mapIdx, r: round, it, t: r1(timer), pt: r1(phaseT), tc: r1(tagCool), mt: Math.round(mt * 100) / 100, sel: [sel.time, sel.rounds],
+          ids, w: ids.map(id => wins[id] || 0), items: items.map(i => [r1(i.x), r1(i.y), PKEYS.indexOf(i.type)]),
+          ps: players.map(p => [r1(p.x), r1(p.y), p.w, p.h, p.face, r1(p.frozen), p.dead ? 1 : 0, p.hold ? PKEYS.indexOf(p.hold) : -1].concat(TIMED.map(k => r1(p[k]))))
+        });
+        let presses = { j: 0, a: 0, n: 0 };
+        link = Ludus.rt(api, {
+          hz: 18, snapshot,
+          input: () => {
+            const pd = pads[myId];
+            if (pads.take(myId, 'up')) presses.j++; if (pads.take(myId, 'act')) presses.a++; if (pads.take(myId, 'down')) presses.n++;
+            return { l: pd.left ? 1 : 0, r: pd.right ? 1 : 0, u: pd.up ? 1 : 0, d: pd.down ? 1 : 0, j: presses.j, a: presses.a, n: presses.n };
+          },
+          onInput: (seat, d) => {
+            const id = 'p' + (seat + 1), pd = pads[id]; if (!pd || !ids.includes(id)) return;
+            pd.left = d.l === 1; pd.right = d.r === 1; pd.up = d.u === 1; pd.down = d.d === 1;
+            const was = seen[id] || { j: 0, a: 0, n: 0 };
+            if (Number.isInteger(d.j) && d.j > was.j) pd.hit.up = true;
+            if (Number.isInteger(d.a) && d.a > was.a) pd.hit.act = true;
+            if (Number.isInteger(d.n) && d.n > was.n) pd.hit.down = true;
+            seen[id] = { j: Number.isInteger(d.j) ? d.j : was.j, a: Number.isInteger(d.a) ? d.a : was.a, n: Number.isInteger(d.n) ? d.n : was.n };
+          },
+          onState: applyState
+        });
+        if (on.isHost) {
+          on.onLeave(seat => {   // a player left: the match carries on without them (the app ends it below two players)
+            const id = 'p' + (seat + 1); if (!ids.includes(id) || ids.length <= 1) return;
+            ids = ids.filter(x => x !== id); players = players.filter(p => p.id !== id);
+            if (it === id) { it = ids[0]; tagCool = TAG_COOL; }
+            if (firstIt === id) firstIt = ids[0];
+          });
+        } else {
+          on.on('end', d => {
+            if (!d || !Array.isArray(d.w) || d.w.length !== ids.length || !d.w.every(Number.isInteger) || !ids.includes(d.win)) return;
+            ids.forEach((id, k) => { wins[id] = d.w[k]; }); phase = 'over'; finishOnline(d.win);
+          });
+        }
+      }
+      // guest: take a state copy from the host (validated: it came over the network)
+      function applyState(d) {
+        const int = (v, a, b) => Number.isInteger(v) && v >= a && v <= b;
+        if (!['menu', 'count', 'play', 'end', 'over'].includes(d.ph) || !int(d.mi, 0, MAPS.length - 1) || !Array.isArray(d.ids) || d.ids.length < 1 || d.ids.length > 4 || !d.ids.every(id => IDS.includes(id))) return;
+        if (!Array.isArray(d.ps) || !Array.isArray(d.w) || !Array.isArray(d.items) || !Array.isArray(d.sel)) return;
+        if (d.ph !== 'menu' && (d.ps.length !== d.ids.length || d.w.length !== d.ids.length)) return;
+        const was = { ph: phase, it };
+        if (d.mi !== mapIdx || map.i !== d.mi) { mapIdx = d.mi; map = buildMap(mapIdx); }
+        ids = d.ids.slice(); d.w.forEach((v, k) => { if (int(v, 0, 9)) wins[ids[k]] = v; });
+        if (int(d.sel[0], 0, 2)) sel.time = d.sel[0]; if (int(d.sel[1], 0, 2)) sel.rounds = d.sel[1];
+        if (int(d.r, 0, 50)) round = d.r;
+        if (ids.includes(d.it)) it = d.it;
+        if (num(d.t)) timer = d.t; if (num(d.pt)) phaseT = d.pt; if (num(d.tc)) tagCool = d.tc;
+        items = d.items.filter(i => Array.isArray(i) && num(i[0]) && num(i[1]) && int(i[2], 0, PKEYS.length - 1)).slice(0, 4)
+          .map(i => { const old = items.find(o => o.x === i[0] && o.y === i[1]); return { x: i[0], y: i[1], type: PKEYS[i[2]], t: old ? old.t : 0 }; });
+        if (d.ph !== 'menu') {
+          players = ids.map((id, k) => {
+            const q = d.ps[k], p = players.find(o => o.id === id) || newPlayer(id);
+            if (!Array.isArray(q) || q.length < 8 + TIMED.length || !q.slice(0, 6).every(num)) return p;
+            p.w = q[2] === SW ? SW : PW; p.h = q[3] === SH ? SH : PH; p.face = q[4] < 0 ? -1 : 1; p.frozen = q[5]; p.dead = q[6] === 1;
+            p.hold = int(q[7], 0, PKEYS.length - 1) ? PKEYS[q[7]] : null;
+            TIMED.forEach((k2, j) => { p[k2] = num(q[8 + j]) ? q[8 + j] : 0; });
+            if (p.dead && !p.wasDead) burst(q[0] + p.w / 2, q[1] + p.h / 2, 34, pcol(id, api.colors()));
+            p.wasDead = p.dead;
+            return p;
+          });
+        }
+        phase = d.ph;
+        if (was.ph === 'count' && phase === 'play') { api.sfx('score'); floaters.push({ text: 'Go', x: W / 2, y: H / 2, t: 0, color: null, big: true }); }
+        if (phase === 'play' && was.ph === 'play' && was.it !== it) { const b = P(it); api.sfx('hit'); flash = 1; if (!api.reduceMotion) shake = 0.5; floaters.push({ text: itText(it), x: b.x + b.w / 2, y: b.y - 14, t: 0, color: null }); }
+        if ((phase === 'end' || phase === 'over') && was.ph === 'play') { api.sfx('boom'); if (!api.reduceMotion) shake = 1; }
+        if (phase === 'count' && was.ph !== 'count') lastTick = -1;
+        api.score(maxWins());
+      }
+      function guestUpdate(dt) {
+        clock += dt; shake = Math.max(0, shake - dt * 2.5); flash = Math.max(0, flash - dt * 3);
+        const sm = link.sample();
+        if (sm && phase !== 'menu' && Array.isArray(sm.a.ps) && Array.isArray(sm.b.ps)) {
+          const { a, b, t } = sm, M = Ludus.rt.mix;
+          players.forEach((p, k) => {
+            const qa = a.ps[k], qb = b.ps[k]; if (!Array.isArray(qb) || !num(qb[0]) || !num(qb[1])) return;
+            const ok = Array.isArray(qa) && num(qa[0]) && num(qa[1]) && a.ids && a.ids[k] === p.id;
+            p.x = ok ? M(qa[0], qb[0], t, 60) : qb[0]; p.y = ok ? M(qa[1], qb[1], t, 60) : qb[1];
+          });
+          if (num(a.mt) && num(b.mt)) { mt = M(a.mt, b.mt, t, 1); placeMovers(map, mt); }
+        }
+        if (phase === 'count') { const n = Math.ceil(phaseT / (COUNT / 3)); if (n !== lastTick && n > 0) { lastTick = n; api.sfx('tick'); } }
+        else if (phase === 'play') { const sc = Math.ceil(timer); if (sc <= 10 && sc !== lastTick && sc > 0) { lastTick = sc; api.sfx('tick'); } }
+        items.forEach(i => { i.t += dt; }); floaters.forEach(f => { f.t += dt; }); floaters = floaters.filter(f => f.t < 1.1);
+        parts.forEach(q => { q.x += q.vx * dt; q.y += q.vy * dt; q.vy += 500 * dt; q.life -= dt * 1.6; }); parts = parts.filter(q => q.life > 0);
+      }
+      api.loop(dt => {
+        if (guest) guestUpdate(dt); else if (!api.ended || phase === 'over') update(dt);
+        if (link) link.step();
+        render();
+      });
+      return { save: on ? () => ({ phase, it, mapIdx, round, ids: ids.slice(), wins: ids.map(id => wins[id] || 0) }) : save, pause() { pads.clear(); }, resume() { pads.clear(); } };
     }
   });
 })();
