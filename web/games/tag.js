@@ -213,7 +213,7 @@
       const view = api.canvas(), { ctx } = view;
       const pads = makePads(api, e => phase === 'menu' && menuKey(e));
       const BASE = [150, 162, 175][api.level];
-      let sel = { map: 0, time: 0, rounds: 1 }, focus = { row: 1, col: 0 };
+      let sel = { map: 0, time: 0, rounds: 1 }, focus = { row: 1, col: 0 }, clicked = null;
       let map = BUILT[0], mapIdx = 0, round = 0, wins = { p1: 0, p2: 0 }, it = 'p1', firstIt = 'p1', timer = 60, phase = 'menu', phaseT = 0;
       let items = [], itemT = 4, tagCool = 0, mt = 0, clock = 0, players = [], parts = [], floaters = [], springs = {};
       let shake = 0, overCalled = false, lastTick = -1, flash = 0, thumbs = null;
@@ -294,7 +294,12 @@
         if (phase !== 'menu') return;
         const r = view.canvas.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top, L = menuLayout();
         L.rows.forEach((row, ri) => row.forEach((item, ci) => {
-          if (x >= item.x && x <= item.x + item.w && y >= item.y && y <= item.y + item.h) { focus = { row: ri, col: ci }; choose(item); }
+          if (x >= item.x && x <= item.x + item.w && y >= item.y && y <= item.y + item.h) {
+            // Scene tiles: first click selects (orange ring), a second click on the same tile opens it.
+            const picked = clicked === ri + ':' + ci; clicked = ri + ':' + ci;
+            focus = { row: ri, col: ci };
+            if (item.key || picked) choose(item); else api.sfx('move');
+          }
         }));
       });
       function thumb(i, tw, col) {
