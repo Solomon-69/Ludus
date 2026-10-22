@@ -64,11 +64,12 @@
   function wideFor(g) { return ORIENT.has(g.id) ? !!(S.orient && S.orient[g.id]) : !!g.wide; }
   function renderOrient(g) {
     const b = $('orientBtn'); b.hidden = !ORIENT.has(g.id);
-    b.classList.toggle('is-wide', wideFor(g));
+    const icon = () => { b.classList.toggle('is-wide', wideFor(g)); $('orientUse').setAttribute('href', wideFor(g) ? '#i-rotate-back' : '#i-rotate'); };
+    icon();
     b.onclick = () => {
       if (!S.orient) S.orient = {};
       S.orient[g.id] = !wideFor(g); L.save(); L.sfx('click');
-      b.classList.toggle('is-wide', wideFor(g));
+      icon();
       L.native('wide', { on: wideFor(g) });
       b.blur();
     };
