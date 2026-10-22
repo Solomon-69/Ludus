@@ -10,7 +10,7 @@
 <p><b>33 little games in your menu bar. Take a little break.</b></p>
 
 <p>
-  <a href="https://github.com/Solomon-69/Ludus/releases/latest"><img alt="Latest release" src="https://img.shields.io/badge/download-latest-d97757?style=flat-square"></a>
+  <a href="https://github.com/Solomon-69/Ludus/releases/latest"><img alt="Version 1.5.0" src="https://img.shields.io/badge/version-1.5.0-d97757?style=flat-square"></a>
   <img alt="macOS 14 or later" src="https://img.shields.io/badge/macOS-14%2B-1f1d1a?style=flat-square&logo=apple&logoColor=white">
   <img alt="Windows 10 or 11" src="https://img.shields.io/badge/Windows-10%20%7C%2011-1f1d1a?style=flat-square">
   <a href="LICENSE"><img alt="MIT licence" src="https://img.shields.io/badge/licence-MIT-5b8a5a?style=flat-square"></a>
@@ -20,14 +20,13 @@
   <a href="https://github.com/Solomon-69/Ludus/releases/latest/download/Ludus.dmg"><b>Download for Mac</b></a>
   &nbsp;&middot;&nbsp;
   <a href="https://github.com/Solomon-69/Ludus/releases/latest/download/Ludus-windows.zip"><b>Download for Windows</b></a>
-  &nbsp;&middot;&nbsp;
 </p>
 
 <br>
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/img/panel-dark.png">
-  <img src="docs/img/panel-light.png" width="400" alt="The Ludus panel open under the menu bar, showing a Continue card for 2048 and a grid of games">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/showcase/ludus-1-dark.png">
+  <img src="docs/showcase/ludus-1-light.png" width="880" alt="The Ludus panel open under the menu bar with 2048 and Sky Raiders beside it">
 </picture>
 
 </div>
@@ -55,36 +54,91 @@ It is free, open source, works fully offline and collects nothing.
 
 ## Features
 
-- **33 games in four groups.** Arcade, Puzzle, Duel (you against the computer) and 2 Player (two people, one keyboard).
-- **Always one click away.** A single menu bar icon. No Dock icon, no windows to manage.
-- **Pick up where you left off.** Close the panel mid-game and it pauses and saves. A Continue card takes you straight back.
-- **Best scores and progress** for every game, stored on your Mac.
-- **Light and dark.** Follows your Mac, or pick one. Seven accent colours.
-- **Compact or Large panel.** Some games open a wider panel when they need the room.
-- **Three difficulty levels** for the computer opponents and the arcade speed.
-- **Keyboard first, mouse friendly.** Arrow keys or WASD, Space, Esc. Most games also work with clicks or swipes.
-- **Light on your Mac.** One small native app. The games are plain HTML, CSS and JavaScript bundled inside it.
-- **Invisible icon option** if you want an empty-looking menu bar. The spot still opens Ludus when clicked.
-- **Offline and private.** No accounts, no ads, no analytics, no network access at all.
+Ludus puts 33 small, polished games one click away. Here is what is inside.
 
-<table>
-  <tr>
-    <td align="center" width="50%">
-      <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="docs/img/game-dark.png">
-        <img src="docs/img/game-light.png" width="300" alt="A game of 2048 in progress">
-      </picture>
-      <br><sub>Every game pauses and saves when the panel closes</sub>
-    </td>
-    <td align="center" width="50%">
-      <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="docs/img/settings-dark.png">
-        <img src="docs/img/settings-light.png" width="300" alt="The Ludus settings screen">
-      </picture>
-      <br><sub>Appearance, panel size, difficulty, sound and more</sub>
-    </td>
-  </tr>
-</table>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/showcase/ludus-2-dark.png">
+  <img src="docs/showcase/ludus-2-light.png" width="880" alt="Four Up in vs Friend mode next to a two-player game of Tag">
+</picture>
+
+### Play a friend on one keyboard
+
+Every board game has a <b>vs Bot / vs Friend</b> switch at the top. Pick Friend and you take turns on the same keyboard, with Player 2 in blue. The real-time games in the 2 Player group give each of you your own keys, so you can both play at once.
+
+- <b>Turn-based with a friend:</b> Four Up, Box It, Nine Squared, The Crossing and Dead Centre.
+- <b>Secret picks:</b> in The Decider, Player 1 picks with <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> and Player 2 with <kbd>J</kbd> <kbd>K</kbd> <kbd>L</kbd>. Both hands show only once you have both locked in.
+- <b>Real time:</b> Air Puck, Light Trails, Rally, Tag and Tank Duel, with one player on <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> and the other on the arrow keys.
+- All of them are in the <b>2 Player</b> tab. The panel widens by itself when a game needs the room.
+
+<br>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/showcase/ludus-3-dark.png">
+  <img src="docs/showcase/ludus-3-light.png" width="880" alt="Sky Raiders, Stack and Chomp side by side">
+</picture>
+
+### Arcade classics that feel right
+
+Eleven arcade games built to play smoothly at 60 frames a second, each with its own best score to beat.
+
+- <b>Sky Raiders</b>: waves of invaders, shields and a mystery ship.
+- <b>Stack</b>: drop each block in 3D and line it up perfectly for a combo.
+- <b>Chomp</b>: a maze, four ghosts and power pellets.
+- Plus Blocks (falling blocks with proper locking), Breakout, Drift, Flappy Spark, Garden Guard, Hammer Climb, Snake and Spark Hop.
+- Three difficulty levels change the speed and how clever the computer is.
+
+<br>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/showcase/ludus-4-dark.png">
+  <img src="docs/showcase/ludus-4-light.png" width="880" alt="2048, Five Letters and Sudoku side by side">
+</picture>
+
+### Puzzles for a quick think
+
+Eight calm puzzle games for a two-minute break or a longer think. Close the panel at any point and the game is saved exactly as it was.
+
+- <b>2048</b>, <b>Five Letters</b> (guess the word in six tries), <b>Sudoku</b> with notes and undo.
+- <b>Minesweeper</b>, <b>Patience</b>, <b>Pairs</b>, <b>Crates</b> and <b>Spark Match</b>.
+- Keyboard first, but every puzzle also works with clicks.
+
+<br>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/showcase/ludus-5-dark.png">
+  <img src="docs/showcase/ludus-5-light.png" width="880" alt="The Ludus home screen with the Continue card magnified">
+</picture>
+
+### Pick up right where you left off
+
+Clicking anywhere outside the panel pauses your game and saves it. Next time you open Ludus, a Continue card at the top takes you straight back in.
+
+- Saves survive quitting Ludus and restarting your Mac.
+- Cards show your best score and mark games that are in progress.
+- Ludus always opens on the All tab, so every game is one glance away.
+
+<br>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/showcase/ludus-6-dark.png">
+  <img src="docs/showcase/ludus-6-light.png" width="880" alt="The Ludus settings screen in light and dark">
+</picture>
+
+### Feels at home on your Mac
+
+Ludus follows your Mac's light or dark look, or you can choose one. Everything else is up to you.
+
+- <b>Appearance:</b> Auto, Light or Dark, and seven accent colours.
+- <b>Panel size:</b> Compact or Large, with a smooth resize between them.
+- <b>Invisible icon:</b> an empty-looking menu bar that still opens Ludus when clicked.
+- <b>Show in Dock:</b> off by default, so Ludus stays in the menu bar only.
+- <b>Sound and volume</b>, reduce motion, difficulty, and control hints under each game.
+
+
+**Also:** best scores and progress for every game stay on your Mac. There are no accounts, no
+ads and no analytics, and Ludus makes no network connections at all. It is one small native app,
+and the games inside are plain HTML, CSS and JavaScript.
+
 
 ## Install
 
@@ -128,6 +182,8 @@ brew install --cask ludus   # not available yet
 | **Puzzle** | 2048, Crates, Five Letters, Minesweeper, Pairs, Patience, Spark Match, Sudoku |
 | **Duel** (you against the computer) | Box It, Dead Centre, Four Up, Last Wire, Nine Squared, Right of Way, The Crossing, The Decider, Wall Run |
 | **2 Player** (one keyboard) | Air Puck, Light Trails, Rally, Tag, Tank Duel |
+
+Four Up, Box It, Nine Squared, The Crossing, The Decider and Dead Centre also have a **vs Friend** mode, so they show up in the 2 Player tab too.
 
 Each game lives in its own file in [`web/games/`](web/games).
 
