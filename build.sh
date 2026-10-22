@@ -56,5 +56,6 @@ if [ "${1:-}" != "--no-install" ]; then
   rm -rf "$HOME/Applications/Ludus.app"
   ditto "$APP" "$HOME/Applications/Ludus.app"
   open -g "$HOME/Applications/Ludus.app"
+  rm -rf "$APP"   # no second copy left behind for Spotlight to show
   echo "Installed ~/Applications/Ludus.app"
 fi
