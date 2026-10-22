@@ -54,6 +54,10 @@ internal sealed class PopupForm : Form
 
     /// <summary>Keeps the panel open when it loses focus (automated test only).</summary>
     public bool StayOpen { get; set; }
+    /// <summary>The page shows its first-run welcome (asks for the panel to open) and finishes it.</summary>
+    public event Action? IntroRequested, IntroDone;
+    /// <summary>Automated test runs skip the first-run welcome.</summary>
+    public static bool SkipIntro { get; set; }
 
     public PopupForm(Theme theme, Action onQuit)
     {
@@ -211,7 +215,8 @@ internal sealed class PopupForm : Form
                $"window.__LUDUS_STATE__ = {Store.LoadStateJson()};\n" +
                $"window.__LUDUS_LOGIN__ = {Bool(Store.LoginEnabled())};\n" +
                $"window.__LUDUS_DARK__ = {Bool(theme.SystemDark)};\n" +
-               $"window.__LUDUS_INVISIBLE__ = {Bool(Store.LoadInvisible())};\n";
+               $"window.__LUDUS_INVISIBLE__ = {Bool(Store.LoadInvisible())};\n" +
+               $"window.__LUDUS_SKIP_INTRO__ = {Bool(SkipIntro)};\n";
     }
 
     private void RunScript(string js)
@@ -268,6 +273,12 @@ internal sealed class PopupForm : Form
                 case "quit":
                     // Leave the WebView2 event first; quitting disposes the control.
                     BeginInvoke((MethodInvoker)Quit);
+                    break;
+                case "intro":
+                    BeginInvoke((MethodInvoker)(() => IntroRequested?.Invoke()));
+                    break;
+                case "introDone":
+                    BeginInvoke((MethodInvoker)(() => IntroDone?.Invoke()));
                     break;
                 case "playing":
                     break;   // the Mac ignores this too; kept for future use

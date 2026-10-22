@@ -74,8 +74,8 @@
   };
 
   Ludus.register({
-    id: 'lastwire', name: 'Last Wire', tag: 'Duel', tint: '#d1495b',
-    hint: 'Click a wire (or <kbd>↑</kbd><kbd>↓</kbd> + <kbd>Space</kbd>) to cut. <kbd>S</kbd> then a wire scans it and its neighbours. Cutting the live wire loses the round',
+    id: 'lastwire', name: 'Last Wire', tag: 'Duel', tint: '#d1495b', versus: true,
+    hint: 'Click a wire (or <kbd>↑</kbd><kbd>↓</kbd> + <kbd>Space</kbd>) to cut. <kbd>S</kbd> then a wire scans it and its neighbours. Cutting the live wire loses the round. Bot or vs Friend (take turns on one keyboard)',
     _logic: logic,
     art(ctx, w, h) {
       const D = Ludus.draw;
@@ -100,6 +100,9 @@
       const D = Ludus.draw, L = logic;
       const view = api.canvas();
       const { ctx } = view;
+      const friend = api.friend, nameOf = who => (who === P ? 'Player 1' : 'Player 2');
+      const sk = who => (who === P ? 'p' : 'c');
+      const whoAv = who => (who === P ? 'you' : friend ? 'p2' : 'bot');
       let wins = { p: 0, c: 0 }, starter = P;
       let live, cut, cutBy, cand, scans, turn, phase, scanMode = false, sel = 4, hover = -1;
       let cutT, scanFx = null, boomAt = 0, boomWire = -1, flash = 0, shake = 0, banner = null, cpuAim = -1, thinking = false;
@@ -109,7 +112,7 @@
         live = Math.floor(Math.random() * N); cut = 0; cand = ALL; cutBy = new Int8Array(N); cutT = new Float64Array(N);
         scans = { p: SCANS, c: SCANS }; turn = starter; phase = 'play'; scanMode = false; banner = null; boomWire = -1; scanFx = null; cpuAim = -1;
 
-        if (turn === C && !quiet) cpuTurn();
+        if (turn === C && !quiet && !friend) cpuTurn();
       }
       const pub = who => ({ cut, cand, sMe: who === P ? scans.p : scans.c, sOp: who === P ? scans.c : scans.p });
       const left = () => N - bits(cut);
@@ -123,7 +126,7 @@
         nextTurn(who);
       }
       function doScan(i, who) {
-        const k = who === P ? 'p' : 'c';
+        const k = sk(who);
         if (scans[k] <= 0 || (cut & (1 << i))) return;
         scans[k]--;
         const nb = nbMask(i), near = (nb & (1 << live)) !== 0;
@@ -135,7 +138,7 @@
       }
       function nextTurn(who) {
         turn = who === P ? C : P; scanMode = false;
-        if (turn === C) cpuTurn();
+        if (turn === C && !friend) cpuTurn();
       }
       function boom(i, who) {
         phase = 'boom'; boomWire = i; boomAt = performance.now(); flash = 1;
@@ -143,11 +146,14 @@
         api.sfx('boom');
         const winner = who === P ? 'c' : 'p';
         wins[winner]++;
-        if (winner === 'p') api.score(wins.p);
-        banner = { text: who === P ? 'You cut it. Boom' : 'Bot cut it. Boom', sub: winner === 'p' ? 'ROUND TO YOU' : 'ROUND TO BOT', t0: performance.now() };
+        if (winner === 'p' && !friend) api.score(wins.p);
+        banner = friend
+          ? { text: nameOf(who) + ' cut it. Boom', sub: winner === 'p' ? 'ROUND TO P1' : 'ROUND TO P2', t0: performance.now() }
+          : { text: who === P ? 'You cut it. Boom' : 'Bot cut it. Boom', sub: winner === 'p' ? 'ROUND TO YOU' : 'ROUND TO BOT', t0: performance.now() };
         const done = wins[winner] >= TARGET;
         api.timeout(() => {
-          if (done) api.over({ score: wins.p, won: winner === 'p', title: winner === 'p' ? 'You win' : 'Bot wins', message: `Rounds ${wins.p} to ${wins.c}` });
+          if (done && friend) api.over({ score: TARGET, won: true, title: (winner === 'p' ? 'Player 1' : 'Player 2') + ' wins', message: `Rounds ${wins.p} to ${wins.c}` });
+          else if (done) api.over({ score: wins.p, won: winner === 'p', title: winner === 'p' ? 'You win' : 'Bot wins', message: `Rounds ${wins.p} to ${wins.c}` });
           else { starter = starter === P ? C : P; newRound(); }
         }, done ? 1700 : 2100);
       }
@@ -175,11 +181,11 @@
       }
 
       function act(i) {
-        if (phase !== 'play' || turn !== P || thinking || i < 0 || (cut & (1 << i))) return;
-        if (scanMode && scans.p > 0) doScan(i, P); else doCut(i, P);
+        if (phase !== 'play' || (turn !== P && !friend) || thinking || i < 0 || (cut & (1 << i))) return;
+        if (scanMode && scans[sk(turn)] > 0) doScan(i, turn); else doCut(i, turn);
       }
       function toggleScan() {
-        if (phase !== 'play' || turn !== P || scans.p <= 0) { api.sfx('hit'); return; }
+        if (phase !== 'play' || (turn !== P && !friend) || scans[sk(turn)] <= 0) { api.sfx('hit'); return; }
         scanMode = !scanMode; bounceBtn = performance.now(); api.sfx('tap');
       }
 
@@ -204,17 +210,18 @@
       const mono = s => `700 ${s}px ui-monospace, "SF Mono", Menlo, Consolas, monospace`;
       function hud(col) {
         const playing = phase === 'play';
-        const status = !playing ? (banner ? banner.text : '') : turn === P ? (scanMode ? 'Pick a wire to scan' : left() === 1 ? 'Only one left' : 'Your move') : 'Bot is thinking';
+        const status = !playing ? (banner ? banner.text : '') : friend ? (scanMode ? nameOf(turn) + ': pick a wire to scan' : left() === 1 ? 'Only one left' : nameOf(turn) + '\u2019s move') : turn === P ? (scanMode ? 'Pick a wire to scan' : left() === 1 ? 'Only one left' : 'Your move') : 'Bot is thinking';
         D.duelHeader(ctx, 8, 8, view.w - 16, {
-          left: { who: 'you', pips: wins.p, of: TARGET }, right: { who: 'bot', pips: wins.c, of: TARGET },
-          turn: playing ? (turn === P ? 'left' : 'right') : null, status, thinking: playing && turn === C
+          left: friend ? { who: 'you', label: 'Player 1', pips: wins.p, of: TARGET } : { who: 'you', pips: wins.p, of: TARGET },
+          right: friend ? { who: 'p2', label: 'Player 2', pips: wins.c, of: TARGET } : { who: 'bot', pips: wins.c, of: TARGET },
+          turn: playing ? (turn === P ? 'left' : 'right') : null, status, thinking: playing && turn === C && !friend
         }, col);
       }
 
       function drawWire(i, col, now) {
         const y = geo.wy0 + geo.row * i + geo.row / 2, x0 = geo.x0, x1 = geo.x1, th = Math.min(10, geo.row * 0.34);
         const isCut = cut & (1 << i), color = COLORS[i];
-        const target = turn === P && phase === 'play' && (hover === i || (hover < 0 && sel === i));
+        const target = (turn === P || friend) && phase === 'play' && (hover === i || (hover < 0 && sel === i));
         // scan bracket preview
         if (target && scanMode && !isCut && i === (hover >= 0 ? hover : sel)) {
           const a = Math.max(0, i - 1), b = Math.min(N - 1, i + 1);
@@ -252,7 +259,7 @@
           const mid = (x0 + x1) / 2, gap = 24 * e, dy = 7 * e;
           draw(x0 + 8, y, mid - gap, y + dy);
           draw(mid + gap, y - dy, x1 - 8, y);
-          if (!boomHere) D.avatar(ctx, mid, y, Math.min(9, geo.row * 0.36), cutBy[i] === P ? 'you' : 'bot', Object.assign({}, col, { dark: true }));
+          if (!boomHere) D.avatar(ctx, mid, y, Math.min(9, geo.row * 0.36), whoAv(cutBy[i]), Object.assign({}, col, { dark: true }));
         }
         if (phase === 'boom' && i === live && !boomHere) {
           ctx.strokeStyle = '#ff8a1f'; ctx.setLineDash([4, 3]); ctx.lineWidth = 1.5;
@@ -286,7 +293,7 @@
         let small = 'ODDS OF BOOM', big;
         const k = bits(cand);
         if (phase === 'boom') { small = 'DETONATED'; big = banner ? banner.sub : ''; }
-        else if (scanFx && now - scanFx.t0 < 1800) { small = (scanFx.who === P ? 'YOUR' : 'BOT') + ' SCAN'; big = scanFx.near ? 'LIVE NEAR' : 'ALL CLEAR'; }
+        else if (scanFx && now - scanFx.t0 < 1800) { small = (friend ? (scanFx.who === P ? 'P1' : 'P2') : scanFx.who === P ? 'YOUR' : 'BOT') + ' SCAN'; big = scanFx.near ? 'LIVE NEAR' : 'ALL CLEAR'; }
         else big = k === 1 ? 'CERTAIN' : '1 IN ' + k;
         ctx.font = mono(Math.max(8, ro.h * 0.17)); ctx.fillStyle = '#7e8594'; ctx.fillText(small, rx, ro.y + ro.h * 0.3);
         ctx.font = mono(Math.max(11, ro.h * 0.3));
@@ -307,17 +314,18 @@
           }
         }
         // scan button
-        const active = scanMode, can = phase === 'play' && turn === P && scans.p > 0;
+        const mine = friend ? scans[sk(turn)] : scans.p, theirs = friend ? scans[sk(turn === P ? C : P)] : scans.c;
+        const active = scanMode, can = phase === 'play' && (turn === P || friend) && mine > 0;
         const bk = api.reduceMotion ? 1 : 1 - 0.06 * Math.max(0, 1 - (now - bounceBtn) / 160);
         ctx.save(); ctx.translate(btn.x + btn.w / 2, btn.y + btn.h / 2); ctx.scale(bk, bk);
         ctx.fillStyle = active ? '#7fd3ff' : can ? '#343944' : '#2a2e36';
         D.roundRect(ctx, -btn.w / 2, -btn.h / 2, btn.w, btn.h, btn.h / 2); ctx.fill();
         D.text(ctx, active ? 'Scanning' : 'Scan', -10, 1, 12.5, active ? '#0b0c0e' : can ? '#e8eaef' : '#6b707c', 700);
-        for (let s = 0; s < SCANS; s++) { ctx.beginPath(); ctx.arc(btn.w / 2 - 34 + s * 11, 0, 3.5, 0, Math.PI * 2); ctx.fillStyle = s < scans.p ? (active ? '#0b0c0e' : '#7fd3ff') : '#4b505c'; ctx.fill(); }
+        for (let s = 0; s < SCANS; s++) { ctx.beginPath(); ctx.arc(btn.w / 2 - 34 + s * 11, 0, 3.5, 0, Math.PI * 2); ctx.fillStyle = s < mine ? (active ? '#0b0c0e' : '#7fd3ff') : '#4b505c'; ctx.fill(); }
         ctx.restore();
         // computer scans left (small dots at the right of the button row)
-        for (let s = 0; s < SCANS; s++) { ctx.beginPath(); ctx.arc(px + pw - 22 - s * 10, btn.y + btn.h / 2, 3, 0, Math.PI * 2); ctx.fillStyle = s < scans.c ? '#9aa0ad' : '#3a3e48'; ctx.fill(); }
-        ctx.font = mono(9); ctx.fillStyle = '#6b707c'; ctx.textAlign = 'right'; ctx.fillText('BOT', px + pw - 22 - SCANS * 10, btn.y + btn.h / 2 + 1);
+        for (let s = 0; s < SCANS; s++) { ctx.beginPath(); ctx.arc(px + pw - 22 - s * 10, btn.y + btn.h / 2, 3, 0, Math.PI * 2); ctx.fillStyle = s < theirs ? '#9aa0ad' : '#3a3e48'; ctx.fill(); }
+        ctx.font = mono(9); ctx.fillStyle = '#6b707c'; ctx.textAlign = 'right'; ctx.fillText(friend ? (turn === P ? 'P2' : 'P1') : 'BOT', px + pw - 22 - SCANS * 10, btn.y + btn.h / 2 + 1);
         // flash
         if (flash > 0) {
           flash = Math.max(0, flash - dt * 1.4);
@@ -350,7 +358,7 @@
         if (!sv || sv.v !== 1 || !sv.wins) return false;
         const wp = sv.wins.p | 0, wc = sv.wins.c | 0;
         if (wp < 0 || wc < 0 || wp >= TARGET || wc >= TARGET) return false;
-        wins = { p: wp, c: wc }; starter = sv.starter === C ? C : P; api.score(wins.p);
+        wins = { p: wp, c: wc }; starter = sv.starter === C ? C : P; if (!friend) api.score(wins.p);
         if (sv.fresh) { newRound(); return true; }
         const okMask = m => Number.isInteger(m) && m >= 0 && m <= ALL;
         if (!Number.isInteger(sv.live) || sv.live < 0 || sv.live >= N || !okMask(sv.cut) || !okMask(sv.cand) || (sv.cut & (1 << sv.live))) return false;
@@ -361,7 +369,7 @@
         for (let i = 0; i < N; i++) if (cut & (1 << i)) cutT[i] = -1e9;
         sel = Math.max(0, Math.min(N - 1, sv.sel | 0));
         thinking = false; cpuAim = -1; turn = sv.turn === C ? C : P;
-        if (turn === C) cpuTurn();
+        if (turn === C && !friend) cpuTurn();
         return true;
       }
 

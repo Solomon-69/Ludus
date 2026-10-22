@@ -160,6 +160,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
         case "dock":
             UserDefaults.standard.set(body["on"] as? Bool ?? false, forKey: dockKey)
             applyDockPolicy()
+        case "intro":
+            // First run: open the panel by itself so the welcome is seen.
+            if !popover.isShown { DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { self.openPopover() } }
         case "quit":
             // Let the panel fold away with its normal animation, then quit (popoverDidClose).
             // Write the running game's snapshot first, then fold the panel away and quit.
@@ -550,6 +553,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
         guard let command = note.object as? String else { return }
         switch command {
         case "panel": if !popover.isShown { openPopover() }
+        case "intro": webView.evaluateJavaScript("window.ludusShowIntro && ludusShowIntro(0)")
         case "close": closePopover()
         case "home": webView.evaluateJavaScript("document.getElementById('backBtn').click()")
         case "settings": webView.evaluateJavaScript("document.getElementById('openSettings').click()")

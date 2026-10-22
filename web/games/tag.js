@@ -71,17 +71,18 @@
     return { i, name: def.name, top: def.top, def, grid, spawns, spots, doors, movers, grav: def.grav || 1, jumpK: def.jumpK || 1 };
   }
   const BUILT = MAPS.map((_, i) => buildMap(i)), solidT = t => '#~<>%'.indexOf(t) >= 0;
-  // Two people, one keyboard: P1 = WASD (+F), P2 = arrows (+ / or Enter). intercept() can swallow keys (scene menu).
+  // Two people, one keyboard: P1 = WASD (+F), P2 = arrows (+ / or Enter). Against the bot both key sets drive P1. intercept() can swallow keys (scene menu).
   function makePads(api, intercept) {
+    const friend = api.friend;
     const C1 = { KeyW: 'up', KeyS: 'down', KeyA: 'left', KeyD: 'right', KeyF: 'act' }, K1 = { w: 'up', s: 'down', a: 'left', d: 'right', f: 'act' };
     const C2 = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right', Slash: 'act', Enter: 'act', NumpadEnter: 'act' };
     const K2 = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right', '/': 'act', Enter: 'act' };
     const blank = () => ({ up: false, down: false, left: false, right: false, act: false, hit: {} });
     const pads = { p1: blank(), p2: blank() };
     function find(e) {
-      if (C1[e.code]) return ['p1', C1[e.code]]; if (C2[e.code]) return ['p2', C2[e.code]];
+      if (C1[e.code]) return ['p1', C1[e.code]]; if (C2[e.code]) return [friend ? 'p2' : 'p1', C2[e.code]];
       const k = e.key && e.key.length === 1 ? e.key.toLowerCase() : e.key;
-      return K1[k] ? ['p1', K1[k]] : K2[k] ? ['p2', K2[k]] : null;
+      return K1[k] ? ['p1', K1[k]] : K2[k] ? [friend ? 'p2' : 'p1', K2[k]] : null;
     }
     api.keys(e => {
       const m = !intercept(e) && find(e); if (!m) return;
@@ -198,8 +199,8 @@
   function sky(g, m, col) { g.fillStyle = m.def.sky[col.dark ? 1 : 0]; D.roundRect(g, 0, 0, W, H, 12); g.fill(); }
   BUILT.forEach(m => placeMovers(m, 0));
   Ludus.register({
-    id: 'tag', name: 'Tag', tag: '2 Player', wide: true, tint: '#6aa56b',
-    hint: '<b>P1</b> <kbd>A</kbd><kbd>D</kbd> run <kbd>W</kbd> jump <kbd>S</kbd> drop <kbd>F</kbd> power · <b>P2</b> same on <kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> + <kbd>/</kbd> or <kbd>Enter</kbd> · scenes: arrows/WASD, <kbd>Enter</kbd>/<kbd>Space</kbd> or click',
+    id: 'tag', name: 'Tag', tag: '2 Player', wide: true, tint: '#6aa56b', versus: true, defaultVs: 'friend',
+    hint: '<b>You</b> <kbd>A</kbd><kbd>D</kbd> or <kbd>←</kbd><kbd>→</kbd> run, <kbd>W</kbd> or <kbd>↑</kbd> jump, <kbd>S</kbd> or <kbd>↓</kbd> drop, <kbd>F</kbd> or <kbd>/</kbd> power-up · vs Bot: the bot is P2 · vs Friend: P1 = <kbd>WASD</kbd> + <kbd>F</kbd>, P2 = <kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> + <kbd>/</kbd> or <kbd>Enter</kbd> · scenes: arrows/WASD, <kbd>Enter</kbd>/<kbd>Space</kbd> or click',
     _rules: { MAPS, buildMap, T, COLS, ROWS, POWERS },
     art(ctx, w, h) {
       ctx.fillStyle = 'rgba(255,255,255,0.32)';
@@ -210,7 +211,7 @@
       D.text(ctx, 'IT', w * 0.3, h * 0.18, h * 0.07, '#fff8f2', 800);
     },
     create(stage, api) {
-      const view = api.canvas(), { ctx } = view;
+      const view = api.canvas(), { ctx } = view, friend = api.friend;
       const pads = makePads(api, e => phase === 'menu' && menuKey(e));
       const BASE = [150, 162, 175][api.level];
       let sel = { map: 0, time: 0, rounds: 1 }, focus = { row: 1, col: 0 }, clicked = null;
@@ -218,7 +219,11 @@
       let items = [], itemT = 4, tagCool = 0, mt = 0, clock = 0, players = [], parts = [], floaters = [], springs = {};
       let shake = 0, overCalled = false, lastTick = -1, flash = 0, thumbs = null;
       const firstTo = () => ROUNDS[sel.rounds], other = id => (id === 'p1' ? 'p2' : 'p1'), P = id => players[id === 'p1' ? 0 : 1];
-      const label = id => (id === 'p1' ? 'P1' : 'P2'), pcol = (id, col) => (id === 'p1' ? col.accent : D.P2);
+      const label = id => (friend ? (id === 'p1' ? 'P1' : 'P2') : (id === 'p1' ? 'You' : 'Bot')), pcol = (id, col) => (id === 'p1' ? col.accent : D.P2);
+      const itText = id => (friend ? label(id) + ' is it' : id === 'p1' ? 'You are it' : 'Bot is it');
+      const wasIt = (id, tail) => (friend ? label(id) + ' was it ' : id === 'p1' ? 'You were it ' : 'Bot was it ') + tail;
+      const takes = id => (friend ? label(id) + ' takes the round' : id === 'p1' ? 'You take the round' : 'Bot takes the round');
+      const winsText = id => (friend ? label(id) + ' wins the match' : id === 'p1' ? 'You win the match' : 'Bot wins the match');
       function newPlayer(id) {
         return { id, x: 0, y: 0, w: PW, h: PH, vx: 0, vy: 0, face: id === 'p1' ? 1 : -1, ground: false, surf: '', onM: -1, wallL: false, wallR: false, door: -1,
           coyote: 0, buffer: 0, lock: 0, dropT: 0, frozen: 0, speedT: 0, jumpT: 0, ghostT: 0, shrinkT: 0, shieldT: 0, hold: null, sq: 1, dead: false, bounce: false };
@@ -234,7 +239,7 @@
         it = round % 2 === 0 ? firstIt : other(firstIt); players = [newPlayer('p1'), newPlayer('p2')];
         players.forEach(p => { p.x = map.spawns[p.id].x; p.y = map.spawns[p.id].y; });
         timer = TIMES[sel.time]; phase = 'count'; phaseT = COUNT; items = []; itemT = 4; tagCool = 0; lastTick = -1; parts = []; floaters = [];
-        pads.clear();
+        pads.clear(); if (!friend) resetBot();
       }
       // ---------- scene menu ----------
       function menuLayout() {
@@ -488,7 +493,7 @@
         a.vx = push * 220; a.vy = Math.min(a.vy, -200);
         api.sfx('hit'); flash = 1; if (!api.reduceMotion) shake = 0.5;
         burst(b.x + b.w / 2, b.y + b.h / 2, 12, pcol(b.id, api.colors()));
-        floaters.push({ text: label(it) + ' is it', x: b.x + b.w / 2, y: b.y - 14, t: 0, color: null });
+        floaters.push({ text: itText(it), x: b.x + b.w / 2, y: b.y - 14, t: 0, color: null });
       }
       function usePower(p) {
         const o = P(other(p.id)), type = p.hold, pw = POWERS[type];
@@ -527,9 +532,210 @@
           return false;
         });
       }
+      // ---------- vs Bot: P2 plans over a graph of standing spots ----------
+      // Nodes are floor cells you can stand in. Edges (walk, fall, jump, drop, spring launch, door) are found by simulating the real physics, so the
+      // bot only attempts moves that work. It chases (or flees) by shortest time on that graph. Ledges that move are ignored.
+      const SK = [{ re: 0.55, slip: 0.22, rate: 2.5, item: 0.3, noise: 2.2 }, { re: 0.4, slip: 0.08, rate: 4, item: 0.55, noise: 0.9 }, { re: 0.26, slip: 0, rate: 7, item: 0.8, noise: 0.25 }][api.level] || { re: 0.4, slip: 0.08, rate: 4, item: 0.55, noise: 0.9 };
+      const navs = {}, ai = { path: [], act: null, actT: 0, replan: 0, pause: 0, useT: 0, upT: 0, goalItem: null, stuckT: 0, lx: 0, ly: 0, info: null };
+      const floorT = t => '#~<>-'.indexOf(t) >= 0, JHOLDS = [0.07, 0.14, 0.22, 0.6];
+      function resetBot() { ai.path = []; ai.act = null; ai.actT = 0; ai.replan = 0; ai.pause = 0; ai.upT = 0; ai.goalItem = null; ai.stuckT = 0; }
+      function simEdge(nav, src, mode, dir, hold) {
+        const G = GRAV * map.grav, dt = 1 / 60, mf = MAX_FALL * (map.grav < 1 ? 0.7 : 1);
+        let x = src.x - PW / 2, y = src.fy - PH, vx = mode === 'fall' ? dir * BASE : 0, vy = 0, grounded = mode === 'fall', dropT = 0, bounce = false;
+        if (mode === 'jump') vy = -JUMP * map.jumpK; else if (mode === 'launch') { vy = -SPRING * Math.sqrt(map.grav); bounce = true; } else if (mode === 'drop') { dropT = 0.22; y += 1; }
+        for (let i = 0; i < 300; i++) {
+          const t = i * dt;
+          if (dir && mode !== 'fall') { const tv = dir * BASE, d = tv - vx; vx += Math.sign(d) * Math.min(Math.abs(d), (grounded ? 2600 : 1600) * dt); }
+          const nx = x + vx * dt; if (solidBox(nx, y, PW, PH)) vx = 0; else x = nx;
+          const l = Math.floor((x + 0.01) / T), rr = Math.floor((x + PW - 0.01) / T);
+          if (grounded) { const fr = Math.floor((y + PH + 0.5) / T); let any = false; for (let c = l; c <= rr; c++) if (floorT(tile(c, fr))) any = true; if (!any) grounded = false; }
+          if (!grounded) {
+            let g = G; if (vy < 0 && !bounce && mode === 'jump' && t >= hold) g *= 2.5; else if (vy > 0) g *= 1.12;
+            vy = Math.min(mf, vy + g * dt); dropT = Math.max(0, dropT - dt);
+            const pb = y + PH; y += vy * dt;
+            if (vy > 0) {
+              const r = Math.floor((y + PH - 0.01) / T); let best = null;
+              for (let c = l; c <= rr; c++) {
+                const tt = tile(c, r);
+                if (tt === '%') return null;
+                if (solidT(tt) || (tt === '-' && dropT <= 0 && pb <= r * T + 0.5)) { const cc = x + PW / 2 - (c * T + T / 2); if (!best || Math.abs(cc) < Math.abs(best.cc)) best = { c, cc }; }
+              }
+              if (best) {
+                y = r * T - PH; vy = 0; const nn = nav.get(best.c, r - 1);
+                if (!nn) return null;
+                if (nn === src) { if (mode === 'fall') { grounded = true; continue; } return null; }
+                return { to: nn.i, cost: t + 0.08 };
+              }
+            } else if (vy < 0) {
+              const r = Math.floor((y + 0.01) / T);
+              for (let c = l; c <= rr; c++) if (solid(c, r)) { y = (r + 1) * T; vy = 0; break; }
+            }
+          }
+          const sc = Math.floor((x + PW / 2) / T), sr = Math.floor((y + PH - 1) / T);
+          if (vy >= 0 && tile(sc, sr) === '^') { const nn = nav.get(sc, sr); if (nn && nn !== src) return { to: nn.i, cost: t + 0.05 }; }
+          if (x + PW / 2 < 0) x += W; else if (x + PW / 2 >= W) x -= W;
+          if (y + PH / 2 < 0) y += H; else if (y + PH / 2 >= H) y -= H;
+        }
+        return null;
+      }
+      function buildNav() {
+        const nav = { nodes: [], byId: new Map() };
+        nav.get = (c, r) => nav.byId.get((((r % ROWS) + ROWS) % ROWS) * COLS + (((c % COLS) + COLS) % COLS)) || null;
+        for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+          const t = tile(c, r);
+          if (solidT(t) || !floorT(tile(c, r + 1))) continue;
+          const di = map.doors.findIndex(d => d.c === c && d.r === r);
+          const nd = { i: nav.nodes.length, c, r, x: c * T + T / 2, fy: (r + 1) * T, spring: t === '^', door: di, edges: [] };
+          nav.nodes.push(nd); nav.byId.set(r * COLS + c, nd);
+        }
+        nav.nodes.forEach(src => {
+          const best = {};
+          const add = (e, dir, kind, hold) => {
+            if (!e) return; let to = e.to, cost = e.cost; const dn = nav.nodes[to];
+            if (dn.door >= 0) { const pd = map.doors[map.doors[dn.door].to], pn = nav.get(pd.c, pd.r); if (!pn) return; to = pn.i; cost += 0.25; }
+            if (to === src.i) return;
+            if (!best[to] || best[to].cost > cost) best[to] = { from: src.i, to, cost, dir, kind, hold: hold || 0 };
+          };
+          if (src.spring) { for (const d of [-1, 0, 1]) add(simEdge(nav, src, 'launch', d, 0), d, 'launch'); }
+          else {
+            for (const d of [-1, 1]) {
+              const nc = src.c + d, tt = tile(nc, src.r); if (solidT(tt)) continue;
+              const nn = nav.get(nc, src.r);
+              if (nn) add({ to: nn.i, cost: T / BASE }, d, 'walk'); else add(simEdge(nav, src, 'fall', d, 0), d, 'fall');
+            }
+            for (const d of [-1, 0, 1]) for (const h of JHOLDS) add(simEdge(nav, src, 'jump', d, h), d, 'jump', h);
+            if (tile(src.c, src.r + 1) === '-') for (const d of [-1, 0, 1]) add(simEdge(nav, src, 'drop', d, 0), d, 'drop');
+          }
+          src.edges = Object.values(best);
+        });
+        return nav;
+      }
+      const navFor = () => navs[mapIdx] || (navs[mapIdx] = buildNav());
+      function dijkstra(nav, srcI) {
+        const n = nav.nodes.length, dist = new Float64Array(n).fill(Infinity), prev = new Array(n).fill(null), done = new Uint8Array(n);
+        dist[srcI] = 0;
+        for (;;) {
+          let u = -1, best = Infinity; for (let i = 0; i < n; i++) if (!done[i] && dist[i] < best) { best = dist[i]; u = i; }
+          if (u < 0) break; done[u] = 1;
+          nav.nodes[u].edges.forEach(e => { if (dist[u] + e.cost < dist[e.to]) { dist[e.to] = dist[u] + e.cost; prev[e.to] = e; } });
+        }
+        return { dist, prev };
+      }
+      function pathTo(d, to) { const out = []; let e = d.prev[to]; while (e) { out.unshift(e); e = d.prev[e.from]; } return out; }
+      function nodeAtP(nav, p) {
+        const cx = p.x + p.w / 2, c = Math.floor(cx / T), r = Math.floor((p.y + p.h - 0.5) / T);
+        return nav.get(c, r) || nav.get(Math.floor((p.x + 0.5) / T), r) || nav.get(Math.floor((p.x + p.w - 0.5) / T), r);
+      }
+      function nodeNear(nav, x, feetY, upMax) {   // the standing spot under / nearest to a point
+        const c = Math.floor(x / T), r0 = Math.floor((feetY - 1) / T);
+        for (let k = 0; k < 7; k++) for (const dc of [0, -1, 1]) { const n = nav.get(c + dc, r0 + k); if (n && !n.spring && n.door < 0 && (dc === 0 || Math.abs(x - n.x) < T)) return n; }
+        let bn = null, bd = Infinity;
+        nav.nodes.forEach(n => { if (n.spring || n.door >= 0) return; const d = Math.hypot(wrapD(n.x - x, W), wrapD(n.fy - feetY, H)); if (d < bd) { bd = d; bn = n; } });
+        return bn;
+      }
+      function itemNode(nav, it2) {
+        let bn = null, bd = Infinity;
+        nav.nodes.forEach(n => {
+          if (n.spring || n.door >= 0) return;
+          const up = (n.fy - 10) - it2.y, dx = Math.abs(wrapD(n.x - it2.x, W));
+          const d = Math.hypot(dx, up < -6 ? (-6 - up) * 3 : up > 56 ? (up - 56) * 2 : 0) + dx * 0.2;
+          if (d < bd) { bd = d; bn = n; }
+        });
+        return bn;
+      }
+      function planBot(nav, node) {
+        ai.replan = SK.re * (0.8 + Math.random() * 0.4);
+        const b = players[1], h = players[0], dB = dijkstra(nav, node.i), hn = nodeNear(nav, h.x + h.w / 2, h.y + h.h);
+        let goal = hn, dH = null; ai.goalItem = null;
+        if (!hn) { ai.path = []; return; }
+        if (it !== 'p2') {
+          dH = dijkstra(nav, hn.i); let bs = -Infinity;
+          nav.nodes.forEach(n => {
+            if (n.spring || n.door >= 0 || dB.dist[n.i] > 4.5) return;
+            const dh = Math.min(dH.dist[n.i], 7), db = dB.dist[n.i], s = dh - 0.15 * db + (db < dH.dist[n.i] - 0.25 ? 3 : 0) + Math.random() * SK.noise;
+            if (s > bs) { bs = s; goal = n; }
+          });
+        }
+        if (!b.hold) items.forEach(i => {
+          if (i.botWant === undefined) i.botWant = Math.random() < SK.item;
+          if (!i.botWant) return; const n = itemNode(nav, i); if (!n) return; const db = dB.dist[n.i];
+          const ok = it === 'p2' ? db < 0.7 + 0.45 * dB.dist[hn.i] : db < 3.5 && db < dH.dist[n.i] - 0.3;
+          if (ok && (!ai.goalItem || db < ai.goalItem.db)) { ai.goalItem = { item: i, db }; goal = n; }
+        });
+        ai.path = goal && goal !== node ? pathTo(dB, goal.i) : []; ai.act = null;
+        ai.info = { goal: goal && goal.i, item: !!ai.goalItem, flee: it !== 'p2' };
+      }
+      function botPower(b, h, dt) {
+        const pad = pads.p2;
+        if (!b.hold || ai.useT > 0) return; const d = Math.hypot(wrapD(h.x - b.x, W), wrapD(h.y - b.y, H)), me = it === 'p2';
+        const use = { speed: me ? d > 70 : d < 240, jump: me ? d > 90 : d < 200, ghost: me ? d > 110 : d < 230, freeze: me ? d < 120 : d < 200,
+          shrink: d < 260, swap: me && d > 170, shield: !me && d < 200 }[b.hold];
+        if (use && Math.random() < dt * SK.rate) { pad.act = true; pad.hit.act = true; ai.useT = 0.8; }
+      }
+      function botThink(dt) {
+        const pad = pads.p2, b = players[1], h = players[0];
+        pad.left = pad.right = pad.up = pad.down = pad.act = false;
+        if (phase !== 'play' || b.dead || b.frozen > 0) { ai.act = null; return; }
+        ai.replan -= dt; ai.pause -= dt; ai.useT -= dt; ai.upT -= dt; ai.actT -= dt;
+        botPower(b, h, dt);
+        if (ai.pause > 0) return;
+        if (Math.random() < dt * SK.slip) { ai.pause = 0.25 + Math.random() * 0.3; return; }
+        const nav = navFor(), cx = b.x + b.w / 2, go = d => { pad.left = d < 0; pad.right = d > 0; }, sgn = v => (Math.abs(v) < 3 ? 0 : Math.sign(v));
+        const jump = hold => { pad.up = true; pad.hit.up = true; ai.upT = hold; };
+        if (ai.upT > 0) pad.up = true;
+        if (!b.ground) {
+          const e = ai.act, dest = e && nav.nodes[e.to];
+          if (dest && dest.spring && b.vy < -450 && Math.abs(wrapD(cx - dest.x, W)) < T * 1.5) {   // sprang: the next edge is the launch
+            ai.path.shift(); ai.act = ai.path[0] && ai.path[0].kind === 'launch' ? ai.path[0] : null;
+          } else if (!e && ai.path[0]) {
+            const n0 = nav.nodes[ai.path[0].to];
+            if (n0.spring && b.vy < -450 && Math.abs(wrapD(cx - n0.x, W)) < T * 1.5) { ai.path.shift(); ai.act = ai.path[0] && ai.path[0].kind === 'launch' ? ai.path[0] : null; }
+          }
+          const e2 = ai.act, d2 = e2 && nav.nodes[e2.to];
+          if (d2) go(sgn(wrapD(d2.x - cx, W)));
+          else { const tx = it === 'p2' ? h.x + h.w / 2 : cx - (h.x + h.w / 2 - cx); go(sgn(wrapD(tx - cx, W))); }
+          return;
+        }
+        const node = nodeAtP(nav, b);
+        if (!node) { go(sgn(wrapD(h.x + h.w / 2 - cx, W)) * (it === 'p2' ? 1 : -1)); if (Math.random() < dt * 3) jump(0.3); return; }
+        if (ai.act) {
+          if (ai.act.to === node.i) { ai.path.shift(); ai.act = null; }
+          else if (ai.act.from !== node.i || ai.actT < 0) { ai.act = null; ai.path = []; }
+        }
+        if (ai.path.length && ai.path[0].to === node.i) ai.path.shift();
+        if (ai.path.length && ai.path[0].from !== node.i) { const k = ai.path.findIndex(e => e.from === node.i); if (k >= 0) ai.path.splice(0, k); else ai.path = []; }
+        const wantItem = ai.goalItem && items.includes(ai.goalItem.item);
+        if (!ai.path.length || ai.replan <= 0 || (ai.goalItem && !wantItem)) planBot(nav, node);
+        const e = ai.path[0];
+        if (!e) {   // already at the goal: finish by hand
+          if (ai.goalItem && items.includes(ai.goalItem.item)) {
+            const it2 = ai.goalItem.item; go(sgn(wrapD(it2.x - cx, W)));
+            if (it2.y < b.y + b.h - 8 && Math.abs(wrapD(it2.x - cx, W)) < 40) jump(0.6);
+          } else if (it === 'p2') {
+            const dx = wrapD(h.x + h.w / 2 - cx, W); go(sgn(dx));
+            if (h.y + h.h < b.y + b.h - 12 && Math.abs(dx) < 90 && b.ground) jump(0.3);
+          } else {
+            const dx = wrapD(h.x + h.w / 2 - cx, W); if (Math.abs(dx) < 70) go(-Math.sign(dx) || 1);
+            if (Math.abs(dx) < 50 && Math.random() < dt * 4) jump(0.3);
+          }
+        } else {
+          const dx = node.x - cx, vx = Math.abs(b.vx);
+          if (e.kind === 'walk') go(e.dir);
+          else if (e.kind === 'fall') { go(e.dir); ai.act = e; ai.actT = 2; }
+          else if (e.kind === 'jump' || e.kind === 'drop') {
+            if (Math.abs(dx) > 6) go(Math.sign(dx));
+            else if (vx > 90 && Math.abs(dx) > 2) { /* let it slow down */ }
+            else if (e.kind === 'jump') { jump(e.hold); go(e.dir); ai.act = e; ai.actT = 2; }
+            else { pad.down = true; go(e.dir); ai.act = e; ai.actT = 2; }
+          }
+        }
+        // stuck? (walking into a wall, a missed jump) -> pick again and hop
+        ai.stuckT += dt; if (Math.hypot(b.x - ai.lx, b.y - ai.ly) > 6) { ai.stuckT = 0; ai.lx = b.x; ai.ly = b.y; }
+        if (ai.stuckT > 1) { ai.stuckT = 0; ai.path = []; ai.act = null; ai.replan = 0; jump(0.3); if (Math.random() < 0.5) go(Math.random() < 0.5 ? -1 : 1); }
+      }
       function endRound() {
         const loser = P(it), win = other(it);
-        timer = 0; wins[win]++; api.score(Math.max(wins.p1, wins.p2)); loser.dead = true;
+        timer = 0; wins[win]++; api.score(friend ? Math.max(wins.p1, wins.p2) : wins.p1); loser.dead = true;
         burst(loser.x + loser.w / 2, loser.y + loser.h / 2, 34, pcol(loser.id, api.colors()));
         api.sfx('boom'); if (!api.reduceMotion) shake = 1;
         phase = wins[win] >= firstTo() ? 'over' : 'end'; phaseT = phase === 'over' ? 1.0 : END_T; pads.clear();
@@ -537,6 +743,7 @@
       function update(dt) {
         clock += dt; shake = Math.max(0, shake - dt * 2.5); flash = Math.max(0, flash - dt * 3);
         if (phase === 'menu') return;
+        if (!friend) botThink(dt);
         mt += dt; placeMovers(map, mt);
         players.forEach(p => { if (p.onM >= 0) carry(p); });
         if (phase === 'count') {
@@ -562,7 +769,7 @@
           if (phase === 'over' && phaseT <= 0 && !overCalled) {
             overCalled = true;
             const win = wins.p1 > wins.p2 ? 'p1' : 'p2';
-            api.over({ score: wins[win], won: true, title: label(win) + ' wins', message: `Rounds ${Math.max(wins.p1, wins.p2)} to ${Math.min(wins.p1, wins.p2)}` });
+            api.over({ score: friend || win === 'p1' ? wins[win] : 0, won: friend || win === 'p1', title: friend ? label(win) + ' wins' : win === 'p1' ? 'You win' : 'Bot wins', message: `Rounds ${Math.max(wins.p1, wins.p2)} to ${Math.min(wins.p1, wins.p2)}` });
           }
         }
         items.forEach(i => { i.t += dt; }); floaters.forEach(f => { f.t += dt; }); floaters = floaters.filter(f => f.t < 1.1);
@@ -681,8 +888,8 @@
         D.roundRect(ctx, x, y - bh / 2, bw, bh, 18); ctx.fill(); ctx.shadowColor = 'transparent';
         D.text(ctx, big, W / 2, y - 28, 17, col.ink, 800);
         D.text(ctx, small, W / 2, y - 9, 11.5, col.ink2, 650);
-        D.avatar(ctx, x + 40, y + 22, 13, 'p1', col); D.avatar(ctx, x + bw - 40, y + 22, 13, 'p2', col);
-        D.text(ctx, 'P1', x + 62, y + 22, 11, col.ink2, 700, 'left'); D.text(ctx, 'P2', x + bw - 62, y + 22, 11, col.ink2, 700, 'right');
+        D.avatar(ctx, x + 40, y + 22, 13, friend ? 'p1' : 'you', col); D.avatar(ctx, x + bw - 40, y + 22, 13, friend ? 'p2' : 'bot', col);
+        D.text(ctx, label('p1'), x + 62, y + 22, 11, col.ink2, 700, 'left'); D.text(ctx, label('p2'), x + bw - 62, y + 22, 11, col.ink2, 700, 'right');
         D.text(ctx, `${wins.p1}  :  ${wins.p2}`, W / 2, y + 22, 22, col.ink, 850);
         D.text(ctx, `first to ${firstTo()}`, W / 2, y + 39, 9, col.ink3, 650);
         ctx.restore();
@@ -693,25 +900,25 @@
           const s = api.reduceMotion ? 1 : D.ease.outBack(Math.min(1, k * 3));
           ctx.fillStyle = col.dark ? 'rgba(0,0,0,0.25)' : 'rgba(255,250,243,0.35)'; ctx.fillRect(0, 0, W, H);
           ctx.save(); ctx.translate(W / 2, H * 0.4); ctx.scale(s, s); D.text(ctx, String(n), 0, 0, 64, col.accent, 800); ctx.restore();
-          D.text(ctx, `${label(it)} is it`, W / 2, H * 0.4 + 50, 17, pcol(it, col), 800);
+          D.text(ctx, itText(it), W / 2, H * 0.4 + 50, 17, pcol(it, col), 800);
           D.text(ctx, `Round ${round + 1} · ${map.name} · ${MAPS[map.i].note}`, W / 2, H * 0.4 + 72, 12, col.ink2, 650);
         } else if (phase === 'play' && timer <= 10) {   // the last ten seconds count down big
           const n = Math.max(1, Math.ceil(timer)), f = n - timer, s = api.reduceMotion ? 1 : 1.25 - 0.25 * D.ease.outCubic(Math.min(1, f * 2.5));
           ctx.save(); ctx.globalAlpha = 0.28 + 0.12 * (1 - f); ctx.translate(W / 2, H / 2); ctx.scale(s, s);
           D.text(ctx, String(n), 0, 0, 150, col.bad || '#d9534f', 850); ctx.restore();
         } else if (phase === 'end') {
-          scoreCard(col, H * 0.42, `${label(other(it))} takes the round`, `${label(it)} was it when time ran out`);
+          scoreCard(col, H * 0.42, takes(other(it)), wasIt(it, 'when time ran out'));
         } else if (phase === 'over') {
           const win = wins.p1 > wins.p2 ? 'p1' : 'p2', wp = P(win);
           if (!wp.dead) D.spark(ctx, wp.x + wp.w / 2, wp.y - 10 + Math.sin(clock * 5) * 1.5, 7, '#e0a526', clock * 2);
-          scoreCard(col, H * 0.36, `${label(win)} wins the match`, `${label(it)} was it at the final whistle`);
+          scoreCard(col, H * 0.36, winsText(win), wasIt(it, 'at the final whistle'));
         }
       }
       function drawHeader(col) {
         const w = view.w;
         D.duelHeader(ctx, 10, 8, w - 20, {
-          left: { who: 'p1', label: 'P1', pips: wins.p1, of: firstTo() },
-          right: { who: 'p2', label: 'P2', pips: wins.p2, of: firstTo() },
+          left: { who: friend ? 'p1' : 'you', label: label('p1'), pips: wins.p1, of: firstTo() },
+          right: { who: friend ? 'p2' : 'bot', label: label('p2'), pips: wins.p2, of: firstTo() },
           turn: phase === 'play' || phase === 'count' ? (it === 'p1' ? 'left' : 'right') : null
         }, col);
         const pw = Math.min(132, (w - 20) * 0.34);
@@ -721,7 +928,7 @@
           if (p.hold) {
             ctx.fillStyle = POWERS[p.hold].color; ctx.beginPath(); ctx.arc(sx, sy, 11, 0, 7); ctx.fill();
             powerIcon(ctx, p.hold, sx, sy, 7.5);
-            D.text(ctx, p.id === 'p1' ? 'F' : '/', sx + (p.id === 'p1' ? 16 : -16), sy + 6, 9, col.ink3, 750);
+            if (friend || p.id === 'p1') D.text(ctx, p.id === 'p1' ? 'F' : '/', sx + (p.id === 'p1' ? 16 : -16), sy + 6, 9, col.ink3, 750);
           } else { ctx.strokeStyle = col.line; ctx.lineWidth = 1.5; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.arc(sx, sy, 10, 0, 7); ctx.stroke(); }
           ctx.restore();
         });
@@ -777,7 +984,7 @@
       }
       // A restored game counts as in progress; a fresh one only once a player has pressed something.
       const restored = !!(api.saved && restore(api.saved));
-      if (window.ludusDebug) window.ludusDebug.tag = () => ({ phase, focus, sel, mapIdx, map: map.name, it, wins, timer, tagCool, round, mt,
+      if (window.ludusDebug) window.ludusDebug.tag = () => ({ friend, bot: friend ? null : { path: ai.path.map(e => e.kind), info: ai.info, nodes: (navs[mapIdx] || { nodes: [] }).nodes.length, edges: (navs[mapIdx] || { nodes: [] }).nodes.reduce((a, n) => a + n.edges.length, 0) }, phase, focus, sel, mapIdx, map: map.name, it, wins, timer, tagCool, round, mt,
         items: items.map(i => ({ x: i.x, y: i.y, type: i.type })), menu: phase === 'menu' ? menuLayout().tiles.map(t => [t.x, t.y, t.w, t.h, t.map]) : null,
         ps: players.map(p => ({ x: p.x, y: p.y, w: p.w, vx: p.vx, vy: p.vy, ground: p.ground, surf: p.surf, onM: p.onM, frozen: p.frozen, hold: p.hold, dead: p.dead,
           speedT: p.speedT, jumpT: p.jumpT, ghostT: p.ghostT, shrinkT: p.shrinkT, shieldT: p.shieldT })) });

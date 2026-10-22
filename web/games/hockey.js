@@ -9,6 +9,7 @@
 
   // Two people, one keyboard: P1 = WASD (+F / left Shift), P2 = arrows (+ / , right Shift, Enter).
   function makePads(api) {
+    const bot = !api.friend;   // vs Bot: both key sets drive P1
     const C1 = { KeyW: 'up', KeyS: 'down', KeyA: 'left', KeyD: 'right', KeyF: 'act', ShiftLeft: 'act' };
     const K1 = { w: 'up', s: 'down', a: 'left', d: 'right', f: 'act' };
     const C2 = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right', Slash: 'act', ShiftRight: 'act', Enter: 'act', NumpadEnter: 'act' };
@@ -16,6 +17,10 @@
     const blank = () => ({ up: false, down: false, left: false, right: false, act: false });
     const pads = { p1: blank(), p2: blank() };
     function find(e) {
+      const m = find0(e);
+      return m && bot ? ['p1', m[1]] : m;
+    }
+    function find0(e) {
       if (e.key === 'Shift') {
         if (e.code === 'ShiftLeft' || e.location === 1) return ['p1', 'act'];
         if (e.code === 'ShiftRight' || e.location === 2) return ['p2', 'act'];
@@ -45,8 +50,8 @@
   }
 
   Ludus.register({
-    id: 'hockey', name: 'Air Hockey', aka: 'Air Puck', tag: '2 Player', wide: true, tint: '#e05d8b',
-    hint: '<b>P1</b> (left) <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move · <b>P2</b> (right) <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> move',
+    id: 'hockey', name: 'Air Hockey', aka: 'Air Puck', tag: '2 Player', wide: true, tint: '#e05d8b', versus: true, defaultVs: 'friend',
+    hint: '<b>vs Bot</b> <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> move · <b>vs Friend</b> P1 (left) <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> · P2 (right) <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd>',
     _rules: { strike },
     art(ctx, w, h) {
       ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = 2;
@@ -80,9 +85,37 @@
         phase = 'ready'; phaseT = 0.9; trail = [];
       }
 
+      // Bot (P2, the top / right mallet): sees the puck only every so often with a little aiming error,
+      // defends its goal line, and hits the puck towards P1's goal when it gets the chance.
+      const REACT = [0.2, 0.13, 0.08][api.level], ERR = [34, 20, 10][api.level], DEF_Y = 66;
+      let ai = { tx: W / 2, ty: DEF_Y, timer: 0, ex: 0 };
+      const axisDir = (pos, v, t) => { const d = t - pos; return Math.abs(d) < 4 || (v * d > 0 && Math.abs(v) / 9 >= Math.abs(d)) ? 0 : d > 0 ? 1 : -1; };
+      function botAxes(dt) {
+        const m = mallets.p2;
+        ai.timer -= dt;
+        if (ai.timer <= 0) {
+          ai.timer = REACT; ai.ex = api.rand(-ERR, ERR);
+          const px = puck.x + ai.ex * 0.4, py = puck.y, speed = Math.hypot(puck.vx, puck.vy);
+          const mine = py < H / 2 - PR;
+          if (mine && (speed < 90 || puck.vy > 0 || py < m.y + 4)) {
+            // attack: line up behind the puck (away from P1's goal), then drive through it at the goal
+            const gx = W / 2 - px, gy = H - py, gl = Math.hypot(gx, gy) || 1, ux = gx / gl, uy = gy / gl;
+            if (m.y < py - 2 && Math.abs(m.x - px) < MR + PR) { ai.tx = px + ux * 26; ai.ty = py + uy * 26; }
+            else { ai.tx = px - ux * (MR + PR + 12); ai.ty = Math.max(MR, py - uy * (MR + PR + 12)); }
+          } else if (puck.vy < -20) {
+            // incoming: predict where it crosses the defence line (bounces off the side walls folded in)
+            let x = puck.x + puck.vx * ((DEF_Y - puck.y) / puck.vy);
+            const span = W - 2 * PR, q = ((x - PR) % (span * 2) + span * 2) % (span * 2);
+            x = PR + (q > span ? span * 2 - q : q);
+            ai.tx = x + ai.ex; ai.ty = DEF_Y;
+          } else { ai.tx = W / 2 + (puck.x - W / 2) * 0.3; ai.ty = DEF_Y + 14; }
+        }
+        return [axisDir(m.x, m.vx, ai.tx), axisDir(m.y, m.vy, ai.ty)];
+      }
       function moveMallet(id, dt) {
         const m = mallets[id], p = dirs(pads[id]), live = phase === 'play' || phase === 'ready';
         let ax = live ? (p.right ? 1 : 0) - (p.left ? 1 : 0) : 0, ay = live ? (p.down ? 1 : 0) - (p.up ? 1 : 0) : 0;
+        if (id === 'p2' && !api.friend) { [ax, ay] = live ? botAxes(dt) : [0, 0]; }
         if (ax && ay) { ax *= Math.SQRT1_2; ay *= Math.SQRT1_2; }
         const damp = Math.exp(-9 * dt);
         if (ax) m.vx += ax * ACC * dt * (m.vx * ax < 0 ? 1.7 : 1); else m.vx *= damp;
@@ -175,7 +208,7 @@
           if (phaseT <= 0 && !overCalled) {
             overCalled = true;
             const win = score.p1 > score.p2 ? 'p1' : 'p2';
-            api.over({ score: score[win], won: true, title: (win === 'p1' ? 'P1' : 'P2') + ' wins', message: `${Math.max(score.p1, score.p2)} to ${Math.min(score.p1, score.p2)}` });
+            api.over({ score: score[win], won: api.friend || win === 'p1', title: api.friend ? (win === 'p1' ? 'P1' : 'P2') + ' wins' : win === 'p1' ? 'You win' : 'Bot wins', message: `${Math.max(score.p1, score.p2)} to ${Math.min(score.p1, score.p2)}` });
           }
         }
         parts.forEach(q => { q.x += q.vx * dt; q.y += q.vy * dt; q.vx *= 0.95; q.vy *= 0.95; q.life -= dt; });
@@ -196,7 +229,8 @@
         ctx.clearRect(0, 0, w, h);
         const side = flat();
         D.duelHeader(ctx, 10, 8, w - 20, {
-          left: { who: 'p1', label: side ? 'P1 left' : 'P1 bottom', score: score.p1 }, right: { who: 'p2', label: side ? 'P2 right' : 'P2 top', score: score.p2 },
+          left: api.friend ? { who: 'p1', label: side ? 'P1 left' : 'P1 bottom', score: score.p1 } : { who: 'you', label: 'You', score: score.p1 },
+          right: api.friend ? { who: 'p2', label: side ? 'P2 right' : 'P2 top', score: score.p2 } : { who: 'bot', label: 'Bot', score: score.p2 },
           turn: null, status: phase === 'goal' ? 'Goal' : ''
         }, col);
         // RW x RH = the rink as it appears on screen
@@ -245,8 +279,8 @@
         ctx.restore();
         // text stays upright: drawn in screen-rink space (RW x RH)
         if (phase === 'goal' || phase === 'over') {
-          const who = lastGoal.who, label = who === 'p1' ? 'P1' : 'P2';
-          const big = phase === 'over' ? `${label} wins the match` : `${label} scores`;
+          const who = lastGoal.who, label = api.friend ? (who === 'p1' ? 'P1' : 'P2') : who === 'p1' ? 'You' : 'Bot';
+          const big = phase === 'over' ? `${label} ${label === 'You' ? 'win' : 'wins'} the match` : `${label} ${label === 'You' ? 'score' : 'scores'}`;
           const k = api.reduceMotion ? 1 : D.ease.outBack(Math.min(1, (clock - lastGoal.t) * 4)), bw = 220, by = RH / 2;
           ctx.save(); ctx.translate(RW / 2, by); ctx.scale(k, k);
           ctx.fillStyle = col.surface; ctx.shadowColor = 'rgba(0,0,0,0.22)'; ctx.shadowBlur = 16; ctx.shadowOffsetY = 5;

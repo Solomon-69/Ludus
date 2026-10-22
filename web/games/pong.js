@@ -7,6 +7,7 @@
 
   // Two people, one keyboard: P1 = WASD (+F / left Shift), P2 = arrows (+ / , right Shift, Enter).
   function makePads(api) {
+    const bot = !api.friend;   // vs Bot: both key sets drive the left paddle
     const C1 = { KeyW: 'up', KeyS: 'down', KeyA: 'left', KeyD: 'right', KeyF: 'act', ShiftLeft: 'act' };
     const K1 = { w: 'up', s: 'down', a: 'left', d: 'right', f: 'act' };
     const C2 = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right', Slash: 'act', ShiftRight: 'act', Enter: 'act', NumpadEnter: 'act' };
@@ -14,6 +15,10 @@
     const blank = () => ({ up: false, down: false, left: false, right: false, act: false, hit: {} });
     const pads = { p1: blank(), p2: blank() };
     function find(e) {
+      const m = find0(e);
+      return m && bot ? ['p1', m[1]] : m;
+    }
+    function find0(e) {
       if (e.key === 'Shift') {
         if (e.code === 'ShiftLeft' || e.location === 1) return ['p1', 'act'];
         if (e.code === 'ShiftRight' || e.location === 2) return ['p2', 'act'];
@@ -48,8 +53,8 @@
   }
 
   Ludus.register({
-    id: 'pong', name: 'Pong', aka: 'Rally', tag: '2 Player', wide: true, tint: '#3f8fb5',
-    hint: '<b>P1</b> <kbd>W</kbd><kbd>S</kbd> move <kbd>F</kbd> power hit · <b>P2</b> <kbd>↑</kbd><kbd>↓</kbd> move <kbd>/</kbd> power hit',
+    id: 'pong', name: 'Pong', aka: 'Rally', tag: '2 Player', wide: true, tint: '#3f8fb5', versus: true, defaultVs: 'friend',
+    hint: '<b>vs Bot</b> <kbd>W</kbd><kbd>S</kbd> or <kbd>↑</kbd><kbd>↓</kbd> move <kbd>F</kbd> power hit · <b>vs Friend</b> P1 <kbd>W</kbd><kbd>S</kbd> move <kbd>F</kbd> power hit · P2 <kbd>↑</kbd><kbd>↓</kbd> move <kbd>/</kbd> power hit',
     _rules: { paddleBounce, TARGET },
     art(ctx, w, h) {
       ctx.fillStyle = 'rgba(255,255,255,0.3)';
@@ -95,12 +100,36 @@
         phase = 'play'; api.sfx('jump');
       }
 
+      // Bot (right paddle): sees the ball only every so often, aims at where it will land plus a
+      // per-rally error, and keeps up with the same paddle physics as a person.
+      const REACT = [0.26, 0.18, 0.12][api.level], ERR = [1.0, 0.8, 0.6][api.level], SLIP = [0.2, 0.12, 0.06][api.level];
+      let ai = { target: H / 2, timer: 0, err: 0, rally: -1 };
+      function landingY() {
+        const dx = (W - PAD_X - PAD_W / 2 - BALL_R) - ball.x;
+        let y = ball.y + ball.vy * dx / Math.max(0.2, ball.vx);
+        const span = H - BALL_R * 2, m = ((y - BALL_R) % (span * 2) + span * 2) % (span * 2);
+        return BALL_R + (m > span ? span * 2 - m : m);
+      }
+      function botDir(dt) {
+        ai.timer -= dt;
+        if (ai.rally !== rally) { ai.rally = rally; ai.err = api.rand(-1, 1) * ERR * PAD_H / 2; if (Math.random() < SLIP) ai.err = (Math.random() < 0.5 ? -1 : 1) * api.rand(0.9, 1.4) * PAD_H; }   // now and then it simply misjudges the ball
+        if (ai.timer <= 0) {
+          ai.timer = REACT;
+          ai.target = phase === 'play' && ball.vx > 0 ? landingY() + ai.err : H / 2 + (phase === 'play' ? (ball.y - H / 2) * 0.25 : 0);
+        }
+        const p = paddles.p2, d = ai.target - p.y;
+        // brake early so it does not overshoot: stop when the remaining distance is under its stopping distance
+        const stop = p.v * p.v / (2 * padAcc * 1.3);
+        if (Math.abs(d) < 5 || (p.v * d > 0 && stop >= Math.abs(d))) return 0;
+        if (phase === 'play' && ball.vx > 0 && !p.power && ball.x > W * 0.55 && Math.random() < dt * 0.6) p.power = 0.22;
+        return d > 0 ? 1 : -1;
+      }
       function movePaddle(id, dt) {
-        const p = paddles[id], pad = pads[id];
-        if (pads.take(id, 'act')) p.power = 0.22;
+        const p = paddles[id], pad = pads[id], isBot = !api.friend && id === 'p2';
+        if (!isBot && pads.take(id, 'act')) p.power = 0.22;
         p.power = Math.max(0, p.power - dt);
         const live = phase !== 'over';
-        const dir = live ? (pad.down ? 1 : 0) - (pad.up ? 1 : 0) : 0;
+        const dir = live ? (isBot ? botDir(dt) : (pad.down ? 1 : 0) - (pad.up ? 1 : 0)) : 0;
         if (dir) p.v += dir * padAcc * dt * (p.v * dir < 0 ? 1.8 : 1);
         else p.v -= Math.sign(p.v) * Math.min(Math.abs(p.v), padAcc * 1.3 * dt);
         p.v = Math.max(-padMax, Math.min(padMax, p.v));
@@ -176,7 +205,7 @@
           if (serveT <= 0 && !overCalled) {
             overCalled = true;
             const win = score.p1 > score.p2 ? 'p1' : 'p2';
-            api.over({ score: score[win], won: true, title: (win === 'p1' ? 'P1' : 'P2') + ' wins', message: `${Math.max(score.p1, score.p2)} to ${Math.min(score.p1, score.p2)}` });
+            api.over({ score: score[win], won: api.friend || win === 'p1', title: api.friend ? (win === 'p1' ? 'P1' : 'P2') + ' wins' : win === 'p1' ? 'You win' : 'Bot wins', message: `${Math.max(score.p1, score.p2)} to ${Math.min(score.p1, score.p2)}` });
           }
         }
         parts.forEach(q => { q.x += q.vx * dt; q.y += q.vy * dt; q.vx *= 0.96; q.vy *= 0.96; q.life -= dt; });
@@ -188,7 +217,7 @@
         const { w, h } = view;
         ctx.clearRect(0, 0, w, h);
         D.duelHeader(ctx, 10, 8, w - 20, {
-          left: { who: 'p1', label: 'P1', score: score.p1 }, right: { who: 'p2', label: 'P2', score: score.p2 },
+          left: api.friend ? { who: 'p1', label: 'P1', score: score.p1 } : { who: 'you', label: 'You', score: score.p1 }, right: api.friend ? { who: 'p2', label: 'P2', score: score.p2 } : { who: 'bot', label: 'Bot', score: score.p2 },
           turn: phase === 'play' ? (ball.vx < 0 ? 'left' : 'right') : null,
           status: phase === 'serve' ? 'Get ready' : phase === 'over' ? '' : `Rally ${rally}`
         }, col);
@@ -238,8 +267,8 @@
           const win = score.p1 > score.p2 ? 'p1' : 'p2', bw = 230;
           ctx.save(); ctx.fillStyle = col.surface; ctx.shadowColor = 'rgba(0,0,0,0.22)'; ctx.shadowBlur = 16; ctx.shadowOffsetY = 5;
           D.roundRect(ctx, W / 2 - bw / 2, H * 0.3 - 30, bw, 60, 16); ctx.fill(); ctx.restore();
-          D.avatar(ctx, W / 2 - bw / 2 + 30, H * 0.3, 16, win, col);
-          D.text(ctx, `${win === 'p1' ? 'P1' : 'P2'} wins the match`, W / 2 + 14, H * 0.3 - 8, 15, col.ink, 800);
+          D.avatar(ctx, W / 2 - bw / 2 + 30, H * 0.3, 16, api.friend ? win : win === 'p1' ? 'you' : 'bot', col);
+          D.text(ctx, (api.friend ? `${win === 'p1' ? 'P1' : 'P2'} wins the match` : win === 'p1' ? 'You win the match' : 'Bot wins the match'), W / 2 + 14, H * 0.3 - 8, 15, col.ink, 800);
           D.text(ctx, `${score.p1} : ${score.p2}`, W / 2 + 14, H * 0.3 + 12, 12, col.ink2, 700);
         }
         ctx.restore(); ctx.restore();

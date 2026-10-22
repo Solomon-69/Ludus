@@ -13,7 +13,12 @@
     const K2 = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right', '/': 'act', Enter: 'act' };
     const blank = () => ({ up: false, down: false, left: false, right: false, act: false, hit: {} });
     const pads = { p1: blank(), p2: blank() };
+    const solo = !api.friend;   // vs Bot: either key set drives the human tank (P1)
     function find(e) {
+      const m = find0(e);
+      return m && solo ? ['p1', m[1]] : m;
+    }
+    function find0(e) {
       if (e.key === 'Shift') {
         if (e.code === 'ShiftLeft' || e.location === 1) return ['p1', 'act'];
         if (e.code === 'ShiftRight' || e.location === 2) return ['p2', 'act'];
@@ -69,8 +74,8 @@
   }
 
   Ludus.register({
-    id: 'tanks', name: 'Tank Trouble', aka: 'Tank Duel', tag: '2 Player', wide: true, tint: '#c98a3a',
-    hint: '<b>P1</b> <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> drive <kbd>F</kbd> fire · <b>P2</b> <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> drive <kbd>/</kbd> fire',
+    id: 'tanks', name: 'Tank Trouble', aka: 'Tank Duel', tag: '2 Player', wide: true, tint: '#c98a3a', versus: true, defaultVs: 'friend',
+    hint: 'vs Bot: <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> drive, <kbd>F</kbd> or <kbd>/</kbd> fire · vs Friend: <b>P1</b> WASD + F, <b>P2</b> arrows + /',
     _rules: { makeMaze, wallRects, MC: PMC, MRW: PMRW },
     art(ctx, w, h) {
       ctx.fillStyle = 'rgba(255,255,255,0.35)';
@@ -127,6 +132,129 @@
         t.x = Math.max(TR, Math.min(W - TR, t.x)); t.y = Math.max(TR, Math.min(H - TR, t.y));
       }
       const inWall = (x, y, pad) => rects.some(r => x > r.x - pad && x < r.x + r.w + pad && y > r.y - pad && y < r.y + r.h + pad);
+
+      // ---------- bot (P2 in vs Bot mode) ----------
+      const friend = api.friend;
+      const nameOf = id => friend ? (id === 'p1' ? 'P1' : 'P2') : (id === 'p1' ? 'You' : 'Bot');
+      const LV = api.level;
+      const LOCK = [0.6, 0.4, 0.18][LV], GAP = [0.9, 0.6, 0.35][LV], SEE = [0.65, 0.35, 0.1][LV];   // aim lock time, extra reload, chance a shell is not noticed
+      const bot = { think: 0, aim: null, lock: 0, wait: 0, dodge: null, stuck: 0, lastX: 0, lastY: 0, back: 0, backDir: 1, noticed: new WeakSet() };
+      const angDiff = (a, b) => { let d = (b - a) % (Math.PI * 2); if (d > Math.PI) d -= Math.PI * 2; if (d < -Math.PI) d += Math.PI * 2; return d; };
+      // Follow a shell's path (with bounces) from (x, y) heading (vx, vy); 'enemy' / 'self' / null for who it reaches first.
+      function trace(x, y, vx, vy, from, foe, maxLen, maxBounce) {
+        const L = Math.hypot(vx, vy); vx /= L; vy /= L;
+        let bounces = 0, dist = 0;
+        for (let i = 0; i < maxLen / 4; i++) {
+          let nx = x + vx * 4, ny = y + vy * 4;
+          if (inWall(nx, y, SR) || nx < SR || nx > W - SR) { vx = -vx; bounces++; nx = x; }
+          if (inWall(nx, ny, SR) || ny < SR || ny > H - SR) { vy = -vy; bounces++; ny = y; }
+          if (bounces > maxBounce) return null;
+          x = nx; y = ny; dist += 4;
+          if (Math.hypot(foe.x - x, foe.y - y) < TR + SR) return { who: 'foe', bounces };
+          if (bounces && Math.hypot(from.x - x, from.y - y) < TR + SR) return { who: 'self', bounces };
+        }
+        return null;
+      }
+      // Shortest way through the maze between two cells (first step toward the goal).
+      function nextCell(sc, sr, gc, gr) {
+        if (sc === gc && sr === gr) return null;
+        const prev = new Map(), key = (c, r) => r * 100 + c;
+        const q = [[sc, sr]]; prev.set(key(sc, sr), null);
+        for (let i = 0; i < q.length; i++) {
+          const [c, r] = q[i];
+          if (c === gc && r === gr) break;
+          const nb = [];
+          if (r > 0 && !maze.h[r][c]) nb.push([c, r - 1]);
+          if (r < MRW - 1 && !maze.h[r + 1][c]) nb.push([c, r + 1]);
+          if (c > 0 && !maze.v[r][c]) nb.push([c - 1, r]);
+          if (c < MC - 1 && !maze.v[r][c + 1]) nb.push([c + 1, r]);
+          nb.forEach(([nc, nr]) => { if (!prev.has(key(nc, nr))) { prev.set(key(nc, nr), [c, r]); q.push([nc, nr]); } });
+        }
+        if (!prev.has(key(gc, gr))) return null;
+        let cur = [gc, gr], p = prev.get(key(gc, gr));
+        while (p && prev.get(key(p[0], p[1]))) { cur = p; p = prev.get(key(p[0], p[1])); }
+        return cur;
+      }
+      // Is one of the human's shells about to hit the bot? Returns the shell's heading or null.
+      function threat(b) {
+        for (const sh of shells) {
+          if (sh.owner === b.id && sh.age < 0.6) continue;
+          let x = sh.x, y = sh.y, vx = sh.vx, vy = sh.vy;
+          for (let t = 0; t < 1.0; t += 1 / 30) {
+            let nx = x + vx / 30, ny = y + vy / 30;
+            if (inWall(nx, y, SR) || nx < SR || nx > W - SR) { vx = -vx; nx = x; }
+            if (inWall(nx, ny, SR) || ny < SR || ny > H - SR) { vy = -vy; ny = y; }
+            x = nx; y = ny;
+            if (Math.hypot(b.x - x, b.y - y) < TR + SR + 7) {
+              if (!bot.noticed.has(sh)) { bot.noticed.add(sh); sh.ignored = Math.random() < SEE; }
+              return sh.ignored ? null : Math.atan2(sh.vy, sh.vx);
+            }
+          }
+        }
+        return null;
+      }
+      function botThink(dt) {
+        const b = tanks[1], h = tanks[0], p = pads.p2;
+        p.up = p.down = p.left = p.right = false;
+        if (b.dead || h.dead || phase !== 'play') { bot.lock = 0; return; }
+        bot.wait = Math.max(0, bot.wait - dt);
+        const steer = (target, fwdMax) => {
+          const d = angDiff(b.a, target);
+          if (d > 0.06) p.right = true; else if (d < -0.06) p.left = true;
+          if (Math.abs(d) < fwdMax) p.up = true;
+        };
+        // stuck? back off for a moment
+        bot.stuck += dt;
+        if (bot.stuck > 0.7) {
+          if (Math.hypot(b.x - bot.lastX, b.y - bot.lastY) < 4 && !bot.aiming) { bot.back = 0.45; bot.backDir = Math.random() < 0.5 ? 1 : -1; }
+          bot.stuck = 0; bot.lastX = b.x; bot.lastY = b.y;
+        }
+        if (bot.back > 0) { bot.back -= dt; p.down = true; if (bot.backDir > 0) p.right = true; else p.left = true; return; }
+        // 1) dodge
+        const inc = threat(b);
+        if (inc !== null) {
+          const opts = [inc + Math.PI / 2, inc - Math.PI / 2].filter(a => !inWall(b.x + Math.cos(a) * 26, b.y + Math.sin(a) * 26, TR));
+          const a = opts.length ? opts[Math.floor(Math.random() * opts.length)] : inc + Math.PI;
+          if (!bot.dodge || clock - bot.dodge.t > 0.35) bot.dodge = { a, t: clock };
+          steer(bot.dodge.a, 1.2);
+          return;
+        }
+        bot.dodge = null;
+        // 2) aim: find a heading whose shot (with bounces) reaches the human, rotate to it, fire
+        bot.think -= dt;
+        if (bot.think <= 0) {
+          bot.think = 0.12; bot.aim = null;
+          let best = null;
+          const direct = Math.atan2(h.y - b.y, h.x - b.x);
+          const cands = [direct]; for (let i = 0; i < 48; i++) cands.push(i * Math.PI / 24);
+          cands.forEach(a => {
+            const r = trace(b.x + Math.cos(a) * (TR + 5), b.y + Math.sin(a) * (TR + 5), Math.cos(a), Math.sin(a), b, h, 420, LV === 0 ? 0 : LV === 1 ? 1 : 2);
+            if (r && r.who === 'foe') {
+              const score = r.bounces * 1.2 + Math.abs(angDiff(b.a, a));
+              if (!best || score < best.score) best = { a, score };
+            }
+          });
+          bot.aim = best ? best.a : null;
+        }
+        bot.aiming = bot.aim !== null;
+        if (bot.aim !== null) {
+          const d = angDiff(b.a, bot.aim);
+          if (d > 0.04) p.right = true; else if (d < -0.04) p.left = true;
+          const r = trace(b.x + Math.cos(b.a) * (TR + 5), b.y + Math.sin(b.a) * (TR + 5), Math.cos(b.a), Math.sin(b.a), b, h, 420, LV === 0 ? 0 : LV === 1 ? 1 : 2);
+          if (r && r.who === 'foe') {
+            bot.lock += dt;
+            if (bot.lock >= LOCK && bot.wait <= 0 && b.cool <= 0) { p.hit.act = true; bot.wait = GAP; }
+          } else bot.lock = Math.max(0, bot.lock - dt * 2);
+          return;
+        }
+        bot.lock = 0;
+        // 3) hunt: follow the maze toward the human
+        const cell = t => [Math.max(0, Math.min(MC - 1, Math.floor(t.x / C))), Math.max(0, Math.min(MRW - 1, Math.floor(t.y / C)))];
+        const [bc, br] = cell(b), [hc, hr] = cell(h);
+        const nx = nextCell(bc, br, hc, hr);
+        const tx = nx ? (nx[0] + 0.5) * C : h.x, ty = nx ? (nx[1] + 0.5) * C : h.y;
+        steer(Math.atan2(ty - b.y, tx - b.x), 0.7);
+      }
 
       function drive(t, dt) {
         const p = pads[t.id];
@@ -189,6 +317,7 @@
 
       function update(dt) {
         clock += dt; shake = Math.max(0, shake - dt * 2.5);
+        if (!friend) botThink(dt);
         tanks.forEach(t => { drive(t, dt); t.kick = Math.max(0, (t.kick || 0) - dt * 6); });
         // tanks don't drive through each other
         const [a, b] = tanks;
@@ -208,7 +337,7 @@
           if (phaseT <= 0 && !overCalled) {
             overCalled = true;
             const win = wins.p1 > wins.p2 ? 'p1' : 'p2';
-            api.over({ score: wins[win], won: true, title: (win === 'p1' ? 'P1' : 'P2') + ' wins', message: `Rounds ${Math.max(wins.p1, wins.p2)} to ${Math.min(wins.p1, wins.p2)}` });
+            api.over({ score: wins[win], won: true, title: friend ? nameOf(win) + ' wins' : win === 'p1' ? 'You win' : 'Bot wins', message: `Rounds ${Math.max(wins.p1, wins.p2)} to ${Math.min(wins.p1, wins.p2)}` });
           }
         }
         parts.forEach(q => { q.x += q.vx * dt; q.y += q.vy * dt; q.vx *= 0.94; q.vy *= 0.94; q.life -= dt; });
@@ -240,7 +369,8 @@
         const { w, h } = view;
         ctx.clearRect(0, 0, w, h);
         D.duelHeader(ctx, 10, 8, w - 20, {
-          left: { who: 'p1', label: 'P1', pips: wins.p1, of: FIRST_TO }, right: { who: 'p2', label: 'P2', pips: wins.p2, of: FIRST_TO },
+          left: friend ? { who: 'p1', label: 'P1', pips: wins.p1, of: FIRST_TO } : { who: 'you', pips: wins.p1, of: FIRST_TO },
+          right: friend ? { who: 'p2', label: 'P2', pips: wins.p2, of: FIRST_TO } : { who: 'bot', pips: wins.p2, of: FIRST_TO },
           turn: null, status: phase === 'over' ? '' : `Round ${round + 1}`
         }, col);
         const top = 56, avail = h - top - 8, s = Math.min((w - 16) / (W + 12), avail / (H + 12));
@@ -272,8 +402,8 @@
         if (phase === 'ready') {
           card(`Round ${round + 1}`, 'Ready...', H / 2);
           tanks.forEach(t => { ctx.strokeStyle = t.id === 'p1' ? col.accent : D.P2; ctx.lineWidth = 2; ctx.globalAlpha = 0.5 + 0.5 * Math.sin(clock * 10); ctx.beginPath(); ctx.arc(t.x, t.y, 17, 0, Math.PI * 2); ctx.stroke(); ctx.globalAlpha = 1; });
-        } else if (phase === 'result') card(result ? `${result === 'p1' ? 'P1' : 'P2'} takes the round` : 'Both tanks down. Draw', `Rounds ${wins.p1} : ${wins.p2}`, H * 0.4);
-        else if (phase === 'over') card(`${result === 'p1' ? 'P1' : 'P2'} wins the match`, `Rounds ${wins.p1} : ${wins.p2}`, H * 0.4);
+        } else if (phase === 'result') card(result ? `${nameOf(result)} ${friend || result === 'p2' ? 'takes' : 'take'} the round` : 'Both tanks down. Draw', `Rounds ${wins.p1} : ${wins.p2}`, H * 0.4);
+        else if (phase === 'over') card(`${nameOf(result)} ${friend || result === 'p2' ? 'wins' : 'win'} the match`, `Rounds ${wins.p1} : ${wins.p2}`, H * 0.4);
         ctx.restore();
       }
 

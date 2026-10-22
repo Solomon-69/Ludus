@@ -14,7 +14,12 @@
     const K2 = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right', '/': 'act', Enter: 'act' };
     const blank = () => ({ up: false, down: false, left: false, right: false, act: false });
     const pads = { p1: blank(), p2: blank() };
+    const solo = !api.friend;   // vs Bot: either key set drives the human rider (P1)
     function find(e) {
+      const m = find0(e);
+      return m && solo ? ['p1', m[1]] : m;
+    }
+    function find0(e) {
       if (e.key === 'Shift') {
         if (e.code === 'ShiftLeft' || e.location === 1) return ['p1', 'act'];
         if (e.code === 'ShiftRight' || e.location === 2) return ['p2', 'act'];
@@ -50,8 +55,8 @@
   }
 
   Ludus.register({
-    id: 'tron', name: 'Tron', aka: 'Light Trails', tag: '2 Player', wide: true, tint: '#2a9d9f',
-    hint: '<b>P1</b> <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> turn · <b>P2</b> <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> turn · don\'t hit walls or trails',
+    id: 'tron', name: 'Tron', aka: 'Light Trails', tag: '2 Player', wide: true, tint: '#2a9d9f', versus: true, defaultVs: 'friend',
+    hint: 'vs Bot: <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> turn · vs Friend: <b>P1</b> WASD, <b>P2</b> arrows · don\'t hit walls or trails',
     _rules: { stepRiders, COLS: PCOLS, ROWS: PROWS },
     art(ctx, w, h) {
       ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.lineWidth = h * 0.05;
@@ -81,6 +86,7 @@
         const q = queues[who]; if (q.length < 3) q.push(k);
       });
 
+      const nameOf = id => friend ? (id === 'p1' ? 'P1' : 'P2') : (id === 'p1' ? 'You' : 'Bot');
       function startMatch() { wins = { p1: 0, p2: 0 }; round = 0; api.score(0); startRound(); }
       function startRound() {
         grid = new Array(COLS * ROWS).fill(0);
@@ -98,6 +104,49 @@
         phase = 'count'; phaseT = COUNT; acc = 0; crash = null; result = null;
       }
 
+      // ---------- bot (P2 in vs Bot mode) ----------
+      const friend = api.friend;
+      const LEFT_OF = { up: 'left', left: 'down', down: 'right', right: 'up' }, RIGHT_OF = { up: 'right', right: 'down', down: 'left', left: 'up' };
+      const free = (x, y) => x >= 0 && y >= 0 && x < COLS && y < ROWS && grid[y * COLS + x] === 0;
+      // Cells each rider reaches first (bot starts at its candidate cell, the human one step later).
+      function territory(bx, by, hx, hy) {
+        const dist = new Int16Array(COLS * ROWS).fill(-1), owner = new Int8Array(COLS * ROWS);
+        let q = [[bx, by, 1], [hx, hy, 2]], i = 0, mine = 0, theirs = 0;
+        dist[by * COLS + bx] = 0; owner[by * COLS + bx] = 1;
+        if (!(hx === bx && hy === by)) { dist[hy * COLS + hx] = 0; owner[hy * COLS + hx] = 2; }
+        const order = [[bx, by, 1], [hx, hy, 2]];
+        q = order;
+        while (i < q.length) {
+          const [x, y, o] = q[i++];
+          for (const k in DIRS) {
+            const nx = x + DIRS[k][0], ny = y + DIRS[k][1];
+            if (!free(nx, ny) || dist[ny * COLS + nx] >= 0) continue;
+            dist[ny * COLS + nx] = dist[y * COLS + x] + 1; owner[ny * COLS + nx] = o;
+            if (o === 1) mine++; else theirs++;
+            q.push([nx, ny, o]);
+          }
+        }
+        return [mine, theirs];
+      }
+      function botSteer() {
+        const bot = riders[1], me = riders[0];
+        const opts = [bot.dir, LEFT_OF[bot.dir], RIGHT_OF[bot.dir]].map(d => ({ d, x: bot.x + DIRS[d][0], y: bot.y + DIRS[d][1] })).filter(o => free(o.x, o.y));
+        if (!opts.length) return;
+        const meNext = { x: me.x + DIRS[me.dir][0], y: me.y + DIRS[me.dir][1] };
+        const lv = api.level;
+        opts.forEach(o => {
+          const head = o.x === meNext.x && o.y === meNext.y;          // would collide head-on
+          grid[o.y * COLS + o.x] = 2;
+          const [mine, theirs] = territory(o.x, o.y, meNext.x, meNext.y);
+          grid[o.y * COLS + o.x] = 0;
+          o.score = (lv === 0 ? mine : mine - theirs * (lv === 2 ? 1 : 0.6)) - (head ? 500 : 0) + (o.d === bot.dir ? 0.6 : 0) + Math.random() * 0.4;
+        });
+        opts.sort((a, b) => b.score - a.score);
+        const slip = [0.14, 0.04, 0.01][lv];
+        const pick = opts.length > 1 && Math.random() < slip ? opts[1 + Math.floor(Math.random() * (opts.length - 1))] : opts[0];
+        if (pick.d !== bot.dir) queues.p2 = [pick.d];
+      }
+
       function turn(r) {
         const q = queues[r.id];
         while (q.length) {
@@ -107,6 +156,7 @@
       }
 
       function tick() {
+        if (!friend) botSteer();
         riders.forEach(turn);
         const { next, crashed } = stepRiders(grid, riders, COLS, ROWS);
         if (crashed.p1 || crashed.p2) {
@@ -151,7 +201,7 @@
           if (phase === 'over' && phaseT <= 0 && !overCalled) {
             overCalled = true;
             const win = wins.p1 > wins.p2 ? 'p1' : 'p2';
-            api.over({ score: wins[win], won: true, title: (win === 'p1' ? 'P1' : 'P2') + ' wins', message: `Rounds ${Math.max(wins.p1, wins.p2)} to ${Math.min(wins.p1, wins.p2)}` });
+            api.over({ score: wins[win], won: true, title: friend ? nameOf(win) + ' wins' : win === 'p1' ? 'You win' : 'Bot wins', message: `Rounds ${Math.max(wins.p1, wins.p2)} to ${Math.min(wins.p1, wins.p2)}` });
           }
         }
         parts.forEach(q => { q.x += q.vx * dt; q.y += q.vy * dt; q.vx *= 0.95; q.vy *= 0.95; q.life -= dt; });
@@ -179,7 +229,8 @@
         const { w, h } = view;
         ctx.clearRect(0, 0, w, h);
         D.duelHeader(ctx, 10, 8, w - 20, {
-          left: { who: 'p1', label: 'P1', pips: wins.p1, of: FIRST_TO }, right: { who: 'p2', label: 'P2', pips: wins.p2, of: FIRST_TO },
+          left: friend ? { who: 'p1', label: 'P1', pips: wins.p1, of: FIRST_TO } : { who: 'you', pips: wins.p1, of: FIRST_TO },
+          right: friend ? { who: 'p2', label: 'P2', pips: wins.p2, of: FIRST_TO } : { who: 'bot', pips: wins.p2, of: FIRST_TO },
           turn: null, status: phase === 'over' ? '' : `Round ${round + 1}`
         }, col);
         const top = 56, avail = h - top - 8, s = Math.min((w - 16) / W, avail / H);
@@ -215,7 +266,7 @@
           });
         }
         if (phase === 'end' || phase === 'over') {
-          const big = result ? `${result === 'p1' ? 'P1' : 'P2'} ${phase === 'over' ? 'wins the match' : 'takes the round'}` : 'Both crashed. Draw';
+          const big = result ? `${nameOf(result)} ${phase === 'over' ? (friend ? 'wins' : result === 'p1' ? 'win' : 'wins') + ' the match' : (friend || result === 'p2' ? 'takes' : 'take') + ' the round'}` : 'Both crashed. Draw';
           const bw = 240;
           ctx.save(); ctx.fillStyle = col.surface; ctx.shadowColor = 'rgba(0,0,0,0.22)'; ctx.shadowBlur = 16; ctx.shadowOffsetY = 5;
           D.roundRect(ctx, W / 2 - bw / 2, H * 0.32 - 26, bw, 52, 16); ctx.fill(); ctx.restore();

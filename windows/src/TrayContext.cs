@@ -27,7 +27,11 @@ internal sealed class TrayContext : ApplicationContext
         Store.RefreshLoginPath();
         Store.EnsureStartMenuShortcut();
 
+        PopupForm.SkipIntro = options.SelfTestPath != null;
         popup = new PopupForm(theme, ExitApp);
+        // First run: the page asks for the panel so its welcome is seen, and keeps it open until it is done.
+        popup.IntroRequested += () => { popup.StayOpen = true; popup.ShowPopup(TrayCenter()); };
+        popup.IntroDone += () => popup.StayOpen = options.TestOpen;
         popup.LoginChanged += () => loginItem!.Checked = Store.LoginEnabled();
         popup.InvisibleChanged += hide => tray!.Visible = !hide;
         popup.PageReady += OnPageReady;
