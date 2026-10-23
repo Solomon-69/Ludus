@@ -1,4 +1,4 @@
-/* Geo Guess maps. One small wrapper (create) gives the game the same few calls whichever map engine runs:
+/* Map Hunt maps. One small wrapper (create) gives the game the same few calls whichever map engine runs:
    - MapLibre GL (vendor/maplibre-gl.js): the real map, drawn on the graphics card from free vector tiles in the
      familiar guessing-map look (mapstyle.js). Its own wheel, pinch and drag handling is used as it comes: no custom zoom code.
    - Leaflet (vendor/leaflet.js): only if the graphics card cannot run MapLibre; a plain flat-colour map you can still pin on.

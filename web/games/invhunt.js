@@ -1,4 +1,4 @@
-/* Invader Hunt: you get a Space Invader mosaic's ID tag (like PA_267). Drop a pin where you think it is on the map;
+/* Mosaic Hunt: you get a street-art mosaic's ID tag (like PA_267). Drop a pin where you think it is on the map;
    the closer, the more points. City hunt: one city's streets. World hunt: any invaded city on Earth (the letters before
    the underscore are the city code). Code breaker: see a code, pick its city, three lives.
    Data: games/invhunt/data.js, positions and status from the community dataset by goguelnikov
@@ -81,7 +81,7 @@
 `);
 
   Ludus.register({
-    id: 'invhunt', name: 'Invader Hunt', aka: 'Space Invader mosaics, street art, map, city codes, geography', tag: 'Puzzle', tint: '#24315c',
+    id: 'invhunt', name: 'Mosaic Hunt', aka: 'street art mosaics, map, city codes, geography', tag: 'Puzzle', tint: '#24315c',
     hint: 'Drag to move · scroll or <kbd>+</kbd><kbd>-</kbd> to zoom · click to pin · <kbd>Enter</kbd> guess · <kbd>H</kbd> hint · <kbd>Esc</kbd> pauses',
     _rules: { px, ll, dist, points, inBounds, fmtD, cityOf },
     art(ctx, w, h) {

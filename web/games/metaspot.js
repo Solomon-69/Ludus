@@ -1,4 +1,4 @@
-/* Meta Spotter: GeoGuessr meta drills. A bollard, a licence plate, road lines, a chevron sign, a line of text or a
+/* Clue Spotter: road-clue drills. A bollard, a licence plate, road lines, a chevron sign, a line of text or a
    coverage note is shown; name the country. Pick one of four (keys 1-4) or type it. Three lives, streak scoring.
    Online: a race over the same ten clues, 15 seconds each, faster right answers score more.
    Clue data: games/metaspot/data.js (compiled from geohints.com, plonkit.net and Wikipedia). Drawings are simple
@@ -229,7 +229,7 @@
 `);
 
   Ludus.register({
-    id: 'metaspot', name: 'Meta Spotter', aka: 'GeoGuessr meta, bollards, plates, road lines, countries, geography', tag: 'Puzzle', tint: '#2f7d55',
+    id: 'metaspot', name: 'Clue Spotter', aka: 'bollards, plates, road lines, countries, geography', tag: 'Puzzle', tint: '#2f7d55',
     online: { min: 2, max: 4 },
     hint: 'Pick <kbd>1</kbd>-<kbd>4</kbd> or click · <kbd>Tab</kbd> Type it · <kbd>Enter</kbd> Next · <kbd>Esc</kbd> pauses',
     onlineHint: 'Same clues for everyone · <kbd>1</kbd>-<kbd>4</kbd> to answer · faster right answers score more',

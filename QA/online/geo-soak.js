@@ -1,6 +1,6 @@
-// Geo Guess soak test (solo): many rounds with key mashing, pause/resume, close/reopen (save + resume), photo downloads
+// Map Hunt soak test (solo): many rounds with key mashing, pause/resume, close/reopen (save + resume), photo downloads
 // that fail, graphics-context loss; plus smooth-zoom steadiness and the pin staying in view when the map shrinks.
-// Needs internet (Panoramax + Esri). NODE_PATH not needed when node_modules is linked here.
+// Needs internet (Panoramax + OpenFreeMap). NODE_PATH not needed when node_modules is linked here.
 // node geo-soak.js [--rounds 12] [--seed 7]
 const L = require('./lib.js');
 const { wait, check, newPage, shot } = L;

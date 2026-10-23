@@ -1,4 +1,4 @@
-/* Blocks: falling tetrominoes, Tetris Guideline rules: 7-bag, SRS wall kicks, ghost, hold once per piece,
+/* Blocks: falling tetrominoes, standard falling-block rules: 7-bag, SRS wall kicks, ghost, hold once per piece,
    0.5 s lock delay with 15 move resets, guideline gravity and scoring (T-spins, back-to-back). */
 (function () {
   const COLS = 10, ROWS = 20, HIDDEN = 2, H = ROWS + HIDDEN;
@@ -90,7 +90,7 @@
   function emptyBoard() { return Array.from({ length: H }, () => Array(COLS).fill(null)); }
 
   Ludus.register({
-    id: 'blocks', name: 'Tetris', aka: 'Blocks', tag: 'Arcade', tint: '#5b8def',
+    id: 'blocks', name: 'Blocks', aka: 'falling blocks', tag: 'Arcade', tint: '#5b8def',
     hint: '<kbd>←</kbd><kbd>→</kbd> move <kbd>↑</kbd> rotate <kbd>Z</kbd> rotate back <kbd>↓</kbd> soft drop <kbd>Space</kbd> hard drop <kbd>C</kbd> hold · click: rotate or move, swipe down: drop',
     _test: { rotateMatrix, cellsOf, fits, tryRotate, fullRows, clearRows, makeBag, gravity, emptyBoard, tSpinKind, clearPoints, LINE_SCORE, COLS, H, LOCK_DELAY, MAX_RESETS },
     art(ctx, w, h) {
@@ -192,7 +192,7 @@
         const rows = fullRows(board), n = rows.length;
         const pts = clearPoints(n, spin, level, b2b);
         if (pts.points) { score += pts.points; api.score(score); }
-        const name = (spin ? (spin === 'mini' ? 'T-Spin Mini' : 'T-Spin') + (n ? ' ' : '') : '') + ['', 'Single', 'Double', 'Triple', 'Tetris'][n];
+        const name = (spin ? (spin === 'mini' ? 'Twist Mini' : 'Twist') + (n ? ' ' : '') : '') + ['', 'Single', 'Double', 'Triple', 'Quad'][n];
         if (spin && !n && layout) pops.push({ text: name + ' +' + pts.points, y: Math.max(HIDDEN + 1, lockRow), t: performance.now() });
         if (n) b2b = pts.difficult;
         if (rows.length) {

@@ -48,7 +48,7 @@ Save-Crop (Join-Path $Shots '05-ludus-wide-game-dark.png') $b[0] $b[1] $b[2] $b[
 Save-TrayCorner (Join-Path $Shots '06-ludus-tray-dark.png')
 Check (Quit-App $Exe 'Ludus') 'wide run: clean quit'
 
-# ---- Run 2b: Geo Guess opens (its photo and map need the internet; the screenshot shows what loaded) ----
+# ---- Run 2b: Map Hunt opens (its photo and map need the internet; the screenshot shows what loaded) ----
 Set-Theme $false
 $json2b = Join-Path $Shots 'ludus-selftest-geo.json'
 $p2b = Start-App $Exe @('--test-open', '--test-game=geoguess', "--selftest=$json2b")
@@ -56,12 +56,12 @@ $p2b = Start-App $Exe @('--test-open', '--test-game=geoguess', "--selftest=$json
 Check (Wait-File $json2b 120) 'geo run: self-test file written'
 $r2b = Get-Content $json2b -Raw | ConvertFrom-Json
 Check $r2b.ready 'geo run: WebView2 loaded the games page'
-Check ($r2b.panelBounds[2] -gt $r2b.panelBounds[3]) 'geo run: Geo Guess opens the panel landscape'
+Check ($r2b.panelBounds[2] -gt $r2b.panelBounds[3]) 'geo run: Map Hunt opens the panel landscape'
 Start-Sleep -Seconds 14
 $b2 = $r2b.panelBounds
 Save-Crop (Join-Path $Shots '05b-ludus-geoguess.png') $b2[0] $b2[1] $b2[2] $b2[3]
 Check (Quit-App $Exe 'Ludus') 'geo run: clean quit'
-# ---- Run 2c/2d: a Geo Guess game saved by Ludus 1.7 (the "blurred map, nothing opens" bug) ----
+# ---- Run 2c/2d: a Map Hunt game saved by Ludus 1.7 (the "blurred map, nothing opens" bug) ----
 $statePath = Join-Path $env:APPDATA 'Ludus\state.json'
 $geoSave = Get-Content (Join-Path $PSScriptRoot '..\..\QA\online\geo-save-1.7.json') -Raw | ConvertFrom-Json
 $keepState = if (Test-Path $statePath) { Get-Content $statePath -Raw } else { $null }
@@ -75,7 +75,7 @@ foreach ($reset in @(0, 1)) {
   $cG = $rG.check | ConvertFrom-Json
   Write-Host "geo resume ($reset): $($rG.check)"
   Check (-not $cG.blurredWithoutMenu) "geo resume ($reset): never blurred without a menu"
-  Check ((-not $cG.paused) -and (-not ($cG.saved -contains 'geoguess'))) "geo resume ($reset): the stuck 1.7 save is dropped, Geo Guess opens a fresh game"
+  Check ((-not $cG.paused) -and (-not ($cG.saved -contains 'geoguess'))) "geo resume ($reset): the stuck 1.7 save is dropped, Map Hunt opens a fresh game"
   Start-Sleep -Seconds 4
   $bG = $rG.panelBounds
   Save-Crop (Join-Path $Shots "05c-ludus-geo-resume$reset.png") $bG[0] $bG[1] $bG[2] $bG[3]

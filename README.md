@@ -25,7 +25,7 @@
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/showcase/ludus-1-dark.png">
-  <img src="docs/showcase/ludus-1-light.png" width="880" alt="The Ludus panel open under the menu bar with 2048 and alien-wave shooter beside it">
+  <img src="docs/showcase/ludus-1-light.png" width="880" alt="The Ludus panel open under the menu bar with 2048 and Sky Raiders beside it">
 </picture>
 
 </div>
@@ -57,28 +57,28 @@ Ludus puts 38 small, polished games one click away. Here is what is inside.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/showcase/ludus-2-dark.png">
-  <img src="docs/showcase/ludus-2-light.png" width="880" alt="Connect Four in vs Friend mode next to a two-player game of Tag">
+  <img src="docs/showcase/ludus-2-light.png" width="880" alt="Four in a Row in vs Friend mode next to a two-player game of Tag">
 </picture>
 
 ### Play a friend on one keyboard
 
 Every board game has a <b>vs Bot / vs Friend</b> switch at the top. Pick Friend and you take turns on the same keyboard, with Player 2 in blue. The real-time games in the 2 Player group give each of you your own keys, so you can both play at once.
 
-- <b>Turn-based with a friend:</b> Connect Four, Dots and Boxes, Ultimate Tic-Tac-Toe, Hex and Dead Centre.
+- <b>Turn-based with a friend:</b> Four in a Row, Dots and Boxes, Ultimate Tic-Tac-Toe, Hex and Dead Centre.
 - <b>Secret picks:</b> in Rock Paper Scissors, Player 1 picks with <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> and Player 2 with <kbd>J</kbd> <kbd>K</kbd> <kbd>L</kbd>. Both hands show only once you have both locked in.
-- <b>Real time:</b> paddle game, Air Hockey, Tag, sword-duel game and tank arena game, with one player on <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> and the other on the arrow keys. Tag takes up to four on one keyboard: P3 on <kbd>I</kbd> <kbd>J</kbd> <kbd>K</kbd> <kbd>L</kbd> (+<kbd>U</kbd>) and P4 on the number pad <kbd>8</kbd> <kbd>4</kbd> <kbd>5</kbd> <kbd>6</kbd> (+<kbd>0</kbd>).
+- <b>Real time:</b> Paddle Duel, Air Hockey, Tag, Sword Duel and Tank Arena, with one player on <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> and the other on the arrow keys. Tag takes up to four on one keyboard: P3 on <kbd>I</kbd> <kbd>J</kbd> <kbd>K</kbd> <kbd>L</kbd> (+<kbd>U</kbd>) and P4 on the number pad <kbd>8</kbd> <kbd>4</kbd> <kbd>5</kbd> <kbd>6</kbd> (+<kbd>0</kbd>).
 - All of them are in the <b>2 Player</b> tab. The panel widens by itself when a game needs the room.
 
 <br>
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/showcase/ludus-3-dark.png">
-  <img src="docs/showcase/ludus-3-light.png" width="880" alt="alien-wave shooter, Stack and Chomp side by side">
+  <img src="docs/showcase/ludus-3-light.png" width="880" alt="Sky Raiders, Stack and Chomp side by side">
 </picture>
 
 ### Play online with a room code
 
-Thirteen games have an <b>Online</b> button next to vs Bot / vs Friend: the board games Connect Four, Dots and Boxes, Ultimate Tic-Tac-Toe, Hex, Quoridor, Rock Paper Scissors, Dead Centre and Last Wire, the action games paddle game and Air Hockey, and Tag, claim-the-land game and swallow-the-city game, which take <b>2 to 4 players</b> (they are in the <b>3-4 Player</b> tab; the host can press <b>Start now</b> once the room has enough players, or the game starts by itself when every seat is taken). Most games are for two players.
+Thirteen games have an <b>Online</b> button next to vs Bot / vs Friend: the board games Four in a Row, Dots and Boxes, Ultimate Tic-Tac-Toe, Hex, Wall Race, Rock Paper Scissors, Dead Centre and Last Wire, the action games Paddle Duel and Air Hockey, and Tag, Land Claim and City Swallow, which take <b>2 to 4 players</b> (they are in the <b>3-4 Player</b> tab; the host can press <b>Start now</b> once the room has enough players, or the game starts by itself when every seat is taken). Most games are for two players.
 
 One player taps <b>Create room</b> and gets a 5 character room code. The <b>Copy invite</b> button copies a short message with the code and a `ludus://join/CODE` link. The other player taps <b>Join room</b> and types or pastes the code, or just clicks the link. It works on Mac and Windows. There is no account and no server of ours: the copies of Ludus talk through free public relays, and that only happens when you choose Play online. Rooms are not private: anyone who knows the code can join. See [PRIVACY.md](PRIVACY.md) and [web/ONLINE.md](web/ONLINE.md).
 
@@ -86,28 +86,28 @@ One player taps <b>Create room</b> and gets a 5 character room code. The <b>Copy
 
 Fourteen arcade games built to play smoothly at 60 frames a second, each with its own best score to beat.
 
-- <b>alien-wave shooter</b>: waves of invaders, shields and a mystery ship.
+- <b>Sky Raiders</b>: waves of invaders, shields and a mystery ship.
 - <b>Stack</b>: drop each block in 3D and line it up perfectly for a combo. Press <kbd>B</kbd> (or the top-left button) for the silly <b>Brain rot</b> skin: every slab is a made-up character with a name and sound captions.
-- <b>maze-and-ghosts game</b>: a maze, four ghosts and power pellets.
-- <b>hammer-climbing game</b>: climb a mountain with a hammer. Pick a difficulty from the menu.
-- <b>garden-defence game</b>: plant a garden against the creeping weeds, on Easy or Hard.
-- <b>swallow-the-city game</b>, <b>claim-the-land game</b> and <b>snake arena game</b>: eat, claim land or grow longer than the rest.
-- Plus falling-blocks game (falling blocks with proper locking), brick-breaker, asteroid shooter, flap-through-the-gaps game, Snake and endless-jumper game.
+- <b>Chomp</b>: a maze, four ghosts and power pellets.
+- <b>Hammer Climb</b>: climb a mountain with a hammer. Pick a difficulty from the menu.
+- <b>Garden Defence</b>: plant a garden against the creeping weeds, on Easy or Hard.
+- <b>City Swallow</b>, <b>Land Claim</b> and <b>Worm Arena</b>: eat, claim land or grow longer than the rest.
+- Plus Blocks (falling blocks with proper locking), Brick Break, Rock Blaster, Flap Through, Snake and Sky Hop.
 - Most games have difficulty levels that change the speed and how clever the computer is.
 
 <br>
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/showcase/ludus-4-dark.png">
-  <img src="docs/showcase/ludus-4-light.png" width="880" alt="2048, five-letter word game and Sudoku side by side">
+  <img src="docs/showcase/ludus-4-light.png" width="880" alt="2048, Five Letters and Sudoku side by side">
 </picture>
 
 ### Puzzles for a quick think
 
 Nine calm puzzle games for a two-minute break or a longer think. Close the panel at any point and the game is saved exactly as it was.
 
-- <b>2048</b>, <b>five-letter word game</b> (guess the word in six tries), <b>Sudoku</b> with notes and undo.
-- <b>mine-clearing puzzle</b>, <b>Solitaire</b>, <b>Memory</b>, <b>Sokoban</b> and <b>match-three game</b>.
+- <b>2048</b>, <b>Five Letters</b> (guess the word in six tries), <b>Sudoku</b> with notes and undo.
+- <b>Minefield</b>, <b>Solitaire</b>, <b>Memory</b>, <b>Crate Push</b> and <b>Sweet Match</b>.
 - <b>Flag Quiz</b>: name the country from its flag. It also has regional flags: US states, Canadian provinces, UK nations and regions in 13 more countries.
 - Keyboard first, but every puzzle also works with clicks.
 
@@ -195,13 +195,13 @@ brew install --cask ludus   # not available yet
 
 | Group | Games |
 | --- | --- |
-| **Arcade** (beat your best) | falling-blocks game, brick-breaker, maze-and-ghosts game, hammer-climbing game, garden-defence game, flap-through-the-gaps game, asteroid shooter, alien-wave shooter, Snake, endless-jumper game, Stack, swallow-the-city game, claim-the-land game, snake arena game, balloon-fusing tower-defence game |
-| **Puzzle** | 2048, Sokoban, five-letter word game, mine-clearing puzzle, Memory, Solitaire, match-three game, Sudoku, Flag Quiz, mosaic-hunting map game, road-sign and street-detail spotting game, language-guessing game |
-| **Duel** (you against the computer) | Dots and Boxes, Dead Centre, Connect Four, Last Wire, Ultimate Tic-Tac-Toe, sword-duel game, Hex, Rock Paper Scissors, Quoridor, balloon tower-defence game, stick-figure brawler |
-| **2 Player** (one keyboard) | Air Hockey, paddle game, Tag, tank arena game |
-| **3-4 Player** (online, Tag also on one keyboard) | Tag, claim-the-land game, swallow-the-city game |
+| **Arcade** (beat your best) | Blocks, Brick Break, Chomp, Hammer Climb, Garden Defence, Flap Through, Rock Blaster, Sky Raiders, Snake, Sky Hop, Stack, City Swallow, Land Claim, Worm Arena, balloon-fusing tower-defence game |
+| **Puzzle** | 2048, Crate Push, Five Letters, Minefield, Memory, Solitaire, Sweet Match, Sudoku, Flag Quiz, Mosaic Hunt, Clue Spotter, Tongue Twister |
+| **Duel** (you against the computer) | Dots and Boxes, Dead Centre, Four in a Row, Last Wire, Ultimate Tic-Tac-Toe, Sword Duel, Hex, Rock Paper Scissors, Wall Race, Pop Duel, stick-figure brawler |
+| **2 Player** (one keyboard) | Air Hockey, Paddle Duel, Tag, Tank Arena |
+| **3-4 Player** (online, Tag also on one keyboard) | Tag, Land Claim, City Swallow |
 
-Connect Four, Dots and Boxes, Ultimate Tic-Tac-Toe, Hex, Rock Paper Scissors and Dead Centre also have a **vs Friend** mode, so they show up in the 2 Player tab too.
+Four in a Row, Dots and Boxes, Ultimate Tic-Tac-Toe, Hex, Rock Paper Scissors and Dead Centre also have a **vs Friend** mode, so they show up in the 2 Player tab too.
 
 Each game lives in its own file in [`web/games/`](web/games).
 
@@ -214,7 +214,7 @@ it and pauses the game. A right-click on the icon works too.
 | --- | --- |
 | Moving | <kbd>&larr;</kbd> <kbd>&uarr;</kbd> <kbd>&rarr;</kbd> <kbd>&darr;</kbd> or <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> in most games |
 | Act, jump, drop, fire | <kbd>Space</kbd> |
-| Pause | <kbd>Esc</kbd> or <kbd>P</kbd> (in five-letter word game, <kbd>P</kbd> types a letter, so use <kbd>Esc</kbd>) |
+| Pause | <kbd>Esc</kbd> or <kbd>P</kbd> (in Five Letters, <kbd>P</kbd> types a letter, so use <kbd>Esc</kbd>) |
 | After a game | <kbd>Enter</kbd>, <kbd>Space</kbd> or <kbd>R</kbd> to play again, <kbd>Esc</kbd> for all games |
 | Settings | <kbd>Esc</kbd> to go back |
 | 2 Player games | One player on <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd>, the other on the arrow keys |
@@ -341,7 +341,7 @@ To report a security problem, see [SECURITY.md](SECURITY.md).
 
 - Made by Solomon, built with the help of Claude.
 - Settings gear icon from [Lucide](https://lucide.dev) (ISC licence). Full list of third-party material and photo/map credits: [THIRD_PARTY.md](THIRD_PARTY.md).
-- Many games are fresh takes on classics such as falling blocks, maze chase, Hex, Quoridor, dots
+- Many games are fresh takes on classics such as falling blocks, maze chase, Hex, Wall Race, dots
   and boxes and ultimate tic-tac-toe. The code and drawings were written for Ludus.
 - Third-party notices are in [NOTICE](NOTICE).
 

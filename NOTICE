@@ -73,7 +73,7 @@ The country flags in web/games/flags/ (used by the Flag Quiz game) come from the
 The SVG files are bundled unchanged except for size optimisation (SVGO) and explicit width and height attributes.
 
 
-Geo Guess libraries and data
+Map Hunt libraries and data
 ----------------------------
 web/vendor/pannellum.* (Pannellum 2.5.6, Matthew Petroff, MIT License, https://pannellum.org) shows the 360 street photos (two small local patches: a picture that finishes loading after its viewer was closed, or a download that failed, is not read again).
 web/vendor/maplibre-gl.* (MapLibre GL JS 5.7.0, MapLibre contributors, BSD 3-Clause License, https://maplibre.org) draws the guess maps on the graphics card.
@@ -84,13 +84,13 @@ web/games/geo/mapstyle.js. Street photos come from the Panoramax public instance
 CC-BY-SA). The game fetches them live and stores nothing; the list of places is web/games/geo/pool.js.
 
 
-Meta Spotter, Tongue Twister and Invader Hunt data
+Clue Spotter, Tongue Twister and Mosaic Hunt data
 --------------------------------------------------
 web/games/metaspot/data.js: clue notes compiled from geohints.com, plonkit.net and Wikipedia (each entry keeps its source link).
 The pictures are simple drawings made in code, not photos.
 web/games/tongue/data.js: sample sentences from the Unicode UDHR collection (https://github.com/unicode-org/udhr), language
 families and map points from Glottolog (https://glottolog.org, CC-BY 4.0), speaker numbers from the sources linked in each entry.
-web/games/invhunt/data.js: Space Invader positions and status from the community dataset by goguelnikov
+web/games/invhunt/data.js: street-art mosaic positions and status from the community dataset by goguelnikov
 (https://github.com/goguelnikov/SpaceInvaders, MIT License). The pixel badges are drawn from each ID, not the real artworks.
 Map tiles in web/games/tongue/tiles/ and web/games/invhunt/tiles/: (c) OpenStreetMap contributors (ODbL,
 https://www.openstreetmap.org/copyright), bundled so the games work offline.

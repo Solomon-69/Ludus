@@ -1,4 +1,4 @@
-// Getting Over It: swinging the hammer in the air must not push the pot (it used to: swing up = pushed down, which
+// Hammer Climb: swinging the hammer in the air must not push the pot (it used to: swing up = pushed down, which
 // killed long jumps). Run with QA/online/run.js QA/climb-air.js
 async () => {
   const g = Ludus.games.find(x => x.id === 'climb'), R = g._rules;

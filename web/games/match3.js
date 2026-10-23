@@ -72,7 +72,7 @@
   }
 
   Ludus.register({
-    id: 'sparkmatch', name: 'Candy Crush', aka: 'Spark Match match three', tag: 'Puzzle', tint: '#e07a3f',
+    id: 'sparkmatch', name: 'Sweet Match', aka: 'match three', tag: 'Puzzle', tint: '#e07a3f',
     hint: 'Drag or click to swap · <kbd>←↑→↓</kbd> move · <kbd>Space</kbd> + arrow swaps',
     _rules: { findMatches, findMove, freshGrid, swapped },
     art(ctx, w, h) {

@@ -1,4 +1,4 @@
-/* Flappy Spark: guide the Claude spark through the gaps. World runs in a 440-unit-tall space scaled to the stage. */
+/* Flap Through: guide the Claude spark through the gaps. World runs in a 440-unit-tall space scaled to the stage. */
 (function () {
   const WH = 440;                 // world height in units
   const GROUND = 46;              // ground strip height
@@ -23,7 +23,7 @@
   }
 
   Ludus.register({
-    id: 'flappy', name: 'Flappy Bird', aka: 'Flappy Spark', tag: 'Arcade', tint: '#3aa6a6',
+    id: 'flappy', name: 'Flap Through', aka: 'Flappy Spark', tag: 'Arcade', tint: '#3aa6a6',
     hint: '<kbd>Space</kbd> <kbd>↑</kbd> or click to flap',
     _test: { hitsRect, hitsPipe, WH, GROUND, BIRD_R, PIPE_W, DIFF, GRAV, FLAP },
     art(ctx, w, h) {

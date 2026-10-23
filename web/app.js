@@ -961,9 +961,9 @@
   // ---------- boot ----------
   if (window.__LUDUS_TEST_FAIL__) throw new Error('Injected startup failure (test)');   // set only by test builds, to check the app shell's failsafe screen
   if (S.filter !== 'All') { S.filter = 'All'; L.save(); }   // Ludus always opens on the All tab
-  // 1.7.1: a Geo Guess save from 1.7 could reopen behind an invisible pause card (blurred map, nothing to press).
+  // 1.7.1: a Map Hunt save from 1.7 could reopen behind an invisible pause card (blurred map, nothing to press).
   // Drop that save once, so the game starts clean after the update.
-  // Geo Guess is never saved mid-game (every open is a fresh game): drop any old Geo save, whatever version wrote it.
+  // Map Hunt is never saved mid-game (every open is a fresh game): drop any old Geo save, whatever version wrote it.
   if (S.saves && S.saves.geoguess) { delete S.saves.geoguess; L.save(); }
   S.geoReset = 1;
   // Best scores: anything that is not a plain number (a damaged file) counts as no score, never blocks a game.
@@ -1005,8 +1005,8 @@
     const pages = [
       { art: mark, app: true, title: 'Welcome to Ludus', text: `${L.games.length} little games, one click away. Take a short break, then get back to work.`,
         items: [
-          [ic('M5 19l4-8 3 5 2-3 5 6zM15 6h.01'), 'Arcade', 'Sky Raiders, Snake, Breakout, Stack and more'],
-          [ic('M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z'), 'Puzzle', '2048, Sudoku, Five Letters, Minesweeper'],
+          [ic('M5 19l4-8 3 5 2-3 5 6zM15 6h.01'), 'Arcade', 'Sky Raiders, Snake, Brick Break, Stack and more'],
+          [ic('M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z'), 'Puzzle', '2048, Sudoku, Five Letters, Minefield'],
           [ic('M8 12h8M6 8a4 4 0 1 0 0 8M18 8a4 4 0 1 1 0 8'), 'Duel and 2 Player', 'Beat the computer, or a friend on one keyboard'],
         ] },
       { art: ic(win ? 'M3 15h18v5H3zM17 17.5h.01M12 4v7M9 8l3 3 3-3' : 'M3 5h18M7 9h10a4 4 0 0 1 0 8H7a4 4 0 0 1 0-8zM9 13h2M10 12v2M15 13h.01'),

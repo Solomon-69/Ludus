@@ -1,4 +1,4 @@
-// Meta Spotter online race test, no internet: node metaspot.js [--dark]
+// Clue Spotter online race test, no internet: node metaspot.js [--dark]
 // Three pages through the in-memory broker: the host picks the clues, everyone gets the same ten clues with the same
 // four answers, a round ends once everyone answered (or the clock runs out), faster right answers score more, and
 // every screen agrees on the final standings.
@@ -13,7 +13,7 @@ const waitPhase = (p, ph, r) => p.waitForFunction(([a, b]) => { const s = window
   const browser = await L.launch();
   try {
     const br = await broker.start();
-    const { pages } = await party(browser, br, 'Meta Spotter', 3, { dark });
+    const { pages } = await party(browser, br, 'Clue Spotter', 3, { dark });
     const [A, B, C] = pages;
     await Promise.all(pages.map(p => waitPhase(p, 'setup')));
     check('all three screens show the race setup', true);

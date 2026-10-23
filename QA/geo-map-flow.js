@@ -1,4 +1,4 @@
-// Geo Guess map flow: click the closed map (opens it), click to pin (pin lands where the pointer is), pin marker shows,
+// Map Hunt map flow: click the closed map (opens it), click to pin (pin lands where the pointer is), pin marker shows,
 // Guess -> result map with the right-answer marker, the guess marker and the dotted line. Dark mode keeps the map light.
 //   node QA/geo-map-flow.js [OUT_PNG_PREFIX]   (prints JSON, exit code 1 on a failed check)
 const path = require('path'), os = require('os');

@@ -1,4 +1,4 @@
-/* Getting Over It (was Hammer Climb): a spark sits in a pot and has only a long hammer.
+/* Hammer Climb: a spark sits in a pot and has only a long hammer.
    One long, wide, hand-made mountain that runs to the RIGHT: the tree and rocks, the boulders, the chimney,
    the slide and the orange-hell pit, furniture and pipes, ice mountain, the ridge, then the tall tower to the summit.
    A menu picks the difficulty (Easy / Normal / Hard / Original): taller steps, wider gaps, steeper and
@@ -295,7 +295,7 @@
   const GRASS = [[-620, 22], [-520, 12], [-460, 9], [-170, 4], [-20, 1], [120, 0]];
 
   Ludus.register({
-    id: 'climb', name: 'Getting Over It', aka: 'Hammer Climb', tag: 'Arcade', tint: '#7d6a58',
+    id: 'climb', name: 'Hammer Climb', tag: 'Arcade', tint: '#7d6a58',
     hint: 'The mouse moves the hammer head. Plant it, keep moving to lever yourself · <kbd>←</kbd><kbd>→</kbd> swing <kbd>↑</kbd><kbd>↓</kbd> reach · <kbd>-</kbd><kbd>+</kbd> sensitivity',
     _rules: { build, makeWorld, step, newState, clampArm, probe, DIFFS, START, HL, HMIN, PR, HR, STEP, VIEW },
     art(ctx, w, h) {
@@ -628,7 +628,7 @@
       function menu(col, w, h) {
         const d = col.dark, m = menuLayout();
         ctx.fillStyle = d ? 'rgba(20,18,16,0.55)' : 'rgba(250,246,240,0.55)'; ctx.fillRect(0, 0, w, h);
-        D.fitText(ctx, 'Getting Over It', w / 2, m.title, w - 40, 20, col.ink, 800);
+        D.fitText(ctx, 'Hammer Climb', w / 2, m.title, w - 40, 20, col.ink, 800);
         D.fitText(ctx, 'Pick your mountain', w / 2, m.sub, w - 40, 12, col.ink2, 650);
         m.cards.forEach((c, i) => {
           const sel = i === pick, hov = i === hover;

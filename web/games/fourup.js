@@ -1,4 +1,4 @@
-/* Four Up: Connect Four against the computer, or a friend on the same keyboard. 7 x 6, first to three games takes the match. */
+/* Four in a Row: drop discs, line up four, against the computer, or a friend on the same keyboard. 7 x 6, first to three games takes the match. */
 (function () {
   const COLS = 7, ROWS = 6, P = 1, C = 2, TARGET = 3;
   const ORDER = [3, 2, 4, 1, 5, 0, 6];
@@ -90,7 +90,7 @@
   };
 
   Ludus.register({
-    id: 'fourup', name: 'Connect Four', aka: 'Four Up', tag: 'Duel', versus: true, online: { min: 2, max: 2 }, tint: '#c4633f',
+    id: 'fourup', name: 'Four in a Row', aka: 'Four Up', tag: 'Duel', versus: true, online: { min: 2, max: 2 }, tint: '#c4633f',
     hint: 'Click a column, or <kbd>←</kbd><kbd>→</kbd> + <kbd>Space</kbd> (or <kbd>1</kbd>-<kbd>7</kbd>). Four in a row wins a game. First to 3 games. vs Friend: take turns',
     _logic: logic,
     art(ctx, w, h) {

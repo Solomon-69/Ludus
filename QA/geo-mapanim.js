@@ -1,4 +1,4 @@
-// Geo Guess small map: expand/contract 30 times. The pin-bar label is decided from the final size (never swaps
+// Map Hunt small map: expand/contract 30 times. The pin-bar label is decided from the final size (never swaps
 // mid-animation, never empty), and the map moves smoothly (no back-and-forth jitter of the tiles between frames).
 async () => {
   const wait = ms => new Promise(r => setTimeout(r, ms));

@@ -1,4 +1,4 @@
-/* Paper.io: territory land grab. Leave your land to draw a trail, come back to close the loop and claim
+/* Land Claim: territory land grab. Leave your land to draw a trail, come back to close the loop and claim
    everything inside. Anyone who crosses your trail (or you, crossing your own) is out. Bigger share of the map wins.
    vs Bot: you against 6-10 AI players (mouse/touch steers freely, WASD or arrows turn).
    vs Friend: P1 = WASD, P2 = arrows on one keyboard, plus AI players. */
@@ -33,7 +33,7 @@
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
   Ludus.register({
-    id: 'paperio', name: 'Paper.io', aka: 'territory land grab', tag: 'Arcade', tint: '#4fb3a9', wide: true, versus: true, defaultVs: 'bot', online: { min: 2, max: 4 },
+    id: 'paperio', name: 'Land Claim', aka: 'territory land grab', tag: 'Arcade', tint: '#4fb3a9', wide: true, versus: true, defaultVs: 'bot', online: { min: 2, max: 4 },
     onlineHint: '<b>Online</b> 2 to 4 players plus bots · steer with the mouse, <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or the arrows · loop back home to claim land · most land at the end wins',
     hint: 'vs Bot: move the mouse or drag to steer, or <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> · loop back home to claim land · vs Friend: <b>P1</b> WASD, <b>P2</b> arrows',
     art(ctx, w, h, c) {

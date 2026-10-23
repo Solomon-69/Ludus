@@ -1,4 +1,4 @@
-/* Slither.io: a big round arena full of glowing food and AI worms. Steer with the pointer (or the keys), hold click / Space to boost
+/* Worm Arena: a big round arena full of glowing food and AI worms. Steer with the pointer (or the keys), hold click / Space to boost
    (costs length, drops food). Touch another worm's body with your head and you pop into food. Length = score.
    vs Friend: two people on one keyboard in the same arena, one camera that zooms to keep both in view; first to die loses. */
 (function () {
@@ -57,7 +57,7 @@
   }
 
   Ludus.register({
-    id: 'slither', name: 'Slither.io', aka: 'snake io worm', tag: 'Arcade', versus: true, tint: '#7c6bb5',
+    id: 'slither', name: 'Worm Arena', aka: 'snake worm arena', tag: 'Arcade', versus: true, tint: '#7c6bb5',
     hint: 'Pointer steers, hold click or <kbd>Space</kbd> to boost · <kbd>←</kbd><kbd>→</kbd> turn · vs Friend: <b>P1</b> A D + Space, <b>P2</b> ← → + /',
     art(ctx, w, h, colors) {
       // A smooth worm: evenly spaced round segments along a gentle S-curve, tapering to the tail, eyes on the head.

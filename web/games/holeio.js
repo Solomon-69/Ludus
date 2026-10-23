@@ -1,4 +1,4 @@
-/* Hole.io: you are a hole in a soft pastel city seen from an angled top-down camera.
+/* City Swallow: you are a hole in a soft pastel city seen from an angled top-down camera.
    Swallow whatever is smaller than you (people, cones, benches, trees, cars, buses, houses, towers) to grow; bigger holes
    swallow smaller holes. Two minutes, then the final ranking. Drag / WASD / arrows to move. vs Friend: P1 WASD, P2 arrows. */
 (function () {
@@ -178,7 +178,7 @@
   }
 
   Ludus.register({
-    id: 'holeio', name: 'Hole.io', aka: 'black hole city swallow', tag: 'Arcade', tint: '#5f8f94', versus: true, online: { min: 2, max: 4 },
+    id: 'holeio', name: 'City Swallow', aka: 'black hole city swallow', tag: 'Arcade', tint: '#5f8f94', versus: true, online: { min: 2, max: 4 },
     onlineHint: '<b>Online</b> 2 to 4 players plus bots · drag, <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or the arrows to move · biggest hole when time is up wins',
     hint: 'Drag, <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> to move · swallow what fits, grow, eat smaller holes · vs Friend: <b>P1</b> WASD, <b>P2</b> arrows',
     art(ctx, w, h) {

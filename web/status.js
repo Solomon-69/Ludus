@@ -1,9 +1,9 @@
 /* Ludus connection state and in-app updater. Nothing here is needed to play: every game works offline.
-   Only the Online tab, Geo Guess photos and updates use the internet. */
+   Only the Online tab, Map Hunt photos and updates use the internet. */
 (function () {
   const L = window.Ludus;
   const root = document.documentElement;
-  L.VERSION = '1.10.0';                       // the shell may override with window.__LUDUS_VERSION__ (the real app version)
+  L.VERSION = '1.11.0';                       // the shell may override with window.__LUDUS_VERSION__ (the real app version)
   // The one place that says where updates come from: the latest release of this GitHub repository.
   // It is private for now, so a 404 just means "Couldn't check". No token is ever stored in the app.
   L.UPDATE_API = 'https://api.github.com/repos/Solomon-69/Ludus/releases/latest';

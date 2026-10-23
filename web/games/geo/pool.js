@@ -1,4 +1,4 @@
-/* Places for Geo Guess: Panoramax 360 pictures (id, sequence), the exact spot (lat/lon), city, country code and full-size width (w).
+/* Places for Map Hunt: Panoramax 360 pictures (id, sequence), the exact spot (lat/lon), city, country code and full-size width (w).
    Each one was checked: 360 x 180 picture at least 5376 px wide (HD copy loads, with CORS), sharp, evenly lit daylight, the road continues
    in both directions. Re-curated Oct 2026 from sharpness and brightness measures. Picture licences: see NOTICE. */
 window.__GEO_POOL__ = [

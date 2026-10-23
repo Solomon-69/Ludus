@@ -39,5 +39,5 @@
 - S10 Open at login (Mac only), Reset best scores (two-step), Quit (Mac only)
 
 ## Games (16)
-2048, Blocks, Flappy Spark, Chomp, Snake, Minesweeper, Breakout, Four Up, Box It, Nine Squared, Last Wire, Wall Run, The Crossing, The Decider, Dead Centre, Right of Way.
+2048, Blocks, Flap Through, Chomp, Snake, Minefield, Brick Break, Four in a Row, Box It, Nine Squared, Last Wire, Wall Race, The Crossing, The Decider, Dead Centre, Sword Duel.
 Each: starts, takes keyboard and mouse input, scores, ends with the game-over sheet, Play again works repeatedly, no leaked listeners, no console errors, light and dark, compact and large stage, difficulty changes behaviour.

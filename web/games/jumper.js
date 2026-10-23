@@ -12,7 +12,7 @@
   const MAX_GAP = 150;                    // a bounce reaches about 172 units, so this is always jumpable
 
   Ludus.register({
-    id: 'sparkhop', name: 'Doodle Jump', aka: 'Spark Hop', tag: 'Arcade', tint: '#e08a3c',
+    id: 'sparkhop', name: 'Sky Hop', aka: 'Spark Hop', tag: 'Arcade', tint: '#e08a3c',
     hint: '<kbd>←</kbd><kbd>→</kbd> steer, or press and hold either side of the board',
     art(ctx, w, h) {
       const plat = (x, y, pw) => { ctx.fillStyle = 'rgba(255,255,255,0.85)'; D.roundRect(ctx, x - pw / 2, y, pw, 6, 3); ctx.fill(); };

@@ -230,7 +230,7 @@
   }
 
   Ludus.register({
-    id: 'garden', name: 'Plants vs. Zombies', aka: 'Garden Guard', tag: 'Arcade', tint: '#6f9a4a',
+    id: 'garden', name: 'Garden Defence', aka: 'Garden Guard', tag: 'Arcade', tint: '#6f9a4a',
     hint: 'Click a card, then a tile · click suns · right-click digs up · Easy / Hard pill: Hard adds new plants, weeds, crows and moles · <kbd>←↑→↓</kbd> move, <kbd>1</kbd>-<kbd>8</kbd> pick, <kbd>Space</kbd> plant, <kbd>X</kbd> dig, <kbd>M</kbd> mode',
     _rules: { waveSize, foeFor, foeForHard, PLANTS, HARD_PLANTS, FOES, DIFF, HARD },
     art(ctx, w, h) {

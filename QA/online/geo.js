@@ -1,4 +1,4 @@
-// Geo Guess online test: two clients, one room, five rounds against the in-memory relay. Needs internet (Panoramax + map tiles).
+// Map Hunt online test: two clients, one room, five rounds against the in-memory relay. Needs internet (Panoramax + map tiles).
 // NODE_PATH=<folder with playwright-core> node geo.js [--dark] [--large]
 const { chromium } = require('playwright-core');
 const L = require('./lib.js');
@@ -16,7 +16,7 @@ const real = es => es.filter(e => !/GL Driver/.test(e));
   const br = await broker.start();
   const A = await newPage(browser, br, { name: 'Ann', size, dark }), B = await newPage(browser, br, { name: 'Bo', size, dark });
   const c = await flexCreate(A); await flexJoin(B, c);
-  await pick(A, ['Geo Guess'], 1);
+  await pick(A, ['Map Hunt'], 1);
   await A.waitForFunction(() => document.querySelectorAll('.seat.on').length === 2, null, { timeout: 9000 });
   await A.click('#lobbyCard button.primary');
   await Promise.all([A, B].map(waitPlaying));

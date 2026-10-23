@@ -27,8 +27,8 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     await cc('All');
     for (const f of ['Arcade', 'Puzzle', 'Duel', '2 Player']) { await p.click(`#filters .chip:text-is("${f}")`); await cc(f); }
     await p.click('#filters .chip:text-is("All")');
-    await p.fill('#search', 'Geo'); await cc('search Geo');
-    check(`${scale * 100}% ${sz} search Geo: Geo Guess first`, await p.evaluate(() => document.querySelector('#grid .card').dataset.id) === 'geoguess');
+    await p.fill('#search', 'Map Hu'); await cc('search Map Hu');
+    check(`${scale * 100}% ${sz} search Map Hu: Map Hunt first`, await p.evaluate(() => document.querySelector('#grid .card').dataset.id) === 'geoguess');
     await p.fill('#search', 'puz'); await cc('search puz');
     await p.fill('#search', ''); await cc('search cleared');
     await p.evaluate(() => { document.getElementById('grid').scrollTop = 400; }); await cc('scrolled');

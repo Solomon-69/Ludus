@@ -1,4 +1,4 @@
-// Geo Guess resume regressions (1.7 "blurred map, nothing opens"): a real 1.7 save (result screen, no guess), a corrupt
+// Map Hunt resume regressions (1.7 "blurred map, nothing opens"): a real 1.7 save (result screen, no guess), a corrupt
 // save, a photo server that fails, and no internet. The pause / welcome card must always be visible and on top.
 const L = require('./lib.js'); const { check, newPage, wait, shot } = L; const fs = require('fs'), path = require('path');
 const SAVE = JSON.parse(fs.readFileSync(path.join(__dirname, 'geo-save-1.7.json'), 'utf8'));
@@ -16,7 +16,7 @@ async function open(b, extra, route) {
 }
 (async () => {
   const b = await L.chromium ? null : null; const br = await require('playwright-core').chromium.launch({ executablePath: process.env.CHROME || undefined, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] }).catch(() => L.launch());
-  // A: his exact 1.7 save (the stuck "blurred map" state): Geo Guess never resumes now, it opens a fresh game
+  // A: his exact 1.7 save (the stuck "blurred map" state): Map Hunt never resumes now, it opens a fresh game
   let p = await open(br, { saves: { geoguess: SAVE }, geoReset: 1 });
   await p.waitForFunction(() => window.ludusDebug.geo && window.ludusDebug.geo().phase === 'setup', null, { timeout: 30000 }).catch(() => {});
   await wait(600); await shot(p, 'resume_A_fresh');
@@ -51,7 +51,7 @@ async function open(b, extra, route) {
   check('D: not blurred behind it', !(await p.evaluate(() => !!document.querySelector('.geo.geo-paused'))));
   await p.context().close();
   // E: no internet at all
-  p = await open(br, { saves: { geoguess: playSave }, geoReset: 1 }, { re: /panoramax|arcgis/, fn: r => r.abort() });
+  p = await open(br, { saves: { geoguess: playSave }, geoReset: 1 }, { re: /panoramax|openfreemap/, fn: r => r.abort() });
   await p.click('#resumeBtn').catch(() => {});
   await p.waitForFunction(() => window.ludusDebug.geo().phase === 'offline', null, { timeout: 60000 }).catch(() => {});
   if ((await st(p)).paused) { await p.click('#resumeBtn'); await wait(400); }

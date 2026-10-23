@@ -1,4 +1,4 @@
-/* Right of Way (id stays 'finalpush'): a spear duel across five screens, in the spirit of Nidhogg.
+/* Right of Way (id stays 'finalpush'): a spear duel across five screens.
    Three controls only: walk, raise or lower your spear (high, middle, low) and thrust.
    A thrust is blocked when the other spear is held at the same height, so read the bot and change height.
    Kill the bot to take the road, then run right to your gate. Two rounds take the decider.
@@ -26,7 +26,7 @@
   const PADS = [{ a: 'left' }, { a: 'right' }, { a: 'up' }, { a: 'down' }, { a: 'atk', l: 'Thrust' }];
 
   Ludus.register({
-    id: 'finalpush', name: 'Nidhogg', aka: 'Right of Way', tag: 'Duel', tint: RUST, versus: true,
+    id: 'finalpush', name: 'Sword Duel', aka: 'Right of Way', tag: 'Duel', tint: RUST, versus: true,
     hint: '<kbd>←</kbd><kbd>→</kbd> walk · <kbd>↑</kbd><kbd>↓</kbd> spear high / middle / low · <kbd>Space</kbd> thrust (or the buttons). Same height blocks. Kill the bot, then run right to your gate. vs Friend: P1 <kbd>A</kbd><kbd>D</kbd> walk, <kbd>W</kbd><kbd>S</kbd> spear, <kbd>F</kbd> thrust; P2 arrows and <kbd>/</kbd> or <kbd>Enter</kbd>',
     art(ctx, w, h) {
       const f = h * 0.84;

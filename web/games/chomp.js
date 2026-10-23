@@ -1,4 +1,4 @@
-/* Chomp: maze chase. Pellets, power sparks, four ghosts with their own chase styles. */
+/* Chomp: maze chase. Pellets, power sparks, four chasers with their own chase styles. */
 (function () {
   const MAP = [
     '###################',
@@ -30,10 +30,10 @@
   const OPP = { up: 'down', down: 'up', left: 'right', right: 'left' };
   const MODES = [7, 20, 7, 20, 5, 20, 5, Infinity]; // scatter, chase, ...
   const GHOSTS = [
-    { name: 'blinky', color: '#d1495b', corner: { x: W - 2, y: -3 }, start: { x: 9, y: 7 }, release: 0 },
-    { name: 'pinky', color: '#e58fb0', corner: { x: 1, y: -3 }, start: { x: 9, y: 9 }, release: 1 },
-    { name: 'inky', color: '#3aa6c4', corner: { x: W - 1, y: H + 1 }, start: { x: 8, y: 9 }, release: 4.5 },
-    { name: 'clyde', color: '#e0a526', corner: { x: 0, y: H + 1 }, start: { x: 10, y: 9 }, release: 8 }
+    { name: 'ember', color: '#d1495b', corner: { x: W - 2, y: -3 }, start: { x: 9, y: 7 }, release: 0 },
+    { name: 'blush', color: '#e58fb0', corner: { x: 1, y: -3 }, start: { x: 9, y: 9 }, release: 1 },
+    { name: 'mist', color: '#3aa6c4', corner: { x: W - 1, y: H + 1 }, start: { x: 8, y: 9 }, release: 4.5 },
+    { name: 'sunny', color: '#e0a526', corner: { x: 0, y: H + 1 }, start: { x: 10, y: 9 }, release: 8 }
   ];
 
   const cellAt = (x, y) => (y < 0 || y >= H ? '#' : MAP[y][((x % W) + W) % W]);
@@ -46,14 +46,29 @@
   const wrapX = x => ((x % W) + W) % W;
   const dist2 = (ax, ay, bx, by) => (ax - bx) * (ax - bx) + (ay - by) * (ay - by);
 
-  // Ghost target tile for chase mode, classic personalities.
-  function chaseTarget(g, pac, blinky) {
+  // Chaser body: a soft round-shouldered blob with two stubby feet and two little ears (own design, not a sheet sprite).
+  function blobPath(ctx, x, y, r, wv) {
+    ctx.beginPath();
+    ctx.moveTo(x - r, y + r * 0.2);
+    ctx.bezierCurveTo(x - r, y - r * 1.05, x + r, y - r * 1.05, x + r, y + r * 0.2);
+    ctx.lineTo(x + r, y + r * 0.62);
+    ctx.quadraticCurveTo(x + r, y + r * 0.92 + wv, x + r * 0.62, y + r * 0.92 + wv);
+    ctx.lineTo(x + r * 0.3, y + r * 0.92 - wv);
+    ctx.lineTo(x - r * 0.3, y + r * 0.92 - wv);
+    ctx.lineTo(x - r * 0.62, y + r * 0.92 + wv);
+    ctx.quadraticCurveTo(x - r, y + r * 0.92 + wv, x - r, y + r * 0.62);
+    ctx.closePath();
+    ctx.moveTo(x - r * 0.75, y - r * 0.55); ctx.lineTo(x - r * 0.95, y - r * 1.05); ctx.lineTo(x - r * 0.4, y - r * 0.85); ctx.closePath();
+    ctx.moveTo(x + r * 0.75, y - r * 0.55); ctx.lineTo(x + r * 0.95, y - r * 1.05); ctx.lineTo(x + r * 0.4, y - r * 0.85); ctx.closePath();
+  }
+  // Ghost target tile for chase mode, four personalities.
+  function chaseTarget(g, pac, ember) {
     const [dx, dy] = DIRS[pac.dir] || [0, 0];
-    if (g.name === 'blinky') return { x: pac.tx, y: pac.ty };
-    if (g.name === 'pinky') return { x: pac.tx + dx * 4, y: pac.ty + dy * 4 };
-    if (g.name === 'inky') {
+    if (g.name === 'ember') return { x: pac.tx, y: pac.ty };
+    if (g.name === 'blush') return { x: pac.tx + dx * 4, y: pac.ty + dy * 4 };
+    if (g.name === 'mist') {
       const px = pac.tx + dx * 2, py = pac.ty + dy * 2;
-      return { x: px * 2 - blinky.tx, y: py * 2 - blinky.ty };
+      return { x: px * 2 - ember.tx, y: py * 2 - ember.ty };
     }
     return dist2(g.tx, g.ty, pac.tx, pac.ty) > 64 ? { x: pac.tx, y: pac.ty } : g.corner;
   }
@@ -73,7 +88,7 @@
   function freshGrid() { return MAP.map(r => r.replace('P', ' ').split('')); }
 
   Ludus.register({
-    id: 'chomp', name: 'Pac-Man', aka: 'Chomp', tag: 'Arcade', tint: '#2f2a24',
+    id: 'chomp', name: 'Chomp', aka: 'maze chase', tag: 'Arcade', tint: '#2f2a24',
     hint: '<kbd>←</kbd><kbd>↑</kbd><kbd>→</kbd><kbd>↓</kbd> or WASD, swipe or click a direction',
     _test: { MAP, W, H, cellAt, isWallFor, chaseTarget, chooseDir, countPellets, freshGrid, OPP, DIRS },
     art(ctx, w, h) {
@@ -87,9 +102,7 @@
       D.spark(ctx, w * 0.67, cy, r * 0.42, '#f4e3d0', 0.3);
       const gx = w * 0.84, gr = r * 0.85;
       ctx.fillStyle = '#e58fb0';
-      ctx.beginPath(); ctx.arc(gx, cy - gr * 0.1, gr, Math.PI, 0); ctx.lineTo(gx + gr, cy + gr * 0.9);
-      for (let i = 0; i < 3; i++) ctx.lineTo(gx + gr - (i + 0.5) * gr * 2 / 3, cy + gr * (i % 2 ? 0.9 : 0.55)), ctx.lineTo(gx + gr - (i + 1) * gr * 2 / 3, cy + gr * 0.9);
-      ctx.closePath(); ctx.fill();
+      blobPath(ctx, gx, cy, gr, 0); ctx.fill();
       ctx.fillStyle = '#fff';
       [-0.35, 0.35].forEach(o => { ctx.beginPath(); ctx.arc(gx + o * gr, cy - gr * 0.15, gr * 0.24, 0, 7); ctx.fill(); });
     },
@@ -112,8 +125,8 @@
         pac = { x: 9, y: 15, dir: 'left', want: 'left', tx: 9, ty: 15, mouth: 0, moving: true };
         ghosts = GHOSTS.map(g => Object.assign({}, g, {
           x: g.start.x, y: g.start.y, tx: g.start.x, ty: g.start.y,
-          dir: g.name === 'blinky' ? 'left' : 'up',
-          state: g.name === 'blinky' ? 'active' : 'house', // house | leaving | active | eaten | entering
+          dir: g.name === 'ember' ? 'left' : 'up',
+          state: g.name === 'ember' ? 'active' : 'house', // house | leaving | active | eaten | entering
           wait: g.release * [1.3, 1, 0.7][L0], fr: false
         }));
         modeIdx = 0; modeT = 0; fright = 0;
@@ -282,13 +295,7 @@
         const blink = fright > 0 && fright < 1.6 && Math.floor(t * 8) % 2 === 0;
         if (g.state !== 'eaten') {
           ctx.fillStyle = g.fr ? (blink ? '#f3ede3' : '#5b6ee1') : g.color;
-          ctx.beginPath(); ctx.arc(x, y - r * 0.1, r, Math.PI, 0); ctx.lineTo(x + r, y + r * 0.85);
-          const wv = Math.sin(t * 14) * r * 0.12;
-          for (let i = 0; i < 3; i++) {
-            ctx.lineTo(x + r - (i + 0.5) * r * 2 / 3, y + r * 0.55 + (i % 2 ? wv : -wv));
-            ctx.lineTo(x + r - (i + 1) * r * 2 / 3, y + r * 0.85);
-          }
-          ctx.closePath(); ctx.fill();
+          blobPath(ctx, x, y, r, Math.sin(t * 14) * r * 0.1); ctx.fill();
         }
         const [dx, dy] = DIRS[g.dir] || [0, 0];
         if (g.fr && g.state !== 'eaten') {

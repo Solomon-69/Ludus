@@ -1,4 +1,4 @@
-/* Wall Run: Quoridor on a 7 x 7 board against the computer. Six walls each.
+/* Wall Race: a wall-blocking race on a 7 x 7 board against the computer. Six walls each.
    Each turn move one square or place a wall. Walls may never cut anyone off from their goal.
    Pawns that meet face to face can jump, or step diagonally if a wall is behind.
    Score = games won in a row. The run ends when the computer gets across. */
@@ -133,7 +133,7 @@
   }
 
   Ludus.register({
-    id: 'wallrun', name: 'Quoridor', aka: 'Wall Run', tag: 'Duel', tint: GREEN, versus: true, online: { min: 2, max: 2 },
+    id: 'wallrun', name: 'Wall Race', aka: 'Wall Run', tag: 'Duel', tint: GREEN, versus: true, online: { min: 2, max: 2 },
     hint: 'Reach the top row first. Click a dot or use <kbd>←</kbd><kbd>↑</kbd><kbd>→</kbd><kbd>↓</kbd> to step. Click a groove to place a wall (6 each), <kbd>R</kbd> or right-click turns it. vs Friend: take turns, Player 2 races to the bottom',
     _rules: { blank, clone, legalMoves, dist, wallOk, apply, rankWalls, chooseAction, S, G },
     art(ctx, w, h) {

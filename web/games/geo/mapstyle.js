@@ -1,4 +1,4 @@
-/* Geo Guess map style: Google Maps look (as in the GeoGuessr guess map), drawn on the GPU from free keyless vector tiles
+/* Map Hunt map style: a soft light map look, drawn on the GPU from free keyless vector tiles
    (OpenFreeMap / OpenMapTiles schema, data from OpenStreetMap). Soft green land, flat light blue water, thin grey borders,
    pale built-up areas and thin pale roads at city zoom. Labels only in English or Latin letters, never local scripts, and
    sparse: countries and oceans when far out, cities then towns while zooming in, only the main streets close up.

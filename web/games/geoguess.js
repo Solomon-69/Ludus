@@ -1,6 +1,6 @@
-/* Geo Guess: a street-level 360 view of somewhere on Earth. Look around, move along the road, then pin where you are on the map.
+/* Map Hunt: a street-level 360 view of somewhere on Earth. Look around, move along the road, then pin where you are on the map.
    Closer pin = more points (5000 max, same falloff as the famous one). Solo, or online with the same places for everyone.
-   Data (all free, no key, no account): street photos from Panoramax (api.panoramax.xyz), map tiles from Esri (styled in games/geo/map.js),
+   Data (all free, no key, no account): street photos from Panoramax (api.panoramax.xyz), map tiles from OpenFreeMap (styled in games/geo/mapstyle.js),
    viewer libraries bundled in web/vendor (Pannellum, Leaflet). The place pool is games/geo/pool.js. Needs internet.
    Solo games are saved (save() below) and resume exactly where they were left; online games follow the host and are not saved. */
 (function () {
@@ -267,7 +267,7 @@
 
   // ---------- the game ----------
   Ludus.register({
-    id: 'geoguess', name: 'Geo Guess', aka: 'Where in the world', tag: 'Arcade', wide: true, tint: '#2f8f83',
+    id: 'geoguess', name: 'Map Hunt', aka: 'Where in the world', tag: 'Arcade', wide: true, tint: '#2f8f83',
     online: { min: 2, max: 4 },
     hint: hintFor('move', false),
     onlineHint: hintFor('move', true),
@@ -345,7 +345,7 @@
       let miniMap = null, miniPin = null, pin = null, resMap = null, resLayers = [], resAnim = null;
       let guesses = [], ready = new Set(), started = false, destroyed = false, autoAt = 0, paused = false;
       let sizeLv = Number.isInteger(saved.map) && saved.map >= 0 && saved.map < MAP_SIZES.length ? saved.map : 1, pinned = !!saved.lock;
-      let restoring = null;   // Geo Guess never resumes a game: every open starts fresh (pause still works while it is open)
+      let restoring = null;   // Map Hunt never resumes a game: every open starts fresh (pause still works while it is open)
       const offs = [];
       const later = (fn, ms) => { const id = setTimeout(() => { if (!destroyed) fn(); }, ms); offs.push(() => clearTimeout(id)); return id; };
       const seats = () => on ? on.seats.slice() : [0];
@@ -783,7 +783,7 @@
         phase = 'offline'; loadEl.hidden = true; hud(false); resEl.hidden = true; waitEl.hidden = true;
         card.className = 'geo-card'; card.innerHTML = '';
         card.appendChild(txt('h2', '', 'Needs internet'));
-        card.appendChild(txt('p', '', 'Geo Guess loads street photos and maps from the web. Check your connection and try again.'));
+        card.appendChild(txt('p', '', 'Map Hunt loads street photos and maps from the web. Check your connection and try again.'));
         const b = txt('button', 'geo-go', 'Try again'); b.onclick = () => { if (!pool || !miniMap || (restoring && !viewer)) boot(); else if (!started) showSetup(); else startRound(round, restoring); };
         card.appendChild(b);
         if (!on && (started || restoring)) {   // a way out of a game that will not come back: start over with new places
@@ -801,7 +801,7 @@
       function showSetup() {
         phase = 'setup'; hud(false); loadEl.hidden = true; resEl.hidden = true;
         card.className = 'geo-card'; card.innerHTML = '';
-        card.appendChild(txt('h2', '', 'Geo Guess'));
+        card.appendChild(txt('h2', '', 'Map Hunt'));
         card.appendChild(txt('p', '', on ? (host ? 'Same places for everyone. Pick the rules, then start.' : 'The host is choosing the rules.') : 'Look around, move along the road, then pin where you are.'));
         card.appendChild(txt('span', 'lab', 'Time per round'));
         card.appendChild(chipRow(TIMES, cfg.time, v => { cfg.time = v; remember(); showSetup(); }, !host));

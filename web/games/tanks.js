@@ -74,7 +74,7 @@
   }
 
   Ludus.register({
-    id: 'tanks', name: 'Tank Trouble', aka: 'Tank Duel', tag: '2 Player', wide: true, tint: '#c98a3a', versus: true, defaultVs: 'friend',
+    id: 'tanks', name: 'Tank Arena', aka: 'Tank Duel', tag: '2 Player', wide: true, tint: '#c98a3a', versus: true, defaultVs: 'friend',
     hint: 'vs Bot: <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> drive, <kbd>F</kbd> or <kbd>/</kbd> fire · vs Friend: <b>P1</b> WASD + F, <b>P2</b> arrows + /',
     _rules: { makeMaze, wallRects, MC: PMC, MRW: PMRW },
     art(ctx, w, h) {

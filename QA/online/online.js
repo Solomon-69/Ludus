@@ -8,12 +8,12 @@ const S = {
     const A = await newPage(browser, br, { name: 'Ann' }), B = await newPage(browser, br, { name: 'Bo' });
     const c = await flexCreate(A); await flexJoin(B, c);
     check('host sees both players', (await rows(A)).length >= 2 && /Bo/.test(await lobbyText(A)), await lobbyText(A));
-    await pick(A, ['Pong', 'Air Hockey'], 3); await wait(700);
+    await pick(A, ['Paddle Duel', 'Air Hockey'], 3); await wait(700);
     const gt = await lobbyText(B);
-    check('guest sees the picked games and rounds live', /Pong, Air Hockey|Air Hockey, Pong/.test(gt) && /3 rounds per game/.test(gt), gt);
+    check('guest sees the picked games and rounds live', /Paddle Duel, Air Hockey|Air Hockey, Paddle Duel/.test(gt) && /3 rounds per game/.test(gt), gt);
     check('guest has no pickers', (await B.$$('#lobbyCard .pick-chips')).length === 0);
     await A.click('#lobbyCard button.primary');
-    const order = ['Pong', 'Air Hockey'], plan = [[0, 0, 1], [0, 1, 0]];
+    const order = ['Paddle Duel', 'Air Hockey'], plan = [[0, 0, 1], [0, 1, 0]];
     let a = 0, b = 0, gwA = 0, gwB = 0;
     for (let g = 0; g < 2; g++) for (let r = 0; r < 3; r++) {
       await playRound([A, B], plan[g][r]); gwA += plan[g][r] === 0 ? 1 : 0; gwB += plan[g][r] === 1 ? 1 : 0;
@@ -41,7 +41,7 @@ const S = {
     const br = await broker.start();
     const [A, B, C] = [await newPage(browser, br, { name: 'Ann' }), await newPage(browser, br, { name: 'Bo' }), await newPage(browser, br, { name: 'Cy' })];
     const c = await flexCreate(A); await flexJoin(B, c); await flexJoin(C, c);
-    await pick(A, ['Tag', 'Paper.io'], 1); await wait(500);
+    await pick(A, ['Tag', 'Land Claim'], 1); await wait(500);
     await A.click('#lobbyCard button.primary');
     await playRound([A, B, C], 2);
     await Promise.all([A, B, C].map(p => waitCard(p, 'Wins so far|Points')));
@@ -49,7 +49,7 @@ const S = {
     await C.evaluate(() => document.getElementById('leaveBtn').click()); await wait(2500);
     await A.click('#lobbyCard button.primary'); await Promise.all([waitPlaying(A), waitPlaying(B)]);
     const nm = await A.$eval('#gameName', e => e.textContent);
-    check('after Cy left the tournament goes on with 2 (Paper.io)', /Paper/.test(nm), nm);
+    check('after Cy left the tournament goes on with 2 (Land Claim)', /Paper/.test(nm), nm);
     await playRound([A, B], 0); await Promise.all([waitCard(A, 'Wins so far|Points|wins'), waitCard(B, 'Wins so far|Points|wins')]);
     await A.click('#lobbyCard button.primary'); await Promise.all([waitCard(A, 'wins|tie'), waitCard(B, 'wins|tie')]);
     const fr = await rows(A);
@@ -61,7 +61,7 @@ const S = {
     const br = await broker.start();
     const [A, B] = [await newPage(browser, br, { name: 'Ann' }), await newPage(browser, br, { name: 'Bo' })];
     const c = await flexCreate(A); await flexJoin(B, c);
-    await pick(A, ['Pong', 'Air Hockey'], 3); await A.click('#lobbyCard button.primary');
+    await pick(A, ['Paddle Duel', 'Air Hockey'], 3); await A.click('#lobbyCard button.primary');
     await playRound([A, B], 1); await Promise.all([waitCard(A, 'Wins so far|Points'), waitCard(B, 'Wins so far|Points')]);
     await A.click('#lobbyCard button.primary'); await Promise.all([waitPlaying(A), waitPlaying(B)]);
     await B.evaluate(() => document.getElementById('leaveBtn').click());
@@ -74,15 +74,15 @@ const S = {
   async party(browser) {
     const br = await broker.start();
     const A = await newPage(browser, br, { name: 'Ann' }), B = await newPage(browser, br, { name: 'Bo' });
-    const c = await flexCreate(A); await flexJoin(B, c); await pick(A, ['Pong', 'Air Hockey'], 5); await wait(800);
+    const c = await flexCreate(A); await flexJoin(B, c); await pick(A, ['Paddle Duel', 'Air Hockey'], 5); await wait(800);
     const saved = await A.evaluate(() => JSON.parse(localStorage.getItem('ludus.v1')).party);
     check('party saved: code, names, games, rounds', saved && saved.code === c && saved.names.length === 2 && saved.games.length === 2 && saved.n === 5, saved);
     await A.reload(); await wait(500); await onlineTab(A);
     const card = await A.$eval('.party-card', e => e.innerText).catch(() => '');
-    check('after a restart the Online page offers Rejoin', /Rejoin/.test(card) && /Ann/.test(card) && /Pong/i.test(card), card);
+    check('after a restart the Online page offers Rejoin', /Rejoin/.test(card) && /Ann/.test(card) && /Paddle Duel/i.test(card), card);
     await A.click('#opRejoin'); await A.waitForSelector('.code-ch', { timeout: 8000 }); await wait(900);
     const on = await A.$$eval('#lobbyCard .pick-chips .chip.is-on', els => els.map(e => e.textContent));
-    check('Rejoin reopens a room with the same games and rounds', on.includes('Pong') && on.includes('Air Hockey') && on.includes('5'), on);
+    check('Rejoin reopens a room with the same games and rounds', on.includes('Paddle Duel') && on.includes('Air Hockey') && on.includes('5'), on);
     check('Rejoin 1 keeps the same room code', (await code(A)) === c, [await code(A), c]);
     await A.evaluate(() => document.getElementById('backBtn').click()); await wait(500); await onlineTab(A);
     await A.click('#opRejoin'); await A.waitForSelector('.code-ch', { timeout: 12000 }); await wait(900);
@@ -181,31 +181,31 @@ const S = {
     { const br = await broker.start(); const O = await newPage(browser, br, { name: 'Old', old: true }), N = await newPage(browser, br, { name: 'New' });
       const c = await oldCreate(O, 'fourup'); await onlineTab(N); await N.fill('#opCode', c); await N.click('#opJoin'); await seatsn(N);
       function seatsn(p) { return seatsOn(p, 2); }
-      check('old host + new guest (Online section): guest lands in the host\'s game', /Connect Four/.test(await N.$eval('#gameName', e => e.textContent)), await N.$eval('#gameName', e => e.textContent));
+      check('old host + new guest (Online section): guest lands in the host\'s game', /Four in a Row/.test(await N.$eval('#gameName', e => e.textContent)), await N.$eval('#gameName', e => e.textContent));
       await O.click('#lobbyCard button.primary'); await Promise.all([started(O), started(N)]);
       await probe(O, N, 'old host + new guest');
       check('...no page errors', errs([O, N]) === 0, [O.errors, N.errors]); br.close(); }
     // 2) new host (Online section), old guest joins from the same game
     { const br = await broker.start(); const N = await newPage(browser, br, { name: 'New' }), O = await newPage(browser, br, { name: 'Old', old: true });
-      const c = await flexCreate(N); await pick(N, ['Connect Four'], 1);
+      const c = await flexCreate(N); await pick(N, ['Four in a Row'], 1);
       await oldJoin(O, 'fourup', c); await seatsOn(N, 2); await wait(500);
       const t = await lobbyText(N);
       check('new host + old guest: pickers hidden, friendly note', (await N.$$('#lobbyCard .pick-chips')).length === 0 && /older Ludus/.test(t), t);
       await N.click('#lobbyCard button.primary'); await Promise.all([started(O), started(N)]);
       await probe(N, O, 'new host + old guest');
       check('...no page errors', errs([O, N]) === 0, [O.errors, N.errors]); br.close(); }
-    // 3) new host with several games picked, old guest joins from Pong: the room becomes a Pong room
+    // 3) new host with several games picked, old guest joins from Paddle Duel: the room becomes a Paddle Duel room
     { const br = await broker.start(); const N = await newPage(browser, br, { name: 'New' }), O = await newPage(browser, br, { name: 'Old', old: true });
-      const c = await flexCreate(N); await pick(N, ['Connect Four', 'Pong'], 3);
+      const c = await flexCreate(N); await pick(N, ['Four in a Row', 'Paddle Duel'], 3);
       await oldJoin(O, 'pong', c); await seatsOn(N, 2); await wait(500);
       const t = await lobbyText(N);
-      check('old guest naming another game: room drops to Pong only', (await N.$$('#lobbyCard .pick-chips')).length === 0 && /Pong only/.test(t), t);
+      check('old guest naming another game: room drops to Paddle Duel only', (await N.$$('#lobbyCard .pick-chips')).length === 0 && /Paddle Duel only/.test(t), t);
       await N.click('#lobbyCard button.primary'); await Promise.all([started(O), started(N)]);
-      check('...Pong runs on both', /Pong/.test(await N.$eval('#gameName', e => e.textContent)) && /Pong/.test(await O.$eval('#gameName', e => e.textContent)));
+      check('...Paddle Duel runs on both', /Paddle Duel/.test(await N.$eval('#gameName', e => e.textContent)) && /Paddle Duel/.test(await O.$eval('#gameName', e => e.textContent)));
       await probe(N, O, 'Online-section host + old guest'); br.close(); }
     // 4) an old guest cannot join a running tournament; the host is told to say "update"
     { const br = await broker.start(); const [A, B] = [await newPage(browser, br, { name: 'Ann' }), await newPage(browser, br, { name: 'Bo' })];
-      const c = await flexCreate(A); await flexJoin(B, c); await pick(A, ['Pong', 'Air Hockey'], 3); await A.click('#lobbyCard button.primary');
+      const c = await flexCreate(A); await flexJoin(B, c); await pick(A, ['Paddle Duel', 'Air Hockey'], 3); await A.click('#lobbyCard button.primary');
       await Promise.all([waitPlaying(A), waitPlaying(B)]);
       const O = await newPage(browser, br, { name: 'Old', old: true });
       await oldJoin(O, 'pong', c); await wait(300);
@@ -216,14 +216,14 @@ const S = {
     { const br = await broker.start(); const { pages } = await party(browser, br, 'Tag', 3);
       check('new + new (3 players) start the game', pages.length === 3 && errs(pages) === 0, pages.map(p => p.errors)); br.close(); }
   },
-  async paper(browser) {   // Paper.io with a guest: the guest steers locally, both screens agree, no errors
-    const br = await broker.start(); const { pages: [A, B] } = await party(browser, br, 'Paper.io', 2); await wait(2200);
+  async paper(browser) {   // Land Claim with a guest: the guest steers locally, both screens agree, no errors
+    const br = await broker.start(); const { pages: [A, B] } = await party(browser, br, 'Land Claim', 2); await wait(2200);
     br.latency = { base: 150, jitter: 150 };
     await Promise.all([hold(A, 'a', 1200), hold(B, 'd', 1200)]); await wait(1500);
     const g = p => p.evaluate(() => { const s = ludusDebug.paperio.state(); return s.players.filter(q => q.human).map(q => [Math.round(q.x), Math.round(q.y)]); });
     const [ga, gb] = [await g(A), await g(B)];
-    check('Paper.io: host and guest see both players about the same place (latency 150-300 ms)', ga.length === 2 && gb.length === 2 && ga.every((q, i) => Math.hypot(q[0] - gb[i][0], q[1] - gb[i][1]) < 8), [ga, gb]);
-    check('Paper.io: no page errors', errs([A, B]) === 0, [A.errors, B.errors]);
+    check('Land Claim: host and guest see both players about the same place (latency 150-300 ms)', ga.length === 2 && gb.length === 2 && ga.every((q, i) => Math.hypot(q[0] - gb[i][0], q[1] - gb[i][1]) < 8), [ga, gb]);
+    check('Land Claim: no page errors', errs([A, B]) === 0, [A.errors, B.errors]);
     br.close();
   },
   async futurehost(browser) {
@@ -238,10 +238,10 @@ const S = {
 
 // ---- real-time games under a slow relay (150-300 ms one way with jitter) ----
 const GAMES = {
-  pong:   { name: 'Pong', own: 'ArrowDown', other: 'w', mine: '() => [0, ludusDebug.pongNet().p2]', host: '() => [0, ludusDebug.pongNet().p2]', seen: '() => [0, ludusDebug.pongNet().p1]', tol: 10 },
+  pong:   { name: 'Paddle Duel', own: 'ArrowDown', other: 'w', mine: '() => [0, ludusDebug.pongNet().p2]', host: '() => [0, ludusDebug.pongNet().p2]', seen: '() => [0, ludusDebug.pongNet().p1]', tol: 10 },
   hockey: { name: 'Air Hockey', own: 'a', other: 'd', mine: '() => { const m = ludusDebug.hockey().m2; return [m.x, m.y]; }', host: '() => { const m = ludusDebug.hockey().m2; return [m.x, m.y]; }', seen: '() => { const m = ludusDebug.hockey().m1; return [m.x, m.y]; }', tol: 14 },
   tag:    { name: 'Tag', own: 'ArrowRight', other: 'd', start: 'enter', mine: "() => { const p = ludusDebug.tagMe(); return [p.x, p.y]; }", host: "() => { const p = ludusDebug.tagMe('p2'); return [p.x, p.y]; }", seen: "() => { const p = ludusDebug.tagMe('p1'); return [p.x, p.y]; }", tol: 20 },
-  holeio: { name: 'Hole.io', own: 'd', other: 'd', start: 'wait', mine: "() => { const p = ludusDebug.holeMe(); return [p.x, p.y]; }", host: "() => { const p = ludusDebug.holeMe(2); return [p.x, p.y]; }", seen: "() => { const p = ludusDebug.holeMe(1); return [p.x, p.y]; }", tol: 30 },
+  holeio: { name: 'City Swallow', own: 'd', other: 'd', start: 'wait', mine: "() => { const p = ludusDebug.holeMe(); return [p.x, p.y]; }", host: "() => { const p = ludusDebug.holeMe(2); return [p.x, p.y]; }", seen: "() => { const p = ludusDebug.holeMe(1); return [p.x, p.y]; }", tol: 30 },
 };
 async function lagGame(browser, id) {
   const G = GAMES[id], br = await broker.start();
@@ -300,7 +300,7 @@ S.layout = async browser => {
     check(tag + ' chip row fits (All, Arcade, Puzzle, Duel, 2 Player, Online) with no clipping', await A.$eval('#filters', e => e.scrollWidth <= e.clientWidth + 1 && [...e.children].every(c => c.getBoundingClientRect().right <= e.getBoundingClientRect().right + 1)));
     await onlineTab(A); await shot(A, 'online_page_' + tag);
     check(tag + ' Online page: no overlap', (await overlap(A)).length === 0, await overlap(A));
-    const c = await flexCreate(A); await flexJoin(B, c); await pick(A, ['Pong', 'Air Hockey', 'Connect Four'], 3); await wait(500);
+    const c = await flexCreate(A); await flexJoin(B, c); await pick(A, ['Paddle Duel', 'Air Hockey', 'Four in a Row'], 3); await wait(500);
     await shot(A, 'room_host_' + tag); await shot(B, 'room_guest_' + tag);
     check(tag + ' room (host, guest): no overlap', (await overlap(A)).length === 0 && (await overlap(B)).length === 0, [await overlap(A), await overlap(B)]);
     await A.click('#lobbyCard button.primary'); await Promise.all([waitPlaying(A), waitPlaying(B)]); await wait(400);
@@ -311,7 +311,7 @@ S.layout = async browser => {
     check(tag + ' scoreboard: no overlap', (await overlap(A)).length === 0 && (await overlap(B)).length === 0, [await overlap(A), await overlap(B)]);
     check(tag + ': no page errors', errs([A, B]) === 0, [A.errors, B.errors]);
     // a plain game: rematch bar
-    const br2 = await broker.start(); const { pages: [C, D] } = await party(browser, br2, 'Pong', 2, { size, dark });
+    const br2 = await broker.start(); const { pages: [C, D] } = await party(browser, br2, 'Paddle Duel', 2, { size, dark });
     await Promise.all([C, D].map((p, k) => p.evaluate(w => ludusForceOver(w), k === 0)));
     await C.waitForSelector('#overSheet:not([hidden])', { timeout: 8000 }); await D.waitForSelector('#overSheet:not([hidden])', { timeout: 8000 });
     await shot(C, 'overbar_host_' + tag); await shot(D, 'overbar_guest_' + tag);

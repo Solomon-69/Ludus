@@ -1,4 +1,4 @@
-// Geo Guess: no text cut off. The pin bar shows the whole sentence only when it fits, else "Place your pin".
+// Map Hunt: no text cut off. The pin bar shows the whole sentence only when it fits, else "Place your pin".
 async () => {
   const wait = ms => new Promise(r => setTimeout(r, ms));
   window.ludusDebug = window.ludusDebug || {}; window.ludusOpenGame('geoguess'); await wait(1500);

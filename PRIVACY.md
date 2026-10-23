@@ -2,7 +2,7 @@
 
 **Ludus collects no data.** No accounts, no analytics, no crash reporting, no ads, no tracking.
 
-- **Geo Guess uses the internet.** When you play Geo Guess, the app loads street photos from the free public Panoramax service (api.panoramax.xyz) and map pictures from Esri's map servers (services.arcgisonline.com). Those services see your internet address and the part of the world you look at, like any website would. Nothing else is sent, and there are no accounts. Ludus does not check for updates by itself.
+- **Map Hunt uses the internet.** When you play Map Hunt, the app loads street photos from the free public Panoramax service (api.panoramax.xyz) and map pictures from the free OpenFreeMap servers (tiles.openfreemap.org). Those services see your internet address and the part of the world you look at, like any website would. Nothing else is sent, and there are no accounts. Ludus does not check for updates by itself.
 - **No other network unless you use Play online.** The games and sounds are bundled with the app. Ludus
   does not connect to the internet on its own, and the app refuses to load any page other than its
   own bundled files. The only exception is the optional **Play online** feature, described below.

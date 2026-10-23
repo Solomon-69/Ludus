@@ -1,4 +1,4 @@
-/* Breakout: bounce the spark ball off your paddle and clear the bricks. Power-ups: wide paddle, multi-ball, slow. */
+/* Brick Break: bounce the spark ball off your paddle and clear the bricks. Power-ups: wide paddle, multi-ball, slow. */
 (function () {
   const D = Ludus.draw;
   const W = 400, H = 480;            // logical field, scaled to fit the stage
@@ -44,7 +44,7 @@
   }
 
   Ludus.register({
-    id: 'breakout', name: 'Breakout', tag: 'Arcade', tint: '#e05d8b',
+    id: 'breakout', name: 'Brick Break', aka: 'bricks', tag: 'Arcade', tint: '#e05d8b',
     hint: 'Move the mouse or <kbd>←</kbd><kbd>→</kbd>, click or <kbd>Space</kbd> to launch',
     _rules: { layout, paddleBounce },
     art(ctx, w, h) {

@@ -54,7 +54,7 @@
   }
 
   Ludus.register({
-    id: 'pong', name: 'Pong', aka: 'Rally', tag: '2 Player', wide: true, tint: '#3f8fb5', versus: true, defaultVs: 'friend',
+    id: 'pong', name: 'Paddle Duel', aka: 'Rally', tag: '2 Player', wide: true, tint: '#3f8fb5', versus: true, defaultVs: 'friend',
     online: { min: 2, max: 2 },
     onlineHint: '<b>Online</b> <kbd>W</kbd><kbd>S</kbd> or <kbd>↑</kbd><kbd>↓</kbd> move your paddle <kbd>F</kbd> or <kbd>/</kbd> power hit · the host has the left paddle',
     hint: '<b>vs Bot</b> <kbd>W</kbd><kbd>S</kbd> or <kbd>↑</kbd><kbd>↓</kbd> move <kbd>F</kbd> power hit · <b>vs Friend</b> P1 <kbd>W</kbd><kbd>S</kbd> move <kbd>F</kbd> power hit · P2 <kbd>↑</kbd><kbd>↓</kbd> move <kbd>/</kbd> power hit',

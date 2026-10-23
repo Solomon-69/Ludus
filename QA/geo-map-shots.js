@@ -1,4 +1,4 @@
-// Screenshots of the Geo Guess guess map (map box opened large) at world, country, city and street zoom.
+// Screenshots of the Map Hunt guess map (map box opened large) at world, country, city and street zoom.
 //   node QA/geo-map-shots.js OUT_PREFIX [webDir]      (webDir lets you shoot an older copy of web/ for a before/after)
 const path = require('path'), os = require('os');
 let pw; try { pw = require('playwright-core'); } catch (e) { pw = require(process.env.PW_CORE || path.join(os.homedir(), '.npm/_npx/e41f203b7505f1fb/node_modules/playwright-core')); }

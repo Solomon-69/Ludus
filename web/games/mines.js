@@ -1,4 +1,4 @@
-/* Minesweeper: first click is always safe and opens an area. Flags are little Claude sparks. */
+/* Minefield: first click is always safe and opens an area. Flags are little Claude sparks. */
 (function () {
   const D = Ludus.draw;
   const CONF = [{ c: 9, r: 9, m: 10 }, { c: 12, r: 12, m: 24 }, { c: 14, r: 16, m: 40 }];
@@ -60,7 +60,7 @@
   }
 
   Ludus.register({
-    id: 'mines', name: 'Minesweeper', tag: 'Puzzle', tint: '#9b6dd6',
+    id: 'mines', name: 'Minefield', aka: 'mines', tag: 'Puzzle', tint: '#9b6dd6',
     hint: 'Click: open · right-click or hold: flag · click a number: clear round it · <kbd>←</kbd><kbd>↑</kbd><kbd>→</kbd><kbd>↓</kbd> <kbd>Space</kbd> open <kbd>F</kbd> flag',
     _rules: { makeBoard, placeMines, flood, around, at, solved },
     art(ctx, w, h) {

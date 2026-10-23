@@ -1,4 +1,4 @@
-/* Ludus real-time link for online action games (Pong, Air Hockey, Tag, Slither.io, Paper.io).
+/* Ludus real-time link for online action games (Paddle Duel, Air Hockey, Tag, Worm Arena, Land Claim).
    The host's screen runs the game and sends a compact copy of the state ~15-20 times a second ("fast"
    messages: never repeated, dropped when the line is down, only the newest matters). Every guest sends
    its controls to the host and draws the host's state, smoothed between the last two copies it got.

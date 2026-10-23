@@ -1,4 +1,4 @@
-// Geo Guess guess map: scripted real mouse-wheel zoom in and out (world -> city -> world) while the browser records what is
+// Map Hunt guess map: scripted real mouse-wheel zoom in and out (world -> city -> world) while the browser records what is
 // really painted. Reports: blank frames (box is one flat colour), and anchor drift (the spot under the pointer must stay
 // under the pointer while zooming: a fixed landmark does not move between frames). Writes frames + log to OUT.
 //   node QA/geo-map-zoom.js OUT_DIR       then   python3 QA/geo-map-zoom-analyse.py OUT_DIR
