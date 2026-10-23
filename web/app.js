@@ -924,7 +924,7 @@
 
   function showIntro(startPage) {
     const win = window.__LUDUS_PLATFORM__ === 'windows';
-    const mark = '<svg viewBox="6 27 88 55" aria-hidden="true"><use href="#ludus-mark"/></svg>';
+    const mark = '<svg viewBox="0 0 88 55" aria-hidden="true"><use href="#ludus-mark"/></svg>';
     const ic = d => `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="${d}"/></svg>`;
     const pages = [
       { art: mark, app: true, title: 'Welcome to Ludus', text: `${L.games.length} little games, one click away. Take a short break, then get back to work.`,
