@@ -941,7 +941,7 @@
       }
       if (on) {
         link = Ludus.rt(api, {
-          hz: 18,
+          hz: 24,
           snapshot: () => {
             if (spawnOut.length) { on.send('spawn', spawnOut.splice(0, 60)); }
             while (goneOut.length) on.send('gone', goneOut.splice(0, 120));
@@ -991,6 +991,9 @@
         });
         if (Array.isArray(d.mv)) d.mv.forEach(q => { if (!Array.isArray(q)) return; const o = byId.get(q[0]); if (o && o.mover && !o.fall && num(q[1]) && num(q[2])) { o.x = q[1]; o.y = q[2]; } });
       }
+      // the guest moves its own hole here at once from its own stick (same speed rule and walls as the host); the host's copy eases it back
+      const pred = guest && link ? link.predictor({ pick: s => { const k = holes.indexOf(myHole()), q = k >= 0 && Array.isArray(s.h) ? s.h[k] : null; return q && num(q[0]) && num(q[1]) ? [q[0], q[1]] : null; }, snap: 140, init: null }) : null;
+      const gh = { x: 0, y: 0, vx: 0, vy: 0, rr: 10 };
       function guestUpdate(dt) {
         clock += dt;
         const sm = link.sample();
@@ -1002,7 +1005,20 @@
             x.x = ok ? M(qa[0], qb[0], t, 120) : qb[0]; x.y = ok ? M(qa[1], qb[1], t, 120) : qb[1]; x.rr = ok ? M(qa[2], qb[2], t) : qb[2];
           });
         }
-        const live = phase === 'play';
+        const live = phase === 'play', mine = myHole();
+        if (mine && link.latest()) {
+          if (live && mine.alive) {
+            const d = humanDir(mine);
+            pred.frame(dt, v => {
+              gh.x = v[0]; gh.y = v[1]; gh.rr = mine.rr;
+              const sp = 116 + mine.rr * 0.75, k = Math.min(1, dt * 9);
+              gh.vx += (d[0] * d[2] * sp - gh.vx) * k; gh.vy += (d[1] * d[2] * sp - gh.vy) * k;
+              gh.x = clamp(gh.x + gh.vx * dt, mine.rr * 0.6, WORLD - mine.rr * 0.6); gh.y = clamp(gh.y + gh.vy * dt, mine.rr * 0.6, WORLD - mine.rr * 0.6);
+              solids(gh); v[0] = gh.x; v[1] = gh.y;
+            });
+            mine.x = pred.v[0]; mine.y = pred.v[1];
+          } else { gh.vx = gh.vy = 0; pred.set([mine.x, mine.y]); }
+        }
         if (live || phase === 'count') for (const o of movers) {   // the same straight-line moves as the host (stepMovers without new spawns)
           o.x += o.vx * dt; o.y += o.vy * dt;
           if (o.t === 'person') { const v = o.axisX ? o.x : o.y; if (v < 10 || v > WORLD - 10) { o.dir = -o.dir; o.vx = o.axisX ? o.dir * o.sp : 0; o.vy = o.axisX ? 0 : o.dir * o.sp; } }
@@ -1021,6 +1037,7 @@
         for (let i = notes.length - 1; i >= 0; i--) { notes[i].t += dt; if (notes[i].t > 2.6) notes.splice(i, 1); }
         if (holes.length) updateCamera(dt);
       }
+      if (window.ludusDebug) window.ludusDebug.holeMe = n => { const h = n ? holes.find(x => x.human === n) : myHole(); return h ? { x: h.x, y: h.y } : null; };
       api.loop(dt => {
         if (guest) guestUpdate(dt); else update(dt);
         if (link) link.step();
