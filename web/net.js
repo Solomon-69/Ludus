@@ -27,6 +27,10 @@
   const CODE_RE = /^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{5}$/;
   const TYPE_RE = /^[A-Za-z0-9_.-]{1,24}$/;
   const MAX_SEATS = 8;
+  const PV = 2;                     // protocol version: 1 = Ludus 1.6.0/1.6.1 (one game per room), 2 = tournaments. Only ever added as optional fields; the wire version v stays 1.
+  const SERIES_PAUSE = 6000;        // ms the scoreboard stays up between rounds before the host starts the next one
+  const RESULT_WAIT = 4000;         // ms the host waits for every player's round result
+  const gameOf = id => { const L = window.Ludus; return L && L.games && L.games.find(g => g.id === id && g.online); };
 
   NET.brokers = () => (Array.isArray(window.__LUDUS_BROKERS__) && window.__LUDUS_BROKERS__.length ? window.__LUDUS_BROKERS__ : BROKERS);
   NET.WebSocket = null;             // tests can put a fake here; null means the browser's own
@@ -280,6 +284,14 @@
     me.started = false; me.gen = 0; me.seed = 0;
     me.sq = 0; me.history = []; me.rxq = {}; me.nackAt = {}; me.pending = [];
     me.active = null;           // the api.online of the running game
+    // tournaments (protocol 2): the host's plan, the series in progress, and what the other side speaks
+    me.flex = role === 'host' && opts.flex !== false;     // a room whose games the host may pick
+    me.plan = { g: me.gameId ? [me.gameId] : [], n: 1 }; // games to play (in order) and rounds per game (0 = tournament: every game once)
+    me.ser = null;              // { gs, gi, ri, n, st: play|board|final, sc: [[cid, name, wins]], why }
+    me.peerPv = {};             // host: cid -> protocol version they announced (missing = 1)
+    me.legacy = false;          // host: somebody on an older Ludus is here; guest: the host is on an older Ludus
+    me.rmin = me.min; me.rmax = me.max;   // the room's own seat limits (a game for one older player shrinks them)
+    me.gmin = me.min; me.gmax = me.max;   // seats the running game wants (the room may be bigger)
     me.over = false;            // closed or left
     me.ready = false;           // host: code claimed; guest: accepted into the room
     const urls = NET.brokers();
@@ -348,7 +360,7 @@
       const ask = () => {
         if (me.over || me.ready || me.conn !== 'online') return;
         if (++me.tries > 6) { me._fail('no-room'); return; }
-        me._pub({ t: 'join', n: me.baseName, g: me.gameId });
+        me._pub({ t: 'join', n: me.baseName, g: me.gameId, pv: PV });
       };
       me.joinTimer = setInterval(ask, 1000);
       ask();
@@ -357,6 +369,12 @@
   Session.prototype._nameFor = function (seat) { return this.baseName || 'Player ' + (seat + 1); };
   Session.prototype.rosterList = function () { return Array.from(this.roster.values()).sort((a, b) => a.seat - b.seat); };
   Session.prototype.count = function () { return this.roster.size; };
+  Session.prototype._hbObj = function () {
+    const o = { t: 'hb', q: this.sq, p: this._rosterWire(), mx: this.max, mn: this.min, g: this.gameId, gen: this.gen, sd: this.seed, pv: PV };
+    if (this.flex) { o.tn = { g: this.plan.g, n: this.plan.n }; if (this.legacy) o.lg = 1; }
+    if (this.ser) o.sr = this._srWire();
+    return o;
+  };
   Session.prototype._rosterWire = function () { return this.rosterList().map(p => [p.seat, p.name, p.cid]); };
 
   Session.prototype._pub = function (obj) {
@@ -377,9 +395,9 @@
       this.roster.forEach((p, seat) => {
         if (seat !== 0 && now - (this.seen[p.cid] || 0) > PEER_TIMEOUT) this._removeSeat(seat, 'timeout');
       });
-      this._pub({ t: 'hb', q: this.sq, p: this._rosterWire(), mx: this.max, mn: this.min, g: this.gameId, gen: this.gen, sd: this.seed });
+      this._pub(this._hbObj());
     } else {
-      if (this.ready) this._pub({ t: 'hb', q: this.sq });
+      if (this.ready) this._pub({ t: 'hb', q: this.sq, pv: PV });
       if (this.ready && now - this.lastHost > PEER_TIMEOUT) this._close('host-lost');
     }
   };
@@ -388,10 +406,15 @@
     if (!p) return;
     this.roster.delete(seat);
     delete this.rxq[p.cid];
-    if (this.role === 'host') this._pub({ t: 'hb', q: this.sq, p: this._rosterWire(), mx: this.max, mn: this.min, g: this.gameId, gen: this.gen, sd: this.seed });
+    delete this.peerPv[p.cid];
+    if (this.role === 'host') {
+      if (this.legacy && !Object.keys(this.peerPv).some(c => this.peerPv[c] < 2)) { this.legacy = false; this.min = this.rmin; this.max = this.rmax; this._emit('legacy', { on: false }); this._emit('plan', this.plan); }
+      this._pub(this._hbObj());
+    }
     this._emit('roster', this.rosterList());
     if (this.started && this.active) this.active._left(seat, p.name, false);
     this._emit('left', { seat, name: p.name, why });
+    if (this.role === 'host' && this.ser) this._afterLeave();
   };
 
   Session.prototype._recv = function (txt) {
@@ -404,12 +427,15 @@
     switch (m.t) {
       case 'join': return this.role === 'host' ? this._onJoin(m) : undefined;
       case 'welcome': return this._onWelcome(m);
-      case 'rej': if (m.to === this.cid && !this.ready) { this._fail(m.why === 'full' || m.why === 'started' || m.why === 'game' ? m.why : 'no-room'); } return;
+      case 'rej': if (m.to === this.cid && !this.ready) { this._fail(m.why === 'full' || m.why === 'started' || m.why === 'game' || m.why === 'update' ? m.why : 'no-room'); } return;
       case 'hb': return this._onHb(m);
       case 'bye': return this._onBye(m);
       case 'start': return this._onStart(m);
       case 'nack': return this._onNack(m);
       case 'rematch': if (this.role === 'host') this._emit('rematch', { name: this._senderName(m.c) }); return;
+      case 'tr': return this._onResult(m);
+      case 'sb': return this._onBoard(m);
+      case 'lob': return m.c === this.hostCid ? this._toLobbyLocal() : undefined;
       case 'g': return this._onGame(m);
       case 'f': return this._onFast(m);
     }
@@ -427,27 +453,176 @@
   Session.prototype._onJoin = function (m) {
     if (!this.ready) return;
     const reply = (extra) => this._pub(Object.assign({ t: 'rej', to: m.c }, extra));
-    if (m.g && m.g !== this.gameId) return reply({ why: 'game' });   // a link invite does not say which game: it joins whatever the room is
-    const existing = this._seatOf(m.c);
+    const pv = Number.isInteger(m.pv) ? m.pv : 1, existing0 = this._seatOf(m.c);
+    // Tournament rooms let the host pick the games, so a newer player's game is not checked. An older player (1.6.x) can only
+    // play the room's one game: the room drops to a single game for as long as they are in it.
+    if (pv >= 2 && this.flex) { /* any game */ }
+    else if (m.g && m.g !== this.gameId) {
+      const g = gameOf(m.g);
+      if (!(this.flex && pv < 2 && g && existing0 < 0 && !this.started && this.roster.size === 1 && !this.legacy)) { if (pv < 2) this._emit('oldpeer', { why: 'game' }); return reply({ why: 'game' }); }
+      this.plan = { g: [m.g], n: 1 }; this.gameId = m.g; this._emit('plan', this.plan);
+    }
+    const existing = existing0;
     if (existing < 0) {
-      if (this.started) return reply({ why: 'started' });
+      if (this.started) { if (pv < 2) this._emit('oldpeer', { why: 'started' }); return reply({ why: 'started' }); }
+      if (pv < 2 && this.flex && !this.legacy) {
+        const g = gameOf(this.gameId);
+        if (g && this.roster.size >= g.online.max) { this._emit('oldpeer', { why: 'full' }); return reply({ why: 'full' }); }
+        if (g) { this.max = g.online.max; this.min = g.online.min; }
+        this.plan = { g: [this.gameId], n: 1 }; this.legacy = true; this.ser = null; this.gmin = this.min; this.gmax = this.max;
+        this._emit('legacy', { on: true });
+      } else if (pv < 2 && this.flex) this.legacy = true;
       if (this.roster.size >= this.max) return reply({ why: 'full' });
+      this.peerPv[m.c] = pv;
       let seat = 1; while (this.roster.has(seat)) seat++;
       this.roster.set(seat, { seat, name: NET.cleanName(m.n, 'Player ' + (seat + 1)), cid: m.c });
       this._emit('roster', this.rosterList());
     }
     const seat = this._seatOf(m.c);
-    this._pub({ t: 'welcome', to: m.c, s: seat, p: this._rosterWire(), mx: this.max, mn: this.min, g: this.gameId });
-    this._pub({ t: 'hb', q: this.sq, p: this._rosterWire(), mx: this.max, mn: this.min, g: this.gameId, gen: this.gen, sd: this.seed });
+    const w = { t: 'welcome', to: m.c, s: seat, p: this._rosterWire(), mx: this.max, mn: this.min, g: this.gameId, pv: PV };
+    if (this.flex) { w.tn = { g: this.plan.g, n: this.plan.n }; if (this.legacy) w.lg = 1; }
+    this._pub(w);
+    this._pub(this._hbObj());
   };
-  // Host: begin the game (or a rematch). Needs at least `min` players.
+  // Host: begin the game (or a rematch / the next round). Needs at least `min` players.
   Session.prototype.start = function () {
-    if (this.role !== 'host' || this.over || this.roster.size < this.min) return false;
+    if (this.role !== 'host' || this.over) return false;
+    if (this.isSeries()) {
+      if (this.ser && this.ser.st === 'board') return this.advance();
+      if (this.ser && this.ser.st === 'play') return false;
+      const gs = this.plan.g.filter(id => this._fits(id));
+      if (!gs.length) return false;
+      this.ser = { gs, gi: 0, ri: 0, n: this.plan.n || 1, st: 'play', sc: this.rosterList().map(p => [p.cid, p.name, 0]), why: '', rep: {} };
+      return this._beginRound();
+    }
+    if (this.flex && !this.legacy) {
+      const g = gameOf(this.gameId);
+      if (!g || !this._fits(this.gameId)) return false;
+      this.gmin = g.online.min; this.gmax = g.online.max; this._closeGaps();
+    } else { if (this.roster.size < this.min) return false; this.gmin = this.min; this.gmax = this.max; }
     this.started = true; this.gen++; this.seed = (randBytes(4).reduce((a, b) => a * 256 + b, 0)) >>> 0;
-    this._pub({ t: 'start', gen: this.gen, sd: this.seed, p: this._rosterWire() });
-    this._emit('start', { gen: this.gen, seed: this.seed });
+    this._pub({ t: 'start', gen: this.gen, sd: this.seed, p: this._rosterWire(), g: this.gameId, gm: [this.gmin, this.gmax] });
+    this._emit('start', { gen: this.gen, seed: this.seed, game: this.gameId });
     return true;
   };
+  // ----- tournaments (host decides, everyone follows the host's copy) -----
+  Session.prototype.isSeries = function () { return this.flex && !this.legacy && (this.plan.g.length > 1 || this.plan.n !== 1 || !!this.ser); };
+  Session.prototype._fits = function (id, n) { const g = gameOf(id), c = n === undefined ? this.roster.size : n; return !!g && g.online.min <= c && c <= g.online.max; };
+  // the games of the plan that the players in the room can play right now
+  Session.prototype.playable = function () { return this.plan.g.filter(id => this._fits(id)); };
+  Session.prototype.setPlan = function (games, n) {
+    if (this.role !== 'host' || this.legacy || !this.flex || this.over || (this.started && this.ser && this.ser.st !== 'final')) return false;
+    const g = (games || []).filter((id, i, a) => typeof id === 'string' && gameOf(id) && a.indexOf(id) === i).slice(0, 12);
+    if (!g.length) return false;
+    this.plan = { g, n: n === 0 ? 0 : [1, 3, 5].includes(n) ? n : 1 }; this.gameId = g[0];
+    this._emit('plan', this.plan);
+    this._pub(this._hbObj());
+    return true;
+  };
+  Session.prototype._setPlan = function (tn) {
+    if (!tn || !Array.isArray(tn.g) || tn.g.length > 12 || !tn.g.every(x => typeof x === 'string' && TYPE_RE.test(x)) || ![0, 1, 3, 5].includes(tn.n)) return;
+    if (JSON.stringify(tn) === JSON.stringify(this.plan)) return;
+    this.plan = { g: tn.g.slice(), n: tn.n }; this._emit('plan', this.plan);
+  };
+  Session.prototype._srWire = function () { const s = this.ser; return { st: s.st, gs: s.gs, gi: s.gi, ri: s.ri, n: s.n, sc: s.sc, why: s.why || '' }; };
+  Session.prototype._applySr = function (sr) {
+    if (this.role === 'host' || !sr || typeof sr !== 'object' || !['play', 'board', 'final'].includes(sr.st) || !Array.isArray(sr.gs) || sr.gs.length > 12 || !sr.gs.every(x => typeof x === 'string' && TYPE_RE.test(x))) return;
+    if (!Number.isInteger(sr.gi) || !Number.isInteger(sr.ri) || !Number.isInteger(sr.n) || !Array.isArray(sr.sc) || sr.sc.length > MAX_SEATS) return;
+    const sc = [];
+    for (const e of sr.sc) { if (!Array.isArray(e) || e.length !== 3 || typeof e[0] !== 'string' || e[0].length > 16 || typeof e[1] !== 'string' || !Number.isInteger(e[2]) || e[2] < 0 || e[2] > 99) return; sc.push([e[0], NET.cleanName(e[1], 'Player'), e[2]]); }
+    const next = { st: sr.st, gs: sr.gs.slice(), gi: sr.gi, ri: sr.ri, n: sr.n, sc, why: typeof sr.why === 'string' ? sr.why.slice(0, 12) : '' };
+    const before = this.ser, same = before && JSON.stringify(before) === JSON.stringify(next);
+    if (same) return;
+    this.ser = next;
+    this._emit('series', next);
+    if (!before || before.st !== next.st) { if (next.st === 'board') this._emit('board', next); else if (next.st === 'final') this._emit('final', next); }
+    else if (next.st === 'board' && JSON.stringify(before.sc) !== JSON.stringify(next.sc)) this._emit('board', next);
+  };
+  Session.prototype._toLobbyLocal = function () { if (!this.ser && !this.started) return; this.ser = null; this.started = false; this._emit('lobby', {}); };
+  Session.prototype._closeGaps = function () {
+    const list = this.rosterList();
+    if (list.every((p, i) => p.seat === i)) return;
+    this.roster = new Map(list.map((p, i) => [i, Object.assign({}, p, { seat: i })]));
+    this._emit('roster', this.rosterList());
+  };
+  Session.prototype._beginRound = function () {
+    const ser = this.ser, id = ser.gs[ser.gi], g = gameOf(id);
+    if (!g) return false;
+    this._closeGaps();
+    ser.st = 'play'; ser.rep = {}; clearTimeout(ser.t1); clearTimeout(ser.t2);
+    this.rosterList().forEach(p => { if (!ser.sc.some(e => e[0] === p.cid)) ser.sc.push([p.cid, p.name, 0]); });
+    this.started = true; this.gen++; this.seed = (randBytes(4).reduce((a, b) => a * 256 + b, 0)) >>> 0;
+    this.gameId = id; this.gmin = g.online.min; this.gmax = g.online.max;
+    this._pub({ t: 'start', gen: this.gen, sd: this.seed, p: this._rosterWire(), g: id, gm: [this.gmin, this.gmax], sr: this._srWire() });
+    this._emit('start', { gen: this.gen, seed: this.seed, game: id });
+    this._emit('series', this.ser);
+    return true;
+  };
+  // every screen tells the host whether this player won the round; the host adds it all up
+  Session.prototype.reportResult = function (won) {
+    if (this.over || !this.ser) return;
+    if (this.role === 'host') this._onResult({ c: this.cid, gen: this.gen, w: won ? 1 : 0 });
+    else this._pub({ t: 'tr', gen: this.gen, w: won ? 1 : 0 });
+  };
+  Session.prototype._onResult = function (m) {
+    const ser = this.ser;
+    if (this.role !== 'host' || !ser || ser.st !== 'play' || m.gen !== this.gen || this._seatOf(m.c) < 0) return;
+    ser.rep[m.c] = m.w === 1 ? 1 : 0;
+    clearTimeout(ser.t1); ser.t1 = setTimeout(() => this._roundDone(), RESULT_WAIT);   // do not wait for ever for somebody who stopped answering
+    this._checkRound();
+  };
+  Session.prototype._checkRound = function () {
+    const ser = this.ser;
+    if (!ser || ser.st !== 'play' || !Object.keys(ser.rep).length) return;
+    if (this.rosterList().every(p => ser.rep[p.cid] !== undefined)) this._roundDone();
+  };
+  Session.prototype._roundDone = function () {
+    const ser = this.ser;
+    if (!ser || ser.st !== 'play') return;
+    clearTimeout(ser.t1);
+    ser.sc.forEach(e => { if (ser.rep[e[0]] === 1) e[2]++; });
+    ser.st = 'board';
+    this._announce('board');
+    ser.t2 = setTimeout(() => this.advance(), SERIES_PAUSE);
+  };
+  Session.prototype._announce = function (ev) {
+    this._pub({ t: 'sb', sr: this._srWire() }); this._pub(this._hbObj());
+    this._emit('series', this.ser); this._emit(ev, this.ser);
+  };
+  // next round, next game, or the final standings
+  Session.prototype.advance = function () {
+    const ser = this.ser;
+    if (this.role !== 'host' || !ser || ser.st !== 'board') return false;
+    clearTimeout(ser.t2);
+    let gi = ser.gi, ri = ser.ri + 1;
+    if (ri >= ser.n) { ri = 0; gi++; }
+    while (gi < ser.gs.length && !this._fits(ser.gs[gi])) { gi++; ri = 0; }
+    if (gi >= ser.gs.length) { this._finalize(gi >= ser.gs.length && ser.gs.slice(ser.gi + 1).some(id => !this._fits(id)) ? 'few' : ''); return true; }
+    ser.gi = gi; ser.ri = ri;
+    return this._beginRound();
+  };
+  Session.prototype._finalize = function (why) {
+    const ser = this.ser; if (!ser) return;
+    clearTimeout(ser.t1); clearTimeout(ser.t2);
+    ser.st = 'final'; ser.why = why || ''; this.started = false;
+    this._announce('final');
+  };
+  // somebody left a running tournament: carry on if the game still has enough players, otherwise show the standings so far
+  Session.prototype._afterLeave = function () {
+    const ser = this.ser; if (!ser || ser.st === 'final') return;
+    const g = gameOf(ser.gs[ser.gi]), n = this.roster.size;
+    if (n < 2 || (ser.st === 'play' && g && n < g.online.min)) { this._finalize('left'); return; }
+    if (ser.st === 'play') this._checkRound();
+    else this._pub(this._hbObj());
+  };
+  Session.prototype.rematchSeries = function () { if (this.ser && this.ser.st === 'final') { this.ser = null; return this.start(); } return false; };
+  Session.prototype.toLobby = function () {
+    if (this.role !== 'host' || !this.ser) return false;
+    clearTimeout(this.ser.t1); clearTimeout(this.ser.t2);
+    this.ser = null; this.started = false; this._pub({ t: 'lob' }); this._pub(this._hbObj()); this._emit('lobby', {});
+    return true;
+  };
+  Session.prototype._onBoard = function (m) { if (this.role !== 'host' && m.c === this.hostCid) this._applySr(m.sr); };
   Session.prototype.requestRematch = function () { this._pub({ t: 'rematch' }); };
 
   // ----- guest side -----
@@ -455,16 +630,20 @@
     if (this.role === 'host' || m.to !== this.cid || this.ready) return;
     const list = cleanRoster(m.p);
     if (!list || !Number.isInteger(m.s) || m.s < 1 || m.s >= MAX_SEATS || !list.some(p => p.seat === m.s && p.cid === this.cid)) return;
+    if (Number.isInteger(m.mp) && m.mp > PV) { this._fail('update'); return; }   // the host needs a newer Ludus than this one
     clearInterval(this.joinTimer);
+    this.hostPv = Number.isInteger(m.pv) ? m.pv : 1; this.legacy = this.hostPv < 2;
+    if (m.tn) this._setPlan(m.tn);
+    this.oldPeer = m.lg === 1;
     this.seat = m.s; this.hostCid = m.c; this.lastHost = Date.now(); this.ready = true; this.client.pin();
     if (!this.gameId && typeof m.g === 'string' && TYPE_RE.test(m.g)) this.gameId = m.g;
-    this.max = Math.max(2, Math.min(MAX_SEATS, m.mx | 0)); this.min = Math.max(2, Math.min(this.max, m.mn | 0));
+    this.max = Math.max(2, Math.min(MAX_SEATS, m.mx | 0)); this.min = Math.max(2, Math.min(this.max, m.mn | 0)); this.gmin = this.min; this.gmax = this.max;
     this._setRoster(list);
     this._emit('ready', { code: this.code });
   };
   Session.prototype._setRoster = function (list) {
     this.roster = new Map(list.map(p => [p.seat, p]));
-    list.forEach(p => { if (!this.seen[p.cid]) this.seen[p.cid] = Date.now(); });
+    list.forEach(p => { if (!this.seen[p.cid]) this.seen[p.cid] = Date.now(); if (p.cid === this.cid && this.role !== 'host') this.seat = p.seat; });
     this._emit('roster', this.rosterList());
   };
   Session.prototype._onHb = function (m) {
@@ -484,18 +663,25 @@
       this._emit('roster', this.rosterList());
       gone.forEach(p => { delete this.rxq[p.cid]; if (this.started && this.active) this.active._left(p.seat, p.name, false); this._emit('left', { seat: p.seat, name: p.name, why: 'gone' }); });
     }
-    if (m.gen > this.gen && Number.isInteger(m.gen) && Number.isInteger(m.sd)) this._startFrom(m.gen, m.sd);
+    this.hostPv = Number.isInteger(m.pv) ? m.pv : 1; this.legacy = this.hostPv < 2;
+    if (m.tn) this._setPlan(m.tn);
+    if ((m.lg === 1) !== !!this.oldPeer) { this.oldPeer = m.lg === 1; this._emit('plan', this.plan); }
+    if (m.sr) this._applySr(m.sr); else if (this.ser && this.ser.st === 'final') this._toLobbyLocal();
+    if (m.gen > this.gen && Number.isInteger(m.gen) && Number.isInteger(m.sd)) this._startFrom(m.gen, m.sd, m.g);
   };
   Session.prototype._onStart = function (m) {
     if (this.role === 'host' || m.c !== this.hostCid || !Number.isInteger(m.gen) || !Number.isInteger(m.sd)) return;
     const list = cleanRoster(m.p);
     if (list) this._setRoster(list);
-    this._startFrom(m.gen, m.sd);
+    if (Array.isArray(m.gm) && m.gm.length === 2 && m.gm.every(Number.isInteger)) { this.gmin = Math.max(2, m.gm[0]); this.gmax = Math.min(MAX_SEATS, m.gm[1]); }
+    if (m.sr) this._applySr(m.sr);
+    this._startFrom(m.gen, m.sd, m.g);
   };
-  Session.prototype._startFrom = function (gen, seed) {
+  Session.prototype._startFrom = function (gen, seed, game) {
     if (gen <= this.gen) return;
+    if (typeof game === 'string' && TYPE_RE.test(game)) this.gameId = game;
     this.started = true; this.gen = gen; this.seed = seed >>> 0;
-    this._emit('start', { gen, seed: this.seed });
+    this._emit('start', { gen, seed: this.seed, game: this.gameId });
   };
   Session.prototype._onBye = function (m) {
     if (m.c === this.hostCid && this.role !== 'host') { this._close('host-left'); return; }
@@ -583,9 +769,9 @@
       }
     };
     const o = {
-      code: s.code, seat: s.seat, min: s.min, max: s.max, isHost: s.role === 'host', gen: s.gen,
+      code: s.code, seat: s.seat, min: s.gmin, max: s.gmax, isHost: s.role === 'host', gen: s.gen,
       get count() { return s.roster.size; },
-      get names() { const a = []; for (let i = 0; i < s.max; i++) { const p = s.roster.get(i); a.push(p ? p.name : ''); } return a; },
+      get names() { const a = []; for (let i = 0; i < s.gmax; i++) { const p = s.roster.get(i); a.push(p ? p.name : ''); } return a; },
       get connected() { return s.conn === 'online' && !s.over; },
       send(type, data) { return s.send(type, data); },
       sendTo(seat, type, data) { return Number.isInteger(seat) && seat >= 0 && seat < MAX_SEATS ? s.send(type, data, seat) : false; },

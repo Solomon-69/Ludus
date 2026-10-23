@@ -477,3 +477,24 @@ svg { display: block; }
   .seat { padding: 4px 10px; }
 }
 @media (prefers-reduced-motion: reduce) { .online-chip .dot, .conn-chip i, .code-ch, .seat.on { animation: none !important; } }
+
+/* Online page and tournament lobby */
+.online-page { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 10px; max-width: 360px; width: 100%; margin: 0 auto; padding: 4px 0 8px; text-align: center; }
+.online-page .op-title { font: 700 20px/1.2 var(--font-round); letter-spacing: -0.01em; }
+.online-page > * { flex-shrink: 0; }
+.online-page .field { text-align: left; }
+.online-page input { height: 40px; border-radius: 12px; border: 0; background: var(--surface-2); color: var(--ink); padding: 0 12px; font: 600 14px var(--font-round); width: 100%; }
+.online-page input:focus { outline: none; box-shadow: inset 0 0 0 2px var(--accent); }
+.online-page input.code-input { height: 52px; text-align: center; font: 700 24px/1 var(--font-round); letter-spacing: 0.3em; padding-left: 0.3em; text-transform: uppercase; }
+.online-page .btn { width: 100%; }
+.op-or { color: var(--ink-3); font-size: 11.5px; font-weight: 600; display: flex; align-items: center; gap: 10px; }
+.op-or::before, .op-or::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+.plan { display: flex; flex-direction: column; gap: 6px; text-align: left; }
+.plan .field-label { margin-top: 2px; }
+.plan-line { font-size: 12.5px; font-weight: 600; color: var(--ink-2); overflow-wrap: anywhere; }
+.pick-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.pick-chips .chip { background: var(--surface-2); max-width: 100%; overflow: hidden; text-overflow: ellipsis; padding: 5px 10px; }
+.pick-chips .chip.is-on { background: var(--ink); color: var(--bg); }
+.seats.stand .seat { opacity: 1; }
+.seat-score { flex: none; font: 700 15px/1 var(--font-round); min-width: 1.4em; text-align: right; }
+.seat.lead { box-shadow: inset 0 0 0 2px var(--accent); }

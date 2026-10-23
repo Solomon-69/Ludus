@@ -5,7 +5,8 @@
   const $ = id => document.getElementById(id);
   const root = document.documentElement;
   const ACCENTS = ['#d97757', '#5b8def', '#4f9d69', '#9b6dd6', '#e0a526', '#e05d8b', '#3aa6a6'];
-  const FILTERS = ['All', 'Arcade', 'Puzzle', 'Duel', '2 Player', '3-4 Player'];
+  const FILTERS = ['All', 'Arcade', 'Puzzle', 'Duel', '2 Player', '3-4 Player', 'Online'];
+  const ONLINE = 'Online';                 // the tab that opens the Online page instead of a list of games
   const TWO = '2 Player';
   const PARTY = '3-4 Player';              // games that 3 or 4 people can play together (online, some also on one keyboard)
   const party = g => !!(g.online && g.online.max >= 3);
@@ -94,11 +95,38 @@
       f.appendChild(b);
     });
   }
+  // ---------- the Online page: make a room or join one ----------
+  function renderOnlinePage(grid) {
+    const page = el('div', 'online-page');
+    page.appendChild(el('div', 'op-title', 'Play online'));
+    page.appendChild(el('p', 'lobby-sub', 'Make a room and share its code, or join a friend. The host picks the games and how many rounds.'));
+    const f = el('label', 'field');
+    f.appendChild(el('span', 'field-label', 'Your name (optional)'));
+    const nm = el('input'); nm.type = 'text'; nm.maxLength = 10; nm.placeholder = 'Player'; nm.value = L.net.cleanName(S.onlineName, ''); nm.autocomplete = 'off'; nm.spellcheck = false; nm.setAttribute('aria-label', 'Your name');
+    nm.addEventListener('input', () => { S.onlineName = L.net.cleanName(nm.value, ''); L.save(); });
+    f.appendChild(nm); page.appendChild(f);
+    const mk = el('button', 'btn primary', 'Create room'); mk.type = 'button'; mk.id = 'opCreate';
+    mk.onclick = () => { L.sfx('click'); createFlexRoom(); };
+    page.appendChild(mk);
+    page.appendChild(el('div', 'op-or', 'or join a room'));
+    const code = el('input', 'code-input'); code.type = 'text'; code.maxLength = 300; code.placeholder = 'K7M2Q'; code.id = 'opCode';
+    code.autocomplete = 'off'; code.spellcheck = false; code.autocapitalize = 'characters'; code.setAttribute('aria-label', 'Room code, invite or link');
+    const msg = el('div', 'lobby-error', ''); msg.setAttribute('role', 'alert');
+    const go = () => { const c = L.net.extractCode(code.value) || L.net.cleanCode(code.value); if (!L.net.validCode(c)) { msg.textContent = 'Room codes are 5 letters or digits.'; code.focus(); return; } msg.textContent = ''; L.sfx('click'); joinFromInvite(c); };
+    code.addEventListener('input', () => { const v = code.value, m = L.net.extractCode(v); code.value = m || L.net.cleanCode(v); msg.textContent = !m && v.replace(/\s/g, '').length > 6 ? 'No room code found in that text.' : ''; });
+    code.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); go(); } });
+    page.appendChild(code); page.appendChild(msg);
+    const jb = el('button', 'btn', 'Join room'); jb.type = 'button'; jb.id = 'opJoin'; jb.onclick = go;
+    page.appendChild(jb);
+    page.appendChild(el('p', 'lobby-note', 'Paste the 5 character code, the invite message or a ludus:// link. Needs the internet; anyone with the code can join.'));
+    grid.appendChild(page);
+  }
   function fmt(n) { return n >= 10000 ? (n / 1000).toFixed(n >= 100000 ? 0 : 1) + 'k' : String(n); }
   function renderCards() {
     const grid = $('grid'); grid.innerHTML = '';
     const list = visibleGames();
     const searching = !!norm(query);
+    if (S.filter === ONLINE && !searching) { renderOnlinePage(grid); return; }
     const lastGame = !searching && S.filter === 'All' && L.games.find(g => g.id === S.last && !S.hidden.includes(g.id));
     const rest = list.filter(g => g !== lastGame);
     // In "All", the games for two people on one keyboard get their own section at the end.
@@ -212,6 +240,7 @@
     stop();
     S.last = id; S.plays[id] = (S.plays[id] || 0) + 1; L.save();
     fillName($('gameName'), g, () => { fillName($('gameName'), g); });
+    $('gameScores').style.display = '';
     $('scoreNow').textContent = '0';
     $('scoreBest').textContent = fmt(S.best[id] || 0);
     if (!S.vs) S.vs = {};
@@ -285,23 +314,39 @@
      the game runs with api.online, and any room trouble sends the player back to the menu with a message. */
   function openLobby(g) {
     persist(); stop(); hideOver(); $('pauseSheet').hidden = true;
-    online = { game: g, session: null, started: false };
+    online = { game: g, session: null, started: false, shown: g.id };
     renderVsToggle(g);
     L.lobby.open(g, lobbyOps(g));
   }
+  // The room sheet lives on the game screen, so a room made from the Online page opens that screen with a plain header first.
+  function showOnlineShell() {
+    persist(); stop(); hideOver(); $('pauseSheet').hidden = true;
+    $('gameName').textContent = 'Online'; $('vsToggle').hidden = true; $('gameScores').style.display = 'none'; $('hint').innerHTML = ''; $('stage').innerHTML = '';
+    $('onlineChip').hidden = true; $('leaveBtn').hidden = true; $('pauseBtn').hidden = true; $('orientBtn').hidden = true;
+    L.native('wide', { on: false });
+    show('game');
+  }
+  function createFlexRoom() {   // from the Online page: no game yet, the host picks them in the room
+    showOnlineShell();
+    online = { game: null, session: null, started: false };
+    L.lobby.openRoom(lobbyOps(null));
+  }
   function lobbyOps(g) {
     return {
-      toast,
-      onStart: s => beginOnline(g, s),
+      toast, goHome,
+      onStart: (s, e) => beginOnline(s, e, g),
       onCancel: () => {
         // back to whatever mode was there before
-        online = null; renderVsToggle(g);
+        online = null;
+        if (!g) { goHome(); return; }
+        renderVsToggle(g);
         if (view === 'game') { $('scoreNow').textContent = '0'; launch(g); }
       }
     };
   }
   // A room invite: the code typed or pasted, or a ludus://join/CODE link opened by the Mac / Windows app. The link does not
-  // say which game, so the room tells us; then that game's screen opens with the room already joined.
+  // say which game, so the room tells us. A newer host (tournament rooms) lets the host pick games, so we just show the room;
+  // a 1.6 host plays one game, so that game's screen opens with the room already joined.
   function joinFromInvite(text) {
     const code = L.net.extractCode(text);
     if (!code) { toast('No room code found'); return false; }
@@ -309,29 +354,59 @@
     toast('Joining room ' + code);
     const s = L.net.joinRoom(code, { gameId: '', name: L.net.cleanName(S.onlineName, '') });
     online = { game: null, session: s, started: false };
-    s.on('error', e => { online = null; toast(L.lobby.why(e.code === 'no-room' || e.code === 'full' || e.code === 'started' ? e.code : 'offline')[0]); });
+    s.on('error', e => { online = null; if (e.code === 'update') L.lobby.notice(...L.lobby.why('update'), () => {}); else toast(L.lobby.why(e.code === 'no-room' || e.code === 'full' || e.code === 'started' ? e.code : 'offline')[0]); });
     s.on('ready', () => {
+      if (s.hostPv >= 2) { showOnlineShell(); online = { game: null, session: s, started: false }; L.lobby.attach(null, s, lobbyOps(null)); return; }
       const g = L.games.find(x => x.id === s.gameId && x.online);
       if (!g) { online = null; s.leave(); toast('This version of Ludus cannot play that room'); return; }
       online = null;                       // start() must not leave the room we just joined
       start(g.id, true);
       clearTimeout(launchTimer); pendingLaunch = null;   // no local game behind the lobby
-      online = { game: g, session: s, started: false };
+      online = { game: g, session: s, started: false, shown: g.id };
       renderVsToggle(g);
       L.lobby.attach(g, s, lobbyOps(g));
     });
     return true;
   }
   window.ludusJoin = joinFromInvite;
-  function beginOnline(g, s) {
-    online = { game: g, session: s, started: true };
-    s.on('start', () => { if (online && online.session === s) launchOnline(g); });
-    s.on('rematch', e => toast((e.name || 'Your opponent') + ' wants a rematch'));
-    s.on('conn', () => syncOnlineBar(g));
-    s.on('left', e => {
-      if (online && online.session === s && s.count() < s.min) endOnline((e.name || 'Your opponent') + ' left', 'The game cannot go on without them, so you are going back to the menu.');
-    });
-    s.on('closed', e => { if (online && online.session === s) endOnline(...L.lobby.why(e.reason)); });
+  const gameById = id => L.games.find(x => x.id === id && x.online);
+  // The room started a game (the first one, the next round, or a rematch): hooks are added once per room.
+  function beginOnline(s, e, fallback) {
+    const g = gameById(e && e.game) || gameById(s.gameId) || fallback;
+    if (!g) { toast('This version of Ludus cannot play that game'); try { s.leave(); } catch (x) {} online = null; return; }
+    online = { game: g, session: s, started: true, shown: online && online.shown };
+    if (!s.appHooked) {
+      s.appHooked = true;
+      const mine = () => online && online.session === s;
+      const ops = () => lobbyOps(online && online.game);
+      s.on('start', ev => { if (!mine()) return; const g2 = gameById(ev.game) || online.game; online.game = g2; online.started = true; L.lobby.hide(); showRound(g2); });
+      s.on('rematch', ev => toast((ev.name || 'Your opponent') + ' wants a rematch'));
+      s.on('conn', () => { if (mine()) syncOnlineBar(online.game); });
+      s.on('left', ev => {
+        if (!mine() || s.ser) return;   // a tournament: the host decides whether it goes on
+        if (s.count() < s.gmin) endOnline((ev.name || 'Your opponent') + ' left', 'The game cannot go on without them, so you are going back to the menu.');
+      });
+      s.on('closed', ev => {
+        if (!mine()) return;
+        if (s.ser && s.ser.st !== 'final') {   // the host went away mid-tournament: keep the standings so far
+          s.ser = Object.assign({}, s.ser, { st: 'final', why: 'host' }); stop(); hideOver(); online.session = null; syncOnlineBar(online.game);
+          L.lobby.series(s, 'final', lobbyOps(online.game)); return;
+        }
+        endOnline(...L.lobby.why(ev.reason));
+      });
+      s.on('board', () => { if (mine()) L.lobby.series(s, 'board', ops()); });
+      s.on('final', () => { if (mine()) { stop(); hideOver(); online.started = false; syncOnlineBar(online.game); L.lobby.series(s, 'final', ops()); } });
+      s.on('lobby', () => { if (mine()) { stop(); hideOver(); online.started = false; syncOnlineBar(online.game); L.lobby.resume(s, ops()); } });
+    }
+    showRound(g);
+  }
+  function showRound(g) {
+    online.game = g;
+    if (view !== 'game' || online.shown !== g.id) {
+      online.shown = g.id;
+      start(g.id, true);                                  // the game's screen, header and name
+      clearTimeout(launchTimer); pendingLaunch = null;    // no local game behind the room
+    }
     launchOnline(g);
   }
   function launchOnline(g) {
@@ -424,6 +499,8 @@
     const run = current && current.run;
     revealTimer = setTimeout(() => {
       if (run && current && current.run === run) run.pause();
+      // a tournament: tell the host who won; the scoreboard card comes up once everybody has reported
+      if (online && online.session && online.session.ser && online.session.ser.st === 'play') { online.session.reportResult(!!res.won); return; }
       $('overSheet').hidden = false; $('overPeek').hidden = true; overAt = performance.now();
     }, window.ludusRevealMs ?? REVEAL_MS);
   }
@@ -661,6 +738,7 @@
   };
   // Test helper: end the current run as if the game called api.over (used by QA/shell-test.js).
   window.ludusOnline = () => online;
+  window.ludusForceOver = won => { if (current) current.run.api.over({ score: 0, won: !!won, title: 'Test' }); };   // test helper: end the round now
   window.ludusSnapshot = () => { try { return current && current.instance && current.instance.save ? current.instance.save() : null; } catch (e) { return null; } };   // test helper   // test helper: the current room, if any
   window.ludusTestOver = score => { if (current) current.run.api.over({ score }); };
   window.ludusState = () => JSON.stringify({ view, game: current && current.game.id, score: $('scoreNow').textContent, paused: !$('pauseSheet').hidden, over: overShown(), revealing: revealing(), games: L.games.length, theme: root.dataset.theme, saved: Object.keys(S.saves) });
@@ -702,7 +780,7 @@
                   : 'Click the controller icon at the top of your screen to open it. Click outside to put it away.',
         items: [
           [ic('M6 5h4v14H6zM14 5h4v14h-4z'), 'Close it mid-game', 'Every game saves itself and waits for you'],
-          [ic('M4 6h16M4 12h10M4 18h7'), 'Pick a tab', 'All, Arcade, Puzzle, Duel, 2 Player or 3-4 Player'],
+          [ic('M4 6h16M4 12h10M4 18h7'), 'Pick a tab', 'All, Arcade, Puzzle, Duel, 2 Player, 3-4 Player or Online'],
           [ic('M11 4a2 2 0 1 1 2 0v1a7 7 0 0 1 5 6.7V15l2 3H4l2-3v-3.3A7 7 0 0 1 11 5z'), 'Make it yours', 'Colours, sound and light or dark in Settings'],
         ] },
       { art: ic('M8 5v14l11-7z'), title: 'Ready to play', text: 'Start with something quick. Your best scores are kept on this computer only.' },
