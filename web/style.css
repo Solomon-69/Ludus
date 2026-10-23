@@ -498,3 +498,9 @@ svg { display: block; }
 .seats.stand .seat { opacity: 1; }
 .seat-score { flex: none; font: 700 15px/1 var(--font-round); min-width: 1.4em; text-align: right; }
 .seat.lead { box-shadow: inset 0 0 0 2px var(--accent); }
+.party-card { background: var(--surface-2); border-radius: 14px; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; text-align: left; }
+.party-head { font-size: 11px; font-weight: 700; color: var(--ink-3); letter-spacing: 0.04em; text-transform: uppercase; }
+.party-line, .party-games { font-size: 12.5px; font-weight: 600; overflow-wrap: anywhere; }
+.party-games { color: var(--ink-2); font-weight: 500; }
+.party-card .lobby-row { justify-content: flex-start; margin-top: 4px; }
+.online-page .party-card .btn { width: auto; }

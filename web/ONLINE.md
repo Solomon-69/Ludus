@@ -1,18 +1,42 @@
 # Ludus online play: notes for game authors
 
 Online play is **opt-in** and everything else in Ludus stays offline. A game that supports it adds one line
-to its `Ludus.register` object and reads `api.online`. A player starts it from the game screen:
-**Online** (next to vs Bot / vs Friend) opens a sheet to *Create room* (shows a 5 character **room code**) or
-*Join room* (type the code). When the host presses Start (or the room fills up) every player's game is created
-with `api.online` set.
+to its `Ludus.register` object and reads `api.online`. Players reach it from the **Online** tab on the home screen
+(there is no Online button on game screens any more): *Create room* (a 5 character **room code**, up to 4 players) or
+*Join room* (code, pasted invite or `ludus://` link). In the room the host picks the games and the rounds; when the host
+presses Start every player's game is created with `api.online` set. The Online page remembers the last party (code, names,
+games, rounds in the saved state as `party`) and offers **Rejoin**; only **Forget** removes it.
+
+## Tournaments (protocol 2)
+
+* The host picks one or more games (those whose `online.min..max` fits the players in the room) and **rounds per game**:
+  1, 3, 5, or **Tournament** (every picked game once, in order). One game and one round is a plain game (old flow, no scoreboard).
+* Every screen reports `won` for its round (`api.over({won})`); the host adds it up (`Session.reportResult`, message kind `tr`)
+  and shows the scoreboard card ("Round 2 of 3 · Next: Pong"), then starts the next round by itself after 6 s (or at Start now).
+  Final standings with the winner; the host can **Rematch** (scores reset) or go **Back to lobby**.
+* The scoreboard is keyed by the player's id, so it survives seat changes. A player who leaves keeps their wins. The host
+  closes seat gaps at each round start. If the game still has enough players the tournament goes on (games that no longer fit
+  are skipped); with too few the standings so far are shown. If the host leaves, guests keep the standings so far.
+* `api.online.min/max` are the **running game's** seats (the room can hold more).
+
+## Old versions (1.6.0 / 1.6.1)
+
+Wire version `v` stays 1 and the topic stays `ludus/v1/<CODE>/m`. Protocol 2 only adds optional fields: `pv` (join, welcome,
+heartbeats), `tn` (plan: games, rounds), `sr` (series state), `lg` (an older player is present), `g`/`gm` on `start`, and new
+message kinds `tr`, `sb`, `lob` that old clients ignore. Roster entries stay `[seat, name, id]`.
+* Old guest in a new room: the host sees no `pv` and drops the room to that single game (picks hidden, "older Ludus" note, the
+  room's seats shrink to the game's). An old guest naming a different game joins an empty Online-page room by switching it to that game.
+  A running tournament refuses an old guest with the usual "already started", and the host is told "your friend needs to update Ludus".
+* Old host, new guest: no `pv` in the welcome, so the guest opens that host's game as before (a link or Online page code is enough).
+* A host that needs a newer protocol (`mp` in the welcome) makes the new client show "Your friend needs to update Ludus".
 
 ## Files
 
 | File | Job |
 | --- | --- |
 | `web/net.js` | MQTT 3.1.1 over WebSocket client (no libraries), rooms, heartbeats, sequence numbers, shared random stream, SHA-256 |
-| `web/lobby.js` | The create / join / waiting sheet and error messages |
-| `web/app.js` | Online button, header chip + Leave button, rematch, room-closed handling |
+| `web/lobby.js` | The create / join / waiting sheet, game and round picker, scoreboard and standings cards, error messages |
+| `web/app.js` | Online page, party memory, header chip + Leave button, round hand-over, rematch, room-closed handling |
 | `web/engine.js` | `makeApi(game, stage, hooks, online)` puts `api.online` on the game's api |
 | `web/rt.js` | `Ludus.rt(api, {...})`: the host-runs-it link for real-time games (see "Real-time games") |
 
@@ -113,8 +137,23 @@ about 0.1 s late; if the host leaves the room closes.
   migration). A connection that drops reconnects by itself (state `connecting` / `online` / `offline`).
 * Room codes are 5 characters from `ABCDEFGHJKMNPQRSTUVWXYZ23456789` (no `I L O 0 1`).
 
+## Prediction and smoothing (real-time games)
+
+`Ludus.rt` sends only what changed (a full state about every 10th time), 24-30 times a second; the guest's own controls go as
+changes (at most 30/s) plus a full set every 150 ms, stamped with the guest's clock. The host echoes the stamp (`ak`) in each
+state copy. `link.predictor({pick, snap})` moves the guest's **own** thing locally every frame from its own controls (Pong
+paddle, Hockey mallet, Tag player, Paper.io and Hole.io heads) and compares the host's copy with where this screen had it at that
+same moment, easing the difference away (snapping only above `snap`). Everything else is drawn about 100 ms in the past between two
+copies and, when copies run late, carried on at the last speed for up to 150 ms (`sample().t` goes above 1). Rendering never waits
+for the network.
+
 ## Testing
 
 Run two to four pages against an in-memory broker (no internet needed): a tiny MQTT broker over a local WebSocket plus
 two headless pages, with `__LUDUS_BROKERS__` pointing at it. `Ludus.net.WebSocket` can also be replaced with a fake.
 `window.ludusSnapshot()` (the game's own `save()`) is handy for comparing the two boards.
+
+`broker.latency = { base, jitter }` (test folder) delays every delivery per receiver while keeping order; `games_online.js lag*`
+and `watchall` run Pong, Hockey, Tag and Hole.io at 150-300 ms and check the guest's own thing moves within 60 ms of a key press,
+converges with the host, and that the host's thing moves on many guest frames. `twopage.js tournament|tleave|tleave2|party|compat|futurehost`
+cover tournaments, leaving mid-tournament, party memory and old/new rooms (the old pages are `git archive v1.6.0 web`).

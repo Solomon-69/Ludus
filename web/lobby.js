@@ -301,7 +301,7 @@
     close() { discard(); if (sheet) sheet.hidden = true; },
     hide,
     // A room made from the Online page: no game yet, the host picks games in the lobby.
-    openRoom(o) { ensure(); discard(); game = null; ops = o; error = ''; sheet.hidden = false; createRoom(); },
+    openRoom(o) { ensure(); discard(); game = null; ops = o; error = ''; sheet.hidden = false; createRoom(); return session; },
     // Scoreboard between rounds ('board') or the final standings ('final') for a session that is playing a tournament.
     series(s, kind, o) { ensure(); unhook(); session = s; ops = o || ops; screen = kind; sheet.hidden = false; render(); },
     // Back to the waiting room (after a tournament, "Back to lobby").

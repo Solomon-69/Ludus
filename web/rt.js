@@ -18,12 +18,13 @@
 (function () {
   const L = window.Ludus;
   const clamp01 = v => v < 0 ? 0 : v > 1 ? 1 : v;
-  const META = { _i: 1, _f: 1, _b: 1 };
+  const META = { _i: 1, _f: 1, _b: 1, _ts: 1 };
   L.rt = function (api, o) {
     const on = api.online;
     if (!on) return null;
     const hz = Math.max(5, Math.min(30, o.hz || 24)), inHz = Math.max(5, Math.min(40, o.inputHz || 30));
-    const delay = o.delay || 100;               // draw about 100 ms in the past so there is a copy on each side
+    const baseDelay = o.delay || 100;           // draw about 100 ms in the past (more when the line is jittery) so there is a copy on each side
+    let delay = baseDelay, off = null, jit = 0;  // off: guest clock minus host clock at the quickest delivery seen; jit: how late a typical copy is beyond that
     const MAXX = o.extrapolate == null ? 150 : o.extrapolate;   // when copies run late, carry on at the last speed for up to this many ms
     const t0 = performance.now(), buf = [];
     let lastSend = 0, lastInAt = 0, lastInObj = null, sentCount = 0, fullId = 0, fullStr = null, latest = null, base = null, newest = null;
@@ -46,7 +47,18 @@
         else return;                            // a change on top of a full copy we never got: wait for the next full one
         Object.keys(META).forEach(k => delete st[k]);
         newest = st;
-        buf.push({ at: performance.now(), s: st }); if (buf.length > 24) buf.shift();
+        // place the copy on the host's own timeline, so copies that arrive bunched up (jitter) are still drawn evenly spaced
+        const now = performance.now();
+        let at = now;
+        if (Number.isFinite(d._ts)) {
+          const x = now - d._ts;
+          off = off === null ? x : Math.min(x, off + 0.1);   // follows the quickest copies; creeps up slowly so a clock drift cannot stick
+          jit += (Math.max(0, x - off) - jit) * 0.08;
+          delay = baseDelay + Math.min(200, jit * 1.4);
+          at = d._ts + off;
+        }
+        if (buf.length && at <= buf[buf.length - 1].at) at = buf[buf.length - 1].at + 0.5;
+        buf.push({ at, s: st }); if (buf.length > 30) buf.shift();
         if (o.onState) o.onState(st);
       });
     }
@@ -60,13 +72,13 @@
           const s = o.snapshot && o.snapshot();
           if (!s) return;
           const ak = {}; Object.keys(acks).forEach(k => { ak[k] = [acks[k].t, Math.round(now - acks[k].at)]; });
-          s.ak = ak;
+          s.ak = ak; s._ts = Math.round(now);
           // Only what changed since the last full copy goes out; a full copy about every 10th time heals a lost one.
           const strs = {}; Object.keys(s).forEach(k => { strs[k] = JSON.stringify(s[k]); });
           if (!fullStr || sentCount++ % 10 === 0) { fullStr = strs; fullId = (fullId + 1) % 1000000; on.sendFast('st', Object.assign({ _f: 1, _i: fullId }, s)); }
           else {
             const dl = { _b: fullId };
-            Object.keys(s).forEach(k => { if (k === 'ak' || strs[k] !== fullStr[k]) dl[k] = s[k]; });
+            Object.keys(s).forEach(k => { if (k === 'ak' || k === '_ts' || strs[k] !== fullStr[k]) dl[k] = s[k]; });
             on.sendFast('st', dl);
           }
         } else if (o.input) {

@@ -105,6 +105,18 @@
     const nm = el('input'); nm.type = 'text'; nm.maxLength = 10; nm.placeholder = 'Player'; nm.value = L.net.cleanName(S.onlineName, ''); nm.autocomplete = 'off'; nm.spellcheck = false; nm.setAttribute('aria-label', 'Your name');
     nm.addEventListener('input', () => { S.onlineName = L.net.cleanName(nm.value, ''); L.save(); });
     f.appendChild(nm); page.appendChild(f);
+    if (S.party && S.party.code) {
+      const p = S.party, card = el('div', 'party-card');
+      card.appendChild(el('div', 'party-head', 'Last party'));
+      const line = el('div', 'party-line'); line.textContent = (p.role === 'host' ? 'You hosted' : 'Room ' + p.code) + ' \u00b7 ' + (p.names || []).join(', ');
+      card.appendChild(line);
+      const gl = el('div', 'party-games'); gl.textContent = (p.games || []).map(id => { const g = L.games.find(x => x.id === id); return g ? dispName(g) : id; }).join(', '); if (gl.textContent) card.appendChild(gl);
+      const row = el('div', 'lobby-row');
+      const rj = el('button', 'btn small primary', 'Rejoin'); rj.type = 'button'; rj.id = 'opRejoin'; rj.onclick = () => { L.sfx('click'); rejoinParty(); };
+      const fg = el('button', 'btn small ghost', 'Forget'); fg.type = 'button'; fg.id = 'opForget'; fg.onclick = () => { L.sfx('click'); S.party = null; L.save(); renderCards(); };
+      row.appendChild(rj); row.appendChild(fg); card.appendChild(row);
+      page.appendChild(card);
+    }
     const mk = el('button', 'btn primary', 'Create room'); mk.type = 'button'; mk.id = 'opCreate';
     mk.onclick = () => { L.sfx('click'); createFlexRoom(); };
     page.appendChild(mk);
@@ -289,7 +301,7 @@
     if (!g.versus) return;
     const mode = inRoom ? 'online' : ((S.vs && S.vs[g.id]) || g.defaultVs || 'bot') === 'friend' ? 'friend' : 'bot';
     box.querySelectorAll('button').forEach(b => {
-      if (b.dataset.vs === 'online') b.hidden = !g.online;
+      if (b.dataset.vs === 'online') b.hidden = true;   // online play lives in the Online section
       const on = b.dataset.vs === mode;
       b.classList.toggle('is-on', on); b.setAttribute('aria-pressed', String(on));
       b.onclick = () => {
@@ -326,10 +338,26 @@
     L.native('wide', { on: false });
     show('game');
   }
-  function createFlexRoom() {   // from the Online page: no game yet, the host picks them in the room
+  // The last party (room code, names, games) is kept in the saved state so the Online page can offer Rejoin. Only "Forget" removes it.
+  function trackParty(s, role) {
+    const save = () => {
+      if (!s.ready) return;
+      S.party = { role, code: s.code, name: L.net.cleanName(S.onlineName, ''), names: s.rosterList().map(p => p.name), games: s.plan.g.slice(), n: s.plan.n, at: Date.now() };
+      L.save();
+    };
+    ['ready', 'roster', 'plan'].forEach(ev => s.on(ev, save));
+  }
+  function rejoinParty() {
+    const p = S.party; if (!p) return;
+    if (p.role === 'host') createFlexRoom(p); else joinFromInvite(p.code);
+  }
+  function createFlexRoom(party) {   // from the Online page: no game yet, the host picks them in the room
     showOnlineShell();
     online = { game: null, session: null, started: false };
-    L.lobby.openRoom(lobbyOps(null));
+    const s = L.lobby.openRoom(lobbyOps(null));
+    if (!s) return;
+    trackParty(s, 'host');
+    if (party && party.games && party.games.length) s.on('ready', () => { s.setPlan(party.games.filter(id => L.games.some(g => g.id === id && g.online)), party.n); });
   }
   function lobbyOps(g) {
     return {
@@ -354,6 +382,7 @@
     toast('Joining room ' + code);
     const s = L.net.joinRoom(code, { gameId: '', name: L.net.cleanName(S.onlineName, '') });
     online = { game: null, session: s, started: false };
+    trackParty(s, 'guest');
     s.on('error', e => { online = null; if (e.code === 'update') L.lobby.notice(...L.lobby.why('update'), () => {}); else toast(L.lobby.why(e.code === 'no-room' || e.code === 'full' || e.code === 'started' ? e.code : 'offline')[0]); });
     s.on('ready', () => {
       if (s.hostPv >= 2) { showOnlineShell(); online = { game: null, session: s, started: false }; L.lobby.attach(null, s, lobbyOps(null)); return; }
@@ -380,6 +409,7 @@
       const mine = () => online && online.session === s;
       const ops = () => lobbyOps(online && online.game);
       s.on('start', ev => { if (!mine()) return; const g2 = gameById(ev.game) || online.game; online.game = g2; online.started = true; L.lobby.hide(); showRound(g2); });
+      s.on('oldpeer', () => { if (mine()) toast('Your friend needs to update Ludus to join this'); });
       s.on('rematch', ev => toast((ev.name || 'Your opponent') + ' wants a rematch'));
       s.on('conn', () => { if (mine()) syncOnlineBar(online.game); });
       s.on('left', ev => {
@@ -738,6 +768,7 @@
   };
   // Test helper: end the current run as if the game called api.over (used by QA/shell-test.js).
   window.ludusOnline = () => online;
+  window.ludusOpenLobby = () => { if (current && current.game && current.game.online) openLobby(current.game); };   // test helper: the old per-game room sheet (no button any more)
   window.ludusForceOver = won => { if (current) current.run.api.over({ score: 0, won: !!won, title: 'Test' }); };   // test helper: end the round now
   window.ludusSnapshot = () => { try { return current && current.instance && current.instance.save ? current.instance.save() : null; } catch (e) { return null; } };   // test helper   // test helper: the current room, if any
   window.ludusTestOver = score => { if (current) current.run.api.over({ score }); };
