@@ -3,6 +3,12 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.9.2 (2026-10-23)
+
+- Geo Guess map tuned to be calmer, like GeoGuessr: one flat soft green for all land (no forest or grass texture),
+  slightly greener parks, pale grey-white built-up areas, thinner and paler roads, and only big cities and country
+  names until you zoom well in (small towns and villages appear later).
+
 ## 1.9.1 (2026-10-23)
 
 - Geo Guess map rebuilt to look and behave like the real GeoGuessr map: a GPU vector map (MapLibre GL, free

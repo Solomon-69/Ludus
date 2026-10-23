@@ -7,9 +7,9 @@
 (function () {
   const HOST = 'https://tiles.openfreemap.org';
   const C = {
-    land: 'rgb(181,229,191)', wood: 'rgb(172,222,183)', park: 'rgb(157,217,166)', pale: 'rgb(246,244,238)', field: 'rgb(236,230,200)',
-    built: 'rgb(235,234,232)', water: 'rgb(138,180,248)', border: 'rgb(150,156,163)', state: 'rgb(190,194,200)',
-    road: 'rgb(250,232,170)', roadMinor: 'rgb(255,255,255)', text: 'rgb(60,64,67)', soft: 'rgb(112,117,122)', sea: 'rgb(86,126,196)'
+    land: 'rgb(193,232,188)', park: 'rgb(179,229,177)', pale: 'rgb(246,244,238)',
+    built: 'rgb(239,237,235)', water: 'rgb(138,180,248)', border: 'rgb(150,156,163)', state: 'rgb(190,194,200)',
+    road: 'rgb(252,240,196)', roadMinor: 'rgb(255,255,255)', text: 'rgb(60,64,67)', soft: 'rgb(112,117,122)', sea: 'rgb(86,126,196)'
   };
   // English first; for names written in another script only the Latin form; plain Latin names as they are.
   const NAME = ['case', ['has', 'name:en'], ['get', 'name:en'], ['has', 'name:nonlatin'], ['coalesce', ['get', 'name:latin'], ''], ['coalesce', ['get', 'name_en'], ['get', 'name'], '']];
@@ -35,12 +35,9 @@
       sources: { ofm: { type: 'vector', url: HOST + '/planet' } },
       layers: [
         { id: 'land', type: 'background', paint: { 'background-color': C.land } },
-        fill('wood', 'landcover', ['==', ['get', 'class'], 'wood'], C.wood),
-        fill('field', 'landcover', ['==', ['get', 'class'], 'farmland'], C.field, { 'fill-opacity': ['interpolate', ['linear'], ['zoom'], 9, 0, 12, 0.35] }),
-        fill('wet', 'landcover', ['==', ['get', 'class'], 'wetland'], 'rgb(168,224,200)', { 'fill-opacity': ['interpolate', ['linear'], ['zoom'], 8, 0, 11, 0.8] }),
         fill('pale', 'landcover', ['match', ['get', 'class'], ['sand', 'rock', 'ice'], true, false], C.pale),
         fill('built', 'landuse', ['match', ['get', 'class'], ['residential', 'commercial', 'retail', 'industrial', 'suburb', 'neighbourhood'], true, false], C.built,
-          { 'fill-opacity': ['interpolate', ['linear'], ['zoom'], 6, 0.35, 9, 0.65, 12, 1] }),
+          { 'fill-opacity': ['interpolate', ['linear'], ['zoom'], 7, 0.2, 9, 0.55, 10.5, 1] }),
         fill('park', 'park', ['all'], C.park, { 'fill-opacity': ['interpolate', ['linear'], ['zoom'], 5, 0, 8, 0.9] }),
         fill('green', 'landuse', ['match', ['get', 'class'], ['park', 'garden', 'cemetery', 'pitch', 'playground', 'zoo'], true, false], C.park, { 'fill-opacity': ['interpolate', ['linear'], ['zoom'], 9, 0, 12, 0.9] }),
         { id: 'stream', type: 'line', source: 'ofm', 'source-layer': 'waterway', minzoom: 10, filter: ['!=', ['get', 'class'], 'river'],
@@ -48,10 +45,10 @@
         { id: 'river', type: 'line', source: 'ofm', 'source-layer': 'waterway', minzoom: 5, filter: ['==', ['get', 'class'], 'river'],
           layout: { 'line-cap': 'round' }, paint: { 'line-color': C.water, 'line-width': lw(5, 0.5, 10, 1.6, 16, 5) } },
         fill('water', 'water', ['all'], C.water),
-        road('minor', ['minor', 'service', 'track'], C.roadMinor, lw(13, 0.6, 17, 3), 13),
-        road('street', ['tertiary', 'secondary'], C.roadMinor, lw(11, 0.6, 17, 4), 11),
-        road('major', ['primary', 'trunk'], C.road, lw(7, 0.5, 11, 1, 17, 5), 7),
-        road('motorway', ['motorway'], C.road, lw(5, 0.5, 11, 1.3, 17, 6), 5),
+        road('minor', ['minor', 'service', 'track'], C.roadMinor, lw(14, 0.4, 17, 2), 14),
+        road('street', ['tertiary', 'secondary'], C.roadMinor, lw(12, 0.4, 17, 2.6), 12),
+        road('major', ['primary', 'trunk'], C.road, lw(7, 0.4, 11, 0.7, 17, 3), 7),
+        road('motorway', ['motorway'], C.road, lw(5, 0.4, 11, 0.9, 17, 3.6), 5),
         { id: 'border-state', type: 'line', source: 'ofm', 'source-layer': 'boundary', minzoom: 4,
           filter: ['all', ['==', ['get', 'admin_level'], 4], ['!=', ['get', 'maritime'], 1]],
           layout: { 'line-join': 'round' }, paint: { 'line-color': C.state, 'line-width': 0.8, 'line-dasharray': [3, 2] } },
@@ -67,12 +64,12 @@
         place('state', ['==', ['get', 'class'], 'state'], 4.5, 8,
           { 'text-size': ['interpolate', ['linear'], ['zoom'], 5, 10, 8, 12], 'text-transform': 'uppercase', 'text-letter-spacing': 0.1 }, { 'text-color': C.soft }),
         place('city', ['==', ['get', 'class'], 'city'], 3, 24,
-          { 'text-size': ['interpolate', ['linear'], ['zoom'], 3, 10, 6, 13, 10, 17] }, {}),
-        place('town', ['==', ['get', 'class'], 'town'], 8.5, 24,
+          { 'text-size': ['interpolate', ['linear'], ['zoom'], 3, 10, 6, 13, 10, 17], 'text-padding': 18 }, {}),
+        place('town', ['==', ['get', 'class'], 'town'], 10.5, 24,
           { 'text-size': ['interpolate', ['linear'], ['zoom'], 7, 11, 11, 14] }, {}),
-        place('village', ['==', ['get', 'class'], 'village'], 12, 24,
+        place('village', ['==', ['get', 'class'], 'village'], 13, 24,
           { 'text-size': ['interpolate', ['linear'], ['zoom'], 10, 11, 14, 13] }, { 'text-color': C.soft }),
-        place('suburb', ['match', ['get', 'class'], ['suburb', 'quarter', 'neighbourhood'], true, false], 12, 24,
+        place('suburb', ['match', ['get', 'class'], ['suburb', 'quarter', 'neighbourhood'], true, false], 13, 24,
           { 'text-size': 11 }, { 'text-color': C.soft }),
         { id: 'street-name', type: 'symbol', source: 'ofm', 'source-layer': 'transportation_name', minzoom: 13,
           filter: ['match', ['get', 'class'], ['motorway', 'trunk', 'primary', 'secondary'], true, false],
