@@ -785,7 +785,13 @@
         card.appendChild(txt('h2', '', 'Needs internet'));
         card.appendChild(txt('p', '', 'Geo Guess loads street photos and maps from the web. Check your connection and try again.'));
         const b = txt('button', 'geo-go', 'Try again'); b.onclick = () => { if (!pool || !miniMap || (restoring && !viewer)) boot(); else if (!started) showSetup(); else startRound(round, restoring); };
-        card.appendChild(b); setCard(true);
+        card.appendChild(b);
+        if (!on && (started || restoring)) {   // a way out of a game that will not come back: start over with new places
+          const n = txt('button', 'geo-chip', 'New game'); n.style.marginTop = '10px';
+          n.onclick = () => { restoring = null; started = false; guesses = []; round = 0; spare = -1; lastSnap = null; pool = null; order = []; api.sfx('click'); boot(); };
+          card.appendChild(n);
+        }
+        setCard(true);
       }
       const chipRow = (opts, cur_, pick, disabled) => {
         const row = el('div', 'geo-chips');

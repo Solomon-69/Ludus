@@ -800,6 +800,9 @@
 
   // ---------- boot ----------
   if (S.filter !== 'All') { S.filter = 'All'; L.save(); }   // Ludus always opens on the All tab
+  // 1.7.1: a Geo Guess save from 1.7 could reopen behind an invisible pause card (blurred map, nothing to press).
+  // Drop that save once, so the game starts clean after the update.
+  if (S.geoReset !== 1) { if (S.saves && S.saves.geoguess) delete S.saves.geoguess; S.geoReset = 1; L.save(); }
   if (S.hidden.length) { S.hidden = []; L.save(); }   // the "Games shown" setting is gone: every game shows
   if (!ACCENTS.includes(S.accent)) { S.accent = ACCENTS[0]; L.save(); }   // e.g. the removed second orange
   applyTheme();
