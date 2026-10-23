@@ -37,20 +37,26 @@
     onlineHint: '<b>Online</b> 2 to 4 players plus bots · steer with the mouse, <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or the arrows · loop back home to claim land · most land at the end wins',
     hint: 'vs Bot: move the mouse or drag to steer, or <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> · loop back home to claim land · vs Friend: <b>P1</b> WASD, <b>P2</b> arrows',
     art(ctx, w, h, c) {
-      ctx.fillStyle = 'rgba(255,255,255,0.18)';
-      ctx.fillRect(0, 0, w, h);
-      const cell = Math.min(w, h) / 9;
-      const blob = (x, y, cw, ch, color) => {
-        ctx.fillStyle = shade(color, -0.22); D.roundRect(ctx, x, y + cell * 0.18, cw, ch, cell * 0.3); ctx.fill();
-        ctx.fillStyle = color; D.roundRect(ctx, x, y, cw, ch, cell * 0.3); ctx.fill();
+      const u = h / 78;
+      ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      ctx.strokeStyle = 'rgba(255,255,255,0.14)'; ctx.lineWidth = 1;
+      const g = 13 * u;
+      for (let x = (w % g) / 2; x < w; x += g) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
+      for (let y = 0; y < h; y += g) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
+      const land = (x, y, bw, bh, color) => {
+        ctx.fillStyle = 'rgba(0,0,0,0.16)'; D.roundRect(ctx, x, y + 3 * u, bw, bh, 6 * u); ctx.fill();
+        ctx.fillStyle = color; D.roundRect(ctx, x, y, bw, bh, 6 * u); ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.28)'; D.roundRect(ctx, x + 2 * u, y + 2 * u, bw - 4 * u, 3 * u, 1.5 * u); ctx.fill();
       };
-      blob(w * 0.08, h * 0.5, cell * 3.6, cell * 3, '#fff8f2');
-      blob(w * 0.58, h * 0.1, cell * 3.2, cell * 2.8, '#5b8def');
-      blob(w * 0.62, h * 0.62, cell * 2.6, cell * 2.2, '#f1c75b');
-      ctx.strokeStyle = 'rgba(255,248,242,0.75)'; ctx.lineWidth = cell * 0.42; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-      ctx.beginPath(); ctx.moveTo(w * 0.3, h * 0.52); ctx.lineTo(w * 0.3, h * 0.2); ctx.lineTo(w * 0.52, h * 0.2); ctx.lineTo(w * 0.52, h * 0.36); ctx.stroke();
-      ctx.fillStyle = '#fff8f2'; ctx.beginPath(); ctx.arc(w * 0.52, h * 0.4, cell * 0.55, 0, TAU); ctx.fill();
-      D.spark(ctx, w * 0.52, h * 0.4, cell * 0.38, '#d97757', 0);
+      land(w * 0.66, h * 0.1, w * 0.26, h * 0.34, '#5b8def');
+      land(w * 0.7, h * 0.58, w * 0.2, h * 0.28, '#f1c75b');
+      const hx = w * 0.46, hy = h * 0.52;
+      ctx.fillStyle = 'rgba(255,248,242,0.24)'; D.roundRect(ctx, w * 0.22, h * 0.2, hx - w * 0.22, h * 0.32, 4 * u); ctx.fill();
+      land(w * 0.07, h * 0.5, w * 0.27, h * 0.38, '#fff8f2');
+      ctx.strokeStyle = 'rgba(255,248,242,0.8)'; ctx.lineWidth = 6 * u;
+      ctx.beginPath(); ctx.moveTo(w * 0.22, h * 0.52); ctx.lineTo(w * 0.22, h * 0.2); ctx.lineTo(hx, h * 0.2); ctx.lineTo(hx, hy - 4 * u); ctx.stroke();
+      ctx.fillStyle = '#fff8f2'; ctx.beginPath(); ctx.arc(hx, hy, 8.5 * u, 0, TAU); ctx.fill();
+      D.spark(ctx, hx, hy, 6.5 * u, '#d97757', 0);
     },
     create(stage, api) {
       const view = api.canvas();
