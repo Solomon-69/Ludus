@@ -75,8 +75,7 @@ foreach ($reset in @(0, 1)) {
   $cG = $rG.check | ConvertFrom-Json
   Write-Host "geo resume ($reset): $($rG.check)"
   Check (-not $cG.blurredWithoutMenu) "geo resume ($reset): never blurred without a menu"
-  if ($reset -eq 0) { Check (-not $cG.paused) 'geo resume: first start after the update drops the 1.7 save (fresh game, no pause card)' }
-  else { Check ($cG.paused -and $cG.pauseOnTop) 'geo resume: an older save reopens with the Welcome back card visible on top' }
+  Check ((-not $cG.paused) -and (-not ($cG.saved -contains 'geoguess'))) "geo resume ($reset): the stuck 1.7 save is dropped, Geo Guess opens a fresh game"
   Start-Sleep -Seconds 4
   $bG = $rG.panelBounds
   Save-Crop (Join-Path $Shots "05c-ludus-geo-resume$reset.png") $bG[0] $bG[1] $bG[2] $bG[3]

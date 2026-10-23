@@ -3,6 +3,12 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.8.1 (2026-10-23)
+
+- Geo Guess no longer saves a game to resume later: every open starts a fresh game (pause still works while it is
+  open, best score kept). Any old Geo Guess save is removed. A damaged best score counts as none.
+- Geo Guess cover: no dashed centre line.
+
 ## 1.8.0 (2026-10-23)
 
 - Crash failsafe: if a game throws, freezes or loses its graphics, a calm recovery card (Try again, New game, Back to

@@ -16,18 +16,17 @@ async function open(b, extra, route) {
 }
 (async () => {
   const b = await L.chromium ? null : null; const br = await require('playwright-core').chromium.launch({ executablePath: process.env.CHROME || undefined, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] }).catch(() => L.launch());
-  // A: the exact 1.7 save, already past the one-time reset: Welcome back card visible, Resume works, next round shows a photo
+  // A: his exact 1.7 save (the stuck "blurred map" state): Geo Guess never resumes now, it opens a fresh game
   let p = await open(br, { saves: { geoguess: SAVE }, geoReset: 1 });
-  await p.waitForFunction(() => window.ludusDebug.geo && window.ludusDebug.geo().phase === 'result', null, { timeout: 30000 });
-  await wait(800); await shot(p, 'resume_A_welcome');
-  check('A: 1.7 save opens with the Welcome back card on top', (await st(p)).paused && await onTop(p, '#resumeBtn'));
-  check('A: Restart (new game) is reachable too', await onTop(p, '#restartBtn'));
-  await p.click('#resumeBtn'); await wait(500);
-  check('A: after Resume nothing is blurred', !(await p.evaluate(() => !!document.querySelector('.geo.geo-paused'))));
-  check('A: pause button shows the pause card', await (async () => { await p.click('#pauseBtn'); await wait(300); const ok = await onTop(p, '#resumeBtn'); await p.click('#resumeBtn'); await wait(300); return ok; })());
-  await p.keyboard.press('Enter');
+  await p.waitForFunction(() => window.ludusDebug.geo && window.ludusDebug.geo().phase === 'setup', null, { timeout: 30000 }).catch(() => {});
+  await wait(600); await shot(p, 'resume_A_fresh');
+  check('A: stuck 1.7 save opens a fresh game (setup card, no pause, nothing blurred)', (await G(p)).phase === 'setup' && !(await st(p)).paused && await onTop(p, '.geo-go') && !(await p.evaluate(() => !!document.querySelector('.geo.geo-paused'))), [await G(p), await st(p)]);
+  check('A: the old Geo save is gone', !(await st(p)).saved.includes('geoguess'));
+  await p.click('.geo-go');
   await p.waitForFunction(() => window.ludusDebug.geo().phase === 'play', null, { timeout: 60000 }).catch(() => {});
-  check('A: next round plays with the photo showing', (await G(p)).phase === 'play' && await p.evaluate(() => document.querySelector('.geo-load').hidden && !!document.querySelector('.geo-pano canvas')), await G(p));
+  check('A: the round plays with the photo showing', (await G(p)).phase === 'play' && await p.evaluate(() => document.querySelector('.geo-load').hidden && !!document.querySelector('.geo-pano canvas')), await G(p));
+  check('A: pause shows the pause card, Resume continues', await (async () => { await p.click('#pauseBtn'); await wait(300); const ok = await onTop(p, '#resumeBtn'); await p.click('#resumeBtn'); await wait(300); return ok && !(await p.evaluate(() => !!document.querySelector('.geo.geo-paused'))); })());
+  check('A: nothing is saved mid-game', await p.evaluate(() => window.ludusSnapshot()) === null);
   await shot(p, 'resume_A_play');
   check('A: no page errors', real(p.errors).length === 0, real(p.errors)); await p.context().close();
   // B: the update drops a 1.7 save once
@@ -43,11 +42,12 @@ async function open(b, extra, route) {
   // D: photo server fails during a resumed round
   const playSave = Object.assign({}, SAVE, { phase: 'play', gs: [], round: 0, left: 40 });
   p = await open(br, { saves: { geoguess: playSave }, geoReset: 1 }, { re: /panoramax/, fn: r => /\/api\/?$/.test(r.request().url()) ? r.continue() : r.abort() });
-  await p.click('#resumeBtn').catch(() => {});
+  await p.waitForFunction(() => window.ludusDebug.geo().phase === 'setup', null, { timeout: 30000 }).catch(() => {});
+  await p.click('.geo-go').catch(() => {});
   await p.waitForFunction(() => window.ludusDebug.geo().phase === 'offline', null, { timeout: 120000 }).catch(() => {});
   if ((await st(p)).paused) { await p.click('#resumeBtn'); await wait(400); }
   await wait(500); await shot(p, 'resume_D_failing');
-  check('D: failing photo server ends on a visible card with Try again and New game', (await G(p)).phase === 'offline' && await onTop(p, '.geo-card .geo-go') && await onTop(p, '.geo-card .geo-chip'), await G(p));
+  check('D: failing photo server ends on a visible card with Try again', (await G(p)).phase === 'offline' && await onTop(p, '.geo-card .geo-go'), await G(p));
   check('D: not blurred behind it', !(await p.evaluate(() => !!document.querySelector('.geo.geo-paused'))));
   await p.context().close();
   // E: no internet at all
@@ -56,7 +56,7 @@ async function open(b, extra, route) {
   await p.waitForFunction(() => window.ludusDebug.geo().phase === 'offline', null, { timeout: 60000 }).catch(() => {});
   if ((await st(p)).paused) { await p.click('#resumeBtn'); await wait(400); }
   await wait(800);
-  check('E: offline: Needs internet card visible with New game', (await G(p)).phase === 'offline' && await onTop(p, '.geo-card .geo-go') && await onTop(p, '.geo-card .geo-chip'), await G(p));
+  check('E: offline: Needs internet card visible with Try again', (await G(p)).phase === 'offline' && await onTop(p, '.geo-card .geo-go'), await G(p));
   await shot(p, 'resume_E_offline'); console.log('E dbg', JSON.stringify(await p.evaluate(() => { const c = document.querySelector('.geo-card'), e = c.querySelector('h2'), b = c.querySelector('.geo-go'), r = b.getBoundingClientRect(), h = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return { h2: [getComputedStyle(e).color, getComputedStyle(e).opacity, getComputedStyle(e).visibility, getComputedStyle(c).color], hit: [r.left, r.top, h && h.className, h && h.id] }; }))); await p.context().close();
   await br.close(); const f = L.results.filter(x => !x).length; console.log(`${L.results.length - f}/${L.results.length}`); process.exit(f ? 1 : 0);
 })().catch(e => { console.error('THREW', e); process.exit(2); });

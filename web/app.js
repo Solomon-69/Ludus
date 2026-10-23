@@ -822,7 +822,7 @@
       appRows.push(row('Quit Ludus', null, q));
     }
     body.appendChild(group('App', appRows));
-    body.appendChild(el('div', 'foot', 'Ludus 1.8.0'));
+    body.appendChild(el('div', 'foot', 'Ludus 1.8.1'));
   }
   $('openSettings').onclick = () => { renderSettings(); show('settings'); L.sfx('tap'); };
   $('settingsBack').onclick = () => { show('home'); renderCards(); };
@@ -890,7 +890,12 @@
   if (S.filter !== 'All') { S.filter = 'All'; L.save(); }   // Ludus always opens on the All tab
   // 1.7.1: a Geo Guess save from 1.7 could reopen behind an invisible pause card (blurred map, nothing to press).
   // Drop that save once, so the game starts clean after the update.
-  if (S.geoReset !== 1) { if (S.saves && S.saves.geoguess) delete S.saves.geoguess; S.geoReset = 1; L.save(); }
+  // Geo Guess is never saved mid-game (every open is a fresh game): drop any old Geo save, whatever version wrote it.
+  if (S.saves && S.saves.geoguess) { delete S.saves.geoguess; L.save(); }
+  S.geoReset = 1;
+  // Best scores: anything that is not a plain number (a damaged file) counts as no score, never blocks a game.
+  if (S.best && typeof S.best === 'object') Object.keys(S.best).forEach(k => { const v = S.best[k]; if (typeof v !== 'number' || !Number.isFinite(v) || v < 0) { delete S.best[k]; } });
+  else S.best = {};
   if (S.hidden.length) { S.hidden = []; L.save(); }   // the "Games shown" setting is gone: every game shows
   if (!ACCENTS.includes(S.accent)) { S.accent = ACCENTS[0]; L.save(); }   // e.g. the removed second orange
   applyTheme();

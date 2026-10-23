@@ -283,7 +283,6 @@
       };
       ctx.strokeStyle = '#e0d2b0'; ctx.lineWidth = 5.6 * u; roads(); ctx.stroke();
       ctx.strokeStyle = '#fffaf0'; ctx.lineWidth = 3.8 * u; roads(); ctx.stroke();
-      ctx.strokeStyle = '#ecdcb8'; ctx.lineWidth = 1 * u; ctx.setLineDash([3 * u, 3 * u]); ctx.beginPath(); ctx.moveTo(pw * 1.3, h * 0.22); ctx.lineTo(pw * 1.3, h); ctx.stroke(); ctx.setLineDash([]);
       for (let i = 1; i < 3; i++) {   // faint folds
         const fx = i * pw, g = ctx.createLinearGradient(fx - 5 * u, 0, fx + 5 * u, 0);
         g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(0.5, 'rgba(0,0,0,0.07)'); g.addColorStop(1, 'rgba(0,0,0,0)');
@@ -346,7 +345,7 @@
       let miniMap = null, miniPin = null, miniLayer = null, pin = null, resMap = null, resLayers = [], resAnim = null;
       let guesses = [], ready = new Set(), started = false, destroyed = false, autoAt = 0, paused = false;
       let sizeLv = Number.isInteger(saved.map) && saved.map >= 0 && saved.map < MAP_SIZES.length ? saved.map : 1, pinned = !!saved.lock;
-      let restoring = on ? null : validSnap(api.saved);   // a saved solo game to resume, until it is back on screen
+      let restoring = null;   // Geo Guess never resumes a game: every open starts fresh (pause still works while it is open)
       const offs = [];
       const later = (fn, ms) => { const id = setTimeout(() => { if (!destroyed) fn(); }, ms); offs.push(() => clearTimeout(id)); return id; };
       const seats = () => on ? on.seats.slice() : [0];
@@ -945,7 +944,6 @@
         };
       }
       return {
-        save: snapshot,
         pause() { paused = true; root.classList.add('geo-paused'); },
         resume() { paused = false; root.classList.remove('geo-paused'); },
         destroy() {
