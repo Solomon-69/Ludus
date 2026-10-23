@@ -12,7 +12,7 @@ games, rounds in the saved state as `party`) and offers **Rejoin**; only **Forge
 * The host picks one or more games (those whose `online.min..max` fits the players in the room) and **rounds per game**:
   1, 3, 5, or **Tournament** (every picked game once, in order). One game and one round is a plain game (old flow, no scoreboard).
 * Every screen reports `won` for its round (`api.over({won})`); the host adds it up (`Session.reportResult`, message kind `tr`)
-  and shows the scoreboard card ("Round 2 of 3 · Next: Pong"), then starts the next round by itself after 6 s (or at Start now).
+  and shows the scoreboard card ("Round 2 of 3 · Next: paddle game"), then starts the next round by itself after 6 s (or at Start now).
   Final standings with the winner; the host can **Rematch** (scores reset) or go **Back to lobby**.
 * The scoreboard is keyed by the player's id, so it survives seat changes. A player who leaves keeps their wins. The host
   closes seat gaps at each round start. If the game still has enough players the tournament goes on (games that no longer fit
@@ -96,14 +96,14 @@ that the host sees **Start now** as soon as `min` players are in. Seats are 0-3 
 accent, blue, green and purple. When a player leaves and at least `min` remain, the game goes on (use `onLeave`);
 below `min` the app ends the room. The home screen has no 3-4 Player tab any more: parties of 2, 3 or 4 all start from the **Online** tab (the host picks games that fit the party).
 
-## Real-time games (Pong, Air Hockey, Tag, Paper.io, Hole.io)
+## Real-time games (paddle game, Air Hockey, Tag, claim-the-land game, swallow-the-city game)
 
 These use `web/rt.js`. **The host's screen runs the game** (physics, bots, scoring) and ~18 times a second sends a
 compact copy of the state with `sendFast('st', ...)`. Every guest sends only its controls (`sendFastTo(0, 'in', ...)`,
 on change and every 200 ms) and draws the host's copy, smoothed between the last two copies (`link.sample()`, drawn
-about 90 ms in the past). Things that must not be lost go over the normal numbered messages instead: Paper.io sends
-changed territory rows (`terr`, run-length coded), Hole.io sends eaten objects (`gone`) and new cars (`spawn`), every
-game sends the final result (`end`). Hole.io builds its city from the shared `rand()` stream, so every screen starts
+about 90 ms in the past). Things that must not be lost go over the normal numbered messages instead: claim-the-land game sends
+changed territory rows (`terr`, run-length coded), swallow-the-city game sends eaten objects (`gone`) and new cars (`spawn`), every
+game sends the final result (`end`). swallow-the-city game builds its city from the shared `rand()` stream, so every screen starts
 with the same city and only the changes travel. A guest validates every number it reads from a state copy.
 Known limits: the host's tab must stay in front (a hidden browser tab slows its timers); a guest sees the world
 about 0.1 s late; if the host leaves the room closes.
@@ -141,8 +141,8 @@ about 0.1 s late; if the host leaves the room closes.
 
 `Ludus.rt` sends only what changed (a full state about every 10th time), 24-30 times a second; the guest's own controls go as
 changes (at most 30/s) plus a full set every 150 ms, stamped with the guest's clock. The host echoes the stamp (`ak`) in each
-state copy. `link.predictor({pick, snap})` moves the guest's **own** thing locally every frame from its own controls (Pong
-paddle, Hockey mallet, Tag player, Paper.io and Hole.io heads) and compares the host's copy with where this screen had it at that
+state copy. `link.predictor({pick, snap})` moves the guest's **own** thing locally every frame from its own controls (paddle game
+paddle, Hockey mallet, Tag player, claim-the-land game and swallow-the-city game heads) and compares the host's copy with where this screen had it at that
 same moment, easing the difference away (snapping only above `snap`). Everything else is drawn about 100 ms in the past between two
 copies and, when copies run late, carried on at the last speed for up to 150 ms (`sample().t` goes above 1). Rendering never waits
 for the network.

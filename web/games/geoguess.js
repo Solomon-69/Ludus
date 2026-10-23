@@ -180,6 +180,7 @@
 .geo[data-mv=nomove] .geo-hs,.geo[data-mv=nmpz] .geo-hs,.geo[data-mv=nomove] .geo-home,.geo[data-mv=nmpz] .geo-home{display:none!important}
 .geo-credit{position:absolute;right:0;bottom:0;z-index:600;font:500 9px/1 var(--font);color:#333;background:rgba(255,255,255,.7);padding:2px 5px;border-top-left-radius:6px;pointer-events:none;white-space:nowrap}
 .geo-credit i{font-style:normal}
+.geo-photocredit{right:auto;left:0;bottom:0;border-top-left-radius:0;border-top-right-radius:6px}
 .geo-mini:not(.open) .geo-credit{display:none}
 .geo-guess{height:40px;border:0;border-radius:999px;font:italic 800 14px var(--font-round);letter-spacing:.06em;text-transform:uppercase;color:#fff;background:#6cb928;cursor:pointer;box-shadow:inset 0 -3px 0 rgba(0,0,0,.16),0 6px 16px -6px rgba(0,0,0,.6);transition:transform .15s var(--spring),filter .15s,background .2s;white-space:nowrap;overflow:hidden;text-align:center;padding:0 12px}
 .geo-guess:hover:not(:disabled){filter:brightness(1.08)}
@@ -324,6 +325,7 @@
       const scoreEl = el('div', 'geo-score geo-glass'); root.appendChild(scoreEl);
       const homeBtn = el('button', 'geo-home geo-glass', HOME_ICON); homeBtn.title = 'Back to the start'; homeBtn.setAttribute('aria-label', 'Back to the start'); root.appendChild(homeBtn);
       const mini = el('div', 'geo-mini'); root.appendChild(mini);
+      const photoCredit = txt('div', 'geo-credit geo-photocredit', 'Photos: Panoramax contributors, CC BY-SA 4.0 or Etalab 2.0'); photoCredit.title = 'Street photos come from Panoramax (panoramax.fr). Each photo belongs to its author and is shared under the licence shown on Panoramax.'; root.appendChild(photoCredit);
       const mapBox = el('div', 'geo-mapbox'); mini.appendChild(mapBox);
       const miniMapEl = el('div', 'geo-minimap'); mapBox.appendChild(miniMapEl);
       const miniCredit = el('div', 'geo-credit'); mapBox.appendChild(miniCredit);
