@@ -2,7 +2,8 @@
    coverage note is shown; name the country. Pick one of four (keys 1-4) or type it. Three lives, streak scoring.
    Online: a race over the same ten clues, 15 seconds each, faster right answers score more.
    Clue data: games/metaspot/data.js (compiled from geohints.com, plonkit.net and Wikipedia). Drawings are simple
-   pictures made from the colours and shapes in those guides, not photos. */
+   pictures, not photos: bollards were measured from GeoHints photos and show the front and the back side by side;
+   plates and chevrons were checked against photos; road lines follow the guides' descriptions. */
 (function () {
   const K = Ludus.dom;
   const DATA = 'games/metaspot/data.js';
@@ -22,7 +23,50 @@
     return `<defs><linearGradient id="mssk${u}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#cfe3f2"/><stop offset="1" stop-color="#eef3f6"/></linearGradient></defs>
       <rect width="600" height="300" fill="url(#mssk${u})"/><path d="M0 190 Q150 170 300 185 T600 180 V300 H0Z" fill="#9fbf7a"/><path d="M0 230 L600 215 V300 H0Z" fill="#7da35c"/>${inner}`;
   }
+  // One post seen from one side (newer data: bollard.front / bollard.back). Positions are fractions of the post height.
+  const num = (v, d) => Number.isFinite(v) ? v : d;
+  function post(S, cx, base, h, label) {
+    const u = ++U, w = Math.max(0.12, Math.min(0.45, num(S.width, 0.25))) * h, x0 = cx - w / 2, top = base - h;
+    const sh = S.shape || 'flat-top';
+    let outline;
+    if (sh === 'round-top') outline = `M${x0} ${base} V${top + w / 2} A${w / 2} ${w / 2} 0 0 1 ${x0 + w} ${top + w / 2} V${base}Z`;
+    else if (sh === 'slanted-top') outline = `M${x0} ${base} V${top + w * 0.45} L${x0 + w} ${top} V${base}Z`;
+    else if (sh === 'pointed-top') outline = `M${x0} ${base} V${top + w * 0.5} L${cx} ${top} L${x0 + w} ${top + w * 0.5} V${base}Z`;
+    else outline = `M${x0} ${base} V${top} H${x0 + w} V${base}Z`;
+    let g = `<clipPath id="mspc${u}"><path d="${outline}"/></clipPath><path d="${outline}" fill="${col(S.body) || '#fff'}"/><g clip-path="url(#mspc${u})">`;
+    if (sh === 'triangular') g += `<rect x="${cx - 1}" y="${top}" width="2" height="${h}" fill="rgba(0,0,0,.12)"/>`;
+    let outer = '';
+    for (const p of Array.isArray(S.parts) ? S.parts : []) {
+      const c = col(p && p.color); if (!c) continue;
+      if (p.type === 'reflector' && num(p.w, 0) > 1) { outer += `<circle cx="${cx}" cy="${top + num(p.y, 0.05) * h}" r="${(p.w * w) / 2}" fill="${c}" stroke="rgba(0,0,0,.5)" stroke-width="1.5"/>`; continue; }
+      if (p.type === 'band') {
+        const y1 = top + num(p.from, 0) * h, y2 = top + num(p.to, 0) * h, sl = num(p.slant, 0) * w * 0.35;
+        g += `<path d="M${x0 - 2} ${y1 - sl} L${x0 + w + 2} ${y1 + sl} L${x0 + w + 2} ${y2 + sl} L${x0 - 2} ${y2 - sl}Z" fill="${c}"/>`;
+      } else if (p.type === 'reflector') {
+        const rw = Math.max(4, num(p.w, 0.5) * w), rh = Math.max(4, num(p.h, 0.08) * h), ry = top + num(p.y, 0.1) * h;
+        const st = `fill="${c}" stroke="rgba(0,0,0,.45)" stroke-width="1"`;
+        if (p.shape === 'round') g += `<circle cx="${cx}" cy="${ry}" r="${Math.min(rw, rh) / 2}" ${st}/>`;
+        else if (p.shape === 'diamond') g += `<path d="M${cx} ${ry - rh / 2} L${cx + rw / 2} ${ry} L${cx} ${ry + rh / 2} L${cx - rw / 2} ${ry}Z" ${st}/>`;
+        else if (p.shape === 'two-dots') { const r = Math.min(rw / 4.5, rh / 2); g += `<circle cx="${cx}" cy="${ry - r * 1.2}" r="${r}" ${st}/><circle cx="${cx}" cy="${ry + r * 1.2}" r="${r}" ${st}/>`; }
+        else if (p.shape === 'chevron') g += `<path d="M${cx - rw / 2} ${ry - rh / 2} L${cx} ${ry} L${cx + rw / 2} ${ry - rh / 2} L${cx + rw / 2} ${ry + rh / 4} L${cx} ${ry + rh * 0.75} L${cx - rw / 2} ${ry + rh / 4}Z" ${st}/>`;
+        else if (p.shape === 'strip') g += `<rect x="${x0}" y="${ry - rh / 2}" width="${w}" height="${rh}" ${st}/>`;
+        else g += `<rect x="${cx - rw / 2}" y="${ry - rh / 2}" width="${rw}" height="${rh}" rx="2" ${st}/>`;
+      }
+    }
+    g += `</g><path d="${outline}" fill="none" stroke="#1d1d1d" stroke-width="2"/>${outer}<ellipse cx="${cx}" cy="${base + 3}" rx="${w * 0.8}" ry="5" fill="rgba(0,0,0,.25)"/>`;
+    if (label) g += `<text x="${cx}" y="${base + 26}" text-anchor="middle" font-family="-apple-system,'Segoe UI',system-ui,sans-serif" font-weight="700" font-size="15" fill="#ffffff" stroke="rgba(0,0,0,.55)" stroke-width="3" paint-order="stroke">${label}</text>`;
+    return g;
+  }
   function drawBollard(b) {
+    if (b.front) {
+      const two = !!b.back, h = 170, base = 250;
+      let g = post(b.front, two ? 200 : 300, base, h, two ? 'Front' : '');
+      if (two) g += post(b.back, 400, base, h, 'Back');
+      return svg(scene(`<path d="M0 262 L600 252 V300 H0Z" fill="#555a60"/>${g}`));
+    }
+    return drawBollardOld(b);
+  }
+  function drawBollardOld(b) {
     const x = 300, base = 268, h = 150, w = b.shape === 'flat' ? 46 : 34, top = base - h;
     const c = col(b.body) || '#ffffff', cap = col(b.cap), band = col(b.band), ref = col(b.reflector), rs = b.reflectorShape;
     const outline = b.shape === 'round' ? `M${x - w / 2} ${base} L${x - w / 2} ${top + w / 2} A${w / 2} ${w / 2} 0 0 1 ${x + w / 2} ${top + w / 2} L${x + w / 2} ${base}Z` : null;
@@ -103,7 +147,7 @@
     return textClue(kind, c);
   }
   const hasKind = (c, k) => !!(c[k] && (k !== 'language' || c[k].sample || c[k].letters) && (k === 'language' || k === 'bollard' || k === 'plate' || k === 'lines' || k === 'chevron' || c[k].note));
-  const host = u => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch (e) { return ''; } };
+  const host = u => { try { return new URL(u).hostname.split('.').slice(-2).join('.'); } catch (e) { return ''; } };
   function factsHTML(c) {
     const li = [`<li><b>Drives on the ${c.drive === 'L' ? 'left' : 'right'}.</b></li>`];
     for (const k of CLUE_KINDS) if (c[k] && (c[k].note || c[k].sample)) li.push(`<li><b>${LABEL[k]}:</b> ${esc(c[k].note || '')}${k === 'language' && c[k].sample ? ' e.g. “' + esc(c[k].sample) + '”' : ''}${c[k].src && host(c[k].src) ? ` <span class="src">${esc(host(c[k].src))}</span>` : ''}</li>`);
