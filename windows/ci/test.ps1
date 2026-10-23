@@ -67,27 +67,32 @@ Set-Theme $false
 # the page must be laid out at its designed size (400 x 600 DIP) whatever the scale, and fit on screen. ----
 . "$PSScriptRoot/dpi.ps1"
 Write-Host "Display scale range (min,current,max %): $(Dpi-Info)"
-$scales = @(125, 150, 175, 200, 100)
-$i = 0
-foreach ($sc in $scales) {
-  $i++
+Write-Host "Resolutions on offer: $(Res-Modes)"
+# Each case: resolution, then display scale. Small laptop screens at 125% are where the panel used to squash.
+$cases = @(@(1024,768,125), @(1366,768,125), @(1366,768,150), @(1920,1080,150), @(1920,1080,175), @(1920,1080,200), @(1024,768,100))
+foreach ($case in $cases) {
+  $rw, $rh, $sc = $case
+  [void](Dpi-Set 100)
+  if ((Res-Set $rw $rh) -ne 'ok') { Write-Host "resolution ${rw}x${rh} not available, skipped"; continue }
   $res = Dpi-Set $sc
-  if ($res -ne 'ok') { Write-Host "scale $sc% not available on this machine ($res), skipped"; continue }
-  $jsonS = Join-Path $Shots "ludus-selftest-dpi$sc.json"
+  if ($res -ne 'ok') { Write-Host "scale $sc% not available at ${rw}x${rh} ($res), skipped"; continue }
+  $tag = "${rw}x${rh}-$sc"
+  $jsonS = Join-Path $Shots "ludus-selftest-dpi$tag.json"
   $pS = Start-App $Exe @('--test-open', "--selftest=$jsonS")
-  Check (Wait-File $jsonS 120) "scale ${sc}%: self-test file written"
+  Check (Wait-File $jsonS 120) "${tag}: self-test file written"
   $rs = Get-Content $jsonS -Raw | ConvertFrom-Json
   $pg = $rs.page | ConvertFrom-Json
-  Write-Host "scale ${sc}%: monitorScale=$($rs.monitorScale) fitZoom=$($rs.fitZoom) panel=$($rs.panelBounds -join 'x') page=$($rs.page) screen=$($rs.screen -join 'x')"
-  Check ([math]::Abs($rs.monitorScale - $sc / 100.0) -lt 0.01) "scale ${sc}%: Windows reports that scale to the app"
-  Check (($rs.panelBounds[0] -ge 0) -and ($rs.panelBounds[1] -ge 0) -and (($rs.panelBounds[0] + $rs.panelBounds[2]) -le $rs.screen[0]) -and (($rs.panelBounds[1] + $rs.panelBounds[3]) -le $rs.screen[1])) "scale ${sc}%: panel fully on screen"
-  Check (([math]::Abs($pg.w - 400) -le 1) -and ([math]::Abs($pg.h - 600) -le 1)) "scale ${sc}%: page laid out at its designed 400x600 (got $($pg.w)x$($pg.h)), not squashed"
-  Check ($pg.sw -le $pg.w + 1) "scale ${sc}%: no sideways overflow"
+  Write-Host "${tag}: monitorScale=$($rs.monitorScale) fitZoom=$($rs.fitZoom) panel=$($rs.panelBounds -join 'x') page=$($rs.page) screen=$($rs.screen -join 'x')"
+  Check ([math]::Abs($rs.monitorScale - $sc / 100.0) -lt 0.01) "${tag}: Windows reports that scale to the app"
+  Check (($rs.panelBounds[0] -ge 0) -and ($rs.panelBounds[1] -ge 0) -and (($rs.panelBounds[0] + $rs.panelBounds[2]) -le $rs.screen[0]) -and (($rs.panelBounds[1] + $rs.panelBounds[3]) -le $rs.screen[1])) "${tag}: panel fully on screen"
+  Check (([math]::Abs($pg.w - 400) -le 1) -and ([math]::Abs($pg.h - 600) -le 1)) "${tag}: page laid out at its designed 400x600 (got $($pg.w)x$($pg.h)), not squashed"
+  Check ($pg.sw -le $pg.w + 1) "${tag}: no sideways overflow"
   Start-Sleep -Seconds 1
-  Save-Screen (Join-Path $Shots ("11-dpi-$sc-desktop.png"))
+  Save-Screen (Join-Path $Shots ("11-dpi-$tag-desktop.png"))
   $b = $rs.panelBounds
-  Save-Crop (Join-Path $Shots ("11-dpi-$sc-panel.png")) $b[0] $b[1] $b[2] $b[3]
-  Check (Quit-App $Exe 'Ludus') "scale ${sc}%: clean quit"
+  Save-Crop (Join-Path $Shots ("11-dpi-$tag-panel.png")) $b[0] $b[1] $b[2] $b[3]
+  Check (Quit-App $Exe 'Ludus') "${tag}: clean quit"
 }
 [void](Dpi-Set 100)
+[void](Res-Set 1024 768)
 Finish
