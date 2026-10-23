@@ -299,25 +299,33 @@
     hint: 'The mouse moves the hammer head. Plant it, keep moving to lever yourself · <kbd>←</kbd><kbd>→</kbd> swing <kbd>↑</kbd><kbd>↓</kbd> reach · <kbd>-</kbd><kbd>+</kbd> sensitivity',
     _rules: { build, makeWorld, step, newState, clampArm, probe, DIFFS, START, HL, HMIN, PR, HR, STEP, VIEW },
     art(ctx, w, h) {
-      // a mountain range rising to the right: boulders, an orange cliff, a snowy peak with a flag, the pot on the way
-      ctx.fillStyle = 'rgba(255,255,255,0.22)';
-      ctx.beginPath(); ctx.moveTo(-5, h); ctx.lineTo(w * 0.1, h * 0.82); ctx.lineTo(w * 0.24, h * 0.76); ctx.lineTo(w * 0.32, h * 0.56);
-      ctx.lineTo(w * 0.44, h * 0.62); ctx.lineTo(w * 0.56, h * 0.44); ctx.lineTo(w * 0.66, h * 0.4); ctx.lineTo(w * 0.8, h * 0.12);
-      ctx.lineTo(w * 0.9, h * 0.22); ctx.lineTo(w + 5, h * 0.3); ctx.lineTo(w + 5, h); ctx.fill();
-      ctx.fillStyle = 'rgba(255,255,255,0.8)';
-      ctx.beginPath(); ctx.moveTo(w * 0.75, h * 0.2); ctx.lineTo(w * 0.8, h * 0.12); ctx.lineTo(w * 0.86, h * 0.18); ctx.lineTo(w * 0.8, h * 0.17); ctx.fill();
-      ctx.fillStyle = 'rgba(255,255,255,0.35)';
-      [[0.12, 0.9, 0.09], [0.24, 0.84, 0.07], [0.18, 0.97, 0.1]].forEach(([x, y, r]) => { ctx.beginPath(); ctx.ellipse(w * x, h * y, w * r, h * r * 0.9, 0, 0, Math.PI * 2); ctx.fill(); });
-      ctx.fillStyle = '#e8925a'; ctx.globalAlpha = 0.9;
-      ctx.beginPath(); ctx.ellipse(w * 0.55, h * 0.5, w * 0.07, h * 0.07, 0, 0, Math.PI * 2); ctx.ellipse(w * 0.6, h * 0.6, w * 0.06, h * 0.06, 0, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1;
-      ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(w * 0.8, h * 0.12); ctx.lineTo(w * 0.8, -h * 0.04); ctx.stroke();
-      ctx.fillStyle = '#fffaf2'; ctx.beginPath(); ctx.moveTo(w * 0.8, -h * 0.04); ctx.lineTo(w * 0.87, -h * 0.01); ctx.lineTo(w * 0.8, h * 0.02); ctx.fill();
-      const px = w * 0.3, py = h * 0.66, r = h * 0.09;
-      ctx.strokeStyle = '#2b2722'; ctx.lineWidth = 3; ctx.lineCap = 'round';
-      ctx.beginPath(); ctx.moveTo(px, py - r * 0.6); ctx.lineTo(w * 0.5, h * 0.44); ctx.stroke();
-      ctx.fillStyle = '#2b2722'; ctx.save(); ctx.translate(w * 0.5, h * 0.44); ctx.rotate(-0.8); D.roundRect(ctx, -8, -4.5, 16, 9, 3); ctx.fill(); ctx.restore();
-      ctx.fillStyle = '#b8603f'; ctx.beginPath(); ctx.moveTo(px - r * 1.1, py - r * 0.5); ctx.lineTo(px + r * 1.1, py - r * 0.5); ctx.lineTo(px + r * 0.8, py + r * 0.7); ctx.lineTo(px - r * 0.8, py + r * 0.7); ctx.closePath(); ctx.fill();
-      D.spark(ctx, px, py - r * 0.9, r * 0.75, '#fffaf2', 0.3);
+      // one clear climb: a far range for depth, a stepped mountain with a snowy peak and flag, the pot on the first ledge,
+      // the hammer reaching from the pot to hook the next ledge
+      const X = v => w * v, Y = v => h * v;
+      ctx.fillStyle = 'rgba(255,255,255,0.12)';
+      ctx.beginPath(); ctx.moveTo(-5, h); ctx.lineTo(-5, Y(0.5)); ctx.lineTo(X(0.18), Y(0.36)); ctx.lineTo(X(0.34), Y(0.5)); ctx.lineTo(X(0.5), Y(0.3)); ctx.lineTo(X(0.7), Y(0.52)); ctx.lineTo(w + 5, Y(0.4)); ctx.lineTo(w + 5, h); ctx.fill();
+      const ridge = [[-0.05, 0.9], [0.14, 0.84], [0.36, 0.78], [0.42, 0.62], [0.64, 0.56], [0.7, 0.4], [0.84, 0.3], [1.05, 0.3]];
+      const trace = () => { ctx.beginPath(); ctx.moveTo(X(ridge[0][0]), h + 5); ridge.forEach(([x, y]) => ctx.lineTo(X(x), Y(y))); ctx.lineTo(w + 5, h + 5); ctx.closePath(); };
+      ctx.fillStyle = 'rgba(255,255,255,0.3)'; trace(); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 1.5; ctx.lineJoin = 'round';
+      ctx.beginPath(); ridge.forEach(([x, y], i) => i ? ctx.lineTo(X(x), Y(y)) : ctx.moveTo(X(x), Y(y))); ctx.stroke();
+      // an orange boulder on the second ledge and a snowy cap on the peak
+      ctx.fillStyle = '#e8925a'; ctx.beginPath(); ctx.ellipse(X(0.56), Y(0.545), w * 0.06, h * 0.075, 0, Math.PI, 0); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#fffaf2';
+      ctx.beginPath(); ctx.moveTo(X(0.77), Y(0.345)); ctx.lineTo(X(0.84), Y(0.3)); ctx.lineTo(X(1.02), Y(0.3)); ctx.lineTo(X(1.02), Y(0.34)); ctx.lineTo(X(0.94), Y(0.37)); ctx.lineTo(X(0.88), Y(0.345)); ctx.closePath(); ctx.fill();
+      // flag on the peak, fully inside the card
+      ctx.strokeStyle = '#fffaf2'; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(X(0.88), Y(0.3)); ctx.lineTo(X(0.88), Y(0.1)); ctx.stroke();
+      ctx.fillStyle = '#e8925a'; ctx.beginPath(); ctx.moveTo(X(0.88), Y(0.1)); ctx.lineTo(X(0.96), Y(0.14)); ctx.lineTo(X(0.88), Y(0.18)); ctx.fill();
+      // the pot, sitting on the first ledge
+      const px = X(0.2), by = Y(0.83), r = h * 0.1;
+      ctx.fillStyle = '#b8603f';
+      ctx.beginPath(); ctx.moveTo(px - r * 1.05, by - r * 1.5); ctx.lineTo(px + r * 1.05, by - r * 1.5); ctx.lineTo(px + r * 0.75, by); ctx.lineTo(px - r * 0.75, by); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#d27650'; ctx.fillRect(px - r * 1.15, by - r * 1.75, r * 2.3, r * 0.4);
+      // the hammer: shaft from the pot rim, head hooked over the second ledge
+      const hx0 = px + r * 0.9, hy0 = by - r * 1.5, hx1 = X(0.42), hy1 = Y(0.6), ang = Math.atan2(hy1 - hy0, hx1 - hx0);
+      ctx.strokeStyle = '#2b2722'; ctx.lineWidth = 3.4; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(hx0, hy0); ctx.lineTo(hx1, hy1); ctx.stroke();
+      ctx.fillStyle = '#2b2722'; ctx.save(); ctx.translate(hx1, hy1); ctx.rotate(ang + Math.PI / 2); D.roundRect(ctx, -h * 0.05, -h * 0.025, h * 0.1, h * 0.05, 3); ctx.fill(); ctx.restore();
     },
     create(stage, api) {
       const view = api.canvas(() => {});
