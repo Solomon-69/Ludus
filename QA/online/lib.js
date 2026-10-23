@@ -11,7 +11,7 @@ if (!fs.existsSync(OLD)) { fs.mkdirSync(path.join(__dirname, '.old'), { recursiv
 const wait = ms => new Promise(r => setTimeout(r, ms));
 const results = [];
 const check = (name, ok, info) => { results.push(!!ok); console.log((ok ? 'PASS ' : 'FAIL ') + name + (!ok && info !== undefined ? '  ' + JSON.stringify(info).slice(0, 400) : '')); };
-const launch = () => chromium.launch({ executablePath: CHROME });
+const launch = () => chromium.launch({ executablePath: CHROME, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
 async function newPage(browser, br, o = {}) {
   const ctx = await browser.newContext({ viewport: o.size || { width: 400, height: 600 }, colorScheme: o.dark ? 'dark' : 'light', deviceScaleFactor: 1 });
   const page = await ctx.newPage(); page.errors = [];
@@ -34,7 +34,7 @@ const rows = page => page.$$eval('#lobbyCard .seat', els => els.map(e => e.inner
 const hasScore = (rs, name, n) => rs.some(x => new RegExp('^\\S+ ' + name + '( \\(you\\))? ' + n + '$').test(x));
 const shot = (p, n) => p.screenshot({ path: path.join(SHOTS, n + '.png') });
 // --- the Online section (new pages)
-const onlineTab = async page => { await page.click('#filters .chip:text-is("Online")'); await page.waitForSelector('#opCreate'); };
+const onlineTab = async page => { await page.click('#filters .chip:has(.chip-lab:text-is("Online"))'); await page.waitForSelector('#opCreate'); };
 async function flexCreate(page) { await onlineTab(page); await page.click('#opCreate'); await page.waitForSelector('.code-ch', { timeout: 8000 }); return code(page); }
 async function flexJoin(page, c) { await onlineTab(page); await page.fill('#opCode', c); await page.click('#opJoin'); await page.waitForSelector('.plan', { timeout: 9000 }); }
 const esc = n => new RegExp('^' + n.replace(/[.]/g, '\\.') + '$');

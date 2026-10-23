@@ -128,7 +128,7 @@ async function sane(p, label) {
     const map = Object.values(window).find(v => false);   // not reachable; use DOM-only measures
     let longT = 0; try { new PerformanceObserver(l => l.getEntries().forEach(e => { if (e.duration > 50) longT++; })).observe({ type: 'longtask' }); } catch (e) {}
     const send = dy => el.dispatchEvent(new WheelEvent('wheel', { deltaY: dy, deltaMode: 0, clientX: cx, clientY: cy, bubbles: true, cancelable: true }));
-    const zoomNow = () => { const t = document.querySelector('.geo-minimap .leaflet-proxy'); return t ? Math.log2(new DOMMatrix(getComputedStyle(t).transform).a) : 0; };
+    const zoomNow = () => ludusGeoTest.map().getZoom();
     let stop = false; (function f() { zs.push(zoomNow()); if (!stop) requestAnimationFrame(f); })();
     // slow wheel clicks with gaps (the bounce case), then a fast flick
     for (let i = 0; i < 10; i++) { send(-100); await new Promise(r => setTimeout(r, 300)); }

@@ -81,9 +81,10 @@
     const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = href; l.dataset.geo = href; document.head.appendChild(l);
   }
   async function loadAll() {
-    loadCss('vendor/leaflet.css'); loadCss('vendor/pannellum.css');
-    await Promise.all([loadScript('vendor/leaflet.js'), loadScript('vendor/pannellum.js'), loadScript('games/geo/pool.js')]);
-    await loadScript('games/geo/map.js');   // needs Leaflet
+    loadCss('vendor/maplibre-gl.css'); loadCss('vendor/leaflet.css'); loadCss('vendor/pannellum.css');
+    // MapLibre draws the map; Leaflet is only the flat fallback for a graphics card that cannot run it.
+    await Promise.all([loadScript('vendor/maplibre-gl.js').catch(() => {}), loadScript('vendor/leaflet.js'), loadScript('vendor/pannellum.js'), loadScript('games/geo/pool.js'), loadScript('games/geo/mapstyle.js')]);
+    await loadScript('games/geo/map.js');   // needs MapLibre and Leaflet
     if (!window.L || !window.pannellum || !Array.isArray(window.__GEO_POOL__) || !window.__GEO_MAP__) throw new Error('missing');
     return window.__GEO_POOL__;
   }
@@ -160,6 +161,12 @@
 .geo .leaflet-container{background:transparent;font-family:var(--font);cursor:crosshair}
 .geo .leaflet-grab,.geo .leaflet-dragging .leaflet-grab{cursor:crosshair}
 .geo .leaflet-tile-pane.geo-nomap{background:rgb(236,236,232)}
+.geo .maplibregl-map{font-family:var(--font);background:rgb(236,236,232)}
+.geo .geo-resmap.maplibregl-map,.geo .geo-minimap.maplibregl-map{position:absolute}
+.geo .maplibregl-canvas-container.maplibregl-interactive,.geo .maplibregl-canvas-container.maplibregl-interactive:active,.geo .maplibregl-canvas{cursor:crosshair}
+.geo-mk{pointer-events:none}
+.geo-mk-lbl{position:absolute;left:50%;bottom:100%;transform:translateX(-50%);margin-bottom:2px;white-space:nowrap;background:rgba(24,21,17,.82);color:#fff;border-radius:8px;padding:3px 7px;font:650 11px var(--font)}
+.geo-mk-lbl:empty{display:none}
 .geo-mapctl{position:absolute;left:7px;top:7px;z-index:650;display:flex;gap:5px;opacity:0;transform:translateY(-3px);transition:opacity .18s,transform .18s;pointer-events:none}
 .geo-mini.open .geo-mapctl{opacity:1;transform:none;pointer-events:auto}
 .geo-mapctl button{width:26px;height:26px;padding:0;border:0;border-radius:50%;display:grid;place-items:center;background:rgba(16,16,18,.74);color:#fff;cursor:pointer;transition:transform .15s var(--spring),background .15s,opacity .15s}
@@ -239,8 +246,6 @@
 .geo-final tr.win td{color:var(--accent)}
 .geo-final td.sm{color:var(--ink-2);font-weight:500}
 .geo-pin{filter:drop-shadow(0 2px 3px rgba(0,0,0,.5))}
-.geo .leaflet-tooltip.geo-lbl{background:rgba(24,21,17,.82);color:#fff;border:0;border-radius:8px;padding:3px 7px;font:650 11px var(--font);box-shadow:none}
-.geo .leaflet-tooltip-top.geo-lbl:before{border-top-color:rgba(24,21,17,.82)}
 @media (prefers-reduced-motion:reduce){.geo-spin{animation-duration:2s}.geo-gpin.drop{animation:none}}
 `;
   let cssIn = false;
@@ -251,7 +256,7 @@
   const ARROW = '<svg viewBox="0 0 68 48"><path d="M8 38 L34 8 L60 38 L50 38 L34 19 L18 38 Z" fill="#fff" stroke="rgba(0,0,0,.35)" stroke-width="2" stroke-linejoin="round"/></svg>';
   const HOME_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5h13V10"/></svg>';
   // Pins like the real game: a round marker with a white rim (guess), and a dark disc with a flag (the right answer).
-  const pinIcon = (col, drop) => L.divIcon({ className: '', html: `<div class="geo-gpin${drop ? ' drop' : ''}" style="--c:${col}"></div>`, iconSize: [24, 24], iconAnchor: [12, 12] });
+  const pinHtml = (col, drop) => `<div class="geo-gpin${drop ? ' drop' : ''}" style="--c:${col}"></div>`;
   const targetHtml = '<svg class="geo-pin" width="30" height="30" viewBox="0 0 30 30"><circle cx="15" cy="15" r="12.5" fill="#1b1b1d" stroke="#fff" stroke-width="2.5"/><path d="M11 22V8.5" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/><path d="M11.4 9h8.6l-2.2 3 2.2 3h-8.6z" fill="#fff"/></svg>';
   const ICON = {
     bigger: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9V3h6"/><path d="M3 3l5 5"/></svg>',
@@ -335,7 +340,7 @@
       let phase = 'boot';        // boot | offline | setup | load | play | wait | result | final
       let pool = null, order = [], round = 0, left = 0, elapsed = 0, lastSec = 99;
       let viewer = null, pendingDone = null, cur = null, sceneN = 0, curScene = '', heading = 0, loadToken = 0;
-      let miniMap = null, miniPin = null, miniLayer = null, pin = null, resMap = null, resLayers = [], resAnim = null;
+      let miniMap = null, miniPin = null, pin = null, resMap = null, resLayers = [], resAnim = null;
       let guesses = [], ready = new Set(), started = false, destroyed = false, autoAt = 0, paused = false;
       let sizeLv = Number.isInteger(saved.map) && saved.map >= 0 && saved.map < MAP_SIZES.length ? saved.map : 1, pinned = !!saved.lock;
       let restoring = null;   // Geo Guess never resumes a game: every open starts fresh (pause still works while it is open)
@@ -366,18 +371,9 @@
       }
 
       // ----- maps -----
-      const MAP_OPTS = { zoomControl: false, attributionControl: false, worldCopyJump: true, minZoom: 1, zoomSnap: 0.25, zoomDelta: 0.5, scrollWheelZoom: false,
-        inertia: true, inertiaDeceleration: 1900, inertiaMaxSpeed: 2600, easeLinearity: 0.2, zoomAnimation: true, fadeAnimation: false, markerZoomAnimation: true,
-        preferCanvas: true, bounceAtZoomLimits: false, doubleClickZoom: false, maxBoundsViscosity: 0.6 };
-      const themed = [];
-      function styleMap(map, credit, el_) {
-        const GM = window.__GEO_MAP__;
-        themed.push(GM.attach(map, credit, isDark).retheme);
-        offs.push(GM.smoothWheel(map, el_));
-      }
       function setPin(ll, quiet) {
         pin = { lat: ll.lat, lon: ll.lon !== undefined ? ll.lon : ll.lng };
-        if (miniLayer) { miniLayer.clearLayers(); L.marker([pin.lat, pin.lon], { icon: pinIcon(SEAT[mySeat], !quiet && !api.reduceMotion), interactive: false }).addTo(miniLayer); }
+        if (miniMap) { if (miniPin) miniPin.remove(); miniPin = miniMap.marker(pin.lat, pin.lon, pinHtml(SEAT[mySeat], !quiet && !api.reduceMotion), { size: 24 }); }
         guessBtn.disabled = false; guessLabel(); if (!quiet) api.sfx('tap');
       }
       // The whole sentence only when it fits the bar at the size the map is going to (open or closed), decided once per
@@ -397,15 +393,12 @@
       };
       function makeMaps() {
         if (miniMap) return;
-        sizeMini(); miniMap = L.map(miniMapEl, MAP_OPTS).setView([25, 10], 1);
-        styleMap(miniMap, miniCredit, miniMapEl);
-        miniLayer = L.layerGroup().addTo(miniMap);
-        miniMap.on('click', e => {
+        sizeMini(); miniMap = window.__GEO_MAP__.create(miniMapEl, miniCredit, { lat: 25, lon: 10, zoom: 1 });
+        miniMap.onClick(ll => {
           if (phase !== 'play' || paused) return;
           if (!mini.classList.contains('open')) { openMini(true); return; }
-          setPin(e.latlng.wrap());
+          setPin(ll);
         });
-        const mo = new MutationObserver(() => themed.forEach(f => f())); mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] }); offs.push(() => mo.disconnect());
       }
       // The mini map is laid out once at its open size (and again only when the window or the size changes); closed, it is just scaled down.
       function sizeMini() {
@@ -415,7 +408,7 @@
         root.style.setProperty('--mini-w', W + 'px'); root.style.setProperty('--mini-h', H + 'px');
         root.style.setProperty('--mini-cw', CW + 'px'); root.style.setProperty('--mini-ch', CH + 'px');
         root.style.setProperty('--mini-s', String(Math.max(CW / W, CH / H).toFixed(4)));
-        if (miniMap) { miniMap.invalidateSize({ animate: false }); keepPinVisible(false); }
+        if (miniMap) { miniMap.resize(); keepPinVisible(false); }
         guessLabel();
         biggerBtn.disabled = sizeLv >= MAP_SIZES.length - 1; smallerBtn.disabled = sizeLv <= 0;
         lockBtn.classList.toggle('on', pinned); lockBtn.title = pinned ? 'Let the map close again' : 'Keep the map open';
@@ -440,13 +433,13 @@
         const s = css('--mini-s'), cw = css('--mini-cw'), ch = css('--mini-ch');
         if (!(s > 0) || !cw || !ch) return;
         const PAD = 16;   // pin radius (12) plus a little room, in map pixels
-        const half = miniMap.getSize().divideBy(2);
+        const sz = miniMap.size(), hx = sz.x / 2, hy = sz.y / 2;
         const vx = Math.max(0, cw / 2 / s - PAD), vy = Math.max(0, ch / 2 / s - PAD);
         const c = miniMap.getCenter(), lon = pin.lon + 360 * Math.round((c.lng - pin.lon) / 360);
-        const d = miniMap.latLngToContainerPoint([pin.lat, lon]).subtract(half);
+        const pp = miniMap.project(pin.lat, lon), d = { x: pp.x - hx, y: pp.y - hy };
         const sx = d.x > vx ? d.x - vx : d.x < -vx ? d.x + vx : 0, sy = d.y > vy ? d.y - vy : d.y < -vy ? d.y + vy : 0;
         if (Math.abs(sx) < 0.5 && Math.abs(sy) < 0.5) return;
-        miniMap.panBy([sx, sy], animate && !api.reduceMotion ? { animate: true, duration: 0.3, easeLinearity: 0.4 } : { animate: false });
+        miniMap.panBy(sx, sy, animate && !api.reduceMotion ? 300 : 0);
       }
       api.on(mini, 'pointerenter', e => { if (e.pointerType === 'touch') return; openMini(true); });
       api.on(mini, 'pointerleave', e => { if (e.pointerType === 'touch') return; clearTimeout(hoverT); hoverT = setTimeout(() => { if (!pinned) openMini(false); }, 450); });
@@ -601,8 +594,8 @@
         if (destroyed || r >= cfg.rounds) return;
         round = r; phase = 'load'; ready = new Set(); pin = null; moving = false; applyMove();
         resEl.hidden = true; waitEl.hidden = true; setCard(false); hud(true);
-        if (miniLayer) miniLayer.clearLayers();
-        if (miniMap) { miniMap.setView([25, 10], 1, { animate: false }); }
+        if (miniPin) { miniPin.remove(); miniPin = null; }
+        if (miniMap) { miniMap.setView(25, 10, 1); }
         mini.style.display = ''; openMini(false);
         guessBtn.disabled = true; guessLabel();
         roundPill.textContent = `Round ${r + 1}/${cfg.rounds}`;
@@ -625,7 +618,7 @@
             phase = 'play'; left = snap ? snap.left : cfg.time; timerEl.hidden = !cfg.time; if (cfg.time) drawTimer();
             if (snap) {
               elapsed = snap.elapsed || 0;
-              if (snap.map && miniMap) miniMap.setView([snap.map[0], snap.map[1]], snap.map[2], { animate: false });
+              if (snap.map && miniMap) miniMap.setView(snap.map[0], snap.map[1], snap.map[2]);
               if (snap.pin) { setPin(snap.pin, true); keepPinVisible(false); }
               restoring = null;
             }
@@ -661,40 +654,37 @@
       function resultMap() {
         if (resMap) return resMap;
         const holder = el('div', 'geo-resmap'); resEl.appendChild(holder);
-        resMap = L.map(holder, MAP_OPTS);
         const cred = el('div', 'geo-credit'); cred.style.fontSize = '10px'; resEl.appendChild(cred);
-        styleMap(resMap, cred, holder);
+        resMap = window.__GEO_MAP__.create(holder, cred, { lat: 25, lon: 10, zoom: 1 });
         return resMap;
       }
       function showResult(r) {
         phase = 'result';
         const p = place(r), g = guesses[r] || {};
         const m = resultMap();
-        resLayers.forEach(l => m.removeLayer(l)); resLayers = [];
+        resLayers.forEach(l => l.remove()); resLayers = [];
         [...resEl.querySelectorAll('.geo-bar,.geo-reslist,.geo-pill')].forEach(e => e.remove());
         resEl.hidden = false; hud(false);
         const truth = [p.lat, p.lon];
-        const tm = L.marker(truth, { icon: L.divIcon({ className: '', html: targetHtml, iconSize: [30, 30], iconAnchor: [15, 15] }), interactive: false, zIndexOffset: 1000 }).addTo(m);
+        const tm = m.marker(p.lat, p.lon, targetHtml, { size: 30, z: 1000 });
         resLayers.push(tm);
         const pl = seats().filter(s => g[s]);
-        const bounds = L.latLngBounds([truth]);
+        const bounds = [truth];
         const lines = [];
         pl.forEach(s => {
           const gg = g[s], col = SEAT[s];
-          const mk = L.marker([gg.lat, gg.lon], { icon: pinIcon(col, false), interactive: false, zIndexOffset: s === mySeat ? 900 : 800 }).addTo(m);
-          if (on) mk.bindTooltip(nameOf(s), { permanent: true, direction: 'top', offset: [0, -14], className: 'geo-lbl' });
-          const ln = L.polyline([[gg.lat, gg.lon], [gg.lat, gg.lon]], { color: '#141414', weight: 3, dashArray: '1 7', lineCap: 'round', opacity: 0.9 }).addTo(m);
-          resLayers.push(mk, ln); lines.push([ln, gg]); bounds.extend([gg.lat, gg.lon]);
+          const mk = m.marker(gg.lat, gg.lon, pinHtml(col, false), { size: 24, z: s === mySeat ? 900 : 800, label: on ? nameOf(s) : '' });
+          const ln = m.line(); ln.set([gg.lat, gg.lon], [gg.lat, gg.lon]);
+          resLayers.push(mk, ln); lines.push([ln, gg]); bounds.push([gg.lat, gg.lon]);
         });
-        m.invalidateSize(false);
-        m.fitBounds(bounds, { paddingTopLeft: [50, 56], paddingBottomRight: [50, 92], maxZoom: 13, animate: false });
+        m.fit(bounds, { top: 56, left: 50, right: 50, bottom: 92 }, 13);
         // line draws from the pin to the real place
         const t0 = performance.now(), dur = api.reduceMotion ? 1 : 900;
         cancelAnimationFrame(resAnim);
         const frame = now => {
           if (destroyed) return;
           const k = Math.min(1, (now - t0) / dur), e = D.ease.outCubic(k);
-          lines.forEach(([ln, gg]) => ln.setLatLngs([[gg.lat, gg.lon], [gg.lat + (truth[0] - gg.lat) * e, gg.lon + (truth[1] - gg.lon) * e]]));
+          lines.forEach(([ln, gg]) => ln.set([gg.lat, gg.lon], [gg.lat + (truth[0] - gg.lat) * e, gg.lon + (truth[1] - gg.lon) * e]));
           if (k < 1) resAnim = requestAnimationFrame(frame);
         };
         resAnim = requestAnimationFrame(frame);
@@ -902,7 +892,7 @@
         else if (phase === 'setup' && host && k === 'Enter') begin();
       });
       guessBtn.onclick = () => submit(false);
-      const ro = new ResizeObserver(() => { if (destroyed) return; root.style.setProperty('--geo-h', stage.clientHeight + 'px'); if (viewer) try { viewer.resize(); } catch (e) {} if (resMap) resMap.invalidateSize(false); sizeMini(); });
+      const ro = new ResizeObserver(() => { if (destroyed) return; root.style.setProperty('--geo-h', stage.clientHeight + 'px'); if (viewer) try { viewer.resize(); } catch (e) {} if (resMap) resMap.resize(); sizeMini(); });
       ro.observe(stage); offs.push(() => ro.disconnect());
       root.style.setProperty('--geo-h', stage.clientHeight + 'px');
       api.loop(dt => {
@@ -921,7 +911,7 @@
       });
       if (window.ludusDebug) window.ludusDebug.geo = () => ({ phase, round, cfg, pin, left, paused, place: pool && order.length ? place(round) : null, heading, at: cur && cur.id, view: viewer && cur ? { yaw: viewer.getYaw(), pitch: viewer.getPitch(), hfov: viewer.getHfov() } : null, guesses: JSON.parse(JSON.stringify(guesses)), order: order.slice(0, 10), seats: seats(), mapOpen: mini.classList.contains('open'), sizeLv, pinned });
       if (window.ludusDebug) window.ludusGeoTest = {
-        pin: (lat, lon) => setPin({ lat, lon }, true), step: dir => stepDir(dir), view: (lat, lon, z) => miniMap && miniMap.setView([lat, lon], z, { animate: false }),
+        pin: (lat, lon) => setPin({ lat, lon }, true), step: dir => stepDir(dir), view: (lat, lon, z) => miniMap && miniMap.setView(lat, lon, z), map: () => miniMap,
         guess: auto => submit(!!auto), state: () => ({ phase, round, left }),
         nextBtn: () => resultFocus && resultFocus.click(), begin, time: t => { cfg.time = t; }, set: c => { Object.assign(cfg, c); applyMove(); showSetup(); }
       };

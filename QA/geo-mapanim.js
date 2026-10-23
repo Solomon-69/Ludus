@@ -18,8 +18,9 @@ async () => {
     while (performance.now() - t0 < 420) {
       await new Promise(r => requestAnimationFrame(r));
       seen.push(b.textContent); labels.add(b.textContent);
-      const tile = document.querySelector('.geo-minimap .leaflet-tile-loaded') || document.querySelector('.geo-minimap .leaflet-tile');
-      if (tile) { const r = tile.getBoundingClientRect(); pos.push([r.left, r.top]); }
+      // screen position of a fixed spot on the map (the map is scaled by the box while it opens and closes)
+      const mm = ludusGeoTest.map().map, el = document.querySelector('.geo-minimap'), r = el.getBoundingClientRect(), pt = mm.project([0, 20]), sc = r.width / el.clientWidth;
+      pos.push([r.left + pt.x * sc, r.top + pt.y * sc]);
     }
     if (new Set(seen).size > 1) swapsMid.push(k + ':' + [...new Set(seen)].join('|'));
     for (let i = 2; i < pos.length; i++) for (const d of [0, 1]) { const a = pos[i - 1][d] - pos[i - 2][d], c = pos[i][d] - pos[i - 1][d]; if (Math.abs(a) > 0.6 && Math.abs(c) > 0.6 && Math.sign(a) !== Math.sign(c)) rev.push(k); }

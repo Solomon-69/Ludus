@@ -11,7 +11,7 @@ const SIZES = { compact: [400, 600], large: [520, 740], wide: [760, 500], widela
 const _s = opt('--size') || ''; const [width, height] = SIZES[_s] || (/^\d+x\d+$/.test(_s) ? _s.split('x').map(Number) : SIZES.compact);
 const chrome = process.env.CHROME || path.join(os.homedir(), 'Library/Caches/ms-playwright/chromium_headless_shell-1243/chrome-headless-shell-mac-arm64/chrome-headless-shell');
 (async () => {
-  const browser = await pw.chromium.launch({ executablePath: chrome });
+  const browser = await pw.chromium.launch({ executablePath: chrome, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
   const ctx = await browser.newContext({ viewport: { width, height }, colorScheme: args.includes('--dark') ? 'dark' : 'light', deviceScaleFactor: 2, offline: args.includes('--offline') });
   const page = await ctx.newPage();
   if (opt('--init')) await page.addInitScript(fs.readFileSync(opt('--init'), 'utf8'));

@@ -76,8 +76,9 @@ The SVG files are bundled unchanged except for size optimisation (SVGO) and expl
 Geo Guess libraries and data
 ----------------------------
 web/vendor/pannellum.* (Pannellum 2.5.6, Matthew Petroff, MIT License, https://pannellum.org) shows the 360 street photos (two small local patches: a picture that finishes loading after its viewer was closed, or a download that failed, is not read again).
-web/vendor/leaflet.* (Leaflet 1.9.4, Volodymyr Agafonkin, BSD 2-Clause License, https://leafletjs.com) draws the maps.
-Map tiles come from the Esri Canvas Gray basemap (Tiles (c) Esri, DeLorme, NAVTEQ; data (c) OpenStreetMap contributors, ODbL),
-with OpenStreetMap standard tiles (https://operations.osmfoundation.org/policies/tiles/) as a fallback. Street photos come from the
-Panoramax public instance (https://api.panoramax.xyz), pictures under their authors' open licences (mostly Etalab 2.0, CC-BY,
+web/vendor/maplibre-gl.* (MapLibre GL JS 5.7.0, MapLibre contributors, BSD 3-Clause License, https://maplibre.org) draws the guess maps on the graphics card.
+web/vendor/leaflet.* (Leaflet 1.9.4, Volodymyr Agafonkin, BSD 2-Clause License, https://leafletjs.com) draws the plain flat fallback map when MapLibre cannot run.
+Map data comes from OpenFreeMap (https://openfreemap.org) vector tiles built from OpenMapTiles (https://openmaptiles.org, schema, CC-BY 4.0) and OpenStreetMap
+(c) OpenStreetMap contributors, ODbL; the fonts for the labels (Noto Sans, SIL Open Font License) are served by the same host. The map look is drawn in
+web/games/geo/mapstyle.js. Street photos come from the Panoramax public instance (https://api.panoramax.xyz), pictures under their authors' open licences (mostly Etalab 2.0, CC-BY,
 CC-BY-SA). The game fetches them live and stores nothing; the list of places is web/games/geo/pool.js.

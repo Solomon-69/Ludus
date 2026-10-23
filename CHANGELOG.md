@@ -3,6 +3,15 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.9.1 (2026-10-23)
+
+- Geo Guess map rebuilt to look and behave like the real GeoGuessr map: a GPU vector map (MapLibre GL, free
+  OpenFreeMap tiles) in the Google palette, with soft green land, flat blue water, thin grey borders, pale built-up
+  areas and thin pale roads. Labels only in English or Latin letters and kept sparse; no icons, no 3D, no satellite.
+  Smooth built-in wheel, pinch and drag zoom (the old per-tile recolouring and custom zoom code are gone, so no blank
+  or blocky tiles and no jiggle). Always light, also in dark mode. If the tiles cannot load (or the graphics card cannot
+  run it), a plain flat-colour map still lets you pin.
+
 ## 1.9.0 (2026-10-23)
 
 - Online light: a small dot on the Online tab (green with a soft pulse when connected, a hollow ring when
