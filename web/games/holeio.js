@@ -198,7 +198,18 @@
       ctx.fillStyle = '#1b1713'; ctx.beginPath(); ctx.ellipse(w * 0.86, h * 0.845, h * 0.075, h * 0.045, 0, 0, Math.PI * 2); ctx.fill();
     },
     create(stage, api) {
-      const view = api.canvas();
+      // pixel budget: never above 2x density, and fewer pixels per point on big windows (8 GB Macs)
+      const PX_BUDGET = 2.2e6;
+      function applyRes() {
+        let d = Math.min(2, window.devicePixelRatio || 1);
+        const px = view.w * view.h * d * d; if (px > PX_BUDGET) d = Math.max(1, Math.sqrt(PX_BUDGET / (view.w * view.h)));
+        d = Math.round(d * 100) / 100;
+        const cw = Math.round(view.w * d), ch = Math.round(view.h * d);
+        if (view.canvas.width !== cw || view.canvas.height !== ch) { view.canvas.width = cw; view.canvas.height = ch; }
+        view.dpr = d; view.ctx.setTransform(d, 0, 0, d, 0, 0);
+      }
+      const view = api.canvas(() => applyRes());
+      applyRes();
       const { ctx } = view;
       const friend = api.friend, LV = api.level, rm = api.reduceMotion;
       // The city is built from rng: online every screen builds it from the room's shared random stream, so all
@@ -248,13 +259,14 @@
         switch (type) {
           case 'person': o.sh = pick(['#e58f7a', '#7fb3d5', '#a5c98a', '#e8c35d', '#c9a3d6', '#f1a7bb']); break;
           case 'bench': o.c = tones(28, 36, 62); break;
-          case 'tree': o.c = tones(rnd(95, 150), rnd(32, 44), rnd(60, 68)); break;
+          case 'tree': { const th = rnd(95, 150); rnd(32, 44); rnd(60, 68); o.c = tones(Math.round(th / 11) * 11, 38, 64); break; }
           case 'car': { const hu = pick([8, 38, 170, 205, 340, 100]); o.c = tones(hu, 52, 70); o.c2 = tones(hu, 40, 80); o.horiz = o.w > o.d; break; }
           case 'bus': { const hu = pick([42, 175, 12]); o.c = tones(hu, 55, 68); o.horiz = o.w > o.d; break; }
           case 'house': { const hu = pick([25, 45, 160, 200, 340, 12]); o.c = tones(hu, 42, 82); o.c2 = tones(pick([8, 18, 215, 350]), 38, 64); break; }
           case 'shop': { const hu = pick([35, 190, 150, 270, 345]); o.c = tones(hu, 36, 84); o.c2 = tones(pick([5, 175, 45, 330]), 48, 70); break; }
           case 'tower': { const hu = pick([210, 190, 30, 255]); o.c = tones(hu, 24, 82); break; }
         }
+        o.sk = styleId(type + '|' + (o.c ? o.c[0][1] : '') + (o.c2 ? o.c2[0][1] : '') + (o.sh || '') + (o.horiz ? 'h' : 'v') + o.w + 'x' + o.d);
         return o;
       }
       const addStatic = o => { const k = gi(o.y) * GC + gi(o.x); (grid[k] || (grid[k] = [])).push(o); objs++; return o; };
@@ -365,8 +377,7 @@
       const cam = { x: WORLD / 2, y: WORLD / 2, s: 1.6, snap: true, yoff: 0, top: 52, bot: 56 };
       function humans() { return holes.filter(h => (on ? isMine(h) : h.human)); }
       function singleScale(rmax) {
-        const { w, h } = view, zw = 96 + rmax * 4.4;
-        return (0.62 * Math.min(w, h * 0.92) + 0.38 * Math.sqrt(w * h * 0.92)) / zw;
+        return clamp(view.w / (11 * (rmax + 10)), 0.12, 2.4);   // hole diameter ends up near a sixth of the width
       }
       function camLimits() {   // friend: how far apart the two humans may be on screen
         const hs = humans(); if (hs.length < 2) return null;
@@ -646,6 +657,40 @@
         updateCamera(dt);
       }
 
+      // ---------- sprite cache: each object style is drawn once per (lean, height, theme) and then stamped ----------
+      const SHL = [-0.4, -0.2, 0, 0.2, 0.4], ZVL = [0.7, 0.9, 1.1], SPR_BUDGET = 2.4e7, MAKE_PER_FRAME = 8;
+      const styleIds = new Map(), spr = []; let sprPx = 0, madeNow = 0;
+      function styleId(k) { let i = styleIds.get(k); if (i === undefined) { i = styleIds.size; styleIds.set(k, i); } return i; }
+      function sprScale(t) { return t === 'person' || t === 'cone' || t === 'lamp' ? 4 : t === 'shop' || t === 'tower' ? 1.6 : 2.5; }
+      function clearSprites() { for (let i = 0; i < spr.length; i++) { const s = spr[i]; if (s) { s.c.width = 0; s.c.height = 0; } } spr.length = 0; sprPx = 0; }
+      function makeSprite(o, shi, zvi, dark, idx) {
+        const sc = sprScale(o.t), hw = o.w / 2, hd = o.d / 2, hh = o.h + 20;
+        const bx = -(hw + 8 + 0.4 * hh), bw = 2 * (hw + 8 + 0.4 * hh) + 3;
+        const by = -(hh * 1.1 + hd * TILT + 4), bh = (hd + 12 + 0.22 * o.h) * TILT + 4 - by;
+        const c = document.createElement('canvas'); c.width = Math.ceil(bw * sc); c.height = Math.ceil(bh * sc);
+        const g = c.getContext('2d'); g.setTransform(sc, 0, 0, sc, -bx * sc, -by * sc);
+        const sh0 = SH, zv0 = ZV; SH = SHL[shi]; ZV = ZVL[zvi];
+        drawObj(g, o, dark);
+        SH = sh0; ZV = zv0;
+        sprPx += c.width * c.height; madeNow++;
+        return (spr[idx] = { c, bx, by, bw, bh, sh: SHL[shi], zv: ZVL[zvi] });
+      }
+      // stamp object o (SH/ZV already set by setLean) with its base centre at screen (sx, sy)
+      function stampObj(o, sx, sy, dark) {
+        const shi = clamp(Math.round((SH + 0.4) / 0.2), 0, 4), zvi = ZV < 0.8 ? 0 : ZV < 1.0 ? 1 : 2;
+        const idx = ((o.sk * 2 + (dark ? 1 : 0)) * 5 + shi) * 3 + zvi;
+        let s = spr[idx];
+        if (!s) {
+          if (madeNow >= MAKE_PER_FRAME) { ctx.save(); ctx.translate(sx, sy); ctx.scale(cam.s, cam.s); drawObj(ctx, o, dark); ctx.restore(); return; }
+          if (sprPx > SPR_BUDGET) clearSprites();
+          s = makeSprite(o, shi, zvi, dark, idx);
+        }
+        const k = cam.s * view.dpr;
+        ctx.setTransform(k, 0, k * (SH - s.sh) / s.zv, k * ZV / s.zv, sx * view.dpr, sy * view.dpr);
+        ctx.drawImage(s.c, s.bx, s.by, s.bw, s.bh);
+        ctx.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
+      }
+
       // ---------- drawing ----------
       const hcol = (h, col) => h.human === 1 ? col.accent : h.human >= 2 ? HCOL[h.human] : h.color;
       function drawGround(col) {
@@ -661,8 +706,10 @@
         ctx.beginPath();
         for (let i = 0; i <= N; i++) { ctx.moveTo(roadC(i), 0); ctx.lineTo(roadC(i), WORLD); ctx.moveTo(0, roadC(i)); ctx.lineTo(WORLD, roadC(i)); }
         ctx.stroke(); ctx.setLineDash([]);
+        const vx0 = cam.x - w / 2 / cam.s - BLOCK, vx1 = cam.x + w / 2 / cam.s, vy0 = cam.y - (h / 2 - cam.yoff) / (cam.s * TILT) - BLOCK, vy1 = cam.y + (h / 2 + cam.yoff) / (cam.s * TILT);
         for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) {
           const bx = ROAD + i * PITCH, by = ROAD + j * PITCH;
+          if (bx < vx0 || bx > vx1 || by < vy0 || by > vy1) continue;
           ctx.fillStyle = dark ? '#312e29' : '#faf6ec'; D.roundRect(ctx, bx, by, BLOCK, BLOCK, 14); ctx.fill();
           const park = parkSet.has(i + ',' + j);
           ctx.fillStyle = park ? (dark ? '#2f3d2c' : '#d3e5c3') : (dark ? '#37332d' : '#efe6d4');
@@ -711,7 +758,7 @@
         ctx.restore();
       }
 
-      const vis = [];
+      const vis = [], byY = (a, b) => a.y - b.y;
       function worldPass(col, dark) {
         const { w, h } = view;
         const hx = w / 2 / cam.s + 90, yTop = cam.y - (h / 2 - cam.yoff) / (cam.s * TILT) - 30, yBot = cam.y + (h / 2 + cam.yoff) / (cam.s * TILT) + 180;
@@ -722,12 +769,12 @@
           for (let k = 0; k < arr.length; k++) { const o = arr[k]; if (o.x > x0 - 60 && o.x < x1 + 60 && o.y > yTop - 60 && o.y < yBot) vis.push(o); }
         }
         for (let k = 0; k < movers.length; k++) { const o = movers[k]; if (o.x > x0 && o.x < x1 && o.y > yTop && o.y < yBot) vis.push(o); }
-        vis.sort((a, b) => a.y - b.y);
+        madeNow = 0;
+        vis.sort(byY);
         for (let k = 0; k < vis.length; k++) {
           const o = vis[k];
           setLean(o.x, o.y);
-          ctx.save(); ctx.translate(sxOf(o.x), syOf(o.y)); ctx.scale(cam.s, cam.s);
-          drawObj(ctx, o, dark); ctx.restore();
+          stampObj(o, sxOf(o.x), syOf(o.y), dark);
         }
         SH = SHEAR0; ZV = ZK;
       }
@@ -767,8 +814,9 @@
 
       // ---------- HUD ----------
       function pill(x, y, w, h, col, r) {
-        ctx.save(); ctx.fillStyle = col.surface; ctx.globalAlpha = 0.93; ctx.shadowColor = 'rgba(0,0,0,0.15)'; ctx.shadowBlur = 10; ctx.shadowOffsetY = 3;
-        D.roundRect(ctx, x, y, w, h, r === undefined ? h / 2 : r); ctx.fill(); ctx.restore();
+        const rr_ = r === undefined ? h / 2 : r;
+        ctx.save(); ctx.fillStyle = 'rgba(0,0,0,0.07)'; D.roundRect(ctx, x - 1, y + 1, w + 2, h + 3, rr_ + 1); ctx.fill();
+        ctx.fillStyle = col.surface; ctx.globalAlpha = 0.93; D.roundRect(ctx, x, y, w, h, rr_); ctx.fill(); ctx.restore();
       }
       function clip(s, size, maxW, weight) {
         ctx.font = `${weight || 650} ${size}px ${FONT}`;
