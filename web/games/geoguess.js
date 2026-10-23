@@ -1,7 +1,8 @@
 /* Geo Guess: a street-level 360 view of somewhere on Earth. Look around, move along the road, then pin where you are on the map.
    Closer pin = more points (5000 max, same falloff as the famous one). Solo, or online with the same places for everyone.
-   Data (all free, no key, no account): street photos from Panoramax (api.panoramax.xyz), map tiles from OpenStreetMap,
-   viewer libraries bundled in web/vendor (Pannellum, Leaflet). The place pool is games/geo/pool.js. Needs internet. */
+   Data (all free, no key, no account): street photos from Panoramax (api.panoramax.xyz), map tiles from Esri (styled in games/geo/map.js),
+   viewer libraries bundled in web/vendor (Pannellum, Leaflet). The place pool is games/geo/pool.js. Needs internet.
+   Solo games are saved (save() below) and resume exactly where they were left; online games follow the host and are not saved. */
 (function () {
   const D = Ludus.draw;
   const API = 'https://api.panoramax.xyz/api';
@@ -11,15 +12,16 @@
   const MOVE_NOTE = { move: 'Move along the road, look around and zoom.', nomove: 'No moving: you stay where you land, but you can still look around and zoom.', nmpz: 'No moving, panning or zooming: one fixed view.' };
   const MAX_POINTS = 5000, FALLOFF_KM = 1492.7;
   const SEAT = ['#d97757', '#5b8def', '#4f9d69', '#9b6dd6'];
-  // Clean, quiet basemap: coastlines, borders, light grey land, country names only (Esri Canvas Gray, free, no key; Carto's raster tiles now need a key).
-  const ESRI = (k, host) => `https://${host || 'services'}.arcgisonline.com/ArcGIS/rest/services/Canvas/${k}/MapServer/tile/{z}/{y}/{x}`;
-  const TILES = [
-    { url: dark => ESRI(dark ? 'World_Dark_Gray_Base' : 'World_Light_Gray_Base'), max: 18, native: 16, credit: 'Tiles © Esri, DeLorme, NAVTEQ · © OpenStreetMap contributors', short: '© Esri · OSM' },
-    // the same Esri map from its second host; never OpenStreetMap standard (it labels places in their local scripts)
-    { url: dark => ESRI(dark ? 'World_Dark_Gray_Base' : 'World_Light_Gray_Base', 'server'), max: 18, native: 16, credit: 'Tiles © Esri, DeLorme, NAVTEQ · © OpenStreetMap contributors', short: '© Esri · OSM' },
-    { url: null, max: 18, native: 16, credit: 'Map unavailable right now: you can still pin a guess', short: 'No map', fallback: true }
-  ];
   const isDark = () => document.documentElement.dataset.theme === 'dark';
+  // Open sizes of the guess map (share of the stage width and height), changed with its size buttons like the real one.
+  const MAP_SIZES = [[0.42, 0.5], [0.56, 0.66], [0.72, 0.8], [0.9, 0.9]];
+  const GUESS_KEYS = 'click the small map to pin, <kbd>Enter</kbd> or <kbd>Space</kbd> to guess';
+  const HINTS = {
+    move: '<b>Drag</b> to look around · <kbd>↑</kbd><kbd>↓</kbd> or the arrows to move · ' + GUESS_KEYS,
+    nomove: '<b>Drag</b> to look around, scroll to zoom · no moving · ' + GUESS_KEYS,
+    nmpz: 'No moving, panning or zooming · ' + GUESS_KEYS
+  };
+  const hintFor = (mv, online) => (online ? '<b>Online</b> same places for everyone · ' : '') + (HINTS[mv] || HINTS.move);
 
   // ---------- pure rules (also used by the tests) ----------
   const rad = d => d * Math.PI / 180;
@@ -48,6 +50,24 @@
     return first.concat(rest);
   }
 
+  // A saved solo game (see save() in create): checked field by field, anything odd means start fresh.
+  const fin = v => typeof v === 'number' && Number.isFinite(v);
+  const okLL = g => !!g && fin(g.lat) && fin(g.lon) && Math.abs(g.lat) <= 90 && Math.abs(g.lon) <= 540;
+  function validSnap(s) {
+    try {
+      if (!s || s.v !== 1 || !s.cfg || !TIMES.some(t => t[0] === s.cfg.time) || !MOVES.some(m => m[0] === s.cfg.move)) return null;
+      if (!Array.isArray(s.places) || s.places.length !== ROUNDS_N || !s.places.every(p => okLL(p) && typeof p.id === 'string' && typeof p.c === 'string' && typeof p.city === 'string')) return null;
+      if (!Number.isInteger(s.round) || s.round < 0 || s.round >= ROUNDS_N || (s.phase !== 'play' && s.phase !== 'result')) return null;
+      if (!Array.isArray(s.gs) || s.gs.length !== (s.phase === 'result' ? s.round + 1 : s.round) || !s.gs.every(g => g === null || okLL(g))) return null;
+      if (!s.at || typeof s.at.id !== 'string' || typeof s.at.c !== 'string') return null;
+      if (s.view && !(fin(s.view.yaw) && fin(s.view.pitch) && fin(s.view.hfov))) return null;
+      if (!fin(s.left) || s.left < 0 || (s.cfg.time && s.left > s.cfg.time)) return null;
+      if (s.pin != null && !okLL(s.pin)) return null;
+      if (s.map != null && !(Array.isArray(s.map) && s.map.length === 3 && s.map.every(fin))) return null;
+      return s;
+    } catch (e) { return null; }
+  }
+
   // ---------- loading libraries and data on demand ----------
   const loaded = {};
   function loadScript(src) {
@@ -63,7 +83,8 @@
   async function loadAll() {
     loadCss('vendor/leaflet.css'); loadCss('vendor/pannellum.css');
     await Promise.all([loadScript('vendor/leaflet.js'), loadScript('vendor/pannellum.js'), loadScript('games/geo/pool.js')]);
-    if (!window.L || !window.pannellum || !Array.isArray(window.__GEO_POOL__)) throw new Error('missing');
+    await loadScript('games/geo/map.js');   // needs Leaflet
+    if (!window.L || !window.pannellum || !Array.isArray(window.__GEO_POOL__) || !window.__GEO_MAP__) throw new Error('missing');
     return window.__GEO_POOL__;
   }
   // Panoramax item (one picture): where it is, which way it faces, the files, and the neighbours along the road.
@@ -129,26 +150,40 @@
 .geo-home{position:absolute;left:10px;bottom:10px;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;cursor:pointer;color:#fff;padding:0}
 .geo-home svg{width:17px;height:17px}
 .geo-home:hover{background:rgba(24,21,17,.8)}
-.geo-mini{position:absolute;right:10px;bottom:10px;width:164px;display:flex;flex-direction:column;gap:6px;z-index:5;transition:width .26s cubic-bezier(.22,1,.36,1);will-change:width}
+.geo-mini{position:absolute;right:10px;bottom:10px;width:var(--mini-cw,180px);display:flex;flex-direction:column;gap:7px;z-index:5;transition:width .3s cubic-bezier(.22,1,.36,1),filter .25s;will-change:width}
 .geo-mini.open{width:var(--mini-w,360px)}
-.geo-mapbox{position:relative;height:112px;border-radius:14px;overflow:hidden;opacity:.9;transition:height .26s cubic-bezier(.22,1,.36,1),opacity .2s;border:1px solid rgba(255,255,255,.28);box-shadow:0 8px 22px -8px rgba(0,0,0,.7);background:#dfe5e8;transform:translateZ(0)}
-:root[data-theme="dark"] .geo-mapbox{background:#232a2e}
+.geo-mapbox{position:relative;height:var(--mini-ch,122px);border-radius:12px;overflow:hidden;opacity:.72;transition:height .3s cubic-bezier(.22,1,.36,1),opacity .2s;box-shadow:0 6px 20px -6px rgba(0,0,0,.65);background:rgb(138,180,248);transform:translateZ(0);cursor:crosshair}
 .geo-mini.open .geo-mapbox{height:var(--mini-h,250px);opacity:1}
 /* the map keeps its big size the whole time and is only scaled down while closed, so opening never re-lays-out the tiles */
-.geo-minimap{position:absolute;left:50%;top:50%;width:var(--mini-w,360px);height:var(--mini-h,250px);transform:translate(-50%,-50%) scale(var(--mini-s,.45));transition:transform .26s cubic-bezier(.22,1,.36,1);will-change:transform}
+.geo-minimap{position:absolute;left:50%;top:50%;width:var(--mini-w,360px);height:var(--mini-h,250px);transform:translate(-50%,-50%) scale(var(--mini-s,.45));transition:transform .3s cubic-bezier(.22,1,.36,1);will-change:transform}
 .geo-mini.open .geo-minimap{transform:translate(-50%,-50%) scale(1)}
-.geo .leaflet-tile-pane.geo-fallback{filter:none}
-:root[data-theme="dark"] .geo .geo-fallback{filter:invert(1) hue-rotate(180deg) brightness(.92) contrast(.88)}
+.geo .leaflet-container{background:transparent;font-family:var(--font);cursor:crosshair}
+.geo .leaflet-grab,.geo .leaflet-dragging .leaflet-grab{cursor:crosshair}
+.geo .leaflet-tile-pane.geo-nomap{background:rgb(236,236,232)}
+.geo-mapctl{position:absolute;left:7px;top:7px;z-index:650;display:flex;gap:5px;opacity:0;transform:translateY(-3px);transition:opacity .18s,transform .18s;pointer-events:none}
+.geo-mini.open .geo-mapctl{opacity:1;transform:none;pointer-events:auto}
+.geo-mapctl button{width:26px;height:26px;padding:0;border:0;border-radius:50%;display:grid;place-items:center;background:rgba(16,16,18,.74);color:#fff;cursor:pointer;transition:transform .15s var(--spring),background .15s,opacity .15s}
+.geo-mapctl button:hover:not(:disabled){background:rgba(16,16,18,.92);transform:scale(1.08)}
+.geo-mapctl button:active:not(:disabled){transform:scale(.94)}
+.geo-mapctl button:disabled{opacity:.38;cursor:default}
+.geo-mapctl button.on{background:var(--accent)}
+.geo-mapctl svg{width:13px;height:13px}
 .geo-veil{position:absolute;inset:0;z-index:2;display:none;touch-action:none}
 .geo[data-mv=nmpz] .geo-veil{display:block}
 .geo[data-mv=nomove] .geo-hs,.geo[data-mv=nmpz] .geo-hs,.geo[data-mv=nomove] .geo-home,.geo[data-mv=nmpz] .geo-home{display:none!important}
-.geo-credit{position:absolute;right:0;bottom:0;z-index:600;font:500 9px/1 var(--font);color:#333;background:rgba(255,255,255,.78);padding:2px 5px;border-top-left-radius:6px;pointer-events:none;white-space:nowrap}
-.geo-credit b{font-weight:500}.geo-credit i{display:none;font-style:normal}
-.geo-mini:not(.open) .geo-credit b{display:none}.geo-mini:not(.open) .geo-credit i{display:inline}
-.geo-guess{height:38px;border:0;border-radius:12px;font:700 14px var(--font-round);letter-spacing:.02em;color:#fff;background:var(--good);cursor:pointer;box-shadow:0 6px 16px -6px rgba(0,0,0,.6);transition:transform .15s var(--spring),filter .15s,opacity .2s}
+.geo-credit{position:absolute;right:0;bottom:0;z-index:600;font:500 9px/1 var(--font);color:#333;background:rgba(255,255,255,.7);padding:2px 5px;border-top-left-radius:6px;pointer-events:none;white-space:nowrap}
+.geo-credit i{font-style:normal}
+.geo-mini:not(.open) .geo-credit{display:none}
+.geo-guess{height:40px;border:0;border-radius:999px;font:italic 800 14px var(--font-round);letter-spacing:.06em;text-transform:uppercase;color:#fff;background:#6cb928;cursor:pointer;box-shadow:inset 0 -3px 0 rgba(0,0,0,.16),0 6px 16px -6px rgba(0,0,0,.6);transition:transform .15s var(--spring),filter .15s,background .2s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 12px}
 .geo-guess:hover:not(:disabled){filter:brightness(1.08)}
 .geo-guess:active:not(:disabled){transform:scale(.97)}
-.geo-guess:disabled{background:rgba(40,36,30,.78);color:rgba(255,255,255,.62);cursor:default}
+.geo-guess:disabled{background:rgba(16,16,18,.78);color:rgba(255,255,255,.72);font-size:10.5px;letter-spacing:.02em;padding:0 8px;cursor:default;box-shadow:0 6px 16px -6px rgba(0,0,0,.6)}
+.geo-gpin{width:24px;height:24px;border-radius:50%;background:var(--c);border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.5),0 0 0 1px rgba(0,0,0,.12);display:grid;place-items:center}
+.geo-gpin:after{content:"";width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.92)}
+.geo-gpin.drop{animation:geodrop .42s cubic-bezier(.34,1.56,.64,1)}
+@keyframes geodrop{from{transform:translateY(-14px) scale(.4);opacity:0}to{transform:none;opacity:1}}
+.geo-res,.geo-top,.geo-score,.geo-round{transition:filter .25s}
+.geo.geo-paused .geo-pano,.geo.geo-paused .geo-mini,.geo.geo-paused .geo-res,.geo.geo-paused .geo-top,.geo.geo-paused .geo-score,.geo.geo-paused .geo-round{filter:blur(9px) brightness(.8)}
 .geo-load{position:absolute;inset:0;display:grid;place-items:center;background:rgba(21,19,15,.55);z-index:3;transition:opacity .25s}
 .geo-load[hidden]{display:none}
 .geo-spin{width:30px;height:30px;border-radius:50%;border:3px solid rgba(255,255,255,.25);border-top-color:#fff;animation:geospin .8s linear infinite}
@@ -205,7 +240,7 @@
 .geo-pin{filter:drop-shadow(0 2px 3px rgba(0,0,0,.5))}
 .geo .leaflet-tooltip.geo-lbl{background:rgba(24,21,17,.82);color:#fff;border:0;border-radius:8px;padding:3px 7px;font:650 11px var(--font);box-shadow:none}
 .geo .leaflet-tooltip-top.geo-lbl:before{border-top-color:rgba(24,21,17,.82)}
-@media (prefers-reduced-motion:reduce){.geo-spin{animation-duration:2s}}
+@media (prefers-reduced-motion:reduce){.geo-spin{animation-duration:2s}.geo-gpin.drop{animation:none}}
 `;
   let cssIn = false;
   function injectCss() { if (cssIn) return; cssIn = true; const s = document.createElement('style'); s.id = 'geo-css'; s.textContent = CSS; document.head.appendChild(s); }
@@ -214,15 +249,21 @@
   const txt = (tag, cls, t) => { const e = el(tag, cls); e.textContent = t; return e; };
   const ARROW = '<svg viewBox="0 0 68 48"><path d="M8 38 L34 8 L60 38 L50 38 L34 19 L18 38 Z" fill="#fff" stroke="rgba(0,0,0,.35)" stroke-width="2" stroke-linejoin="round"/></svg>';
   const HOME_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5h13V10"/></svg>';
-  const pinHtml = (col, dot) => `<svg class="geo-pin" width="28" height="36" viewBox="0 0 28 36"><path d="M14 35C14 35 3 22.5 3 13.5a11 11 0 0 1 22 0C25 22.5 14 35 14 35Z" fill="${col}" stroke="#fff" stroke-width="2.2"/><circle cx="14" cy="13.5" r="${dot ? 4.2 : 3.6}" fill="#fff"/></svg>`;
-  const targetHtml = '<svg class="geo-pin" width="30" height="30" viewBox="0 0 30 30"><circle cx="15" cy="15" r="12" fill="#1f1b16" stroke="#fff" stroke-width="2.4"/><circle cx="15" cy="15" r="7" fill="none" stroke="#ffd9a8" stroke-width="2"/><circle cx="15" cy="15" r="2.6" fill="#ffd9a8"/></svg>';
+  // Pins like the real game: a round marker with a white rim (guess), and a dark disc with a flag (the right answer).
+  const pinIcon = (col, drop) => L.divIcon({ className: '', html: `<div class="geo-gpin${drop ? ' drop' : ''}" style="--c:${col}"></div>`, iconSize: [24, 24], iconAnchor: [12, 12] });
+  const targetHtml = '<svg class="geo-pin" width="30" height="30" viewBox="0 0 30 30"><circle cx="15" cy="15" r="12.5" fill="#1b1b1d" stroke="#fff" stroke-width="2.5"/><path d="M11 22V8.5" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/><path d="M11.4 9h8.6l-2.2 3 2.2 3h-8.6z" fill="#fff"/></svg>';
+  const ICON = {
+    bigger: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9V3h6"/><path d="M3 3l5 5"/></svg>',
+    smaller: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 7v6H7"/><path d="M13 13 8 8"/></svg>',
+    pin: '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M10.6 1.6 14.4 5.4l-1.4.5-2.7 2.7.3 3-1.2 1.2-2.6-2.6-3.6 3.6-.8-.8 3.6-3.6-2.6-2.6L4.6 5.6l3 .3 2.7-2.7z"/></svg>'
+  };
 
   // ---------- the game ----------
   Ludus.register({
     id: 'geoguess', name: 'Geo Guess', aka: 'Where in the world', tag: 'Arcade', wide: true, tint: '#2f8f83',
     online: { min: 2, max: 4 },
-    hint: '<b>Drag</b> to look around · <kbd>↑</kbd><kbd>↓</kbd> or the arrows to move · click the small map to pin, <kbd>Enter</kbd> to guess',
-    onlineHint: '<b>Online</b> same places for everyone · drag to look · <kbd>↑</kbd><kbd>↓</kbd> or arrows to move · pin on the map, <kbd>Enter</kbd> to guess',
+    hint: hintFor('move', false),
+    onlineHint: hintFor('move', true),
     _rules: { distKm, pointsFor, bearing, chooseOrder, MAX_POINTS },
     art(ctx, w, h) {
       // A flat map filling the whole card: river, parks, roads, a red pin with its shadow and a small compass. Folds kept faint.
@@ -288,7 +329,10 @@
       const mapBox = el('div', 'geo-mapbox'); mini.appendChild(mapBox);
       const miniMapEl = el('div', 'geo-minimap'); mapBox.appendChild(miniMapEl);
       const miniCredit = el('div', 'geo-credit'); mapBox.appendChild(miniCredit);
-      const guessBtn = txt('button', 'geo-guess', 'Guess'); guessBtn.disabled = true; mini.appendChild(guessBtn);
+      const ctl = el('div', 'geo-mapctl'); mapBox.appendChild(ctl);
+      const ctlBtn = (icon, label) => { const b = el('button', '', ICON[icon]); b.title = label; b.setAttribute('aria-label', label); ctl.appendChild(b); return b; };
+      const biggerBtn = ctlBtn('bigger', 'Bigger map'), smallerBtn = ctlBtn('smaller', 'Smaller map'), lockBtn = ctlBtn('pin', 'Keep the map open');
+      const guessBtn = txt('button', 'geo-guess', 'Place your pin on the map'); guessBtn.disabled = true; mini.appendChild(guessBtn);
       const waitEl = txt('div', 'geo-pill geo-glass geo-wait', ''); waitEl.hidden = true; root.appendChild(waitEl);
       const resEl = el('div', 'geo-res'); resEl.hidden = true; root.appendChild(resEl);
       const card = el('div', 'geo-card'); card.hidden = true; root.appendChild(card);
@@ -299,7 +343,9 @@
       let pool = null, order = [], round = 0, left = 0, elapsed = 0, lastSec = 99;
       let viewer = null, pendingDone = null, cur = null, sceneN = 0, curScene = '', heading = 0, loadToken = 0;
       let miniMap = null, miniPin = null, miniLayer = null, pin = null, resMap = null, resLayers = [], resAnim = null;
-      let totals = [], pts = [], guesses = [], ready = new Set(), started = false, destroyed = false, autoAt = 0, tileLoads = 0, tileErrs = 0, tileSet = 0;
+      let guesses = [], ready = new Set(), started = false, destroyed = false, autoAt = 0, paused = false;
+      let sizeLv = Number.isInteger(saved.map) && saved.map >= 0 && saved.map < MAP_SIZES.length ? saved.map : 1, pinned = !!saved.lock;
+      let restoring = on ? null : validSnap(api.saved);   // a saved solo game to resume, until it is back on screen
       const offs = [];
       const later = (fn, ms) => { const id = setTimeout(() => { if (!destroyed) fn(); }, ms); offs.push(() => clearTimeout(id)); return id; };
       const seats = () => on ? on.seats.slice() : [0];
@@ -327,55 +373,54 @@
       }
 
       // ----- maps -----
-      const MAP_OPTS = { zoomControl: false, attributionControl: false, worldCopyJump: true, minZoom: 1, zoomSnap: 0.25, zoomDelta: 0.5, wheelPxPerZoomLevel: 110, wheelDebounceTime: 35,
-        inertia: true, inertiaDeceleration: 2600, inertiaMaxSpeed: 1800, easeLinearity: 0.22, zoomAnimation: true, fadeAnimation: true, markerZoomAnimation: true,
+      const MAP_OPTS = { zoomControl: false, attributionControl: false, worldCopyJump: true, minZoom: 1, zoomSnap: 0.25, zoomDelta: 0.5, scrollWheelZoom: false,
+        inertia: true, inertiaDeceleration: 1900, inertiaMaxSpeed: 2600, easeLinearity: 0.2, zoomAnimation: true, fadeAnimation: true, markerZoomAnimation: true,
         preferCanvas: true, bounceAtZoomLimits: false, doubleClickZoom: false, maxBoundsViscosity: 0.6 };
       const themed = [];
-      function tileLayer(map, credit) {
-        let layer = null;
-        const make = i => {
-          const t = TILES[i]; tileSet = i;
-          if (layer) map.removeLayer(layer);
-          const o = { maxZoom: t.max, maxNativeZoom: t.native, crossOrigin: false, keepBuffer: 2, updateWhenZooming: false, updateWhenIdle: false, updateInterval: 120 };
-          if (!t.url) { layer = null; map.getPane('tilePane').classList.add('geo-fallback'); setCredit(); return; }
-          layer = L.tileLayer(t.url(isDark()), o).addTo(map);
-          const tp = map.getPane('tilePane'); tp.classList.toggle('geo-fallback', !!t.fallback);
-          layer.on('tileload', () => { tileLoads++; });
-          layer.on('tileerror', () => { tileErrs++; if (tileLoads === 0 && tileErrs >= 4 && tileSet < TILES.length - 1) { tileErrs = 0; make(tileSet + 1); setCredit(); } });
-          setCredit();
-        };
-        const setCredit = () => { credit.innerHTML = '<b>' + TILES[tileSet].credit + '</b><i>' + TILES[tileSet].short + '</i>'; };
-        make(0);
-        themed.push(() => { const t = TILES[tileSet]; if (layer && t.url) layer.setUrl(t.url(isDark())); });
+      function styleMap(map, credit, el_) {
+        const GM = window.__GEO_MAP__;
+        themed.push(GM.attach(map, credit, isDark).retheme);
+        offs.push(GM.smoothWheel(map, el_));
       }
+      function setPin(ll, quiet) {
+        pin = { lat: ll.lat, lon: ll.lon };
+        if (miniLayer) { miniLayer.clearLayers(); L.marker([pin.lat, pin.lon], { icon: pinIcon(SEAT[mySeat], !quiet && !api.reduceMotion), interactive: false }).addTo(miniLayer); }
+        guessBtn.disabled = false; guessLabel(); if (!quiet) api.sfx('tap');
+      }
+      const guessLabel = () => { guessBtn.textContent = guessBtn.disabled ? 'Place your pin on the map' : 'Guess'; };
       function makeMaps() {
+        if (miniMap) return;
         sizeMini(); miniMap = L.map(miniMapEl, MAP_OPTS).setView([25, 10], 1);
-        tileLayer(miniMap, miniCredit);
+        styleMap(miniMap, miniCredit, miniMapEl);
         miniLayer = L.layerGroup().addTo(miniMap);
         miniMap.on('click', e => {
-          if (phase !== 'play') return;
+          if (phase !== 'play' || paused) return;
           if (!mini.classList.contains('open')) { openMini(true); return; }
-          const ll = e.latlng.wrap();
-          pin = { lat: ll.lat, lon: ll.lng };
-          miniLayer.clearLayers();
-          L.marker([pin.lat, pin.lon], { icon: L.divIcon({ className: '', html: pinHtml(SEAT[mySeat], false), iconSize: [28, 36], iconAnchor: [14, 34] }), interactive: false }).addTo(miniLayer);
-          guessBtn.disabled = false; guessBtn.textContent = 'Guess'; api.sfx('tap');
+          setPin(e.latlng.wrap());
         });
         const mo = new MutationObserver(() => themed.forEach(f => f())); mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] }); offs.push(() => mo.disconnect());
       }
-      // The mini map is laid out once at its big size (and again only when the window changes); closed, it is just scaled down.
+      // The mini map is laid out once at its open size (and again only when the window or the size changes); closed, it is just scaled down.
       function sizeMini() {
-        const rw = stage.clientWidth || 600, rh = stage.clientHeight || 400;
-        const W = Math.round(Math.min(360, rw * 0.56)), H = Math.round(Math.max(90, Math.min(250, rh - 128)));
+        const rw = stage.clientWidth || 600, rh = stage.clientHeight || 400, [fw, fh] = MAP_SIZES[sizeLv];
+        const W = Math.round(Math.max(240, Math.min(rw - 20, rw * fw))), H = Math.round(Math.max(130, Math.min(rh - 67, rh * fh)));
+        const CW = Math.round(Math.max(150, Math.min(230, rw * 0.19))), CH = Math.round(CW * 0.7);
         root.style.setProperty('--mini-w', W + 'px'); root.style.setProperty('--mini-h', H + 'px');
-        root.style.setProperty('--mini-s', String(Math.max(160 / W, 108 / H).toFixed(4)));
-        if (miniMap) miniMap.invalidateSize(false);
+        root.style.setProperty('--mini-cw', CW + 'px'); root.style.setProperty('--mini-ch', CH + 'px');
+        root.style.setProperty('--mini-s', String(Math.max(CW / W, CH / H).toFixed(4)));
+        if (miniMap) miniMap.invalidateSize({ animate: false });
+        biggerBtn.disabled = sizeLv >= MAP_SIZES.length - 1; smallerBtn.disabled = sizeLv <= 0;
+        lockBtn.classList.toggle('on', pinned); lockBtn.title = pinned ? 'Let the map close again' : 'Keep the map open';
       }
-      let hoverT = 0, pinned = false;
-      function openMini(on_) { clearTimeout(hoverT); mini.classList.toggle('open', on_); }
+      const keepMapPrefs = () => { S.geo = Object.assign({}, S.geo, { map: sizeLv, lock: pinned }); Ludus.save(); };
+      const resize = d => { const n = Math.max(0, Math.min(MAP_SIZES.length - 1, sizeLv + d)); if (n === sizeLv) return; sizeLv = n; sizeMini(); keepMapPrefs(); api.sfx('click'); };
+      biggerBtn.onclick = () => resize(1); smallerBtn.onclick = () => resize(-1);
+      lockBtn.onclick = () => { pinned = !pinned; sizeMini(); keepMapPrefs(); api.sfx('click'); if (pinned) openMini(true); };
+      let hoverT = 0;
+      function openMini(on_) { clearTimeout(hoverT); mini.classList.toggle('open', on_ || pinned); }
       api.on(mini, 'pointerenter', e => { if (e.pointerType === 'touch') return; openMini(true); });
-      api.on(mini, 'pointerleave', e => { if (e.pointerType === 'touch') return; clearTimeout(hoverT); hoverT = setTimeout(() => { if (!pinned) openMini(false); }, 320); });
-      api.on(root, 'pointerdown', e => { if (!mini.contains(e.target) && mini.classList.contains('open')) { pinned = false; openMini(false); } }, true);
+      api.on(mini, 'pointerleave', e => { if (e.pointerType === 'touch') return; clearTimeout(hoverT); hoverT = setTimeout(() => { if (!pinned) openMini(false); }, 450); });
+      api.on(root, 'pointerdown', e => { if (!pinned && !mini.contains(e.target) && mini.classList.contains('open')) openMini(false); }, true);
 
       // ----- the street view -----
       function arrowSpot(item, nb) {
@@ -387,18 +432,35 @@
         return { type: 'equirectangular', panorama: item.src, hotSpots: spots, autoLoad: true, crossOrigin: 'anonymous' };
       }
       const NO_UI = { showControls: false, showFullscreenCtrl: false, showZoomCtrl: false, compass: false, mouseZoom: true, hfov: 90, minHfov: 50, maxHfov: 110, pitch: 0, yaw: 0, disableKeyboardCtrl: true, sceneFadeDuration: 250, friction: 0.1, touchPanSpeedCoeffFactor: 1, autoRotate: 0 };
-      function showItem(item, keepHeading, onDone0) {
-        const onDone = ok => { if (!ok && item.src !== item.sd) { item.src = item.sd; showItem(item, keepHeading, onDone0); return; } onDone0 && onDone0(ok); };
+      // One picture load at a time: Pannellum breaks ('Cannot set properties of undefined') when a scene is swapped while
+      // the previous picture is still downloading, so a new request waits for the current one to finish.
+      let busy = false, queued = null;
+      // A picture download that fails half way makes Pannellum throw from inside its own loader (FileReader / image src):
+      // treat that as a failed load (retried with the smaller copy) instead of a page error.
+      const onPanoError = e => {
+        if (!/pannellum\.js/.test((e && e.filename) || '')) return;
+        e.preventDefault();
+        if (busy && pendingDone) pendingDone(false);
+      };
+      window.addEventListener('error', onPanoError); offs.push(() => window.removeEventListener('error', onPanoError));
+      function showItem(item, keepHeading, onDone0, view) {
+        if (busy) { queued = [item, keepHeading, onDone0, view]; return; }
+        const onDone = ok => { if (!ok && item.src !== item.sd) { item.src = item.sd; showItem(item, keepHeading, onDone0, view); return; } onDone0 && onDone0(ok); };
         const token = ++loadToken;
         const prevScene = curScene, id = 's' + (++sceneN);
         const hd = keepHeading ? heading : item.az;
-        const yaw = wrap180(hd - item.az), pitch = viewer ? viewer.getPitch() : 0, hfov = viewer ? viewer.getHfov() : 90;
-        loadEl.hidden = false;
+        const yaw = view ? view.yaw : wrap180(hd - item.az), pitch = view ? view.pitch : viewer ? viewer.getPitch() : 0, hfov = view ? view.hfov : viewer ? viewer.getHfov() : 90;
+        loadEl.hidden = false; busy = true;
         let fin = false;
-        const done = ok => { if (fin) return; fin = true; if (token === loadToken) loadEl.hidden = true; onDone && onDone(ok); };
+        const done = ok => {
+          if (fin) return; fin = true; busy = false;
+          if (token === loadToken) loadEl.hidden = true;
+          if (!destroyed) onDone && onDone(ok);
+          if (!busy && queued && !destroyed) { const q = queued; queued = null; showItem(...q); }
+        };
         pendingDone = done;
         if (!viewer) {
-          viewer = pannellum.viewer(panoEl, { default: Object.assign({ firstScene: id }, NO_UI, { yaw }), scenes: { [id]: sceneFor(item) } });
+          viewer = pannellum.viewer(panoEl, { default: Object.assign({ firstScene: id }, NO_UI, { yaw, pitch, hfov }), scenes: { [id]: sceneFor(item) } });
           viewer.on('error', () => { if (pendingDone) pendingDone(false); });
           viewer.on('load', () => { if (token !== loadToken) return; cur = item; curScene = id; done(true); prefetch(item); });
         } else {
@@ -407,7 +469,6 @@
           viewer.loadScene(id, pitch, yaw, hfov);
         }
         later(() => done(false), 25000);
-        item._token = token;
       }
       function prefetch(item) {
         item.next.slice(0, 1).concat(item.prev.slice(0, 1)).forEach(nb => getItem(item.c, nb.id).then(it => { warmImage(it.src); }, () => {}));
@@ -468,27 +529,38 @@
 
       // ----- the round -----
       function setCard(show) { card.hidden = !show; }
-      function applyMove() { root.dataset.mv = cfg.move; }
+      function applyMove() {
+        root.dataset.mv = cfg.move;
+        const h = document.getElementById('hint'); if (h && S.hints) h.innerHTML = hintFor(cfg.move, !!on);   // the right controls for this mode
+      }
       function hud(vis) { [roundPill, top, scoreEl, homeBtn, mini].forEach(e => { e.style.visibility = vis ? 'visible' : 'hidden'; }); }
-      function startRound(r) {
+      // snap: a saved game being resumed (place along the road, view, time left, pin, map view)
+      function startRound(r, snap) {
         if (destroyed || r >= cfg.rounds) return;
         round = r; phase = 'load'; ready = new Set(); pin = null; moving = false; applyMove();
         resEl.hidden = true; waitEl.hidden = true; setCard(false); hud(true);
         if (miniLayer) miniLayer.clearLayers();
-        if (miniMap) { miniMap.setView([25, 10], 1); }
-        mini.style.display = ''; openMini(false); pinned = false;
-        guessBtn.disabled = true; guessBtn.textContent = 'Guess';
+        if (miniMap) { miniMap.setView([25, 10], 1, { animate: false }); }
+        mini.style.display = ''; openMini(false);
+        guessBtn.disabled = true; guessLabel();
         roundPill.textContent = `Round ${r + 1}/${cfg.rounds}`;
         timerEl.hidden = true; elapsed = 0; lastSec = 99;
         renderScore(r);
-        const p = place(r);
-        getItem(p.c, p.id).then(it => {
+        const p = place(r), at = snap && snap.at;
+        const first = at ? getItem(at.c, at.id).catch(() => getItem(p.c, p.id)) : getItem(p.c, p.id);
+        first.then(it => {
           if (destroyed || round !== r || phase !== 'load') return;
           showItem(it, false, ok => {
             if (destroyed || round !== r || phase !== 'load') return;
             if (!ok) { fail(); return; }
-            phase = 'play'; left = cfg.time; timerEl.hidden = !cfg.time || false; if (!cfg.time) timerEl.hidden = true; else drawTimer();
-          });
+            phase = 'play'; left = snap ? snap.left : cfg.time; timerEl.hidden = !cfg.time; if (cfg.time) drawTimer();
+            if (snap) {
+              elapsed = snap.elapsed || 0;
+              if (snap.map && miniMap) miniMap.setView([snap.map[0], snap.map[1]], snap.map[2], { animate: false });
+              if (snap.pin) setPin(snap.pin, true);
+              restoring = null;
+            }
+          }, snap && at && it.id === at.id ? snap.view : null);
         }, () => fail());
       }
       function drawTimer() {
@@ -501,7 +573,7 @@
         const g = pin ? { lat: pin.lat, lon: pin.lon } : null;
         (guesses[round] = guesses[round] || {})[mySeat] = g;
         if (on) on.send('guess', g ? { r: round, lat: Math.round(g.lat * 1e5) / 1e5, lon: Math.round(g.lon * 1e5) / 1e5 } : { r: round, n: 1 });
-        phase = 'wait'; api.sfx('score'); openMini(false);
+        phase = 'wait'; api.sfx('score'); mini.classList.remove('open');
         mini.style.display = 'none'; timerEl.hidden = true;
         checkDone();
       }
@@ -522,7 +594,7 @@
         const holder = el('div', 'geo-resmap'); resEl.appendChild(holder);
         resMap = L.map(holder, MAP_OPTS);
         const cred = el('div', 'geo-credit'); cred.style.fontSize = '10px'; resEl.appendChild(cred);
-        tileLayer(resMap, cred);
+        styleMap(resMap, cred, holder);
         return resMap;
       }
       function showResult(r) {
@@ -540,9 +612,9 @@
         const lines = [];
         pl.forEach(s => {
           const gg = g[s], col = SEAT[s];
-          const mk = L.marker([gg.lat, gg.lon], { icon: L.divIcon({ className: '', html: pinHtml(col, false), iconSize: [28, 36], iconAnchor: [14, 34] }), interactive: false, zIndexOffset: s === mySeat ? 900 : 800 }).addTo(m);
-          if (on) mk.bindTooltip(nameOf(s), { permanent: true, direction: 'top', offset: [0, -32], className: 'geo-lbl' });
-          const ln = L.polyline([[gg.lat, gg.lon], [gg.lat, gg.lon]], { color: col, weight: 3, dashArray: '2 7', lineCap: 'round', opacity: 0.95 }).addTo(m);
+          const mk = L.marker([gg.lat, gg.lon], { icon: pinIcon(col, false), interactive: false, zIndexOffset: s === mySeat ? 900 : 800 }).addTo(m);
+          if (on) mk.bindTooltip(nameOf(s), { permanent: true, direction: 'top', offset: [0, -14], className: 'geo-lbl' });
+          const ln = L.polyline([[gg.lat, gg.lon], [gg.lat, gg.lon]], { color: '#141414', weight: 3, dashArray: '1 7', lineCap: 'round', opacity: 0.9 }).addTo(m);
           resLayers.push(mk, ln); lines.push([ln, gg]); bounds.extend([gg.lat, gg.lon]);
         });
         m.invalidateSize(false);
@@ -563,11 +635,10 @@
         const bar = el('div', 'geo-bar geo-glass');
         const st = (label, val, cls) => { const d = el('div', 'st' + (cls ? ' ' + cls : '')); d.append(txt('span', '', label), txt('b', '', val)); return d; };
         const distB = st('Distance', myKm === null ? 'No guess' : fmtDist(myKm));
-        const ptsB = st('Points', '0', 'pts'), totB = st('Total', fmtN(totalOf(mySeat, r + 1)));
+        const ptsB = st('Points', '0', 'pts');   // the running total only shows on the final summary
         const last = r + 1 >= cfg.rounds;
         const next = txt('button', 'geo-next', last ? 'Results' : 'Next');
-        bar.append(distB, ptsB);
-        bar.append(totB, next); resEl.appendChild(bar);
+        bar.append(distB, ptsB, next); resEl.appendChild(bar);
         if (on) {
           const list = el('div', 'geo-reslist geo-glass');
           seats().slice().sort((a, b) => roundPts(r, b) - roundPts(r, a)).forEach(s => {
@@ -652,7 +723,7 @@
         card.className = 'geo-card'; card.innerHTML = '';
         card.appendChild(txt('h2', '', 'Needs internet'));
         card.appendChild(txt('p', '', 'Geo Guess loads street photos and maps from the web. Check your connection and try again.'));
-        const b = txt('button', 'geo-go', 'Try again'); b.onclick = () => { if (!pool) boot(); else if (!started) showSetup(); else startRound(round); };
+        const b = txt('button', 'geo-go', 'Try again'); b.onclick = () => { if (!pool || !miniMap || (restoring && !viewer)) boot(); else if (!started) showSetup(); else startRound(round, restoring); };
         card.appendChild(b); setCard(true);
       }
       const chipRow = (opts, cur_, pick, disabled) => {
@@ -669,14 +740,14 @@
         card.appendChild(chipRow(TIMES, cfg.time, v => { cfg.time = v; remember(); showSetup(); }, !host));
         card.appendChild(txt('span', 'lab', 'Movement'));
         card.appendChild(chipRow(MOVES, cfg.move, v => { cfg.move = v; remember(); showSetup(); }, !host));
-        card.appendChild(txt('p', 'note small', MOVE_NOTE[cfg.move]));
+        card.appendChild(txt('p', 'note small', MOVE_NOTE[cfg.move])); applyMove();
         if (host) {
           const go = txt('button', 'geo-go', 'Start'); go.onclick = begin; card.appendChild(go);
           if (on) card.appendChild(txt('p', 'note', `${on.count} of ${on.max} players here`));
         } else card.appendChild(txt('p', 'note', 'Waiting for the host to start…'));
         setCard(true);
       }
-      const remember = () => { if (host) { S.geo = { time: cfg.time, move: cfg.move }; Ludus.save(); if (on) on.send('cfg', { t: cfg.time, m: cfg.move }); } };
+      const remember = () => { if (host) { S.geo = Object.assign({}, S.geo, { time: cfg.time, move: cfg.move }); Ludus.save(); if (on) on.send('cfg', { t: cfg.time, m: cfg.move }); } };
       function begin() {
         if (phase !== 'setup' || !host) return;
         started = true; api.sfx('click');
@@ -716,14 +787,20 @@
         phase = 'boot'; loadEl.hidden = false; setCard(false);
         try {
           if (navigator.onLine === false) throw new Error('offline');
-          pool = await loadAll();
+          const all = await loadAll();
           if (destroyed) return;
-          order = chooseOrder(pool, on ? () => on.rand() : () => Math.random());
+          // a resumed game keeps its own five places in its own order; a new one draws them
+          if (restoring) {
+            const o = restoring.order, same = Array.isArray(o) && o.length === ROUNDS_N && o.every((i, k) => Number.isInteger(i) && all[i] && all[i].id === restoring.places[k].id);
+            if (same) { pool = all; order = o.slice(); } else { pool = restoring.places.map(p => Object.assign({}, p)); order = pool.map((_, i) => i); }
+          }
+          else if (!pool) { pool = all; order = chooseOrder(pool, on ? () => on.rand() : () => Math.random()); }
           const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 9000);
           try { const r = await fetch(API + '/', { signal: ctl.signal }); if (!r.ok) throw new Error('api'); } finally { clearTimeout(t); }
           if (destroyed) return;
           makeMaps();
           loadEl.hidden = true;
+          if (restoring) { resumeSaved(restoring); return; }
           const first = place(0);   // the first street shows blurred behind the settings card
           getItem(first.c, first.id).then(it => { if (!destroyed && phase === 'setup') showItem(it, false); }, () => {});
           if (on && !host) { phase = 'setup'; showSetup(); const hi = () => { if (!started && !destroyed) { on.send('hello', {}); later(hi, 2500); } }; hi(); }
@@ -734,10 +811,11 @@
       boot();
 
       // ----- frame loop, keys, resize -----
+      const typing = () => { const a = document.activeElement; return !!a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA' || a.tagName === 'SELECT' || a.isContentEditable); };
       api.keys(e => {
         const k = e.key;
         if (phase === 'play') {
-          if (k === 'Enter') { if (pin) submit(false); return; }
+          if (k === 'Enter' || k === ' ') { if (pin && !e.repeat && !typing()) submit(false); return; }
           if (k === 'ArrowUp' || k === 'w' || k === 'W') { stepDir(1); return; }
           if (k === 'ArrowDown' || k === 's' || k === 'S') { stepDir(-1); return; }
           if (cfg.move === 'nmpz') return;
@@ -745,7 +823,7 @@
           if ((k === 'ArrowRight' || k === 'd' || k === 'D') && viewer) viewer.setYaw(viewer.getYaw() + 12, false);
           if ((k === '+' || k === '=') && viewer) viewer.setHfov(viewer.getHfov() - 8, false);
           if ((k === '-' || k === '_') && viewer) viewer.setHfov(viewer.getHfov() + 8, false);
-        } else if (phase === 'result' && (k === 'Enter' || k === ' ') && resultFocus && !resultFocus.disabled) { resultFocus.click(); }
+        } else if (phase === 'result' && (k === 'Enter' || k === ' ') && !e.repeat && resultFocus && !resultFocus.disabled) { resultFocus.click(); }
         else if (phase === 'setup' && host && k === 'Enter') begin();
       });
       guessBtn.onclick = () => submit(false);
@@ -765,14 +843,43 @@
         }
         if (autoAt && phase === 'result' && performance.now() > autoAt) { autoAt = 0; autoGo && autoGo(); }
       });
-      if (window.ludusDebug) window.ludusDebug.geo = () => ({ phase, round, cfg, pin, place: pool && order.length ? place(round) : null, heading, at: cur && cur.id, guesses: JSON.parse(JSON.stringify(guesses)), order: order.slice(0, 10), seats: seats() });
+      if (window.ludusDebug) window.ludusDebug.geo = () => ({ phase, round, cfg, pin, left, paused, place: pool && order.length ? place(round) : null, heading, at: cur && cur.id, view: viewer && cur ? { yaw: viewer.getYaw(), pitch: viewer.getPitch(), hfov: viewer.getHfov() } : null, guesses: JSON.parse(JSON.stringify(guesses)), order: order.slice(0, 10), seats: seats(), mapOpen: mini.classList.contains('open'), sizeLv, pinned });
       if (window.ludusDebug) window.ludusGeoTest = {
-        pin: (lat, lon) => { pin = { lat, lon }; guessBtn.disabled = false; },
+        pin: (lat, lon) => setPin({ lat, lon }, true), step: dir => stepDir(dir), view: (lat, lon, z) => miniMap && miniMap.setView([lat, lon], z, { animate: false }),
         guess: auto => submit(!!auto), state: () => ({ phase, round, left }),
         nextBtn: () => resultFocus && resultFocus.click(), begin, time: t => { cfg.time = t; }, set: c => { Object.assign(cfg, c); applyMove(); showSetup(); }
       };
+      // ----- save and pause -----
+      function resumeSaved(s) {
+        cfg = { time: s.cfg.time, move: s.cfg.move, rounds: ROUNDS_N }; started = true; applyMove();
+        guesses = s.gs.map(g => ({ 0: g ? { lat: g.lat, lon: g.lon } : null }));
+        if (s.phase === 'result') { round = s.round; showResult(s.round); restoring = null; }
+        else startRound(s.round, s);
+      }
+      let lastSnap = null;
+      function snapshot() {
+        if (on || destroyed) return null;
+        if (restoring) return restoring;   // still loading the resumed game: keep what was saved
+        if (phase === 'offline' && started) return lastSnap;   // the connection dropped mid-game: keep the last good state
+        if (!started || !pool || !order.length) return null;
+        const ph = phase === 'result' || phase === 'wait' ? 'result' : phase === 'play' || phase === 'load' ? 'play' : null;
+        if (!ph) return null;   // setup, offline before start, or the game is over
+        const live = phase === 'play' && cur, p = place(round), c = miniMap ? miniMap.getCenter() : null;
+        return lastSnap = {
+          v: 1, cfg: { time: cfg.time, move: cfg.move }, round, phase: ph, order: order.slice(0, cfg.rounds),
+          places: order.slice(0, cfg.rounds).map(i => { const q = pool[i]; return { id: q.id, c: q.c, lat: q.lat, lon: q.lon, city: q.city, cc: q.cc }; }),
+          gs: Array.from({ length: ph === 'result' ? round + 1 : round }, (_, r) => { const g = guesses[r] && guesses[r][0]; return g ? { lat: g.lat, lon: g.lon } : null; }),
+          at: live ? { c: cur.c, id: cur.id } : { c: p.c, id: p.id },
+          view: live && viewer ? { yaw: viewer.getYaw(), pitch: viewer.getPitch(), hfov: viewer.getHfov() } : null,
+          left: phase === 'play' ? Math.max(0, left) : cfg.time, elapsed,
+          pin: ph === 'play' && pin ? { lat: pin.lat, lon: pin.lon } : null,
+          map: ph === 'play' && c ? [c.lat, c.lng, miniMap.getZoom()] : null
+        };
+      }
       return {
-        pause() {}, resume() {},
+        save: snapshot,
+        pause() { paused = true; root.classList.add('geo-paused'); },
+        resume() { paused = false; root.classList.remove('geo-paused'); },
         destroy() {
           destroyed = true; offs.forEach(f => f()); cancelAnimationFrame(resAnim);
           try { viewer && viewer.destroy(); } catch (e) {}

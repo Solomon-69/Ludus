@@ -54,6 +54,12 @@ const real = es => es.filter(e => !/GL Driver/.test(e));
     const [ra, rb] = await Promise.all([A, B].map(p => p.$eval('.geo-reslist', e => e.innerText.replace(/\s+/g, ' '))));
     check(`round ${r + 1}: both screens list the same two players and scores`, ra === rb && /Ann/.test(ra) && /Bo/.test(ra), [ra, rb]);
     if (r === 0) { await wait(1800); await shot(A, `geo_${tag}_result_host`); await shot(B, `geo_${tag}_result_guest`); }
+    if (r < 4) { const bars = await Promise.all([A, B].map(p => p.$eval('.geo-bar', e => e.innerText))); check(`round ${r + 1}: result bar shows distance and points, no total`, bars.every(t => /distance/i.test(t) && /points/i.test(t) && !/total/i.test(t)), bars); }
+    if (r === 0) {
+      check('online games are never saved', (await Promise.all([A, B].map(p => p.evaluate(() => window.ludusSnapshot())))).every(v => v === null));
+      check('no pause button online', (await Promise.all([A, B].map(p => p.$eval('#pauseBtn', e => e.hidden)))).every(Boolean));
+      check('hint names Space to guess', /Space/.test(await A.$eval('#hint', e => e.innerText)));
+    }
     await B.click('.geo-next'); await wait(400);
     if (r < 4) check('guest waits for the others after Next', await B.$eval('.geo-next', e => e.disabled));
     await A.click('.geo-next');
@@ -63,7 +69,10 @@ const real = es => es.filter(e => !/GL Driver/.test(e));
   await wait(2500);
   const tbl = p => p.$eval('.geo-final table', e => e.innerText.replace(/\s+/g, ' ').replace(/ \(you\)/g, '')), ttl = p => p.$eval('.geo-final h2', e => e.innerText);
   const fa = await tbl(A), fb = await tbl(B);
-  check('winner titles: host "You win", guest "Ann wins"', (await ttl(A)) === 'You win' && (await ttl(B)) === 'Ann wins', [await ttl(A), await ttl(B)]);
+  // places are random, so either player can win: the titles must match the scores
+  const tot = await A.$$eval('.geo-final tr', rows => Object.fromEntries(rows.slice(1).map(r => [r.querySelector('.name span').textContent.replace(' (you)', ''), Number(r.lastElementChild.textContent.replace(/,/g, ''))])));
+  const exp = tot.Ann === tot.Bo ? ['A tie', 'A tie'] : tot.Ann > tot.Bo ? ['You win', 'Ann wins'] : ['Bo wins', 'You win'];
+  check(`winner titles match the scores (${exp.join(' / ')})`, (await ttl(A)) === exp[0] && (await ttl(B)) === exp[1], [await ttl(A), await ttl(B), tot]);
   check('final table identical on both', fa === fb, [fa, fb]);
   await shot(A, `geo_${tag}_final_host`); await shot(B, `geo_${tag}_final_guest`);
   console.log('final:', fa);
