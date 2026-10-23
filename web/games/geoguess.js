@@ -183,6 +183,7 @@
 .geo-gpin.drop{animation:geodrop .42s cubic-bezier(.34,1.56,.64,1)}
 @keyframes geodrop{from{transform:translateY(-14px) scale(.4);opacity:0}to{transform:none;opacity:1}}
 .geo-res,.geo-top,.geo-score,.geo-round{transition:filter .25s}
+.geo.geo-paused .geo-card,.geo.geo-paused .geo-bar,.geo.geo-paused .geo-wait{visibility:hidden}
 .geo.geo-paused .geo-pano,.geo.geo-paused .geo-mini,.geo.geo-paused .geo-res,.geo.geo-paused .geo-top,.geo.geo-paused .geo-score,.geo.geo-paused .geo-round{filter:blur(9px) brightness(.8)}
 .geo-load{position:absolute;inset:0;display:grid;place-items:center;background:rgba(21,19,15,.55);z-index:3;transition:opacity .25s}
 .geo-load[hidden]{display:none}
