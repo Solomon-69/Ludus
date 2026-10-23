@@ -1,4 +1,4 @@
-/* Geo Guess map look, matched to the GeoGuessr guess map (Google Maps style, from Solomon's screen recording): green land
+/* Geo Guess map look, styled like a familiar street-photo guessing map: green land
    cover, flat bright blue water, thin grey borders, English labels; at city zoom a pale grey street map with sparse labels.
    Free tiles, no key: Esri World Street Map up to zoom 8 (its labels are English there), recoloured in the browser to the
    Google palette; from zoom 9 Esri Light Gray Base (recoloured) with Esri Light Gray Reference labels (English; the street

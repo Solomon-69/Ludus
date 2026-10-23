@@ -17,8 +17,8 @@ All notable changes to Ludus. Versions follow the app's version number (`Info.pl
 ## 1.8.2 (2026-10-23)
 
 - New covers: Flag Quiz (France and Seychelles, clean edges), 2048 (a real board mid-game), Ultimate tic-tac-toe
-  (nine small boards), Slither.io (smooth worm), Air Hockey (rink in play), Tanks (arena, two tanks, a shell);
-  Tetris and Minefield lose the little star; Geo Guess map without the pale stripe.
+  (nine small boards), snake arena game (smooth worm), Air Hockey (rink in play), Tanks (arena, two tanks, a shell);
+  falling-blocks game and Minefield lose the little star; Geo Guess map without the pale stripe.
 - Mac: opening Ludus closes the panel of our other menu bar apps (and the other way round); a click on any other
   menu bar item closes it too, except Nox's quick dark-mode switch.
 - Geo Guess: the pin bar shows the whole sentence only when it fits, otherwise "Place your pin"; never cut off.
@@ -45,19 +45,19 @@ All notable changes to Ludus. Versions follow the app's version number (`Info.pl
 - Card covers are redrawn whenever their size changes, so they are never squashed or stretched (panel back from a wide
   game, Compact/Large, screen scale). Search lists the best name match first (Geo finds Geo Guess) and starts at the top.
 - Online page: fills the panel with no empty band, tidier Last party card, "Create a room" wording.
-- Getting Over It: swinging the hammer in the air no longer pushes the pot, so long jumps fly their full arc.
+- hammer-climbing game: swinging the hammer in the air no longer pushes the pot, so long jumps fly their full arc.
 
 ## 1.7.0 (2026-10-23)
 
 - **Online tournaments and parties:** pick several games and rounds, play them in a row with a scoreboard, rejoin your party, and a rematch button on the final standings. Still works with friends on 1.6.x (they play one game per room).
-- **Smoother online action games:** guests now predict their own paddle or player and ease out the host's corrections, so Pong, Air Hockey, Tag, Hole.io, Paper.io and Slither feel responsive on slow connections.
+- **Smoother online action games:** guests now predict their own paddle or player and ease out the host's corrections, so paddle game, Air Hockey, Tag, swallow-the-city game, claim-the-land game and snake arena game feel responsive on slow connections.
 - **Online page:** the 3-4 Player games moved into Online; filter chips All, Arcade, Puzzle, Duel, 2 Player and Online.
-- **Polish:** new covers for Hole.io, Paper.io, Sokoban and Slither, a redrawn Rock Paper Scissors fist with a spring rebound, and fixes for toasts overlapping the result bar.
+- **Polish:** new covers for swallow-the-city game, claim-the-land game, Sokoban and Slither, a redrawn Rock Paper Scissors fist with a spring rebound, and fixes for toasts overlapping the result bar.
 - **Windows:** better handling of display scaling and zoom.
 - **Geo Guess (new game):** a street-level photo from somewhere on Earth; look around, move along the road, pin the place on the map. Solo or online for 2 to 4 players with the same places for everyone.
 - **Online lobby:** two tabs, Single game and Tournament, with cover cards for picking games. Rejoin brings back the same room code.
 - **Rock Paper Scissors** plays against the bot on its own; play a friend through Online (picks stay secret).
-- **Hole.io:** buildings no longer twitch or shift while you move. **Snake:** a little slower, with a bump and spark burst on a crash.
+- **swallow-the-city game:** buildings no longer twitch or shift while you move. **Snake:** a little slower, with a bump and spark burst on a crash.
 - **The panel always opens on All games, scrolled to the top.**
 
 ## 1.6.0 (2026-10-23)
@@ -65,11 +65,11 @@ All notable changes to Ludus. Versions follow the app's version number (`Info.pl
 - **Play online (opt-in):** create a room, share the 5 character code (or the Copy invite link,
   `ludus://join/CODE`) and play with someone in another place. Works on Mac and Windows, for 2 to 4 players,
   in 13 games. Uses free public relays only when you choose Play online. Rooms are not private. See `web/ONLINE.md`.
-- **3-4 Player tab:** Tag, Paper.io and Hole.io for three or four players.
+- **3-4 Player tab:** Tag, claim-the-land game and swallow-the-city game for three or four players.
 - **Search:** the best match leads as a highlighted card, with related games below it.
 - **Rename games (Settings > Play):** click a game's name to give it your own. The original name is still shown.
 - **Game list (37 games):** new Flag Quiz (countries plus regional flags from the US, Canada, the UK and 13 more
-  countries), Slither.io, Hole.io, Paper.io, Bloons TD Battles, Plants vs. Zombies (Easy and Hard), Getting Over It
+  countries), snake arena game, swallow-the-city game, claim-the-land game, balloon tower-defence game, garden-defence game (Easy and Hard), hammer-climbing game
   (difficulty menu) and the Brain rot skin for Stack. Tron has been removed.
 
 ## 1.5

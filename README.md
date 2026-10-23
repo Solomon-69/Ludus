@@ -13,7 +13,6 @@
   <a href="https://github.com/Solomon-69/Ludus/releases/latest"><img alt="Version 1.7.0" src="https://img.shields.io/badge/version-1.7.0-d97757?style=flat-square"></a>
   <img alt="macOS 14 or later" src="https://img.shields.io/badge/macOS-14%2B-1f1d1a?style=flat-square&logo=apple&logoColor=white">
   <img alt="Windows 10 or 11" src="https://img.shields.io/badge/Windows-10%20%7C%2011-1f1d1a?style=flat-square">
-  <a href="LICENSE"><img alt="MIT licence" src="https://img.shields.io/badge/licence-MIT-5b8a5a?style=flat-square"></a>
 </p>
 
 <p>
@@ -26,7 +25,7 @@
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/showcase/ludus-1-dark.png">
-  <img src="docs/showcase/ludus-1-light.png" width="880" alt="The Ludus panel open under the menu bar with 2048 and Space Invaders beside it">
+  <img src="docs/showcase/ludus-1-light.png" width="880" alt="The Ludus panel open under the menu bar with 2048 and alien-wave shooter beside it">
 </picture>
 
 </div>
@@ -35,7 +34,7 @@ Ludus is a small panel of games that lives in the Mac menu bar (and the Windows 
 Click the controller, play a quick round, then click anywhere else. The panel tucks itself
 away and your game waits, paused, exactly where you left it.
 
-It is free, open source, works fully offline by default and collects nothing. Playing a friend over the internet is an opt-in extra (see [Play online](#play-online-with-a-room-code)).
+It is free, source-available, works fully offline by default and collects nothing. Playing a friend over the internet is an opt-in extra (see [Play online](#play-online-with-a-room-code)).
 
 ## Contents
 
@@ -67,19 +66,19 @@ Every board game has a <b>vs Bot / vs Friend</b> switch at the top. Pick Friend 
 
 - <b>Turn-based with a friend:</b> Connect Four, Dots and Boxes, Ultimate Tic-Tac-Toe, Hex and Dead Centre.
 - <b>Secret picks:</b> in Rock Paper Scissors, Player 1 picks with <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> and Player 2 with <kbd>J</kbd> <kbd>K</kbd> <kbd>L</kbd>. Both hands show only once you have both locked in.
-- <b>Real time:</b> Pong, Air Hockey, Tag, Nidhogg and Tank Trouble, with one player on <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> and the other on the arrow keys. Tag takes up to four on one keyboard: P3 on <kbd>I</kbd> <kbd>J</kbd> <kbd>K</kbd> <kbd>L</kbd> (+<kbd>U</kbd>) and P4 on the number pad <kbd>8</kbd> <kbd>4</kbd> <kbd>5</kbd> <kbd>6</kbd> (+<kbd>0</kbd>).
+- <b>Real time:</b> paddle game, Air Hockey, Tag, sword-duel game and tank arena game, with one player on <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> and the other on the arrow keys. Tag takes up to four on one keyboard: P3 on <kbd>I</kbd> <kbd>J</kbd> <kbd>K</kbd> <kbd>L</kbd> (+<kbd>U</kbd>) and P4 on the number pad <kbd>8</kbd> <kbd>4</kbd> <kbd>5</kbd> <kbd>6</kbd> (+<kbd>0</kbd>).
 - All of them are in the <b>2 Player</b> tab. The panel widens by itself when a game needs the room.
 
 <br>
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/showcase/ludus-3-dark.png">
-  <img src="docs/showcase/ludus-3-light.png" width="880" alt="Space Invaders, Stack and Chomp side by side">
+  <img src="docs/showcase/ludus-3-light.png" width="880" alt="alien-wave shooter, Stack and Chomp side by side">
 </picture>
 
 ### Play online with a room code
 
-Thirteen games have an <b>Online</b> button next to vs Bot / vs Friend: the board games Connect Four, Dots and Boxes, Ultimate Tic-Tac-Toe, Hex, Quoridor, Rock Paper Scissors, Dead Centre and Last Wire, the action games Pong and Air Hockey, and Tag, Paper.io and Hole.io, which take <b>2 to 4 players</b> (they are in the <b>3-4 Player</b> tab; the host can press <b>Start now</b> once the room has enough players, or the game starts by itself when every seat is taken). Most games are for two players.
+Thirteen games have an <b>Online</b> button next to vs Bot / vs Friend: the board games Connect Four, Dots and Boxes, Ultimate Tic-Tac-Toe, Hex, Quoridor, Rock Paper Scissors, Dead Centre and Last Wire, the action games paddle game and Air Hockey, and Tag, claim-the-land game and swallow-the-city game, which take <b>2 to 4 players</b> (they are in the <b>3-4 Player</b> tab; the host can press <b>Start now</b> once the room has enough players, or the game starts by itself when every seat is taken). Most games are for two players.
 
 One player taps <b>Create room</b> and gets a 5 character room code. The <b>Copy invite</b> button copies a short message with the code and a `ludus://join/CODE` link. The other player taps <b>Join room</b> and types or pastes the code, or just clicks the link. It works on Mac and Windows. There is no account and no server of ours: the copies of Ludus talk through free public relays, and that only happens when you choose Play online. Rooms are not private: anyone who knows the code can join. See [PRIVACY.md](PRIVACY.md) and [web/ONLINE.md](web/ONLINE.md).
 
@@ -87,28 +86,28 @@ One player taps <b>Create room</b> and gets a 5 character room code. The <b>Copy
 
 Fourteen arcade games built to play smoothly at 60 frames a second, each with its own best score to beat.
 
-- <b>Space Invaders</b>: waves of invaders, shields and a mystery ship.
+- <b>alien-wave shooter</b>: waves of invaders, shields and a mystery ship.
 - <b>Stack</b>: drop each block in 3D and line it up perfectly for a combo. Press <kbd>B</kbd> (or the top-left button) for the silly <b>Brain rot</b> skin: every slab is a made-up character with a name and sound captions.
-- <b>Pac-Man</b>: a maze, four ghosts and power pellets.
-- <b>Getting Over It</b>: climb a mountain with a hammer. Pick a difficulty from the menu.
-- <b>Plants vs. Zombies</b>: plant a garden against the creeping weeds, on Easy or Hard.
-- <b>Hole.io</b>, <b>Paper.io</b> and <b>Slither.io</b>: eat, claim land or grow longer than the rest.
-- Plus Tetris (falling blocks with proper locking), Breakout, Asteroids, Flappy Bird, Snake and Doodle Jump.
+- <b>maze-and-ghosts game</b>: a maze, four ghosts and power pellets.
+- <b>hammer-climbing game</b>: climb a mountain with a hammer. Pick a difficulty from the menu.
+- <b>garden-defence game</b>: plant a garden against the creeping weeds, on Easy or Hard.
+- <b>swallow-the-city game</b>, <b>claim-the-land game</b> and <b>snake arena game</b>: eat, claim land or grow longer than the rest.
+- Plus falling-blocks game (falling blocks with proper locking), brick-breaker, asteroid shooter, flap-through-the-gaps game, Snake and endless-jumper game.
 - Most games have difficulty levels that change the speed and how clever the computer is.
 
 <br>
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/showcase/ludus-4-dark.png">
-  <img src="docs/showcase/ludus-4-light.png" width="880" alt="2048, Wordle and Sudoku side by side">
+  <img src="docs/showcase/ludus-4-light.png" width="880" alt="2048, five-letter word game and Sudoku side by side">
 </picture>
 
 ### Puzzles for a quick think
 
 Nine calm puzzle games for a two-minute break or a longer think. Close the panel at any point and the game is saved exactly as it was.
 
-- <b>2048</b>, <b>Wordle</b> (guess the word in six tries), <b>Sudoku</b> with notes and undo.
-- <b>Minesweeper</b>, <b>Solitaire</b>, <b>Memory</b>, <b>Sokoban</b> and <b>Candy Crush</b>.
+- <b>2048</b>, <b>five-letter word game</b> (guess the word in six tries), <b>Sudoku</b> with notes and undo.
+- <b>mine-clearing puzzle</b>, <b>Solitaire</b>, <b>Memory</b>, <b>Sokoban</b> and <b>match-three game</b>.
 - <b>Flag Quiz</b>: name the country from its flag. It also has regional flags: US states, Canadian provinces, UK nations and regions in 13 more countries.
 - Keyboard first, but every puzzle also works with clicks.
 
@@ -196,11 +195,11 @@ brew install --cask ludus   # not available yet
 
 | Group | Games |
 | --- | --- |
-| **Arcade** (beat your best) | Tetris, Breakout, Pac-Man, Getting Over It, Plants vs. Zombies, Flappy Bird, Asteroids, Space Invaders, Snake, Doodle Jump, Stack, Hole.io, Paper.io, Slither.io |
-| **Puzzle** | 2048, Sokoban, Wordle, Minesweeper, Memory, Solitaire, Candy Crush, Sudoku, Flag Quiz |
-| **Duel** (you against the computer) | Dots and Boxes, Dead Centre, Connect Four, Last Wire, Ultimate Tic-Tac-Toe, Nidhogg, Hex, Rock Paper Scissors, Quoridor, Bloons TD Battles |
-| **2 Player** (one keyboard) | Air Hockey, Pong, Tag, Tank Trouble |
-| **3-4 Player** (online, Tag also on one keyboard) | Tag, Paper.io, Hole.io |
+| **Arcade** (beat your best) | falling-blocks game, brick-breaker, maze-and-ghosts game, hammer-climbing game, garden-defence game, flap-through-the-gaps game, asteroid shooter, alien-wave shooter, Snake, endless-jumper game, Stack, swallow-the-city game, claim-the-land game, snake arena game |
+| **Puzzle** | 2048, Sokoban, five-letter word game, mine-clearing puzzle, Memory, Solitaire, match-three game, Sudoku, Flag Quiz |
+| **Duel** (you against the computer) | Dots and Boxes, Dead Centre, Connect Four, Last Wire, Ultimate Tic-Tac-Toe, sword-duel game, Hex, Rock Paper Scissors, Quoridor, balloon tower-defence game |
+| **2 Player** (one keyboard) | Air Hockey, paddle game, Tag, tank arena game |
+| **3-4 Player** (online, Tag also on one keyboard) | Tag, claim-the-land game, swallow-the-city game |
 
 Connect Four, Dots and Boxes, Ultimate Tic-Tac-Toe, Hex, Rock Paper Scissors and Dead Centre also have a **vs Friend** mode, so they show up in the 2 Player tab too.
 
@@ -215,7 +214,7 @@ it and pauses the game. A right-click on the icon works too.
 | --- | --- |
 | Moving | <kbd>&larr;</kbd> <kbd>&uarr;</kbd> <kbd>&rarr;</kbd> <kbd>&darr;</kbd> or <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> in most games |
 | Act, jump, drop, fire | <kbd>Space</kbd> |
-| Pause | <kbd>Esc</kbd> or <kbd>P</kbd> (in Wordle, <kbd>P</kbd> types a letter, so use <kbd>Esc</kbd>) |
+| Pause | <kbd>Esc</kbd> or <kbd>P</kbd> (in five-letter word game, <kbd>P</kbd> types a letter, so use <kbd>Esc</kbd>) |
 | After a game | <kbd>Enter</kbd>, <kbd>Space</kbd> or <kbd>R</kbd> to play again, <kbd>Esc</kbd> for all games |
 | Settings | <kbd>Esc</kbd> to go back |
 | 2 Player games | One player on <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd>, the other on the arrow keys |
@@ -341,7 +340,7 @@ To report a security problem, see [SECURITY.md](SECURITY.md).
 ## Credits
 
 - Made by Solomon, built with the help of Claude.
-- Settings gear icon from [Lucide](https://lucide.dev) (ISC licence).
+- Settings gear icon from [Lucide](https://lucide.dev) (ISC licence). Full list of third-party material and photo/map credits: [THIRD_PARTY.md](THIRD_PARTY.md).
 - Many games are fresh takes on classics such as falling blocks, maze chase, Hex, Quoridor, dots
   and boxes and ultimate tic-tac-toe. The code and drawings were written for Ludus.
 - Third-party notices are in [NOTICE](NOTICE).
@@ -350,4 +349,17 @@ Ludus is an independent project and is not affiliated with or endorsed by Anthro
 
 ## Licence
 
-[MIT](LICENSE). Copyright (c) 2026 Solomon.
+Copyright (c) 2026 Solomon. All rights reserved. Source not licensed for reuse: you can read it and use the app, but you may not copy, modify or redistribute the code or artwork without written permission. Bundled third-party parts keep their own licences, see [THIRD_PARTY.md](THIRD_PARTY.md).
+
+## Trademarks
+
+Ludus is an independent project. Not affiliated with or endorsed by the makers of any game it resembles; all trademarks and game names belong to their owners. Game names are used only to describe the style of play.
+
+## Unsigned apps: how to open them, and how to check your download
+
+These apps are not signed yet. Signing needs Apple's paid developer account (and a Windows code-signing certificate), which the project does not have yet. The apps are safe to use as far as the author knows, but your computer cannot prove who made them, so it warns you the first time.
+
+- **Mac:** right-click the app, choose **Open**, then **Open** again. If there is no Open button, go to System Settings > Privacy & Security and click **Open Anyway**.
+- **Windows:** if SmartScreen says "Windows protected your PC", click **More info**, then **Run anyway**.
+
+To check that a download has not been changed, compare its SHA-256 fingerprint with the one in [CHECKSUMS.md](CHECKSUMS.md) (Mac: `shasum -a 256 <file>` in Terminal; Windows: `certutil -hashfile <file> SHA256`).
