@@ -3,8 +3,8 @@
 Fingerprints of the current release downloads. If a file you downloaded gives a different fingerprint, do not open it.
 
 ```
-d40419b407467334006bfddd7470ad737a94dc273aa5e98554182c91cf1bf85b  Ludus-mac.zip
-f612552d8fdd1f58b0cdee8fae5a388fde29d3fed1b089cd49c182951034039b  Ludus-windows.zip
+df1116869bd73c7ace00616b407c4d24a265179fc88bceebcd2c16f1401cc26a  Ludus-mac.zip
+b8f3acdeac0b4ce1013bc1f694a46a8e250071c1a12d53b5d72f4bdc09b22192  Ludus-windows.zip
 ```
 
 Check on Mac: `shasum -a 256 <file>`. Check on Windows: `certutil -hashfile <file> SHA256`.
