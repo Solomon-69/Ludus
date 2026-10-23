@@ -21,7 +21,7 @@ const L = require('./lib.js'); const { check, newPage, shot, wait } = L;
     check(`${tag}: no empty band under the page (gap ${r.gap}px)`, r.gap <= 26 && r.scroll <= 1, r);
     check(`${tag}: equal gaps between the blocks (${r.gaps})`, r.even, r.gaps);
     check(`${tag}: nothing overlaps or is cut off`, r.overlap === 0 && r.clip === 0, r);
-    check(`${tag}: three steps`, r.steps.join('|') === '1Create or join a room|2Share the code|3Host picks games', r.steps);
+    check(`${tag}: three steps`, r.steps.join('|') === '1Create or join|2Share the code|3Host picks games', r.steps);
     check(`${tag}: steps never cut off, at most two lines (${r.stepLines})`, r.stepCut === 0 && r.stepLines <= 2, r);
     const want = dark ? 'rgb(50, 45, 39)' : 'rgb(239, 231, 218)';
     check(`${tag}: boxes use the ${dark ? 'unchanged dark' : 'deeper cream'} fill`, r.boxes.every(c => c === want), r.boxes);
