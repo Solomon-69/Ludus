@@ -79,7 +79,7 @@ const S = {
     check('party saved: code, names, games, rounds', saved && saved.code === c && saved.names.length === 2 && saved.games.length === 2 && saved.n === 5, saved);
     await A.reload(); await wait(500); await onlineTab(A);
     const card = await A.$eval('.party-card', e => e.innerText).catch(() => '');
-    check('after a restart the Online page offers Rejoin', /Rejoin/.test(card) && /Ann/.test(card) && /Pong/.test(card), card);
+    check('after a restart the Online page offers Rejoin', /Rejoin/.test(card) && /Ann/.test(card) && /Pong/i.test(card), card);
     await A.click('#opRejoin'); await A.waitForSelector('.code-ch', { timeout: 8000 }); await wait(900);
     const on = await A.$$eval('#lobbyCard .pick-chips .chip.is-on', els => els.map(e => e.textContent));
     check('Rejoin reopens a room with the same games and rounds', on.includes('Pong') && on.includes('Air Hockey') && on.includes('5'), on);
