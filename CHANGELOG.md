@@ -9,3 +9,4 @@ All notable changes to Ludus. Versions follow the app's version number (`Info.pl
 - Online play with a room code, Map Hunt with free open maps (OpenFreeMap, OpenStreetMap, MapLibre, Panoramax photos).
 - Every game has its own original name and artwork. Mosaic Hunt uses original pixel creatures; Garden Defence has original plant art.
 - Open source under the MIT licence.
+- Settings: More is always visible; rename pencil replaces the underline; optional Original names from your own file.

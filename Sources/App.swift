@@ -94,6 +94,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
         } else { DispatchQueue.main.async { self.showFallback() } }
     }
 
+    /// The player's own list of game names (never shipped with Ludus): ~/Library/Application Support/Ludus/original-names.json, game id -> name.
+    private var namesFileURL: URL {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("Ludus", isDirectory: true).appendingPathComponent("original-names.json")
+    }
+    /// The file's names as a JS expression: an object of strings, or null when the file is missing or not valid.
+    private func originalNamesLiteral() -> String {
+        guard let data = try? Data(contentsOf: namesFileURL),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return "null" }
+        let clean = obj.compactMapValues { $0 as? String }
+        guard let out = try? JSONSerialization.data(withJSONObject: clean),
+              let text = String(data: out, encoding: .utf8) else { return "null" }
+        return text.replacingOccurrences(of: "\u{2028}", with: "\\u2028").replacingOccurrences(of: "\u{2029}", with: "\\u2029")
+    }
+    /// Shows the names file in Finder (or its folder, made if needed, when the file does not exist yet).
+    private func revealNamesFile() {
+        let url = namesFileURL
+        if FileManager.default.fileExists(atPath: url.path) { NSWorkspace.shared.activateFileViewerSelecting([url]); return }
+        try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        NSWorkspace.shared.open(url.deletingLastPathComponent())
+    }
+
     /// Runs before the page's own scripts: hands over saved scores/settings and the Mac's state.
     private func bootScript() -> String {
         let login = SMAppService.mainApp.status == .enabled
@@ -104,6 +126,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
         window.__LUDUS_INVISIBLE__ = \(invisible);
         window.__LUDUS_DOCK__ = \(UserDefaults.standard.bool(forKey: dockKey));
         window.__LUDUS_DARK__ = \(isDark());
+        window.__LUDUS_ORIGINAL_NAMES__ = \(originalNamesLiteral());
+        window.__LUDUS_NAMES_PATH__ = \(String(reflecting: namesFileURL.path));
         window.__LUDUS_VERSION__ = \(String(reflecting: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"));
         \(testBoot())
         """
@@ -272,6 +296,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
             setLogin(body["on"] as? Bool ?? false)
         case "invisible":
             setInvisible(body["on"] as? Bool ?? false)
+        case "names":
+            webView.evaluateJavaScript("window.ludusNames && ludusNames(\(originalNamesLiteral()))")
+        case "revealNames":
+            revealNamesFile()
         case "dock":
             UserDefaults.standard.set(body["on"] as? Bool ?? false, forKey: dockKey)
             applyDockPolicy()

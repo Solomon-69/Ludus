@@ -154,10 +154,16 @@ svg { display: block; }
 .art canvas { width: 100%; height: 100%; display: block; }
 .card-name { font: 640 13.5px/1.15 var(--font-round); }
 .renaming .card-name, .renaming .game-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* Rename games (Settings): the name becomes a small button; long names end with an ellipsis */
-.rename-name { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom;
-  border-radius: 6px; padding: 0 3px; margin: 0 -3px; cursor: text; box-shadow: inset 0 -1.5px 0 color-mix(in srgb, var(--accent) 55%, transparent); transition: background 0.15s; }
-.rename-name:hover, .rename-name:focus-visible { background: color-mix(in srgb, var(--accent) 14%, transparent); outline: 0; }
+/* Rename games (Settings): the name becomes a small button; long names end with an ellipsis. A faint pencil fades in at its right. */
+.rename-name { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; vertical-align: bottom; cursor: text; position: relative; }
+.rename-name .rn-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rename-name .rn-pen { flex: none; width: 12px; height: 12px; color: var(--ink-3); opacity: 0.55; transition: opacity 0.35s ease; animation: rn-in 0.4s ease both; }
+@keyframes rn-in { from { opacity: 0; } }
+.rename-name::after { content: ""; position: absolute; right: -16px; top: 50%; width: 44px; height: 44px; transform: translateY(-50%); }   /* 44px tap area, no visible box */
+.rename-name:hover .rn-pen, .rename-name:focus-visible .rn-pen { opacity: 0.95; }
+.rename-name:focus-visible { outline: 0; }
+@media (prefers-reduced-motion: reduce) { .rename-name .rn-pen { transition: none; animation: none; } }
+.reduce .rename-name .rn-pen { transition: none; animation: none; }
 .sheet.rename-sheet { position: fixed; z-index: 20; padding: 12px; }
 .rename-card { width: min(300px, 100%); }
 .rename-card input {
@@ -578,10 +584,8 @@ svg { display: block; }
 .online-page.op-offline #opCreate, .online-page.op-offline .join-row, .online-page.op-offline .party-card, .online-page.op-offline .op-or { opacity: 0.4; pointer-events: none; }
 .sv { display: flex; align-items: center; gap: 12px; }
 .sv .vol { width: 104px; }
-.more-toggle { display: flex; align-items: center; gap: 4px; width: calc(100% - 8px); text-align: left; cursor: pointer; }
-.more-toggle svg { width: 14px; height: 14px; transition: transform 0.25s var(--spring); }
-.more-toggle[aria-expanded="true"] svg { transform: rotate(180deg); }
-.more-box[hidden] { display: none; }
+.names-note { overflow-wrap: anywhere; }
+.row.is-disabled { opacity: 0.55; pointer-events: none; }
 .quit-group { margin-top: 14px; }
 .upd-ctl { display: flex; align-items: center; gap: 6px; flex: none; }
 .row-sub.good { color: var(--net-on); font-weight: 600; }

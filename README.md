@@ -138,6 +138,7 @@ Clicking anywhere outside the panel pauses your game and saves it. Next time you
 - Type in the search box. The best match appears first as a highlighted card, and <b>Related games</b> follow below it.
 - Tabs for All, Arcade, Puzzle, Duel, 2 Player and 3-4 Player.
 - Optional <b>Rename games</b> in Settings: turn it on and click a game's name to give it your own. The original name is still shown.
+- Optional <b>Original names</b> in Settings > More: shows your own list of game names from a file you create yourself (`~/Library/Application Support/Ludus/original-names.json` on Mac, `%APPDATA%\Ludus\original-names.json` on Windows, `{"game-id": "Name"}`). Off by default; no names are included with Ludus.
 
 <br>
 

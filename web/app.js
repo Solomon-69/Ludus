@@ -14,7 +14,20 @@
   // Off: every name is the original. On: a name the player typed (kept in S.names, also while switched off) replaces it.
   const NAME_MAX = 24;
   const customName = g => (S.renameGames && S.names && typeof S.names[g.id] === 'string' && S.names[g.id].trim()) || '';
-  const dispName = g => customName(g) || g.name;
+  // "Original names": the player's own list (original-names.json, id -> name). It only changes what is shown, never ids or saves,
+  // and a name typed in Rename games still wins. No names ship with Ludus; the file comes from the player.
+  let fileNames = null;   // id -> name from the file, or null when there is no (valid) file
+  L.setFileNames = o => {
+    fileNames = null;
+    if (o && typeof o === 'object' && !Array.isArray(o)) {
+      fileNames = {};
+      Object.keys(o).forEach(k => { const v = o[k]; if (typeof v === 'string' && v.trim()) fileNames[k] = v.trim().slice(0, 40); });
+    }
+  };
+  const fileName = g => (S.originalNames && fileNames && fileNames[g.id]) || '';
+  const dispName = g => customName(g) || fileName(g) || g.name;
+  window.ludusNames = o => { L.setFileNames(o); if (view === 'settings') renderSettings(); else if (view === 'home') renderCards(); };
+  L.setFileNames(window.__LUDUS_ORIGINAL_NAMES__);
   L.displayName = dispName;
   const REVEAL_MS = 1200;   // how long the final board stays on screen before the result bar slides up
   const SAVE_EVERY_MS = 4000;
@@ -224,9 +237,12 @@
   function fillName(el, g, done) {
     el.textContent = ''; el.title = '';
     root.classList.toggle('renaming', !!S.renameGames);
-    if (!S.renameGames) { el.textContent = g.name; return; }
+    if (!S.renameGames) { el.textContent = dispName(g); return; }
     const n = document.createElement('span');
-    n.className = 'rename-name'; n.textContent = dispName(g); n.setAttribute('role', 'button'); n.tabIndex = 0;
+    n.className = 'rename-name';
+    const nt = document.createElement('span'); nt.className = 'rn-text'; nt.textContent = dispName(g); n.appendChild(nt);
+    n.insertAdjacentHTML('beforeend', '<svg class="rn-pen" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"/></svg>');
+    n.setAttribute('role', 'button'); n.tabIndex = 0;
     n.title = customName(g) ? g.name + ' \u00b7 click to rename' : 'Click to rename';
     n.setAttribute('aria-label', 'Rename ' + dispName(g));
     const open = e => { e.preventDefault(); e.stopPropagation(); openRename(g, done); };
@@ -799,6 +815,28 @@
     const g = el('div', 'group'); rows.forEach(r => g.appendChild(r)); frag.appendChild(g);
     return frag;
   }
+  // Original names (Settings > More): the player's own list from original-names.json; the row says when there is no file yet.
+  function originalNamesRow(native) {
+    const path = window.__LUDUS_NAMES_PATH__ || '';
+    const sub = row('Original names', 'Show your own list of original game names. Add them in the file shown below.', sw(!!S.originalNames && native, v => {
+      S.originalNames = v; L.save(); if (native) L.native('names'); renderCards(); refresh();
+    }, 'Original names'));
+    const t = sub.querySelector('.row-text'); const note = el('div', 'row-sub names-note'); t.appendChild(note);
+    const btn = el('button', 'small-btn names-btn', 'Reveal'); btn.type = 'button'; sub.appendChild(btn);
+    if (!native) sub.classList.add('is-disabled');
+    function refresh() {
+      if (!native) { note.textContent = 'Available in the Mac and Windows apps.'; btn.hidden = true; return; }
+      btn.hidden = false;
+      note.textContent = fileNames ? path : 'No file found: create original-names.json' + (path ? ' in ' + path.replace(/[\\/][^\\/]*$/, '') : '');
+    }
+    btn.onclick = () => {
+      L.sfx('click'); L.native('revealNames');
+      try { if (path && navigator.clipboard) navigator.clipboard.writeText(path); } catch (e) { /* the path is shown on screen anyway */ }
+      toast('Path copied');
+    };
+    refresh();
+    return sub;
+  }
   // The Update row (Settings > App): one line of state, one button. See status.js for the states.
   function updateRow() {
     const U = L.update, r = el('div', 'row upd');
@@ -869,7 +907,7 @@
     };
     appRows.push(row('Reset best scores', 'Clears every high score', reset, 'danger'));
     body.appendChild(group('App', appRows));
-    // More: the rarely used switches, folded away until asked for.
+    // More: always visible.
     const moreRows = [];
     if (native && typeof window.__LUDUS_INVISIBLE__ === 'boolean') {
       // The app hands over __LUDUS_INVISIBLE__. Mac: an empty menu bar slot. Windows: no tray icon, Ctrl+Alt+G or the Start menu.
@@ -879,11 +917,8 @@
       moreRows.push(row('Invisible icon', invisibleHelp, sw(!!window.__LUDUS_INVISIBLE__, v => { window.__LUDUS_INVISIBLE__ = v; L.native('invisible', { on: v }); }, 'Invisible icon')));
     }
     moreRows.push(row('Rename games', 'Click a game’s name to give it your own', sw(!!S.renameGames, v => { S.renameGames = v; L.save(); }, 'Rename games')));
-    const moreBtn = el('button', 'group-label more-toggle', '<span>More</span><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-down"/></svg>');
-    moreBtn.type = 'button'; moreBtn.id = 'moreToggle'; moreBtn.setAttribute('aria-expanded', 'false');
-    const moreBox = el('div', 'group more-box'); moreBox.hidden = true; moreRows.forEach(x => moreBox.appendChild(x));
-    moreBtn.onclick = () => { const open = moreBox.hidden; moreBox.hidden = !open; moreBtn.setAttribute('aria-expanded', String(open)); L.sfx('click'); };
-    body.append(moreBtn, moreBox);
+    moreRows.push(originalNamesRow(native));
+    body.appendChild(group('More', moreRows));
     if (native) {
       const q = el('button', 'small-btn', 'Quit'); q.onclick = () => L.native('quit');
       const g = el('div', 'group quit-group'); g.appendChild(row('Quit Ludus', null, q)); body.appendChild(g);
