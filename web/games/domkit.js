@@ -1,4 +1,4 @@
-/* Small helpers for the games that are built from page elements instead of a canvas (Meta Spotter, Tongue Twister,
+/* Small helpers for the games that are built from page elements instead of a canvas (Clue Spotter, Tongue Twister,
    Mosaic Hunt): load a data file on demand, make elements, add a style sheet once, and a type-ahead answer box.
    Everything is offline: data files sit next to the game under games/<id>/ and load with a plain script tag,
    which works under file:// on Mac and Windows. */

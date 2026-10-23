@@ -470,7 +470,7 @@
       }
       function showRaceSetup() {
         phase = 'setup'; sheet.innerHTML = ''; const p = el('div', 'lk-panel lk-pop');
-        p.appendChild(el('h2', '', 'Meta Spotter race'));
+        p.appendChild(el('h2', '', 'Clue Spotter race'));
         p.appendChild(el('p', 'lk-muted', isHost ? `Same ${RACE_N} clues for everyone, ${RACE_T} seconds each. Faster right answers score more.` : 'The host is choosing the clues.'));
         const row = (label, opts, cur, pick) => {
           p.appendChild(el('span', 'lk-label', label)); const r = el('div', 'lk-chips');
