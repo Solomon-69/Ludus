@@ -70,7 +70,7 @@
           ctx.bezierCurveTo((p1[0] + (p2[0] - p0[0]) / 6) * w, (p1[1] + (p2[1] - p0[1]) / 6) * h, (p2[0] - (p3[0] - p1[0]) / 6) * w, (p2[1] - (p3[1] - p1[1]) / 6) * h, p2[0] * w, p2[1] * h);
         }
       };
-      [[0.92, 0.14, '#ffd36b'], [0.74, 0.08, '#fff8f2'], [0.14, 0.34, '#ffd36b'], [0.62, 0.9, '#fff8f2'], [0.9, 0.8, '#ffd36b']].forEach(([x, y, c]) => {
+      [[0.92, 0.2, '#ffd36b'], [0.74, 0.14, '#fff8f2'], [0.14, 0.34, '#ffd36b'], [0.62, 0.84, '#fff8f2'], [0.9, 0.78, '#ffd36b']].forEach(([x, y, c]) => {
         ctx.fillStyle = 'rgba(255,255,255,0.22)'; ctx.beginPath(); ctx.arc(w * x, h * y, 6.5 * u, 0, TAU); ctx.fill();
         ctx.fillStyle = c; ctx.beginPath(); ctx.arc(w * x, h * y, 3.2 * u, 0, TAU); ctx.fill();
       });

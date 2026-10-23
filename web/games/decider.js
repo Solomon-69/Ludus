@@ -73,29 +73,56 @@
   const outcome = (a, b) => (a === b ? 0 : BEATS[a] === b ? 1 : -1);
 
   // ---------- drawing the three hands ----------
+  // Side-on, pointing right (the second player's hand is mirrored). Shapes are filled with the player's colour and
+  // separated by thin translucent dark/light lines, so the same drawing reads on light and dark backgrounds.
   function drawHand(ctx, kind, x, y, r, col, ink, flip) {
+    const LINE = 'rgba(30,18,12,0.34)', GLOSS = 'rgba(255,255,255,0.38)';
     ctx.save(); ctx.translate(x, y); if (flip) ctx.scale(-1, 1);
-    ctx.fillStyle = col; ctx.strokeStyle = col; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.scale(r, r); ctx.translate(0.1, 0);       // unit space: the hand spans about -0.9 .. 0.8
+    ctx.fillStyle = col; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    const lw = Math.max(0.03, 1.1 / r);             // keeps separation lines visible on the small button icons
+    const cap = (x1, y1, x2, y2, wd) => {            // a capsule (finger / thumb) with its outline
+      ctx.lineWidth = wd; ctx.strokeStyle = col;
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+      ctx.lineWidth = lw; ctx.strokeStyle = LINE; ctx.beginPath();
+      const a = Math.atan2(y2 - y1, x2 - x1), h = wd / 2;
+      ctx.arc(x2, y2, h, a - Math.PI / 2, a + Math.PI / 2); ctx.arc(x1, y1, h, a + Math.PI / 2, a + Math.PI * 1.5);
+      ctx.closePath(); ctx.stroke();
+    };
+    const sleeve = () => {
+      ctx.save(); ctx.fillStyle = ink; ctx.globalAlpha = 0.5;
+      ctx.beginPath(); ctx.moveTo(-0.9, -0.34); ctx.lineTo(-0.58, -0.3); ctx.lineTo(-0.58, 0.36); ctx.lineTo(-0.9, 0.4); ctx.closePath(); ctx.fill(); ctx.restore();
+    };
+    const back = () => {                              // back of the hand / palm block
+      ctx.beginPath(); ctx.moveTo(-0.6, -0.3);
+      ctx.bezierCurveTo(-0.45, -0.52, 0.1, -0.56, 0.3, -0.46);
+      ctx.bezierCurveTo(0.44, -0.3, 0.44, 0.3, 0.3, 0.5); ctx.bezierCurveTo(0.1, 0.56, -0.45, 0.5, -0.6, 0.34); ctx.closePath(); ctx.fill();
+    };
     if (kind === 'rock') {
-      // fist: palm block, four knuckles along the front, thumb tucked across
-      Ludus.draw.roundRect(ctx, -r * 0.5, -r * 0.42, r * 0.82, r * 0.9, r * 0.2); ctx.fill();
-      for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.arc(r * 0.36, -r * 0.33 + i * r * 0.25, r * 0.15, 0, Math.PI * 2); ctx.fill(); }
-      ctx.strokeStyle = ink; ctx.globalAlpha = 0.3; ctx.lineWidth = r * 0.06;
-      for (let i = 1; i < 4; i++) { ctx.beginPath(); ctx.moveTo(r * 0.2, -r * 0.455 + i * r * 0.25); ctx.lineTo(r * 0.48, -r * 0.455 + i * r * 0.25); ctx.stroke(); }
-      ctx.beginPath(); ctx.moveTo(-r * 0.3, r * 0.12); ctx.quadraticCurveTo(r * 0.05, r * 0.02, r * 0.2, r * 0.22); ctx.stroke();
-      ctx.globalAlpha = 1;
+      sleeve(); back();
+      // four curled fingers stacked down the front, knuckles to the right
+      for (let i = 0; i < 4; i++) {
+        const yy = -0.36 + i * 0.235, ex = 0.52 - (i === 3 ? 0.08 : i === 0 ? 0.04 : 0);
+        cap(0.02, yy, ex, yy, 0.23);
+        ctx.strokeStyle = GLOSS; ctx.lineWidth = 0.035; ctx.beginPath(); ctx.moveTo(0.2, yy - 0.06); ctx.lineTo(ex - 0.1, yy - 0.06); ctx.stroke();
+      }
+      // thumb wrapped across the front of the fingers
+      cap(-0.2, 0.4, 0.4, 0.16, 0.26);
+      ctx.strokeStyle = GLOSS; ctx.lineWidth = 0.035; ctx.beginPath(); ctx.moveTo(-0.05, 0.34); ctx.lineTo(0.3, 0.2); ctx.stroke();
     } else if (kind === 'paper') {
-      Ludus.draw.roundRect(ctx, -r * 0.5, -r * 0.62, r * 1.0, r * 1.24, r * 0.14); ctx.fill();
-      ctx.strokeStyle = ink; ctx.globalAlpha = 0.25; ctx.lineWidth = r * 0.07;
-      for (let i = 0; i < 4; i++) { const yy = -r * 0.32 + i * r * 0.22; ctx.beginPath(); ctx.moveTo(-r * 0.3, yy); ctx.lineTo(r * 0.3, yy); ctx.stroke(); }
-      ctx.globalAlpha = 1;
+      sleeve();
+      ctx.beginPath(); ctx.moveTo(-0.6, -0.3); ctx.bezierCurveTo(-0.45, -0.52, -0.1, -0.5, 0.02, -0.42);
+      ctx.lineTo(0.02, 0.44); ctx.bezierCurveTo(-0.1, 0.52, -0.45, 0.5, -0.6, 0.34); ctx.closePath(); ctx.fill();
+      [[-0.33, 0.7], [-0.11, 0.78], [0.11, 0.72], [0.33, 0.56]].forEach(([yy, ex]) => cap(0.0, yy, ex, yy, 0.2));
+      cap(-0.28, -0.38, 0.12, -0.7, 0.22);
+      ctx.strokeStyle = LINE; ctx.lineWidth = lw; ctx.beginPath(); ctx.moveTo(-0.3, -0.04); ctx.quadraticCurveTo(-0.15, 0.06, 0.0, 0.0); ctx.stroke();
     } else {
-      ctx.lineWidth = r * 0.16;
-      ctx.beginPath(); ctx.moveTo(-r * 0.2, r * 0.18); ctx.lineTo(r * 0.62, -r * 0.5); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(-r * 0.2, -r * 0.18); ctx.lineTo(r * 0.62, r * 0.5); ctx.stroke();
-      ctx.lineWidth = r * 0.13;
-      ctx.beginPath(); ctx.arc(-r * 0.42, -r * 0.3, r * 0.22, 0, Math.PI * 2); ctx.stroke();
-      ctx.beginPath(); ctx.arc(-r * 0.42, r * 0.3, r * 0.22, 0, Math.PI * 2); ctx.stroke();
+      sleeve(); back();
+      // ring and pinky curled, thumb across them, index and middle out in a V
+      cap(0.0, 0.2, 0.42, 0.2, 0.2); cap(0.0, 0.4, 0.36, 0.4, 0.2);
+      cap(0.15, -0.02, 0.78, -0.5, 0.2);
+      cap(0.15, -0.2, 0.8, 0.0, 0.2);
+      cap(-0.2, 0.46, 0.28, 0.28, 0.22);
     }
     ctx.restore();
   }
@@ -104,11 +131,11 @@
     id: 'decider', name: 'Rock Paper Scissors', aka: 'The Decider', tag: 'Duel', tint: PINK, versus: true, online: { min: 2, max: 2 },
     onlineHint: 'Pick with <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd>, <kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> or a click. Picks are secret until both players have locked in. First to 3',
     hint: 'Pick with <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd>, <kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> or a click. Rock beats scissors, scissors beat paper, paper beats rock. First to 3. vs Friend: secret picks, Player 1 <kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>, Player 2 <kbd>J</kbd><kbd>K</kbd><kbd>L</kbd>',
-    _rules: { makeBrain, outcome, BEATS, COUNTER },
+    _rules: { makeBrain, outcome, BEATS, COUNTER }, _hand: drawHand,
     art(ctx, w, h) {
-      const r = Math.min(w, h) * 0.34;
+      const r = Math.min(w, h) * 0.36;
       drawHand(ctx, 'rock', w * 0.3, h * 0.52, r, 'rgba(255,255,255,0.95)', '#7a1d43', false);
-      drawHand(ctx, 'scissors', w * 0.7, h * 0.52, r, 'rgba(255,255,255,0.75)', '#7a1d43', true);
+      drawHand(ctx, 'paper', w * 0.7, h * 0.52, r, 'rgba(255,255,255,0.75)', '#7a1d43', true);
       Ludus.draw.text(ctx, 'VS', w / 2, h * 0.52, r * 0.42, 'rgba(255,255,255,0.85)', 800);
     },
     create(stage, api) {
@@ -293,7 +320,9 @@
             ctx.strokeStyle = c; ctx.lineWidth = 3; ctx.globalAlpha = 0.5 + 0.3 * Math.sin(clock * 6);
             ctx.beginPath(); ctx.arc(x, ay, r * 1.12, 0, Math.PI * 2); ctx.stroke(); ctx.globalAlpha = 1;
           }
-          ctx.save(); ctx.translate(x, ay + bob); ctx.scale(s * (won && revealed ? 1.08 : 1), s * (won && revealed ? 1.08 : 1));
+          // spring rebound after the reveal: a quick pop up that settles back
+          const rb = revealed && phase === 'reveal' && !api.reduceMotion ? -r * 0.16 * Math.exp(-6 * st) * Math.sin(st * 22) : 0;
+          ctx.save(); ctx.translate(x, ay + bob + rb); ctx.scale(s * (won && revealed ? 1.08 : 1), s * (won && revealed ? 1.08 : 1));
           if (revealed && m) drawHand(ctx, m, 0, 0, r, c, col.ink, flip);
           else if (shaking) drawHand(ctx, 'rock', 0, 0, r, c, col.ink, flip);
           else if (friend) {
