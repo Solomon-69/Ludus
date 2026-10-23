@@ -191,7 +191,7 @@
     onlineHint: 'Same clues for everyone · <kbd>1</kbd>-<kbd>4</kbd> to answer · faster right answers score more',
     _rules: { makeQuestion, poolFor, hasKind, pointsFor, racePoints, validQ, scrub, drawn },
     art(ctx, w, h) {
-      const u = h / 78, gy = h * 0.8;
+      const u = Math.min(h / 78, w / 190), gy = h * 0.8;
       // sky, ground and road
       const g = ctx.createLinearGradient(0, 0, 0, h); g.addColorStop(0, '#3d9168'); g.addColorStop(1, '#2a6e4b');
       ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);

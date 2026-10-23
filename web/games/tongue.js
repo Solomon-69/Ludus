@@ -96,7 +96,7 @@
     hint: 'Type a language, <kbd>↑</kbd><kbd>↓</kbd> to choose, <kbd>Enter</kbd> to guess · six guesses · <kbd>Esc</kbd> pauses',
     _rules: { compare, pointsFor, filterPool, match, distKm, bearing, fmtN },
     art(ctx, w, h) {
-      const u = h / 78;
+      const u = Math.min(h / 78, w / 236);
       const g = ctx.createLinearGradient(0, 0, w, h); g.addColorStop(0, '#36707a'); g.addColorStop(1, '#24525a');
       ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
       const bubble = (x, y, bw, bh, fill, tailLeft) => {
@@ -105,6 +105,7 @@
         ctx.beginPath(); const tx = tailLeft ? x + 14 * u : x + bw - 14 * u;
         ctx.moveTo(tx - 5 * u, y + bh - 1); ctx.lineTo(tx + (tailLeft ? -4 : 4) * u, y + bh + 9 * u); ctx.lineTo(tx + 6 * u, y + bh - 1); ctx.closePath(); ctx.fill();
       };
+      ctx.save(); ctx.translate(0, (h - 78 * u) / 2);   // centred when the card is taller than it is wide
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       const cx = w / 2;
       bubble(cx - 82 * u, 12 * u, 72 * u, 30 * u, '#fffdf8', true);
@@ -112,8 +113,7 @@
       bubble(cx + 6 * u, 30 * u, 76 * u, 30 * u, '#f2c94c', false);
       ctx.fillStyle = '#3a2f12'; ctx.font = `700 ${16 * u}px "Hiragino Sans", "Yu Gothic", "Noto Sans CJK JP", system-ui, sans-serif`; ctx.fillText('こんにちは', cx + 44 * u, 45.5 * u);
       ctx.fillStyle = 'rgba(255,255,255,0.9)'; ctx.font = `800 ${22 * u}px ui-rounded, -apple-system, system-ui, sans-serif`; ctx.fillText('?', cx - 2 * u, 59 * u);
-      ctx.fillStyle = 'rgba(255,255,255,0.22)'; ctx.font = `700 ${12 * u}px -apple-system, system-ui, sans-serif`;
-      ctx.fillText('Привет', cx - 100 * u, 62 * u); ctx.fillText('مرحبا', cx + 104 * u, 18 * u);
+      ctx.restore();
     },
     create(stage, api) {
       const el = K.el;
