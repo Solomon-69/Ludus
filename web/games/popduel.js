@@ -1,4 +1,4 @@
-/* Bloons TD Battles (Pop Duel): balloon tower defence. The same waves run down two tracks; build towers with
+/* Pop Duel: balloon tower defence. The same waves run down two tracks; build towers with
    three upgrade paths, fire abilities and send balloons to your rival. The first track to run out of lives loses.
    vs Bot = your track against the computer's; vs Friend = two tracks on one screen, each player clicks their own.
    Solo modes (Classic, Relaxed, Rush, Deflation) are picked from the start menu. Everything is drawn on the canvas. */
@@ -419,7 +419,7 @@
   const inside = (m, x, y, w, h) => m && m.x >= x && m.x <= x + w && m.y >= y && m.y <= y + h;
 
   Ludus.register({
-    id: 'popduel', name: 'Bloons TD Battles', aka: 'Pop Duel balloon tower defence', tag: 'Duel', wide: true, versus: true, tint: '#4f9a4a',
+    id: 'popduel', name: 'Pop Duel', aka: 'balloon tower defence', tag: 'Duel', wide: true, versus: true, tint: '#4f9a4a',
     hint: 'Pick a tower, click grass to build · click it to upgrade · vs Friend: P1 left track, P2 right · <kbd>1</kbd>-<kbd>0</kbd> towers · <kbd>Space</kbd> speed',
     online: { min: 2, max: 2 },
     onlineHint: '<b>Online</b> You defend your own track, your friend defends theirs · same waves on the same clock · Send balloons at them from the Send tab · <kbd>1</kbd>-<kbd>0</kbd> towers',
@@ -803,7 +803,7 @@
         ctx.save(); ctx.fillStyle = col.dark ? 'rgba(0,0,0,0.35)' : 'rgba(255,255,255,0.35)'; ctx.fillRect(0, TOP - 4, w, h - TOP + 4); ctx.restore();
         ctx.save(); ctx.fillStyle = col.surface; ctx.shadowColor = 'rgba(0,0,0,0.25)'; ctx.shadowBlur = 22; ctx.shadowOffsetY = 6;
         D.roundRect(ctx, x, y, cw, ch, 18); ctx.fill(); ctx.restore();
-        fit1(ctx, 'Bloons TD Battles', x + cw / 2, y + 24, cw - 30, 17, col.ink, 800);
+        fit1(ctx, 'Pop Duel', x + cw / 2, y + 24, cw - 30, 17, col.ink, 800);
         const sub = friend ? 'P1 defends the left track, P2 the right. Same waves; send balloons at each other.' : 'Same waves on both tracks. Send balloons to break the bot’s defence.';
         D.fitText(ctx, sub, x + cw / 2, y + 52, cw - 36, 11.5, col.ink2, 600, 10);
         button(x + 18, y + 76, cw - 36, 36, { label: friend ? 'Start duel: P1 vs P2' : 'Start duel vs bot', primary: true, r: 12, size: 12.5, fn: () => startRun('duel') });

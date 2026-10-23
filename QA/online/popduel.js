@@ -1,4 +1,4 @@
-// Pop Duel (Bloons TD Battles) online test, no internet: node popduel.js [--dark]
+// Pop Duel online test, no internet: node popduel.js [--dark]
 // Two pages through the in-memory broker: both tracks run, towers and balloons show up on the rival's copy,
 // sent balloons land on the other screen, and when one track falls both screens agree on the winner.
 const L = require('./lib.js');
@@ -12,7 +12,7 @@ const ctl = (p, fn, arg) => p.evaluate(([f, a]) => { const C = window.ludusDebug
   try {
     const br = await broker.start();
     const wide = { width: 760, height: 500 };
-    const { pages } = await party(browser, br, 'Bloons TD Battles', 2, { size: wide, dark });
+    const { pages } = await party(browser, br, 'Pop Duel', 2, { size: wide, dark });
     const [A, B] = pages;
     await wait(600);
     const a0 = await st(A), b0 = await st(B);
@@ -50,7 +50,7 @@ const ctl = (p, fn, arg) => p.evaluate(([f, a]) => { const C = window.ludusDebug
     await shot(A, 'popduel-over');
     check('no console errors on either screen', errs(pages) === 0, pages.map(p => p.errors));
     // a dead heat: both tracks fall in the same moment, the results cross on the wire, both screens still agree
-    const two = await party(browser, br, 'Bloons TD Battles', 2, { size: { width: 400, height: 600 }, dark });
+    const two = await party(browser, br, 'Pop Duel', 2, { size: { width: 400, height: 600 }, dark });
     const [C1, C2] = two.pages; await wait(600);
     await Promise.all([ctl(C1, 'C.boards()[0].lives = 0'), ctl(C2, 'C.boards()[1].lives = 0')]);
     await wait(3200);
