@@ -182,20 +182,31 @@
     onlineHint: '<b>Online</b> 2 to 4 players plus bots · drag, <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or the arrows to move · biggest hole when time is up wins',
     hint: 'Drag, <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> to move · swallow what fits, grow, eat smaller holes · vs Friend: <b>P1</b> WASD, <b>P2</b> arrows',
     art(ctx, w, h) {
-      ctx.fillStyle = 'rgba(255,255,255,0.28)'; ctx.fillRect(0, h * 0.58, w, h * 0.1); ctx.fillRect(w * 0.62, 0, w * 0.09, h);
+      const u = h / 78;
+      ctx.fillStyle = 'rgba(255,255,255,0.22)'; ctx.fillRect(0, h * 0.6, w, h * 0.1); ctx.fillRect(w * 0.64, 0, w * 0.08, h);
+      ctx.fillStyle = 'rgba(255,255,255,0.35)'; for (let x = 0; x < w; x += 16 * u) ctx.fillRect(x, h * 0.645, 8 * u, 1.4 * u);
       const b = (x, y, bw, bd, bh, c1, c2, c3) => {
+        ctx.fillStyle = 'rgba(0,0,0,0.16)'; ctx.beginPath(); ctx.ellipse(x + bw * 0.55, y + 1.5 * u, bw * 0.75, 3 * u, 0, 0, Math.PI * 2); ctx.fill();
         ctx.fillStyle = c3; ctx.beginPath(); ctx.moveTo(x + bw, y); ctx.lineTo(x + bw - bh * 0.22, y - bh * 0.8); ctx.lineTo(x + bw - bh * 0.22, y - bh * 0.8 - bd); ctx.lineTo(x + bw, y - bd); ctx.closePath(); ctx.fill();
         ctx.fillStyle = c2; ctx.fillRect(x, y - bh * 0.8, bw, bh * 0.8);
         ctx.fillStyle = c1; ctx.beginPath(); ctx.moveTo(x, y - bh * 0.8); ctx.lineTo(x + bw, y - bh * 0.8); ctx.lineTo(x + bw - bh * 0.22, y - bh * 0.8 - bd); ctx.lineTo(x - bh * 0.22, y - bh * 0.8 - bd); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = 'rgba(0,0,0,0.12)'; const wn = Math.max(2, Math.round(bh / (9 * u)));
+        for (let i = 0; i < wn; i++) { const wy = y - bh * 0.8 + (i + 0.5) * (bh * 0.8 / wn) - u; ctx.fillRect(x + bw * 0.2, wy, bw * 0.2, 2 * u); ctx.fillRect(x + bw * 0.6, wy, bw * 0.2, 2 * u); }
       };
-      b(w * 0.08, h * 0.5, w * 0.16, h * 0.09, h * 0.36, '#fff3e6', '#f2dcc6', '#dcc3aa');
-      b(w * 0.3, h * 0.46, w * 0.15, h * 0.08, h * 0.26, '#e8f3ee', '#cfe4da', '#b4cdc1');
-      b(w * 0.76, h * 0.5, w * 0.15, h * 0.08, h * 0.3, '#e9eef8', '#d3dcee', '#b9c5de');
-      const hx = w * 0.5, hy = h * 0.78;
-      ctx.fillStyle = 'rgba(255,248,240,0.9)'; ctx.beginPath(); ctx.ellipse(hx, hy, h * 0.28, h * 0.18, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#1b1713'; ctx.beginPath(); ctx.ellipse(hx, hy + 1, h * 0.25, h * 0.15, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#5b8def'; ctx.beginPath(); ctx.ellipse(w * 0.86, h * 0.84, h * 0.09, h * 0.056, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#1b1713'; ctx.beginPath(); ctx.ellipse(w * 0.86, h * 0.845, h * 0.075, h * 0.045, 0, 0, Math.PI * 2); ctx.fill();
+      b(w * 0.1, h * 0.52, w * 0.15, h * 0.09, h * 0.4, '#fff3e6', '#f2dcc6', '#dcc3aa');
+      b(w * 0.32, h * 0.48, w * 0.14, h * 0.08, h * 0.3, '#e8f3ee', '#cfe4da', '#b4cdc1');
+      b(w * 0.78, h * 0.52, w * 0.14, h * 0.08, h * 0.32, '#e9eef8', '#d3dcee', '#b9c5de');
+      const hole = (x, y, rx, ry, rim) => {
+        ctx.fillStyle = rim; ctx.beginPath(); ctx.ellipse(x, y, rx * 1.12, ry * 1.18, 0, 0, Math.PI * 2); ctx.fill();
+        const gr = ctx.createRadialGradient(x - rx * 0.2, y - ry * 0.3, ry * 0.1, x, y, rx);
+        gr.addColorStop(0, '#3a322b'); gr.addColorStop(1, '#14100d');
+        ctx.fillStyle = gr; ctx.beginPath(); ctx.ellipse(x, y + u * 0.6, rx, ry, 0, 0, Math.PI * 2); ctx.fill();
+      };
+      const hx = w * 0.56, hy = h * 0.76;
+      hole(hx, hy, h * 0.3, h * 0.17, 'rgba(255,248,240,0.92)');
+      ctx.save(); ctx.translate(hx - h * 0.08, hy - h * 0.1); ctx.rotate(-0.4);
+      ctx.fillStyle = '#f1c75b'; ctx.fillRect(-4 * u, -4 * u, 8 * u, 8 * u); ctx.restore();
+      hole(w * 0.9, h * 0.82, h * 0.1, h * 0.06, '#5b8def');
     },
     create(stage, api) {
       // pixel budget: never above 2x density, and fewer pixels per point on big windows (8 GB Macs)

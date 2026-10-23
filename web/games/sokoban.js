@@ -45,14 +45,36 @@
     hint: '<kbd>←</kbd><kbd>↑</kbd><kbd>→</kbd><kbd>↓</kbd> or click to walk and push · <kbd>Z</kbd> undo · <kbd>R</kbd> restart level · <kbd>B</kbd>/<kbd>N</kbd> previous/next level',
     _levels: LEVELS.map(l => l.m),
     art(ctx, w, h) {
-      const s = Math.min(w, h) * 0.24, cx = w / 2, cy = h / 2;
-      ctx.strokeStyle = 'rgba(255,255,255,0.75)'; ctx.lineWidth = 2; ctx.setLineDash([3, 3]);
-      ctx.beginPath(); ctx.arc(cx + s * 1.1, cy, s * 0.36, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
-      ctx.fillStyle = '#f6e3c4'; D.roundRect(ctx, cx - s * 0.5, cy - s * 0.5, s, s, s * 0.18); ctx.fill();
-      ctx.strokeStyle = '#b5894f'; ctx.lineWidth = 2.5;
-      ctx.beginPath(); ctx.moveTo(cx - s * 0.3, cy - s * 0.3); ctx.lineTo(cx + s * 0.3, cy + s * 0.3); ctx.moveTo(cx + s * 0.3, cy - s * 0.3); ctx.lineTo(cx - s * 0.3, cy + s * 0.3); ctx.stroke();
-      ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.beginPath(); ctx.arc(cx - s * 1.1, cy, s * 0.42, 0, Math.PI * 2); ctx.fill();
-      D.spark(ctx, cx - s * 1.1, cy, s * 0.32, '#fffaf2', 0.2);
+      const s = Math.min(h * 0.28, w / 10.5), cols = 9, rows = 3;
+      const ox = (w - cols * s) / 2, oy = (h - rows * s) / 2;
+      const cell = (c, r) => [ox + c * s, oy + r * s];
+      for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+        const [x, y] = cell(c, r);
+        const wall = (r === 0 && c !== 4 && c !== 5) || (r === 2 && (c < 3 || c === 8));
+        if (wall) {
+          ctx.fillStyle = 'rgba(70,45,20,0.42)'; D.roundRect(ctx, x + 0.5, y + 0.5, s - 1, s - 1, s * 0.14); ctx.fill();
+          ctx.strokeStyle = 'rgba(255,255,255,0.14)'; ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.moveTo(x + 2, y + s / 2); ctx.lineTo(x + s - 2, y + s / 2); ctx.moveTo(x + s * (r % 2 ? 0.3 : 0.7), y + 2); ctx.lineTo(x + s * (r % 2 ? 0.3 : 0.7), y + s / 2); ctx.stroke();
+        } else {
+          ctx.fillStyle = (r + c) % 2 ? 'rgba(255,255,255,0.13)' : 'rgba(255,255,255,0.07)';
+          D.roundRect(ctx, x + 0.5, y + 0.5, s - 1, s - 1, s * 0.14); ctx.fill();
+        }
+      }
+      const crate = (c, r, on) => {
+        const [x, y] = cell(c, r), p = s * 0.12;
+        ctx.fillStyle = 'rgba(0,0,0,0.2)'; D.roundRect(ctx, x + p, y + p + s * 0.07, s - 2 * p, s - 2 * p, s * 0.16); ctx.fill();
+        ctx.fillStyle = on ? '#bfe3a8' : '#f6e3c4'; D.roundRect(ctx, x + p, y + p, s - 2 * p, s - 2 * p, s * 0.16); ctx.fill();
+        ctx.strokeStyle = on ? '#4f8d4a' : '#b5894f'; ctx.lineWidth = Math.max(1.5, s * 0.1); ctx.lineCap = 'round';
+        const a = x + s * 0.3, b = x + s * 0.7, d = y + s * 0.3, e = y + s * 0.7;
+        ctx.beginPath(); ctx.moveTo(a, d); ctx.lineTo(b, e); ctx.moveTo(b, d); ctx.lineTo(a, e); ctx.stroke();
+      };
+      const [tx, ty] = cell(6, 1);
+      ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 1.8; ctx.setLineDash([3, 3]);
+      ctx.beginPath(); ctx.arc(tx + s / 2, ty + s / 2, s * 0.3, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+      crate(7, 1, true); crate(4, 1, false);
+      const [px, py] = cell(1, 1);
+      ctx.fillStyle = '#fffaf2'; ctx.beginPath(); ctx.arc(px + s / 2, py + s / 2, s * 0.42, 0, Math.PI * 2); ctx.fill();
+      D.spark(ctx, px + s / 2, py + s / 2, s * 0.3, '#d97757', 0.2);
     },
     create(stage, api) {
       const view = api.canvas(() => render());   // also draws the board while a resumed game waits on "Welcome back"
