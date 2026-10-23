@@ -71,3 +71,13 @@ Flag Quiz flag images
 The country flags in web/games/flags/ (used by the Flag Quiz game) come from the flag-icons project
 (https://github.com/lipis/flag-icons, 4x3 set), Copyright (c) 2013 Panayiotis Lipiridis, MIT License.
 The SVG files are bundled unchanged except for size optimisation (SVGO) and explicit width and height attributes.
+
+
+Geo Guess libraries and data
+----------------------------
+web/vendor/pannellum.* (Pannellum 2.5.6, Matthew Petroff, MIT License, https://pannellum.org) shows the 360 street photos.
+web/vendor/leaflet.* (Leaflet 1.9.4, Volodymyr Agafonkin, BSD 2-Clause License, https://leafletjs.com) draws the maps.
+Map tiles come from OpenStreetMap (c) OpenStreetMap contributors, ODbL, used under the tile usage policy with attribution
+(https://operations.osmfoundation.org/policies/tiles/), with CARTO basemaps as a fallback. Street photos come from the
+Panoramax public instance (https://api.panoramax.xyz), pictures under their authors' open licences (mostly Etalab 2.0, CC-BY,
+CC-BY-SA). The game fetches them live and stores nothing; the list of places is web/games/geo/pool.js.
