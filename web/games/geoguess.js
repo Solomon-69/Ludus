@@ -12,10 +12,12 @@
   const MAX_POINTS = 5000, FALLOFF_KM = 1492.7;
   const SEAT = ['#d97757', '#5b8def', '#4f9d69', '#9b6dd6'];
   // Clean, quiet basemap: coastlines, borders, light grey land, country names only (Esri Canvas Gray, free, no key; Carto's raster tiles now need a key).
-  const ESRI = k => `https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/${k}/MapServer/tile/{z}/{y}/{x}`;
+  const ESRI = (k, host) => `https://${host || 'services'}.arcgisonline.com/ArcGIS/rest/services/Canvas/${k}/MapServer/tile/{z}/{y}/{x}`;
   const TILES = [
     { url: dark => ESRI(dark ? 'World_Dark_Gray_Base' : 'World_Light_Gray_Base'), max: 18, native: 16, credit: 'Tiles © Esri, DeLorme, NAVTEQ · © OpenStreetMap contributors', short: '© Esri · OSM' },
-    { url: () => 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', max: 19, native: 19, credit: '© OpenStreetMap contributors', short: '© OSM', fallback: true }
+    // the same Esri map from its second host; never OpenStreetMap standard (it labels places in their local scripts)
+    { url: dark => ESRI(dark ? 'World_Dark_Gray_Base' : 'World_Light_Gray_Base', 'server'), max: 18, native: 16, credit: 'Tiles © Esri, DeLorme, NAVTEQ · © OpenStreetMap contributors', short: '© Esri · OSM' },
+    { url: null, max: 18, native: 16, credit: 'Map unavailable right now: you can still pin a guess', short: 'No map', fallback: true }
   ];
   const isDark = () => document.documentElement.dataset.theme === 'dark';
 
@@ -335,15 +337,16 @@
           const t = TILES[i]; tileSet = i;
           if (layer) map.removeLayer(layer);
           const o = { maxZoom: t.max, maxNativeZoom: t.native, crossOrigin: false, keepBuffer: 2, updateWhenZooming: false, updateWhenIdle: false, updateInterval: 120 };
+          if (!t.url) { layer = null; map.getPane('tilePane').classList.add('geo-fallback'); setCredit(); return; }
           layer = L.tileLayer(t.url(isDark()), o).addTo(map);
           const tp = map.getPane('tilePane'); tp.classList.toggle('geo-fallback', !!t.fallback);
           layer.on('tileload', () => { tileLoads++; });
-          layer.on('tileerror', () => { tileErrs++; if (tileSet === 0 && tileLoads === 0 && tileErrs >= 4) { make(1); setCredit(); } });
+          layer.on('tileerror', () => { tileErrs++; if (tileLoads === 0 && tileErrs >= 4 && tileSet < TILES.length - 1) { tileErrs = 0; make(tileSet + 1); setCredit(); } });
           setCredit();
         };
         const setCredit = () => { credit.innerHTML = '<b>' + TILES[tileSet].credit + '</b><i>' + TILES[tileSet].short + '</i>'; };
         make(0);
-        themed.push(() => { const t = TILES[tileSet]; if (layer && !t.fallback) layer.setUrl(t.url(isDark())); });
+        themed.push(() => { const t = TILES[tileSet]; if (layer && t.url) layer.setUrl(t.url(isDark())); });
       }
       function makeMaps() {
         sizeMini(); miniMap = L.map(miniMapEl, MAP_OPTS).setView([25, 10], 1);
