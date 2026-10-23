@@ -948,7 +948,7 @@
         pause() { paused = true; root.classList.add('geo-paused'); },
         resume() { paused = false; root.classList.remove('geo-paused'); },
         destroy() {
-          destroyed = true; offs.forEach(f => f()); cancelAnimationFrame(resAnim);
+          destroyed = true; clearTimeout(hoverT); offs.forEach(f => f()); cancelAnimationFrame(resAnim);
           try { viewer && viewer.destroy(); } catch (e) {}
           try { miniMap && miniMap.remove(); } catch (e) {}
           try { resMap && resMap.remove(); } catch (e) {}

@@ -94,7 +94,7 @@ internal static class Updater
             "$ErrorActionPreference='SilentlyContinue'\n" +
             "while (Get-Process -Id $ProcId -ErrorAction SilentlyContinue) { Start-Sleep -Milliseconds 200 }\n" +
             "Start-Sleep -Milliseconds 300\n" +
-            "for ($i=0; $i -lt 10; $i++) { Copy-Item -Path (Join-Path $Staged '*') -Destination $Install -Recurse -Force -ErrorAction Stop; if ($?) { break }; Start-Sleep -Milliseconds 500 }\n" +
+            "for ($i=0; $i -lt 10; $i++) { try { Copy-Item -Path (Join-Path $Staged '*') -Destination $Install -Recurse -Force -ErrorAction Stop; break } catch { Add-Content -Path (Join-Path $env:TEMP 'ludus-swap.log') -Value ('copy failed: ' + $_.Exception.Message); Start-Sleep -Milliseconds 500 } }\n" +
             "Start-Process -FilePath (Join-Path $Install 'Ludus.exe')\n" +
             "Remove-Item -Recurse -Force (Split-Path $Staged -Parent) -ErrorAction SilentlyContinue\n" +
             "Remove-Item -Force $PSCommandPath -ErrorAction SilentlyContinue\n");

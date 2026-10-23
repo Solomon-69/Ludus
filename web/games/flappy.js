@@ -23,7 +23,7 @@
   }
 
   Ludus.register({
-    id: 'flappy', name: 'Flap Through', aka: 'Flappy Spark', tag: 'Arcade', tint: '#3aa6a6',
+    id: 'flappy', name: 'Flap Through', tag: 'Arcade', tint: '#3aa6a6',
     hint: '<kbd>Space</kbd> <kbd>↑</kbd> or click to flap',
     _test: { hitsRect, hitsPipe, WH, GROUND, BIRD_R, PIPE_W, DIFF, GRAV, FLAP },
     art(ctx, w, h) {
