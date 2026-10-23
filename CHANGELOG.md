@@ -3,7 +3,10 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
-## 1.7.1 (2026-10-23)
+## 1.8.0 (2026-10-23)
+
+- Crash failsafe: if a game throws, freezes or loses its graphics, a calm recovery card (Try again, New game, Back to
+  games) replaces it; a save that keeps crashing is set aside; errors go to a local log file, never on screen.
 
 - Geo Guess: a saved game no longer reopens as a blurred map with nothing to press (the game's map sat on top of the
   Paused / Welcome back card). The pause card is always on top; a 1.7 Geo Guess save is cleared once after updating.
