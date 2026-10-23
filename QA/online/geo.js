@@ -1,4 +1,4 @@
-// Geo Guess online test: two clients, one room, three rounds against the in-memory relay. Needs internet (Panoramax + map tiles).
+// Geo Guess online test: two clients, one room, five rounds against the in-memory relay. Needs internet (Panoramax + map tiles).
 // NODE_PATH=<folder with playwright-core> node geo.js [--dark] [--large]
 const { chromium } = require('playwright-core');
 const L = require('./lib.js');
@@ -23,23 +23,26 @@ const real = es => es.filter(e => !/GL Driver/.test(e));
   await Promise.all([A, B].map(p => phase(p, 'setup')));
   await wait(1500);
   const ga = await A.$eval('.geo-card', e => e.innerText), gb = await B.$eval('.geo-card', e => e.innerText);
-  check('host sees Start and the pickers', /Start/.test(ga) && /time per round/i.test(ga), ga);
+  check('host sees Start and the pickers', /Start/.test(ga) && /time per round/i.test(ga) && /movement/i.test(ga) && !/\brounds\b/i.test(ga), ga);
   check('guest sees waiting, no Start', /Waiting for the host/.test(gb) && !/\nStart/.test(gb), gb);
   check('guest chips are disabled', await B.$$eval('.geo-chip', els => els.every(e => e.disabled)));
   await shot(A, `geo_${tag}_setup_host`); await shot(B, `geo_${tag}_setup_guest`);
-  await A.click('.geo-chip:text-is("No limit")'); await A.click('.geo-chip:text-is("3")');
+  await A.click('.geo-chip:text-is("No limit")'); await A.click('.geo-chip:text-is("No move")');
   await wait(900);
   const on_ = await B.$$eval('.geo-chip.on', els => els.map(e => e.textContent));
-  check('guest sees the host choices live', on_.join() === 'No limit,3', on_);
+  check('guest sees the host choices live', on_.join() === 'No limit,No move', on_);
   await A.click('.geo-go');
   await Promise.all([A, B].map(p => phase(p, 'play')));
   const [da, db] = [await dbg(A), await dbg(B)];
-  check('same places and rules on both screens', da.place.id === db.place.id && JSON.stringify(da.order) === JSON.stringify(db.order) && db.cfg.rounds === 3 && db.cfg.time === 0, [da.place, db.place, db.cfg]);
+  check('same places and rules on both screens', da.place.id === db.place.id && JSON.stringify(da.order) === JSON.stringify(db.order) && db.cfg.rounds === 5 && db.cfg.time === 0 && db.cfg.move === 'nomove', [da.place, db.place, db.cfg]);
   check('timer hidden with no limit', await A.$eval('.geo-timer', e => e.hidden));
+  check('no move: arrows and home hidden on both screens', (await Promise.all([A, B].map(p => p.evaluate(() => document.querySelector('.geo').dataset.mv === 'nomove' && getComputedStyle(document.querySelector('.geo-home')).display === 'none')))).every(Boolean));
   await wait(800); await shot(A, `geo_${tag}_play_host`);
+  await A.hover('.geo-mini'); await wait(120); await shot(A, `geo_${tag}_map_opening`); await wait(700); await shot(A, `geo_${tag}_map_open`);
+  await A.mouse.move(100, 100); await wait(900);
   const places = [da.place.id];
-  const pins = [[[40.4, -3.7], [48.8, 2.3]], [[10, 10], [-30, 140]], [[60, 20], [35, -100]]];
-  for (let r = 0; r < 3; r++) {
+  const pins = [[[40.4, -3.7], [48.8, 2.3]], [[10, 10], [-30, 140]], [[60, 20], [35, -100]], [[0, 0], [20, 20]], [[45, 9], [46, 8]]];
+  for (let r = 0; r < 5; r++) {
     if (r > 0) { await Promise.all([A, B].map(p => phase(p, 'play'))); places.push((await dbg(A)).place.id); }
     await A.evaluate(([la, lo]) => ludusGeoTest.pin(la, lo), pins[r][0]);
     await A.click('.geo-guess');
@@ -52,10 +55,10 @@ const real = es => es.filter(e => !/GL Driver/.test(e));
     check(`round ${r + 1}: both screens list the same two players and scores`, ra === rb && /Ann/.test(ra) && /Bo/.test(ra), [ra, rb]);
     if (r === 0) { await wait(1800); await shot(A, `geo_${tag}_result_host`); await shot(B, `geo_${tag}_result_guest`); }
     await B.click('.geo-next'); await wait(400);
-    if (r < 2) check('guest waits for the others after Next', await B.$eval('.geo-next', e => e.disabled));
+    if (r < 4) check('guest waits for the others after Next', await B.$eval('.geo-next', e => e.disabled));
     await A.click('.geo-next');
   }
-  check('three different places', new Set(places).size === 3, places);
+  check('five different places', new Set(places).size === 5, places);
   await Promise.all([A, B].map(p => phase(p, 'final')));
   await wait(2500);
   const tbl = p => p.$eval('.geo-final table', e => e.innerText.replace(/\s+/g, ' ').replace(/ \(you\)/g, '')), ttl = p => p.$eval('.geo-final h2', e => e.innerText);
