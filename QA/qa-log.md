@@ -40,3 +40,6 @@ Mac = installed app (test hook) or headless harness on the same web files; Windo
 | shell-test 47/47, fit and btns harness | pass (pre-existing: sparkhop Score overlap, wide over-bar clip are flaky/old) | n/a |
 
 Known: smoke flags Map Hunt "leaked 1" listener and a Pannellum FileReader error during random mashing (does not reproduce in a plain open/close, 0 leaked).
+
+## v1.11.1 pass (23 Oct 2026, headless)
+smoke (all 43 games): pass. shell-test: pass. offline-update-test: ALL PASSED. Mosaic Hunt: city hunt flow (pin, submit, +5000, plaque, map) pass, 45 spots in bounds per city. Garden Defence: cover and in-game art redrawn, smoke pass. Covers sheet re-rendered.

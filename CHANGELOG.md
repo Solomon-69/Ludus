@@ -3,6 +3,13 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.11.1 (2026-10-23)
+
+- Mosaic Hunt now uses only our own material: eight original pixel creatures (Moth, Newt, Pip, Bloop, Gull, Fox, Crab, Owl)
+  hidden at made-up spots around 7 city centres plus 40 more world cities. No real artworks, positions, IDs or artist names.
+- Garden Defence has new original plant art: a glow bulb, flared horns and a pebble, new cover.
+- Ludus is now open source under the MIT licence.
+
 ## 1.11.0 (2026-10-23)
 
 - Every game now has its own original name, with no other company's game title anywhere (menus, covers, hints, search,

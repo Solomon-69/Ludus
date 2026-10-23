@@ -1,6 +1,6 @@
 Ludus
 Copyright (c) 2026 Solomon
-All rights reserved (source not licensed for reuse). See THIRD_PARTY.md for third-party material and credits.
+Released under the MIT License (see LICENSE). See THIRD_PARTY.md for third-party material and credits.
 
 This product includes third-party material, listed below.
 
@@ -84,13 +84,13 @@ web/games/geo/mapstyle.js. Street photos come from the Panoramax public instance
 CC-BY-SA). The game fetches them live and stores nothing; the list of places is web/games/geo/pool.js.
 
 
-Clue Spotter, Tongue Twister and Mosaic Hunt data
+Clue Spotter, Tongue Twister and Mosaic Hunt data (maps)
 --------------------------------------------------
 web/games/metaspot/data.js: clue notes compiled from geohints.com, plonkit.net and Wikipedia (each entry keeps its source link).
 The pictures are simple drawings made in code, not photos.
 web/games/tongue/data.js: sample sentences from the Unicode UDHR collection (https://github.com/unicode-org/udhr), language
 families and map points from Glottolog (https://glottolog.org, CC-BY 4.0), speaker numbers from the sources linked in each entry.
-web/games/invhunt/data.js: street-art mosaic positions and status from the community dataset by goguelnikov
-(https://github.com/goguelnikov/SpaceInvaders, MIT License). The pixel badges are drawn from each ID, not the real artworks.
+web/games/invhunt/data.js: original, made-up creature mosaics at invented spots around each city centre (no real artworks or positions).
+The eight pixel creatures are drawn in web/games/invhunt.js.
 Map tiles in web/games/tongue/tiles/ and web/games/invhunt/tiles/: (c) OpenStreetMap contributors (ODbL,
 https://www.openstreetmap.org/copyright), bundled so the games work offline.

@@ -86,7 +86,7 @@ One player taps <b>Create room</b> and gets a 5 character room code. The <b>Copy
 
 Fourteen arcade games built to play smoothly at 60 frames a second, each with its own best score to beat.
 
-- <b>Sky Raiders</b>: waves of invaders, shields and a mystery ship.
+- <b>Sky Raiders</b>: waves of pixel aliens, shields and a mystery ship.
 - <b>Stack</b>: drop each block in 3D and line it up perfectly for a combo. Press <kbd>B</kbd> (or the top-left button) for the silly <b>Brain rot</b> skin: every slab is a made-up character with a name and sound captions.
 - <b>Chomp</b>: a maze, four ghosts and power pellets.
 - <b>Hammer Climb</b>: climb a mountain with a hammer. Pick a difficulty from the menu.
@@ -349,7 +349,7 @@ Ludus is an independent project and is not affiliated with or endorsed by Anthro
 
 ## Licence
 
-Copyright (c) 2026 Solomon. All rights reserved. Source not licensed for reuse: you can read it and use the app, but you may not copy, modify or redistribute the code or artwork without written permission. Bundled third-party parts keep their own licences, see [THIRD_PARTY.md](THIRD_PARTY.md).
+Ludus is open source under the [MIT License](LICENSE). Copyright (c) 2026 Solomon. Use it, change it, share it. Bundled third-party parts keep their own licences, see [THIRD_PARTY.md](THIRD_PARTY.md).
 
 ## Trademarks
 

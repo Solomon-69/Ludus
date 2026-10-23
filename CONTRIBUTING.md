@@ -30,4 +30,4 @@ Each game is one file in `web/games/`.
 - Match the style of the code around you.
 - No third-party code or assets unless the licence allows it and it is added to `NOTICE`.
 
-The source is not licensed for reuse. By contributing you agree that your contribution may be used in Ludus under the same all-rights-reserved terms.
+Ludus is MIT licensed. By contributing you agree that your contribution is released under the same MIT licence.

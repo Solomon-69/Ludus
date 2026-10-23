@@ -1,6 +1,6 @@
 # Third-party material in Ludus
 
-Ludus itself is Copyright (c) 2026 Solomon, all rights reserved. The parts below belong to others and keep their own licences.
+Ludus itself is Copyright (c) 2026 Solomon, MIT licence (see LICENSE). The parts below belong to others and keep their own licences.
 
 ## Code bundled in the app
 

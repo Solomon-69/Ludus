@@ -1,9 +1,8 @@
-/* Mosaic Hunt: you get a street-art mosaic's ID tag (like PA_267). Drop a pin where you think it is on the map;
-   the closer, the more points. City hunt: one city's streets. World hunt: any invaded city on Earth (the letters before
+/* Mosaic Hunt: you get the name tag of a made-up pixel creature mosaic (like PA_Moth3). Drop a pin where you think it is on the map;
+   the closer, the more points. City hunt: one city's streets. World hunt: any city in the list (the letters before
    the underscore are the city code). Code breaker: see a code, pick its city, three lives.
-   Data: games/invhunt/data.js, positions and status from the community dataset by goguelnikov
-   (github.com/goguelnikov/SpaceInvaders, MIT licence). Map tiles in games/invhunt/tiles (© OpenStreetMap contributors).
-   The pixel badge is drawn from the ID, it is not the real artwork. Everything works offline. */
+   Data: games/invhunt/data.js, original made-up spots (no real artworks or positions). Map tiles in games/invhunt/tiles (© OpenStreetMap contributors).
+   The pixel creatures are drawn by us (8 original designs). Everything works offline. */
 (function () {
   const K = Ludus.dom;
   const DATA = 'games/invhunt/data.js', TILES = 'games/invhunt/tiles/';
@@ -11,9 +10,9 @@
   const LENS = [5, 10];
   const STATUS = ['On the wall', 'Damaged', 'Destroyed', 'Unknown'];
   const HINT_COST = 500, MAX_PTS = 5000, CODE_LIVES = 3;
-  const NAMES = { AIX: 'Aix-en-Provence', AMI: 'Amiens', AMS: 'Amsterdam', ANVR: 'Antwerp', ANZR: 'Anzère', AVI: 'Avignon', BGK: 'Bangkok', BRC: 'Barcelona', BSL: 'Basel', BTA: 'Bastia', BRL: 'Berlin', BRN: 'Bern', BT: 'Bhutan', BAB: 'Biarritz-Anglet-Bayonne', BBO: 'Bilbao', BXL: 'Brussels', CCU: 'Cancún', CAPF: 'Cap Ferret', CHAR: 'Charleroi', CLR: 'Clermont-Ferrand', CON: 'Contis-les-Bains', CAZ: 'Côte d’Azur', DJN: 'Daejeon', DHK: 'Dhaka', DIJ: 'Dijon', DJBA: 'Djerba', ELT: 'Eilat', FAO: 'Faro', FTBL: 'Fontainebleau', FRQ: 'Forcalquier', FKF: 'Frankfurt', GNV: 'Geneva', GRN: 'Grenoble', GRU: 'Grude', GRTI: 'Grumeti', HALM: 'Halmstad', HK: 'Hong Kong', IST: 'Istanbul', KAT: 'Kathmandu', KLN: 'Cologne', LCT: 'La Ciotat', REUN: 'La Réunion', LAP: 'Lapland', LSN: 'Lausanne', LIL: 'Lille', LJU: 'Ljubljana', LDN: 'London', LND: 'London', LA: 'Los Angeles', LBR: 'Luberon', LY: 'Lyon', MAN: 'Manchester', MRAK: 'Marrakech', MARS: 'Marseille', MLB: 'Melbourne', MEN: 'Menorca', MIA: 'Miami', MBSA: 'Mombasa', MTB: 'Montauban', MPL: 'Montpellier', MUN: 'Munich', MLGA: 'Málaga', NA: 'Nantes', NY: 'New York', NCL: 'Newcastle', NOO: 'Noordwijk', NIM: 'Nîmes', ORLN: 'Orléans', PA: 'Paris', PAU: 'Pau', PRP: 'Perpignan', PRT: 'Perth', POTI: 'Potosí', RBA: 'Rabat', RA: 'Ravenna', RDU: 'Redu', RN: 'Rennes', ROM: 'Rome', RTD: 'Rotterdam', SD: 'San Diego', SL: 'Seoul', STK: 'Stockholm', SP: 'São Paulo', TK: 'Tokyo', TLS: 'Toulouse', VLMO: 'Valmorel', VRN: 'Varanasi', VRS: 'Versailles', WN: 'Vienna', VSB: 'Visby' };
+  const NAMES = {'PA': 'Paris', 'LDN': 'London', 'NY': 'New York', 'HK': 'Hong Kong', 'TK': 'Tokyo', 'LA': 'Los Angeles', 'ROM': 'Rome', 'BRL': 'Berlin', 'MAD': 'Madrid', 'LIS': 'Lisbon', 'AMS': 'Amsterdam', 'BXL': 'Brussels', 'VIE': 'Vienna', 'PRG': 'Prague', 'WAW': 'Warsaw', 'STK': 'Stockholm', 'CPH': 'Copenhagen', 'DUB': 'Dublin', 'ATH': 'Athens', 'IST': 'Istanbul', 'CAI': 'Cairo', 'RBA': 'Rabat', 'NBO': 'Nairobi', 'DEL': 'Delhi', 'BGK': 'Bangkok', 'SGP': 'Singapore', 'SL': 'Seoul', 'SYD': 'Sydney', 'MLB': 'Melbourne', 'AKL': 'Auckland', 'MEX': 'Mexico City', 'SP': 'São Paulo', 'BUE': 'Buenos Aires', 'SCL': 'Santiago', 'BOG': 'Bogotá', 'TOR': 'Toronto', 'CHI': 'Chicago', 'SFO': 'San Francisco', 'MIA': 'Miami', 'LY': 'Lyon', 'MARS': 'Marseille', 'BRC': 'Barcelona', 'MUN': 'Munich', 'KAT': 'Kathmandu', 'DHK': 'Dhaka', 'LSN': 'Lausanne', 'GNV': 'Geneva'};
   const cityOf = c => NAMES[c] || c;
-  const canon = c => c === 'LND' ? 'LDN' : c;
+  const canon = c => c;
 
   // ---------- geometry and scoring (pure, testable) ----------
   function px(lat, lng, z) { const n = 256 * 2 ** z, s = Math.sin(lat * Math.PI / 180); return [(lng + 180) / 360 * n, (0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI)) * n]; }
@@ -26,17 +25,24 @@
   }
   function inBounds(r, T) { const [x, y] = px(r.lat, r.lng, T.z); return x >= T.x0 * 256 + 8 && x <= (T.x0 + T.nx) * 256 - 8 && y >= T.y0 * 256 + 8 && y <= (T.y0 + T.ny) * 256 - 8; }
 
-  // ---------- pixel badge from the ID (a stand-in, not the real artwork) ----------
+  // ---------- original pixel creatures (11 wide, 8 tall); the name in the ID picks the design ----------
+  const CREATURES = {
+    Moth: ['10000000001', '11000000011', '11101110111', '01111111110', '00110101100', '00111111100', '00010001000', '00100000100'],
+    Newt: ['00000000000', '01100000110', '01111111110', '11111111111', '11011111011', '01111111110', '00110001100', '01100000110'],
+    Pip: ['00001110000', '00111111100', '01111111110', '01101110110', '01111111110', '00111111100', '00011011000', '00110001100'],
+    Bloop: ['00011111000', '00111111100', '01111111110', '11011111011', '11111111111', '11111111111', '01011011010', '00000000000'],
+    Gull: ['00000000000', '11000000011', '01110001110', '00111111100', '00011111000', '00001110000', '00001010000', '00010001000'],
+    Fox: ['10100000101', '11110001111', '11111111111', '10111111101', '11111111111', '01110101110', '00111111100', '00010001000'],
+    Crab: ['10100000101', '10100000101', '11111111111', '11011111011', '01111111110', '00111111100', '01010001010', '10010001001'],
+    Owl: ['10100000101', '11111111111', '11011011011', '11011011011', '11111011111', '01111111110', '00111111100', '00110001100']
+  };
   function hash(s) { let h = 2166136261; for (const c of s) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
-  const PALS = [['#ff3c7a', '#ffd23c'], ['#1f6fd8', '#7fd1ff'], ['#18a058', '#c6f36b'], ['#8a3cff', '#ff9de0'], ['#ff7a1a', '#fff066'], ['#111111', '#e0e0e0']];
+  const PALS = [['#ff3c7a', '#ffd23c'], ['#1f6fd8', '#7fd1ff'], ['#18a058', '#c6f36b'], ['#8a3cff', '#ff9de0'], ['#ff7a1a', '#fff066'], ['#2b2b2b', '#e0e0e0']];
   function sprite(cv, id) {
     const g = cv.getContext('2d'), N = 16; cv.width = N; cv.height = N;
-    let h = hash(id); const rnd = () => { h ^= h << 13; h >>>= 0; h ^= h >>> 17; h ^= h << 5; h >>>= 0; return h / 4294967296; };
-    const pal = PALS[Math.floor(rnd() * 6)];
+    const name = (id.split('_')[1] || '').replace(/\d+$/, ''), P = CREATURES[name] || CREATURES.Pip, pal = PALS[hash(id) % 6];
     for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { g.fillStyle = (x + y) % 2 ? '#ebe7dc' : '#f4f1e8'; g.fillRect(x, y, 1, 1); }
-    const w = 5, hgt = 8, ox = 3, oy = 4;
-    for (let y = 0; y < hgt; y++) for (let x = 0; x < w; x++) { if (rnd() < 0.55 || (x === w - 1 && y > 1 && y < 6)) { g.fillStyle = rnd() < 0.2 ? pal[1] : pal[0]; g.fillRect(ox + x, oy + y, 1, 1); g.fillRect(ox + 9 - x, oy + y, 1, 1); } }
-    g.fillStyle = '#fff'; g.fillRect(ox + 2, oy + 2, 1, 1); g.fillRect(ox + 7, oy + 2, 1, 1); g.fillStyle = '#111'; g.fillRect(ox + 2, oy + 3, 1, 1); g.fillRect(ox + 7, oy + 3, 1, 1);
+    P.forEach((r, j) => [...r].forEach((c, i) => { if (c === '1') { g.fillStyle = (i + j) % 5 === 0 ? pal[1] : pal[0]; g.fillRect(2 + i, 4 + j, 1, 1); } }));
   }
 
   K.style('ludus-invhunt', `
@@ -81,7 +87,7 @@
 `);
 
   Ludus.register({
-    id: 'invhunt', name: 'Mosaic Hunt', aka: 'street art mosaics, map, city codes, geography', tag: 'Puzzle', tint: '#24315c',
+    id: 'invhunt', name: 'Mosaic Hunt', aka: 'pixel creatures, map, city codes, geography', tag: 'Puzzle', tint: '#24315c',
     hint: 'Drag to move · scroll or <kbd>+</kbd><kbd>-</kbd> to zoom · click to pin · <kbd>Enter</kbd> guess · <kbd>H</kbd> hint · <kbd>Esc</kbd> pauses',
     _rules: { px, ll, dist, points, inBounds, fmtD, cityOf },
     art(ctx, w, h) {
@@ -92,7 +98,7 @@
       for (let x = -20 * u; x < w + 20 * u; x += 34 * u) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x + 18 * u, h); ctx.stroke(); }
       for (let y = 12 * u; y < h; y += 26 * u) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y - 6 * u); ctx.stroke(); }
       // the mosaic tile
-      const P = ['00100000100', '00010001000', '00111111100', '01101110110', '11111111111', '10111111101', '10100000101', '00011011000'];
+      const P = ['10000000001', '11000000011', '11101110111', '01111111110', '00110101100', '00111111100', '00010001000', '00100000100'];
       const s = 5 * u, tw = 11 * s, th = 8 * s, tx = w / 2 - tw / 2 - 18 * u, ty = h / 2 - th / 2 - 2 * u;
       ctx.fillStyle = 'rgba(0,0,0,0.25)'; Ludus.draw.roundRect(ctx, tx - 6 * u + 2 * u, ty - 6 * u + 3 * u, tw + 12 * u, th + 12 * u, 4 * u); ctx.fill();
       ctx.fillStyle = '#f7f4ec'; Ludus.draw.roundRect(ctx, tx - 6 * u, ty - 6 * u, tw + 12 * u, th + 12 * u, 4 * u); ctx.fill();
@@ -105,7 +111,7 @@
       ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x, cy, r * 0.4, 0, 7); ctx.fill();
       // ID tag
       ctx.fillStyle = 'rgba(255,255,255,0.88)'; ctx.font = `800 ${10 * u}px ui-monospace, Menlo, Consolas, monospace`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText('PA_267', tx + tw / 2, ty + th + 16 * u);
+      ctx.fillText('PA_Moth3', tx + tw / 2, ty + th + 16 * u);
     },
     create(stage, api) {
       const el = K.el;
@@ -127,7 +133,7 @@
       const main = el('div', 'ih-main'); root.appendChild(main);
       const side = el('div', 'ih-side'); main.appendChild(side);
       const plaque = el('div', 'ih-plaque'); side.appendChild(plaque);
-      const badge = el('canvas'); badge.setAttribute('aria-label', 'Pixel badge drawn from this ID');
+      const badge = el('canvas'); badge.setAttribute('aria-label', 'Pixel creature for this name tag');
       const pinfo = el('div', 'grow'), idEl = el('div', 'id'), meta = el('div', 'meta'); pinfo.append(idEl, meta);
       plaque.append(badge, pinfo);
       const status = el('div', 'lk-row ih-status'); side.appendChild(status);

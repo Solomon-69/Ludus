@@ -15,11 +15,11 @@ const server = http.createServer((req, res) => {
   const base = 'http://127.0.0.1:' + server.address().port;
   if (req.url === '/ok') { res.setHeader('content-type', 'application/json'); return res.end(JSON.stringify({ tag_name: 'v' + latest, assets: [
     { name: 'Ludus-mac.zip', browser_download_url: base + '/Ludus-mac.zip' }, { name: 'Ludus-windows.zip', browser_download_url: base + '/Ludus-windows.zip' }, { name: 'SHA256SUMS.txt', browser_download_url: base + '/SHA256SUMS.txt' }] })); }
-  if (req.url === '/same') { res.setHeader('content-type', 'application/json'); return res.end(JSON.stringify({ tag_name: 'v1.11.0', assets: [] })); }
+  if (req.url === '/same') { res.setHeader('content-type', 'application/json'); return res.end(JSON.stringify({ tag_name: 'v1.11.1', assets: [] })); }
   if (req.url === '/broken') return res.end('<html>nope');
   res.statusCode = 404; res.end('{"message":"Not Found"}');
 });
-const NATIVE = `window.__LUDUS_NATIVE__=true;window.__LUDUS_DOCK__=true;window.__LUDUS_INVISIBLE__=false;window.__LUDUS_LOGIN__=false;window.__LUDUS_VERSION__='1.11.0';
+const NATIVE = `window.__LUDUS_NATIVE__=true;window.__LUDUS_DOCK__=true;window.__LUDUS_INVISIBLE__=false;window.__LUDUS_LOGIN__=false;window.__LUDUS_VERSION__='1.11.1';
 window.chrome={webview:{postMessage:m=>{(window.__msgs=window.__msgs||[]).push(m);}}};`;
 (async () => {
   await new Promise(r => server.listen(0, '127.0.0.1', r));
@@ -44,7 +44,7 @@ window.chrome={webview:{postMessage:m=>{(window.__msgs=window.__msgs||[]).push(m
   { const t = await open({ api: '/same' }); await openSettings(t.page);
     const txt = (await settingsText(t.page)).toLowerCase();
     ok(!/Show controls/i.test(txt), 'Settings: "Show controls under games" is gone');
-    const order = ['Look', 'Appearance', 'Accent', 'Panel size', 'Reduce motion', 'Play', 'Difficulty', 'Sound & volume', '\napp\n', 'Ludus 1.11.0', 'Open at login', 'Show in Dock', 'Share with a friend', 'Reset best scores', '\nmore\n'].map(k => txt.indexOf(k.toLowerCase()));
+    const order = ['Look', 'Appearance', 'Accent', 'Panel size', 'Reduce motion', 'Play', 'Difficulty', 'Sound & volume', '\napp\n', 'Ludus 1.11.1', 'Open at login', 'Show in Dock', 'Share with a friend', 'Reset best scores', '\nmore\n'].map(k => txt.indexOf(k.toLowerCase()));
     ok(order.every((v, i) => v >= 0 && (i === 0 || v > order[i - 1])), 'Settings: order is Look, Play, App, More');
     ok(!/\bVolume\b/.test(txt.replace('Sound & volume', '')) && !/^Sound$/m.test(txt), 'Settings: Sound and Volume are one row');
     const more = await t.page.evaluate(() => ({ hidden: document.querySelector('.more-box').hidden, inv: document.querySelector('.more-box').innerText }));
@@ -60,7 +60,7 @@ window.chrome={webview:{postMessage:m=>{(window.__msgs=window.__msgs||[]).push(m
 
   // ===== 2. Update row against the fake server =====
   { const t = await open({ api: '/ok' }); await openSettings(t.page);
-    let s = await rowState(t.page); ok(s.st === 'idle' && /Ludus 1.11.0/.test(s.text), 'Update: starts at Check (' + s.text + ')');
+    let s = await rowState(t.page); ok(s.st === 'idle' && /Ludus 1.11.1/.test(s.text), 'Update: starts at Check (' + s.text + ')');
     await t.page.click('#updRow button'); await wait(60);
     await wait(500); s = await rowState(t.page);
     ok(s.st === 'available' && /Update to 1.12.0/.test(s.text), 'Update: orange "Update to 1.12.0" (' + s.text + ')');

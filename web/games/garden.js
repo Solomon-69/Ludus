@@ -57,24 +57,31 @@
     D.spark(ctx, x, y, r * 1.35, SUN_GOLD, t || 0);
     ctx.fillStyle = '#f6d36b'; ctx.beginPath(); ctx.arc(x, y, r * 0.62, 0, Math.PI * 2); ctx.fill();
   }
+  // a flared horn on a stem (our own design): the seed leaves through the wide bell
   function shooterHead(ctx, s, kick, head, nozzles, c) {
-    ctx.fillStyle = head; ctx.beginPath(); ctx.arc(-kick, -s * 0.08, s * 0.24, 0, Math.PI * 2); ctx.fill();
-    nozzles.forEach(dy => { D.roundRect(ctx, s * 0.08 - kick, -s * 0.17 + dy, s * 0.3, s * 0.18, s * 0.08); ctx.fill(); });
-    ctx.fillStyle = c.dark ? '#24301d' : '#2f4a27';
-    nozzles.forEach(dy => { ctx.beginPath(); ctx.arc(s * 0.37 - kick, -s * 0.08 + dy, s * 0.06, 0, Math.PI * 2); ctx.fill(); });
-    ctx.fillStyle = '#fffaf0'; ctx.beginPath(); ctx.arc(s * 0.02 - kick, -s * 0.16, s * 0.06, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#2b2722'; ctx.beginPath(); ctx.arc(s * 0.04 - kick, -s * 0.16, s * 0.03, 0, Math.PI * 2); ctx.fill();
+    nozzles.forEach(dy => {
+      ctx.fillStyle = head; ctx.beginPath();
+      ctx.moveTo(-s * 0.2 - kick, -s * 0.08 + dy - s * 0.07); ctx.lineTo(s * 0.12 - kick, -s * 0.08 + dy - s * 0.15);
+      ctx.lineTo(s * 0.34 - kick, -s * 0.08 + dy - s * 0.2); ctx.lineTo(s * 0.34 - kick, -s * 0.08 + dy + s * 0.2);
+      ctx.lineTo(s * 0.12 - kick, -s * 0.08 + dy + s * 0.15); ctx.lineTo(-s * 0.2 - kick, -s * 0.08 + dy + s * 0.07); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fillRect(-s * 0.02 - kick, -s * 0.2 + dy, s * 0.06, s * 0.24);
+      ctx.fillStyle = c.dark ? '#24301d' : '#2f4a27'; ctx.beginPath(); ctx.ellipse(s * 0.34 - kick, -s * 0.08 + dy, s * 0.05, s * 0.15, 0, 0, Math.PI * 2); ctx.fill();
+    });
   }
   function drawPlant(ctx, k, x, y, s, c, t, extra) {
     ctx.save(); ctx.translate(x, y);
     const sway = Math.sin(t * 2 + x) * 0.04;
     ctx.rotate(sway);
     const leaf = c.dark ? '#6aa35a' : '#5d9a4c', stem = c.dark ? '#4f7f43' : '#4a8040';
-    if (k === 0) { // bloom: petals round a spark heart
+    if (k === 0) { // glow bulb: a lantern-shaped bud that makes light
       ctx.fillStyle = stem; ctx.fillRect(-s * 0.05, 0, s * 0.1, s * 0.42);
-      for (let i = 0; i < 7; i++) { const a = i * Math.PI * 2 / 7 + t * 0.3; ctx.fillStyle = SUN_GOLD; ctx.beginPath(); ctx.ellipse(Math.cos(a) * s * 0.22, -s * 0.08 + Math.sin(a) * s * 0.22, s * 0.13, s * 0.08, a, 0, Math.PI * 2); ctx.fill(); }
-      ctx.fillStyle = c.dark ? '#5a3b22' : '#8a5a33'; ctx.beginPath(); ctx.arc(0, -s * 0.08, s * 0.14, 0, Math.PI * 2); ctx.fill();
-      if (extra > 0) D.spark(ctx, 0, -s * 0.08, s * 0.1 + extra * s * 0.1, '#fff1c4', t * 3);
+      ctx.fillStyle = leaf; ctx.beginPath(); ctx.ellipse(s * 0.16, s * 0.3, s * 0.16, s * 0.06, -0.5, 0, Math.PI * 2); ctx.fill();
+      const glow = 0.5 + Math.sin(t * 3) * 0.15;
+      ctx.fillStyle = 'rgba(255,214,102,' + (0.28 * glow).toFixed(3) + ')'; ctx.beginPath(); ctx.arc(0, -s * 0.12, s * 0.4, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = c.dark ? '#5a3b22' : '#7a5230'; D.roundRect(ctx, -s * 0.1, -s * 0.5, s * 0.2, s * 0.08, s * 0.03); ctx.fill();
+      ctx.fillStyle = SUN_GOLD; ctx.beginPath(); ctx.moveTo(0, -s * 0.44); ctx.bezierCurveTo(s * 0.34, -s * 0.34, s * 0.3, s * 0.08, 0, s * 0.12); ctx.bezierCurveTo(-s * 0.3, s * 0.08, -s * 0.34, -s * 0.34, 0, -s * 0.44); ctx.fill();
+      ctx.fillStyle = '#fff1c4'; ctx.beginPath(); ctx.ellipse(-s * 0.06, -s * 0.16, s * 0.07, s * 0.14, 0.2, 0, Math.PI * 2); ctx.fill();
+      if (extra > 0) D.spark(ctx, 0, -s * 0.12, s * 0.1 + extra * s * 0.1, '#fff1c4', t * 3);
     } else if (k === 1 || k === 4 || k === 5) { // sprout shooter, frost shooter, twin shooter
       ctx.fillStyle = stem; ctx.fillRect(-s * 0.05, 0, s * 0.1, s * 0.42);
       ctx.fillStyle = leaf; ctx.beginPath(); ctx.ellipse(-s * 0.16, s * 0.3, s * 0.16, s * 0.06, 0.5, 0, Math.PI * 2); ctx.fill();
