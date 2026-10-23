@@ -198,7 +198,7 @@ brew install --cask ludus   # not available yet
 | --- | --- |
 | **Arcade** (beat your best) | Tetris, Breakout, Pac-Man, Getting Over It, Plants vs. Zombies, Flappy Bird, Asteroids, Space Invaders, Snake, Doodle Jump, Stack, Hole.io, Paper.io, Slither.io |
 | **Puzzle** | 2048, Sokoban, Wordle, Minesweeper, Memory, Solitaire, Candy Crush, Sudoku, Flag Quiz |
-| **Duel** (you against the computer) | Dots and Boxes, Dead Centre, Connect Four, Last Wire, Ultimate Tic-Tac-Toe, Nidhogg, Hex, Rock Paper Scissors, Quoridor, Bloons TD Battles |
+| **Duel** (you against the computer) | Dots and Boxes, Dead Centre, Connect Four, Last Wire, Ultimate Tic-Tac-Toe, Nidhogg, Hex, Rock Paper Scissors, Quoridor, Pop Duel, Stick Brawl |
 | **2 Player** (one keyboard) | Air Hockey, Pong, Tag, Tank Trouble |
 | **3-4 Player** (online, Tag also on one keyboard) | Tag, Paper.io, Hole.io |
 
