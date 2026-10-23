@@ -78,11 +78,28 @@
     hint: 'vs Bot: <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> drive, <kbd>F</kbd> or <kbd>/</kbd> fire · vs Friend: <b>P1</b> WASD + F, <b>P2</b> arrows + /',
     _rules: { makeMaze, wallRects, MC: PMC, MRW: PMRW },
     art(ctx, w, h) {
-      ctx.fillStyle = 'rgba(255,255,255,0.35)';
-      [[0.1, 0.12, 0.8, 0.04], [0.1, 0.84, 0.8, 0.04], [0.48, 0.12, 0.04, 0.4], [0.1, 0.12, 0.03, 0.76], [0.87, 0.12, 0.03, 0.76], [0.25, 0.5, 0.3, 0.04]].forEach(([x, y, ww, hh]) => { D.roundRect(ctx, w * x, h * y, w * ww, h * hh, 2); ctx.fill(); });
-      const tank = (x, y, a, color) => { ctx.save(); ctx.translate(x, y); ctx.rotate(a); ctx.fillStyle = color; D.roundRect(ctx, -h * 0.09, -h * 0.07, h * 0.18, h * 0.14, h * 0.03); ctx.fill(); ctx.fillRect(0, -h * 0.015, h * 0.13, h * 0.03); ctx.restore(); };
-      tank(w * 0.28, h * 0.7, -0.4, '#fff8f2'); tank(w * 0.72, h * 0.32, 2.6, '#5b8def');
-      ctx.fillStyle = '#2b2018'; ctx.beginPath(); ctx.arc(w * 0.5, h * 0.62, h * 0.02, 0, Math.PI * 2); ctx.fill();
+      // Top-down arena: a framed floor, a few walls, two tanks (tracks, hull, turret, barrel) and a shell in flight.
+      const u = h / 78, ax = w * 0.08, ay = h * 0.1, aw = w * 0.84, ah = h * 0.8;
+      ctx.fillStyle = 'rgba(255,255,255,0.14)'; D.roundRect(ctx, ax, ay, aw, ah, 8 * u); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 2.4 * u; D.roundRect(ctx, ax, ay, aw, ah, 8 * u); ctx.stroke();
+      ctx.fillStyle = 'rgba(255,255,255,0.62)';
+      [[0.5, 0.1, 0.012, 0.36], [0.27, 0.56, 0.16, 0.012], [0.66, 0.36, 0.012, 0.3], [0.66, 0.66, 0.14, 0.012]].forEach(([x, y, ww, hh]) => { D.roundRect(ctx, w * x - 1.3 * u, h * y, Math.max(2.6 * u, w * ww), Math.max(2.6 * u, h * hh), 1.3 * u); ctx.fill(); });
+      const tank = (x, y, a, ta, body, dark) => {
+        const s = 10 * u;
+        ctx.save(); ctx.translate(x, y + 1.4 * u); ctx.rotate(a); ctx.fillStyle = 'rgba(0,0,0,0.16)'; D.roundRect(ctx, -s * 1.2, -s, s * 2.4, s * 2, s * 0.4); ctx.fill(); ctx.restore();
+        ctx.save(); ctx.translate(x, y); ctx.rotate(a);
+        ctx.fillStyle = dark; D.roundRect(ctx, -s * 1.25, -s * 1.02, s * 2.5, s * 0.5, s * 0.2); ctx.fill(); D.roundRect(ctx, -s * 1.25, s * 0.52, s * 2.5, s * 0.5, s * 0.2); ctx.fill();
+        ctx.fillStyle = body; D.roundRect(ctx, -s * 1.05, -s * 0.62, s * 2.1, s * 1.24, s * 0.3); ctx.fill();
+        ctx.rotate(ta - a); ctx.fillStyle = dark; D.roundRect(ctx, 0, -s * 0.16, s * 1.65, s * 0.32, s * 0.12); ctx.fill();
+        ctx.fillStyle = body; ctx.beginPath(); ctx.arc(0, 0, s * 0.5, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = dark; ctx.lineWidth = s * 0.12; ctx.stroke();
+        ctx.restore();
+      };
+      tank(w * 0.27, h * 0.75, -0.25, -0.35, '#fff8f2', '#8a6a55'); tank(w * 0.8, h * 0.27, Math.PI + 0.3, Math.PI + 0.45, '#5b8def', '#2f4f8f');
+      const sx = w * 0.47, sy = h * 0.66;
+      ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 1.6 * u; ctx.lineCap = 'round'; ctx.setLineDash([1.5 * u, 3 * u]);
+      ctx.beginPath(); ctx.moveTo(w * 0.36, h * 0.71); ctx.lineTo(sx, sy); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = '#2b2018'; ctx.beginPath(); ctx.arc(sx, sy, 2.4 * u, 0, Math.PI * 2); ctx.fill();
     },
     create(stage, api) {
       const view = api.canvas(onResize);

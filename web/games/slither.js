@@ -60,26 +60,27 @@
     id: 'slither', name: 'Slither.io', aka: 'snake io worm', tag: 'Arcade', versus: true, tint: '#7c6bb5',
     hint: 'Pointer steers, hold click or <kbd>Space</kbd> to boost · <kbd>←</kbd><kbd>→</kbd> turn · vs Friend: <b>P1</b> A D + Space, <b>P2</b> ← → + /',
     art(ctx, w, h, colors) {
+      // A smooth worm: evenly spaced round segments along a gentle S-curve, tapering to the tail, eyes on the head.
       const u = h / 78;
-      ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-      const pts = [[0.1, 0.72], [0.28, 0.76], [0.46, 0.64], [0.5, 0.46], [0.4, 0.3], [0.55, 0.2], [0.75, 0.3], [0.84, 0.46]];
-      const path = () => {
-        ctx.beginPath(); ctx.moveTo(pts[0][0] * w, pts[0][1] * h);
-        for (let i = 0; i < pts.length - 1; i++) {
-          const p0 = pts[Math.max(0, i - 1)], p1 = pts[i], p2 = pts[i + 1], p3 = pts[Math.min(pts.length - 1, i + 2)];
-          ctx.bezierCurveTo((p1[0] + (p2[0] - p0[0]) / 6) * w, (p1[1] + (p2[1] - p0[1]) / 6) * h, (p2[0] - (p3[0] - p1[0]) / 6) * w, (p2[1] - (p3[1] - p1[1]) / 6) * h, p2[0] * w, p2[1] * h);
-        }
-      };
-      [[0.92, 0.2, '#ffd36b'], [0.74, 0.14, '#fff8f2'], [0.14, 0.34, '#ffd36b'], [0.62, 0.84, '#fff8f2'], [0.9, 0.78, '#ffd36b']].forEach(([x, y, c]) => {
-        ctx.fillStyle = 'rgba(255,255,255,0.22)'; ctx.beginPath(); ctx.arc(w * x, h * y, 6.5 * u, 0, TAU); ctx.fill();
-        ctx.fillStyle = c; ctx.beginPath(); ctx.arc(w * x, h * y, 3.2 * u, 0, TAU); ctx.fill();
+      [[0.92, 0.2, '#ffd36b'], [0.74, 0.14, '#fff8f2'], [0.14, 0.3, '#ffd36b'], [0.6, 0.86, '#fff8f2'], [0.9, 0.8, '#ffd36b'], [0.3, 0.12, '#fff8f2']].forEach(([x, y, c]) => {
+        ctx.fillStyle = 'rgba(255,255,255,0.22)'; ctx.beginPath(); ctx.arc(w * x, h * y, 6 * u, 0, TAU); ctx.fill();
+        ctx.fillStyle = c; ctx.beginPath(); ctx.arc(w * x, h * y, 3 * u, 0, TAU); ctx.fill();
       });
-      ctx.strokeStyle = 'rgba(0,0,0,0.14)'; ctx.lineWidth = 12 * u; ctx.save(); ctx.translate(0, 2 * u); path(); ctx.stroke(); ctx.restore();
-      ctx.strokeStyle = '#fff8f2'; ctx.lineWidth = 12 * u; path(); ctx.stroke();
-      ctx.strokeStyle = 'rgba(124,107,181,0.5)'; ctx.lineWidth = 3.4 * u; ctx.setLineDash([0, 9 * u]); path(); ctx.stroke(); ctx.setLineDash([]);
-      const [hx, hy] = pts[pts.length - 1];
-      ctx.fillStyle = '#fff8f2'; ctx.beginPath(); ctx.arc(w * hx, h * hy, 9.5 * u, 0, TAU); ctx.fill();
-      D.spark(ctx, w * hx, h * hy, 7.5 * u, '#d97757', 0.3);
+      const len = Math.min(w * 0.72, h * 2.6), x0 = (w - len) / 2;
+      const at = t => [x0 + len * t, h * (0.54 + 0.2 * Math.sin(t * TAU * 1.05 - 0.5))];
+      const dense = []; for (let i = 0; i <= 400; i++) dense.push(at(i / 400));
+      const seg = [], gap = 4.2 * u; let acc = 0; seg.push(dense[0]);
+      for (let i = 1; i < dense.length; i++) { acc += Math.hypot(dense[i][0] - dense[i - 1][0], dense[i][1] - dense[i - 1][1]); if (acc >= gap) { seg.push(dense[i]); acc = 0; } }
+      const n = seg.length, rad = i => (4.2 + 4.6 * Math.pow(i / (n - 1), 0.6)) * u;
+      ctx.fillStyle = 'rgba(0,0,0,0.13)';
+      seg.forEach((p, i) => { ctx.beginPath(); ctx.arc(p[0], p[1] + 2 * u, rad(i), 0, TAU); ctx.fill(); });
+      seg.forEach((p, i) => { ctx.fillStyle = Math.floor((n - 1 - i) / 3) % 2 ? '#efe4ff' : '#fff8f2'; ctx.beginPath(); ctx.arc(p[0], p[1], rad(i), 0, TAU); ctx.fill(); });
+      const hd = seg[n - 1], pr = seg[n - 2], a = Math.atan2(hd[1] - pr[1], hd[0] - pr[0]), hr = rad(n - 1);
+      [-1, 1].forEach(k => {
+        const ex = hd[0] + Math.cos(a + k * 0.75) * hr * 0.5, ey = hd[1] + Math.sin(a + k * 0.75) * hr * 0.5;
+        ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(ex, ey, hr * 0.34, 0, TAU); ctx.fill();
+        ctx.fillStyle = '#2b2140'; ctx.beginPath(); ctx.arc(ex + Math.cos(a) * hr * 0.12, ey + Math.sin(a) * hr * 0.12, hr * 0.18, 0, TAU); ctx.fill();
+      });
     },
 
     create(stage, api) {

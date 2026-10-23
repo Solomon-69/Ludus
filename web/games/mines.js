@@ -73,7 +73,11 @@
         ctx.fillStyle = k === 'c' || k === 'f' ? 'rgba(255,255,255,0.88)' : 'rgba(255,255,255,0.32)';
         D.roundRect(ctx, x, y, s, s, s * 0.24); ctx.fill();
         if (k === '1' || k === '2') D.text(ctx, k, x + s / 2, y + s / 2 + 1, s * 0.56, k === '1' ? '#3f2a66' : '#fff', 800);
-        if (k === 'f') D.spark(ctx, x + s / 2, y + s / 2, s * 0.32, '#d97757', 0.2);
+        if (k === 'f') {   // a flag on a covered square, like the real game
+          const fx = x + s * 0.4, fy = y + s * 0.22;
+          ctx.fillStyle = '#3f2a66'; ctx.fillRect(fx - s * 0.035, fy, s * 0.07, s * 0.56); ctx.fillRect(fx - s * 0.17, y + s * 0.74, s * 0.34, s * 0.07);
+          ctx.fillStyle = '#e5483f'; ctx.beginPath(); ctx.moveTo(fx + s * 0.035, fy); ctx.lineTo(fx + s * 0.36, fy + s * 0.15); ctx.lineTo(fx + s * 0.035, fy + s * 0.3); ctx.closePath(); ctx.fill();
+        }
         if (k === 'm') mineIcon(ctx, x + s / 2, y + s / 2, s * 0.2, '#2b2140');
       }
     },

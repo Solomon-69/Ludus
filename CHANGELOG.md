@@ -3,6 +3,17 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.8.2 (2026-10-23)
+
+- New covers: Flag Quiz (France and Seychelles, clean edges), 2048 (a real board mid-game), Ultimate tic-tac-toe
+  (nine small boards), Slither.io (smooth worm), Air Hockey (rink in play), Tanks (arena, two tanks, a shell);
+  Tetris and Minefield lose the little star; Geo Guess map without the pale stripe.
+- Mac: opening Ludus closes the panel of our other menu bar apps (and the other way round); a click on any other
+  menu bar item closes it too, except Nox's quick dark-mode switch.
+- Geo Guess: the pin bar shows the whole sentence only when it fits, otherwise "Place your pin"; never cut off.
+- Online page: equal spacing between every block; Last party card shows "Last party · <game>", the players with a
+  crown on the host, Forget and Rejoin on the right.
+
 ## 1.8.1 (2026-10-23)
 
 - Geo Guess no longer saves a game to resume later: every open starts a fresh game (pause still works while it is

@@ -100,10 +100,10 @@
   }
   // ---------- the Online page: make a room or join one ----------
   function renderOnlinePage(grid) {
-    // Three groups (heading, your room, joining one) spread over the page's full height, so the page has no empty band
-    // at the bottom whatever its size; the panel itself keeps the same size as every other tab.
-    const page = el('div', 'online-page'), head = el('div', 'op-group op-head'), mid = el('div', 'op-group'), join = el('div', 'op-group');
-    page.appendChild(head); page.appendChild(mid); page.appendChild(join);
+    // The blocks (heading, name, last party, Create room, joining) share the page's full height with equal gaps
+    // between them, so there is no empty band at the bottom; the panel itself keeps the same size as every other tab.
+    const page = el('div', 'online-page'), head = el('div', 'op-group op-head'), join = el('div', 'op-group');
+    page.appendChild(head); const mid = { appendChild: e => page.appendChild(e) };
     head.appendChild(el('div', 'op-title', 'Play online'));
     head.appendChild(el('p', 'lobby-sub', 'Create a room and share its code, or join a friend. The host picks the games and how many rounds.'));
     const f = el('label', 'field');
@@ -126,30 +126,36 @@
     const jr = el('div', 'join-row'); jr.appendChild(code); jr.appendChild(jb);   // the code and the Join button side by side
     join.appendChild(jr); join.appendChild(msg);
     join.appendChild(el('p', 'lobby-note', 'Code, invite message or ludus:// link. Needs the internet.'));
+    page.appendChild(join);
     grid.appendChild(page);
   }
-  // The last room you were in: one tidy card, a "Last party" tag and who hosted on top, the players as small name chips
-  // and the games underneath, Rejoin and Forget on the right.
+  // The last room you were in: an orange "Last party · <game>" tag on top, then the players as small name chips (a
+  // crown on the host's) with Forget and Rejoin on the right.
   function partyCard(p) {
-    const card = el('div', 'party-card'), info = el('div', 'party-info');
-    const top = el('div', 'party-top');
-    top.appendChild(el('span', 'party-tag', 'Last party'));
-    const who = el('span', 'party-who'); who.textContent = p.role === 'host' ? 'Hosted by you' : 'Room ' + p.code; top.appendChild(who);
-    info.appendChild(top);
-    const names = (p.names || []).filter(Boolean), games = (p.games || []).map(id => { const g = L.games.find(x => x.id === id); return g ? dispName(g) : id; }).join(', ');
-    if (names.length) {
-      const ppl = el('div', 'party-people');
-      names.forEach((n, i) => { const c = el('span', 'party-chip'), av = el('i', 'party-av'); av.textContent = String(n).trim().charAt(0).toUpperCase() || '?'; av.style.setProperty('--c', PARTY_COLS[i % PARTY_COLS.length]); c.appendChild(av); c.appendChild(document.createTextNode(n)); ppl.appendChild(c); });
-      info.appendChild(ppl);
-    }
-    if (games) { const gl = el('div', 'party-games'); gl.textContent = games; gl.title = games; info.appendChild(gl); }
+    const card = el('div', 'party-card');
+    const games = (p.games || []).map(id => { const g = L.games.find(x => x.id === id); return g ? dispName(g) : id; });
+    const gameLabel = games.length ? games[0] + (games.length > 1 ? ' +' + (games.length - 1) : '') : '';
+    const tag = el('span', 'party-tag', 'Last party' + (gameLabel ? ' \u00b7 ' + gameLabel : ''));
+    tag.title = games.join(', ');
+    card.appendChild(tag);
+    // never cut off: if the full tag does not fit, it shows just the game
+    requestAnimationFrame(() => { if (gameLabel && tag.scrollWidth > tag.clientWidth + 1) tag.textContent = gameLabel; });
+    const row = el('div', 'party-row'), ppl = el('div', 'party-people');
+    (p.names || []).filter(Boolean).forEach((n, i) => {
+      const c = el('span', 'party-chip'), av = el('i', 'party-av');
+      av.textContent = String(n).trim().charAt(0).toUpperCase() || '?'; av.style.setProperty('--c', PARTY_COLS[i % PARTY_COLS.length]);
+      c.appendChild(av); c.appendChild(document.createTextNode(n));
+      if (i === 0) { const cr = el('span', 'party-crown', CROWN); cr.setAttribute('role', 'img'); cr.setAttribute('aria-label', 'Host'); cr.title = 'Host'; c.appendChild(cr); }
+      ppl.appendChild(c);
+    });
     const acts = el('div', 'party-acts');
     const fg = el('button', 'btn small ghost', 'Forget'); fg.type = 'button'; fg.id = 'opForget'; fg.onclick = () => { L.sfx('click'); S.party = null; L.save(); renderCards(); };
     const rj = el('button', 'btn small primary', 'Rejoin'); rj.type = 'button'; rj.id = 'opRejoin'; rj.onclick = () => { L.sfx('click'); rejoinParty(); };
     acts.appendChild(fg); acts.appendChild(rj);
-    card.appendChild(info); card.appendChild(acts);
+    row.appendChild(ppl); row.appendChild(acts); card.appendChild(row);
     return card;
   }
+  const CROWN = '<svg viewBox="0 0 16 12" width="12" height="9" aria-hidden="true"><path d="M1 3.2 4.6 6 8 1l3.4 5L15 3.2 13.6 11H2.4z" fill="currentColor"/></svg>';
   const PARTY_COLS = ['#d97757', '#5b8def', '#4f9d69', '#9b6dd6'];   // the seat colours used in online games
   function fmt(n) { return n >= 10000 ? (n / 1000).toFixed(n >= 100000 ? 0 : 1) + 'k' : String(n); }
   function renderCards() {
@@ -822,7 +828,7 @@
       appRows.push(row('Quit Ludus', null, q));
     }
     body.appendChild(group('App', appRows));
-    body.appendChild(el('div', 'foot', 'Ludus 1.8.1'));
+    body.appendChild(el('div', 'foot', 'Ludus 1.8.2'));
   }
   $('openSettings').onclick = () => { renderSettings(); show('settings'); L.sfx('tap'); };
   $('settingsBack').onclick = () => { show('home'); renderCards(); };

@@ -61,6 +61,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
         appearanceObserver = NSApp.observe(\.effectiveAppearance) { [weak self] _, _ in
             Task { @MainActor in self?.pushAppearance() }
         }
+        // Our menu bar apps close their panel when another of them opens one.
+        PanelGroup.listen { [weak self] in Task { @MainActor in self?.closePopover() } }
         #if LUDUS_TEST
         // UI test hook, compiled only into local test builds (build.sh adds -D LUDUS_TEST unless RELEASE=1).
         DistributedNotificationCenter.default().addObserver(
@@ -453,6 +455,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
 
     private func openPopover() {
         guard let button = popoverAnchor() else { return }
+        PanelGroup.announceOpen()   // close our other menu bar apps' panels
         bounceIcon()
         wide = false   // Ludus always opens on All games, so never at a wide game's landscape size
         popover.contentViewController?.preferredContentSize = currentSize()
@@ -482,7 +485,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: reveal)   // never stay hidden
         MenuBarStrip.startEsc(window: { [weak self] in self?.popover.contentViewController?.view.window }, close: { [weak self] in self?.closePopover() })
         clickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
-            if MenuBarStrip.contains() { return }   // clicks on other menu bar icons keep the panel open
+            if PanelGroup.isOnNoxSwitch() { return }   // Nox's quick dark-mode switch never closes the panel; any other click does
             Task { @MainActor in self?.closePopover() }
         }
     }

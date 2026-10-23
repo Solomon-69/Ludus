@@ -176,23 +176,29 @@
     hint: 'Click a square, or <kbd>←</kbd><kbd>↑</kbd><kbd>→</kbd><kbd>↓</kbd> + <kbd>Space</kbd>. The square you pick sends the bot to that board. Win 3 boards in a row. vs Friend: take turns',
     _logic: logic,
     art(ctx, w, h) {
-      const D = Ludus.draw, S = Math.min(w, h) * 0.86, s = S / 3, ox = (w - S) / 2, oy = (h - S) / 2;
-      ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 2; ctx.lineCap = 'round';
-      for (let k = 1; k < 3; k++) {
-        ctx.beginPath(); ctx.moveTo(ox + k * s, oy + 2); ctx.lineTo(ox + k * s, oy + S - 2); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(ox + 2, oy + k * s); ctx.lineTo(ox + S - 2, oy + k * s); ctx.stroke();
+      // Ultimate tic-tac-toe in play: nine small boards, each with its own little grid; two boards already won.
+      const D = Ludus.draw, S = Math.min(w, h) * 0.88, s = S / 3, ox = (w - S) / 2, oy = (h - S) / 2, pad = s * 0.12, m = (s - pad * 2) / 3;
+      const NAVY = '#1d3566';
+      const X = (x, y, r, lw) => { ctx.strokeStyle = '#fff'; ctx.lineWidth = lw; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(x - r, y - r); ctx.lineTo(x + r, y + r); ctx.moveTo(x + r, y - r); ctx.lineTo(x - r, y + r); ctx.stroke(); };
+      const O = (x, y, r, lw) => { ctx.strokeStyle = NAVY; ctx.lineWidth = lw; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke(); };
+      const won = { 0: 'x', 8: 'o' }, active = 4;
+      // marks inside each small board: [board, cell, who]
+      const marks = [[1, 0, 'x'], [1, 4, 'o'], [2, 2, 'o'], [3, 6, 'x'], [4, 0, 'x'], [4, 4, 'o'], [4, 8, 'x'], [5, 1, 'o'], [6, 3, 'x'], [6, 4, 'o'], [7, 7, 'x'], [7, 2, 'o'], [3, 4, 'o'], [5, 5, 'x']];
+      for (let b = 0; b < 9; b++) {
+        const bx = ox + (b % 3) * s, by = oy + Math.floor(b / 3) * s;
+        ctx.fillStyle = b === active ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.13)';
+        D.roundRect(ctx, bx + s * 0.04, by + s * 0.04, s * 0.92, s * 0.92, s * 0.12); ctx.fill();
+        if (won[b]) { won[b] === 'x' ? X(bx + s / 2, by + s / 2, s * 0.26, Math.max(2, s * 0.09)) : O(bx + s / 2, by + s / 2, s * 0.28, Math.max(2, s * 0.08)); continue; }
+        ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = Math.max(0.8, s * 0.025); ctx.lineCap = 'round';
+        for (let k = 1; k < 3; k++) {
+          ctx.beginPath(); ctx.moveTo(bx + pad + k * m, by + pad); ctx.lineTo(bx + pad + k * m, by + s - pad); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(bx + pad, by + pad + k * m); ctx.lineTo(bx + s - pad, by + pad + k * m); ctx.stroke();
+        }
+        marks.filter(q => q[0] === b).forEach(([, c, who]) => {
+          const x = bx + pad + (c % 3) * m + m / 2, y = by + pad + Math.floor(c / 3) * m + m / 2;
+          who === 'x' ? X(x, y, m * 0.22, Math.max(1, m * 0.13)) : O(x, y, m * 0.26, Math.max(1, m * 0.12));
+        });
       }
-      ctx.fillStyle = 'rgba(255,255,255,0.22)'; D.roundRect(ctx, ox + s + 3, oy + 3, s - 6, s - 6, 5); ctx.fill();
-      const X = (x, y, r, lw) => { ctx.strokeStyle = '#fff'; ctx.lineWidth = lw; ctx.beginPath(); ctx.moveTo(x - r, y - r); ctx.lineTo(x + r, y + r); ctx.moveTo(x + r, y - r); ctx.lineTo(x - r, y + r); ctx.stroke(); };
-      ctx.lineWidth = 3; X(ox + s / 2, oy + s / 2, s * 0.22, 3); X(ox + s * 1.5, oy + s * 1.5, s * 0.22, 3);
-      ctx.strokeStyle = '#1d3566'; ctx.lineWidth = 3;
-      [[2, 0], [0, 2]].forEach(([c, r]) => { ctx.beginPath(); ctx.arc(ox + c * s + s / 2, oy + r * s + s / 2, s * 0.27, 0, Math.PI * 2); ctx.stroke(); });
-      const m = s / 3;
-      ctx.lineWidth = 1.6;
-      [[0, 0, 1], [1, 1, 2], [2, 2, 1], [0, 2, 2]].forEach(([c, r, who]) => {
-        const x = ox + s + c * m + m / 2, y = oy + r * m + m / 2;
-        if (who === 1) X(x, y, m * 0.2, 1.6); else { ctx.beginPath(); ctx.arc(x, y, m * 0.24, 0, Math.PI * 2); ctx.stroke(); }
-      });
     },
     create(stage, api) {
       const D = Ludus.draw, L = logic;

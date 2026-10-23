@@ -3,14 +3,16 @@ Ludus.register({
   id: 'g2048', name: '2048', tag: 'Puzzle', tint: '#e0a526',
   hint: '<kbd>←</kbd><kbd>↑</kbd><kbd>→</kbd><kbd>↓</kbd> or swipe',
   art(ctx, w, h) {
-    const vals = [2, 4, 8, 16, 32, 64, 128, 2048];
-    const s = Math.min(w, h) * 0.24, gap = s * 0.14;
-    const ox = (w - (s * 4 + gap * 3)) / 2, oy = (h - (s * 2 + gap)) / 2;
-    vals.forEach((v, i) => {
-      const x = ox + (i % 4) * (s + gap), y = oy + Math.floor(i / 4) * (s + gap);
-      ctx.fillStyle = `rgba(255,255,255,${0.35 + i * 0.08})`;
-      Ludus.draw.roundRect(ctx, x, y, s, s, s * 0.22); ctx.fill();
-      Ludus.draw.text(ctx, String(v), x + s / 2, y + s / 2 + 1, s * (v > 999 ? 0.3 : 0.42), '#5a3b10', 750);
+    // A 4x4 board mid-game, in the game's own tile colours, with the 2048 tile made.
+    const D = Ludus.draw, B = Math.min(w, h) * 0.9, gap = B * 0.035, s = (B - gap * 5) / 4;
+    const ox = (w - B) / 2, oy = (h - B) / 2;
+    const pal = { 2: ['#f4e9d8', '#776e65'], 4: ['#efdcc0', '#776e65'], 8: ['#f2b179', '#fff'], 16: ['#f59563', '#fff'], 32: ['#f67c5f', '#fff'], 64: ['#f65e3b', '#fff'], 128: ['#edcf72', '#fff'], 2048: ['#d97757', '#fff'] };
+    const cells = [0, 2, 0, 4, 2, 8, 16, 0, 4, 32, 64, 2, 8, 128, 2048, 4];
+    ctx.fillStyle = 'rgba(120,80,20,0.32)'; D.roundRect(ctx, ox, oy, B, B, B * 0.06); ctx.fill();
+    cells.forEach((v, i) => {
+      const x = ox + gap + (i % 4) * (s + gap), y = oy + gap + Math.floor(i / 4) * (s + gap);
+      ctx.fillStyle = v ? pal[v][0] : 'rgba(255,255,255,0.28)'; D.roundRect(ctx, x, y, s, s, s * 0.14); ctx.fill();
+      if (v) D.text(ctx, String(v), x + s / 2, y + s / 2 + 1, s * (v > 999 ? 0.3 : v > 99 ? 0.36 : 0.46), pal[v][1], 800);
     });
   },
   create(stage, api) {

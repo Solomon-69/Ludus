@@ -101,12 +101,11 @@
         ctx.fillStyle = 'rgba(255,255,255,' + (t === 'I' ? 0.9 : t === 'O' ? 0.7 : t === 'L' ? 0.55 : 0.8) + ')';
         Ludus.draw.roundRect(ctx, ox + x * s + 1, oy + y * s + 1, s - 2, s - 2, s * 0.25); ctx.fill();
       });
-      // falling T with the spark on top
+      // the falling T
       const tx = ox + 3 * s, ty = oy - s * 0.6;
       [[0, 0], [1, 0], [2, 0], [1, 1]].forEach(([x, y]) => {
         ctx.fillStyle = '#ffe2d6'; Ludus.draw.roundRect(ctx, tx + x * s + 1, ty + y * s + 1, s - 2, s - 2, s * 0.25); ctx.fill();
       });
-      Ludus.draw.spark(ctx, tx + s * 1.5, ty + s * 0.5, s * 0.34, '#d97757', 0.3);
     },
     create(stage, api) {
       const D = Ludus.draw;

@@ -599,18 +599,24 @@
       const fw = Math.min(w * 0.46, h * 0.62), fh = fw * 0.72;
       const flag = (cx, cy, rot, paint) => {
         ctx.save(); ctx.translate(cx, cy); ctx.rotate(rot);
+        // soft shadow from a shape a little inside the flag, so no light rim shows at the flag's edge
         ctx.shadowColor = 'rgba(0,0,0,0.25)'; ctx.shadowBlur = fw * 0.12; ctx.shadowOffsetY = fw * 0.04;
-        ctx.fillStyle = '#fff'; D.roundRect(ctx, -fw / 2, -fh / 2, fw, fh, fw * 0.07); ctx.fill();
+        ctx.fillStyle = 'rgba(0,0,0,0.35)'; D.roundRect(ctx, -fw / 2 + 1, -fh / 2 + 1, fw - 2, fh - 2, fw * 0.06); ctx.fill();
         ctx.shadowColor = 'transparent';
         ctx.save(); D.roundRect(ctx, -fw / 2, -fh / 2, fw, fh, fw * 0.07); ctx.clip(); paint(); ctx.restore();
         ctx.restore();
       };
-      flag(w * 0.36, h * 0.54, -0.14, () => {            // three vertical bands
-        ['#2b5fc4', '#ffffff', '#d8402f'].forEach((c, i) => { ctx.fillStyle = c; ctx.fillRect(-fw / 2 + i * fw / 3, -fh / 2, fw / 3 + 0.5, fh); });
+      flag(w * 0.36, h * 0.54, -0.14, () => {            // France
+        ['#002654', '#ffffff', '#ce1126'].forEach((c, i) => { ctx.fillStyle = c; ctx.fillRect(-fw / 2 + i * fw / 3 - 0.5, -fh / 2 - 1, fw / 3 + 1, fh + 2); });
       });
-      flag(w * 0.64, h * 0.46, 0.12, () => {             // three horizontal bands and a disc
-        ['#f4c542', '#2f9d5f', '#e8e8ec'].forEach((c, i) => { ctx.fillStyle = c; ctx.fillRect(-fw / 2, -fh / 2 + i * fh / 3, fw, fh / 3 + 0.5); });
-        ctx.fillStyle = '#d8402f'; ctx.beginPath(); ctx.arc(0, 0, fh * 0.17, 0, Math.PI * 2); ctx.fill();
+      flag(w * 0.64, h * 0.46, 0.12, () => {             // Seychelles: five rays fanning out from the bottom-left corner
+        const L = -fw / 2 - 1, T = -fh / 2 - 1, R = fw / 2 + 1, B = fh / 2 + 1, W = R - L, H = B - T;
+        const ray = (c, pts) => { ctx.fillStyle = c; ctx.beginPath(); ctx.moveTo(L, B); pts.forEach(([x, y]) => ctx.lineTo(x, y)); ctx.closePath(); ctx.fill(); };
+        ray('#003f87', [[L, T], [L + W / 3, T]]);
+        ray('#fcd856', [[L + W / 3, T], [L + W * 2 / 3, T]]);
+        ray('#d62828', [[L + W * 2 / 3, T], [R, T], [R, T + H / 3]]);
+        ray('#ffffff', [[R, T + H / 3], [R, T + H * 2 / 3]]);
+        ray('#007a3d', [[R, T + H * 2 / 3], [R, B]]);
       });
     },
     create(stage, api) {

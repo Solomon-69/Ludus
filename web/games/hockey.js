@@ -57,12 +57,24 @@
     hint: '<b>vs Bot</b> <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> move · <b>vs Friend</b> P1 (left) <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> · P2 (right) <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd>',
     _rules: { strike },
     art(ctx, w, h) {
-      ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.moveTo(w * 0.1, h / 2); ctx.lineTo(w * 0.9, h / 2); ctx.stroke();
-      ctx.beginPath(); ctx.arc(w / 2, h / 2, h * 0.16, 0, Math.PI * 2); ctx.stroke();
-      ctx.fillStyle = '#fff8f2'; ctx.beginPath(); ctx.arc(w * 0.36, h * 0.76, h * 0.12, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#5b8def'; ctx.beginPath(); ctx.arc(w * 0.64, h * 0.24, h * 0.12, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#3b2418'; ctx.beginPath(); ctx.arc(w * 0.52, h * 0.56, h * 0.07, 0, Math.PI * 2); ctx.fill();
+      // A side-on rink in play: boards, centre line and circle, two goals, two mallets and the puck with a short trail.
+      const DR = Ludus.draw, u = h / 78, rx = w * 0.07, ry = h * 0.12, rw = w * 0.86, rh = h * 0.76, cy = ry + rh / 2;
+      ctx.fillStyle = 'rgba(255,255,255,0.16)'; DR.roundRect(ctx, rx, ry, rw, rh, rh * 0.32); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.75)'; ctx.lineWidth = 2 * u; DR.roundRect(ctx, rx, ry, rw, rh, rh * 0.32); ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 1.5 * u;
+      ctx.beginPath(); ctx.moveTo(w / 2, ry); ctx.lineTo(w / 2, ry + rh); ctx.stroke();
+      ctx.beginPath(); ctx.arc(w / 2, cy, rh * 0.22, 0, Math.PI * 2); ctx.stroke();
+      [rx, rx + rw].forEach((gx, k) => { ctx.beginPath(); ctx.arc(gx, cy, rh * 0.26, k ? Math.PI / 2 : -Math.PI / 2, k ? Math.PI * 1.5 : Math.PI / 2); ctx.stroke(); });
+      ctx.fillStyle = '#2b2018'; [rx, rx + rw].forEach(gx => { DR.roundRect(ctx, gx - 2.5 * u, cy - rh * 0.17, 5 * u, rh * 0.34, 2.5 * u); ctx.fill(); });
+      const mallet = (x, y, col) => {
+        ctx.fillStyle = 'rgba(0,0,0,0.16)'; ctx.beginPath(); ctx.arc(x, y + 1.6 * u, rh * 0.15, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, y, rh * 0.15, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.beginPath(); ctx.arc(x, y, rh * 0.07, 0, Math.PI * 2); ctx.fill();
+      };
+      mallet(rx + rw * 0.2, cy + rh * 0.12, '#fff8f2'); mallet(rx + rw * 0.8, cy - rh * 0.14, '#5b8def');
+      const px = rx + rw * 0.6, py = cy + rh * 0.16, pr = rh * 0.085;
+      for (let i = 4; i >= 1; i--) { ctx.fillStyle = `rgba(43,32,24,${0.08 * (5 - i)})`; ctx.beginPath(); ctx.arc(px - i * pr * 1.1, py + i * pr * 0.32, pr * (1 - i * 0.12), 0, Math.PI * 2); ctx.fill(); }
+      ctx.fillStyle = '#2b2018'; ctx.beginPath(); ctx.arc(px, py, pr, 0, Math.PI * 2); ctx.fill();
     },
     create(stage, api) {
       const view = api.canvas(onResize);

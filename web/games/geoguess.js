@@ -174,7 +174,7 @@
 .geo-credit{position:absolute;right:0;bottom:0;z-index:600;font:500 9px/1 var(--font);color:#333;background:rgba(255,255,255,.7);padding:2px 5px;border-top-left-radius:6px;pointer-events:none;white-space:nowrap}
 .geo-credit i{font-style:normal}
 .geo-mini:not(.open) .geo-credit{display:none}
-.geo-guess{height:40px;border:0;border-radius:999px;font:italic 800 14px var(--font-round);letter-spacing:.06em;text-transform:uppercase;color:#fff;background:#6cb928;cursor:pointer;box-shadow:inset 0 -3px 0 rgba(0,0,0,.16),0 6px 16px -6px rgba(0,0,0,.6);transition:transform .15s var(--spring),filter .15s,background .2s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 12px}
+.geo-guess{height:40px;border:0;border-radius:999px;font:italic 800 14px var(--font-round);letter-spacing:.06em;text-transform:uppercase;color:#fff;background:#6cb928;cursor:pointer;box-shadow:inset 0 -3px 0 rgba(0,0,0,.16),0 6px 16px -6px rgba(0,0,0,.6);transition:transform .15s var(--spring),filter .15s,background .2s;white-space:nowrap;overflow:hidden;text-align:center;padding:0 12px}
 .geo-guess:hover:not(:disabled){filter:brightness(1.08)}
 .geo-guess:active:not(:disabled){transform:scale(.97)}
 .geo-guess:disabled{background:rgba(16,16,18,.78);color:rgba(255,255,255,.72);font-size:10.5px;letter-spacing:.02em;padding:0 8px;cursor:default;box-shadow:0 6px 16px -6px rgba(0,0,0,.6)}
@@ -267,10 +267,9 @@
     onlineHint: hintFor('move', true),
     _rules: { distKm, pointsFor, bearing, chooseOrder, MAX_POINTS },
     art(ctx, w, h) {
-      // A flat map filling the whole card: river, parks, roads, a red pin with its shadow and a small compass. Folds kept faint.
+      // A flat map filling the whole card: river, parks, roads, a red pin with its shadow and a small compass.
       const u = h / 78, TAU = Math.PI * 2, pw = w / 3;
       ctx.fillStyle = '#f6efdc'; ctx.fillRect(0, 0, w, h);
-      ctx.fillStyle = '#efe6cf'; ctx.fillRect(pw, 0, pw, h);
       ctx.fillStyle = '#b9dca0';
       const blob = (x, y, bw, bh, r) => { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + bw, y, x + bw, y + bh, r); ctx.arcTo(x + bw, y + bh, x, y + bh, r); ctx.arcTo(x, y + bh, x, y, r); ctx.arcTo(x, y, x + bw, y, r); ctx.closePath(); ctx.fill(); };
       blob(pw * 0.12, h * 0.62, pw * 0.78, h * 0.5, 5 * u); blob(pw * 2.18, -4 * u, pw * 0.66, h * 0.4, 5 * u);
@@ -283,12 +282,6 @@
       };
       ctx.strokeStyle = '#e0d2b0'; ctx.lineWidth = 5.6 * u; roads(); ctx.stroke();
       ctx.strokeStyle = '#fffaf0'; ctx.lineWidth = 3.8 * u; roads(); ctx.stroke();
-      for (let i = 1; i < 3; i++) {   // faint folds
-        const fx = i * pw, g = ctx.createLinearGradient(fx - 5 * u, 0, fx + 5 * u, 0);
-        g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(0.5, 'rgba(0,0,0,0.07)'); g.addColorStop(1, 'rgba(0,0,0,0)');
-        ctx.fillStyle = g; ctx.fillRect(fx - 5 * u, 0, 10 * u, h);
-        ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.fillRect(fx, 0, 0.8 * u, h);
-      }
       // compass, bottom-left
       const kx = 15 * u, ky = h - 15 * u;
       ctx.fillStyle = 'rgba(0,0,0,0.14)'; ctx.beginPath(); ctx.arc(kx, ky + 1.2 * u, 9 * u, 0, TAU); ctx.fill();
@@ -387,7 +380,12 @@
         if (miniLayer) { miniLayer.clearLayers(); L.marker([pin.lat, pin.lon], { icon: pinIcon(SEAT[mySeat], !quiet && !api.reduceMotion), interactive: false }).addTo(miniLayer); }
         guessBtn.disabled = false; guessLabel(); if (!quiet) api.sfx('tap');
       }
-      const guessLabel = () => { guessBtn.textContent = guessBtn.disabled ? 'Place your pin on the map' : 'Guess'; };
+      // The whole sentence only when it fits the bar; otherwise the short one. Never cut off.
+      const guessLabel = () => {
+        if (!guessBtn.disabled) { guessBtn.textContent = 'Guess'; return; }
+        guessBtn.textContent = 'Place your pin on the map';
+        if (guessBtn.clientWidth && guessBtn.scrollWidth > guessBtn.clientWidth) guessBtn.textContent = 'Place your pin';
+      };
       function makeMaps() {
         if (miniMap) return;
         sizeMini(); miniMap = L.map(miniMapEl, MAP_OPTS).setView([25, 10], 1);
@@ -417,6 +415,7 @@
       biggerBtn.onclick = () => resize(1); smallerBtn.onclick = () => resize(-1);
       lockBtn.onclick = () => { pinned = !pinned; sizeMini(); keepMapPrefs(); api.sfx('click'); if (pinned) openMini(true); };
       let hoverT = 0;
+      mini.addEventListener('transitionend', e => { if (e.target === mini && e.propertyName === 'width') guessLabel(); });
       function openMini(on_) {
         clearTimeout(hoverT);
         const was = mini.classList.contains('open'), now = !!(on_ || pinned);
@@ -895,6 +894,7 @@
       guessBtn.onclick = () => submit(false);
       const ro = new ResizeObserver(() => { if (destroyed) return; root.style.setProperty('--geo-h', stage.clientHeight + 'px'); if (viewer) try { viewer.resize(); } catch (e) {} if (resMap) resMap.invalidateSize(false); sizeMini(); });
       ro.observe(stage); offs.push(() => ro.disconnect());
+      const rb = new ResizeObserver(() => { if (!destroyed) guessLabel(); }); rb.observe(guessBtn); offs.push(() => rb.disconnect());
       root.style.setProperty('--geo-h', stage.clientHeight + 'px');
       api.loop(dt => {
         if (viewer && cur && (phase === 'play' || phase === 'load')) heading = wrap360(cur.az + viewer.getYaw());
