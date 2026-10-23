@@ -62,9 +62,15 @@
     art(ctx, w, h, colors) {
       const u = h / 78;
       ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-      const pts = [[0.12, 0.74], [0.24, 0.5], [0.4, 0.34], [0.52, 0.5], [0.46, 0.7], [0.62, 0.78], [0.8, 0.62], [0.82, 0.4]];
-      const path = () => { ctx.beginPath(); pts.forEach(([x, y], i) => (i ? ctx.lineTo(x * w, y * h) : ctx.moveTo(x * w, y * h))); };
-      [[0.9, 0.2, '#ffd36b'], [0.7, 0.2, '#fff8f2'], [0.14, 0.2, '#ffd36b'], [0.36, 0.84, '#fff8f2'], [0.9, 0.84, '#ffd36b']].forEach(([x, y, c]) => {
+      const pts = [[0.1, 0.72], [0.28, 0.76], [0.46, 0.64], [0.5, 0.46], [0.4, 0.3], [0.55, 0.2], [0.75, 0.3], [0.84, 0.46]];
+      const path = () => {
+        ctx.beginPath(); ctx.moveTo(pts[0][0] * w, pts[0][1] * h);
+        for (let i = 0; i < pts.length - 1; i++) {
+          const p0 = pts[Math.max(0, i - 1)], p1 = pts[i], p2 = pts[i + 1], p3 = pts[Math.min(pts.length - 1, i + 2)];
+          ctx.bezierCurveTo((p1[0] + (p2[0] - p0[0]) / 6) * w, (p1[1] + (p2[1] - p0[1]) / 6) * h, (p2[0] - (p3[0] - p1[0]) / 6) * w, (p2[1] - (p3[1] - p1[1]) / 6) * h, p2[0] * w, p2[1] * h);
+        }
+      };
+      [[0.92, 0.14, '#ffd36b'], [0.74, 0.08, '#fff8f2'], [0.14, 0.34, '#ffd36b'], [0.62, 0.9, '#fff8f2'], [0.9, 0.8, '#ffd36b']].forEach(([x, y, c]) => {
         ctx.fillStyle = 'rgba(255,255,255,0.22)'; ctx.beginPath(); ctx.arc(w * x, h * y, 6.5 * u, 0, TAU); ctx.fill();
         ctx.fillStyle = c; ctx.beginPath(); ctx.arc(w * x, h * y, 3.2 * u, 0, TAU); ctx.fill();
       });
