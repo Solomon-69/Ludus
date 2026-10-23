@@ -7,7 +7,7 @@
 
 <h1>Ludus</h1>
 
-<p><b>37 little games in your menu bar. Take a little break.</b></p>
+<p><b>38 little games in your menu bar. Take a little break.</b></p>
 
 <p>
   <a href="https://github.com/Solomon-69/Ludus/releases/latest"><img alt="Version 1.7.0" src="https://img.shields.io/badge/version-1.7.0-d97757?style=flat-square"></a>
@@ -54,7 +54,7 @@ It is free, open source, works fully offline by default and collects nothing. Pl
 
 ## Features
 
-Ludus puts 37 small, polished games one click away. Here is what is inside.
+Ludus puts 38 small, polished games one click away. Here is what is inside.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/showcase/ludus-2-dark.png">
