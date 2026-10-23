@@ -96,7 +96,10 @@
       ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 6; ctx.lineCap = 'round';
       ctx.beginPath(); ctx.moveTo(8, cy - r * 1.6); ctx.lineTo(w - 8, cy - r * 1.6); ctx.moveTo(8, cy + r * 1.6); ctx.lineTo(w - 8, cy + r * 1.6); ctx.stroke();
       ctx.fillStyle = '#d97757';
-      ctx.beginPath(); ctx.moveTo(w * 0.24, cy); ctx.arc(w * 0.24, cy, r, 0.22 * Math.PI, 1.78 * Math.PI); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.arc(w * 0.24, cy, r, 0, 7); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(w * 0.24 + r * 0.3, cy - r * 0.25, r * 0.2, 0, 7); ctx.fill();
+      ctx.fillStyle = '#2f2a24'; ctx.beginPath(); ctx.arc(w * 0.24 + r * 0.36, cy - r * 0.25, r * 0.09, 0, 7); ctx.fill();
+      ctx.strokeStyle = '#2f2a24'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(w * 0.24 + r * 0.2, cy + r * 0.05, r * 0.4, 0.15 * Math.PI, 0.75 * Math.PI); ctx.stroke();
       ctx.fillStyle = '#f4e3d0';
       for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.arc(w * (0.4 + i * 0.09), cy, 2.4, 0, 7); ctx.fill(); }
       D.spark(ctx, w * 0.67, cy, r * 0.42, '#f4e3d0', 0.3);
