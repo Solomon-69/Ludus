@@ -198,6 +198,7 @@ internal sealed class TrayContext : ApplicationContext
             var filter = await popup.Eval("(document.querySelector('#filters .chip.is-on')||{}).textContent || null");
             var b = popup.Bounds;
             var t = TrayBounds();
+            var page = await popup.Eval("JSON.stringify({w:innerWidth,h:innerHeight,dpr:devicePixelRatio,sw:document.documentElement.scrollWidth,sh:document.documentElement.scrollHeight})");
             File.WriteAllText(options.SelfTestPath, JsonSerializer.Serialize(new
             {
                 app = "Ludus",
@@ -205,6 +206,10 @@ internal sealed class TrayContext : ApplicationContext
                 ready = popup.IsReady,
                 panelVisible = popup.Visible,
                 panelBounds = new[] { b.X, b.Y, b.Width, b.Height },
+                monitorScale = Native.ScaleAt(new Point(b.X + b.Width / 2, b.Y + b.Height / 2)),
+                fitZoom = popup.FitZoom,
+                page = JsonSerializer.Deserialize<string>(page),
+                screen = new[] { Screen.PrimaryScreen!.Bounds.Width, Screen.PrimaryScreen.Bounds.Height },
                 tray = t is { } r ? new[] { r.X, r.Y, r.Width, r.Height } : null,
                 trayVisible = tray.Visible,
                 hotKey = hotKey.Registered,

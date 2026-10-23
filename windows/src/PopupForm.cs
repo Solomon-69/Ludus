@@ -40,6 +40,7 @@ internal sealed class PopupForm : Form
     private bool quitting;
     private long lastHiddenAt;
     private string? bootScriptId;
+    private double fitZoom = 1.0;   // below 1 only when the screen is too small for the whole panel
 
     /// <summary>Raised when "Open at login" changes from inside the page.</summary>
     public event Action? LoginChanged;
@@ -51,6 +52,7 @@ internal sealed class PopupForm : Form
     public event Action? PageReady;
 
     public bool IsReady => ready;
+    public double FitZoom => fitZoom;
 
     /// <summary>Keeps the panel open when it loses focus (automated test only).</summary>
     public bool StayOpen { get; set; }
@@ -78,6 +80,12 @@ internal sealed class PopupForm : Form
         web = new WebView2 { Dock = DockStyle.Fill };
         Controls.Add(web);
         ApplyThemeColors();
+
+        // Resolution or display scale changed (docking a laptop, plugging a monitor, Settings > Display): lay out again.
+        Microsoft.Win32.SystemEvents.DisplaySettingsChanged += (_, _) =>
+        {
+            if (IsHandleCreated && Visible) BeginInvoke((MethodInvoker)Relayout);
+        };
 
         theme.SystemDarkChanged += dark =>
         {
@@ -160,6 +168,7 @@ internal sealed class PopupForm : Form
             {
                 ready = e.IsSuccess;
                 if (!e.IsSuccess) { Store.Log($"Page failed to load: {e.WebErrorStatus}"); return; }
+                ApplyZoom();
                 if (Visible) RunScript("window.ludusOpened && ludusOpened()");
                 PageReady?.Invoke();
             };
@@ -247,11 +256,11 @@ internal sealed class PopupForm : Form
                 case "size":
                     size = StringProp(msg, "size") == "large" ? "large" : "compact";
                     Store.SaveSize(size);
-                    if (Visible) Bounds = PopupBounds();   // one layout at the new size, no animated reflow
+                    if (Visible) Relayout();   // one layout at the new size, no animated reflow
                     break;
                 case "wide":
                     wide = msg.TryGetProperty("on", out var wideProp) && wideProp.ValueKind == JsonValueKind.True;
-                    if (Visible) Bounds = PopupBounds();
+                    if (Visible) Relayout();
                     RunScript("window.ludusResized && ludusResized()");   // the page waits for this before starting the game
                     break;
                 case "theme":
@@ -340,7 +349,7 @@ internal sealed class PopupForm : Form
 
         theme.Refresh();   // in case a theme change event was missed while hidden
         wide = false;   // Ludus always opens on All games, so never at a wide game's landscape size
-        Bounds = PopupBounds();
+        Relayout();
         if (!Visible) Show();
         Activate();
         Native.SetForegroundWindow(Handle);
@@ -385,7 +394,21 @@ internal sealed class PopupForm : Form
         // We size the panel ourselves per monitor; stop WinForms from rescaling it a second time.
         e.Cancel = true;
         base.OnDpiChanged(e);
-        if (Visible) BeginInvoke((MethodInvoker)(() => { Bounds = PopupBounds(); }));
+        if (Visible) BeginInvoke((MethodInvoker)Relayout);
+    }
+
+    /// <summary>Puts the panel at its right size and place for the monitor it is on, and zooms the page to match.</summary>
+    private void Relayout()
+    {
+        Bounds = PopupBounds();
+        ApplyZoom();
+    }
+
+    private void ApplyZoom()
+    {
+        if (web.CoreWebView2 == null) return;
+        try { if (Math.Abs(web.ZoomFactor - fitZoom) > 0.001) web.ZoomFactor = fitZoom; }
+        catch (Exception ex) { Store.Log($"Zoom failed: {ex.Message}"); }
     }
 
     /// <summary>Panel rectangle in physical pixels: DIP size times the monitor scale, docked to the taskbar side.</summary>
@@ -396,8 +419,14 @@ internal sealed class PopupForm : Form
         var scale = Native.ScaleAt(anchor);
         var dip = wide ? (size == "large" ? WideLargeDip : WideCompactDip) : (size == "large" ? LargeDip : CompactDip);
         var gap = (int)Math.Round(GapDip * scale);
-        var w = Math.Min((int)Math.Round(dip.Width * scale), work.Width - gap * 2);
-        var h = Math.Min((int)Math.Round(dip.Height * scale), work.Height - gap * 2);
+        // The page is laid out for the full DIP size. On a screen too small for it (a laptop at 125% or 150%),
+        // shrink the whole panel and zoom the page by the same amount, so nothing is ever squashed or cut off.
+        var wantW = dip.Width * scale;
+        var wantH = dip.Height * scale;
+        var fit = Math.Min(1.0, Math.Min((work.Width - gap * 2) / wantW, (work.Height - gap * 2) / wantH));
+        fitZoom = Math.Max(0.4, fit);
+        var w = Math.Max(1, (int)Math.Round(wantW * fitZoom));
+        var h = Math.Max(1, (int)Math.Round(wantH * fitZoom));
 
         var edge = TaskbarEdge(screen);
         // An auto-hidden taskbar does not shrink the working area; leave room for it to slide in.

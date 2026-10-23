@@ -62,4 +62,32 @@ Save-TrayCorner (Join-Path $Shots '08-ludus-tray-invisible.png')
 Check (Quit-App $Exe 'Ludus') 'invisible run: clean quit'
 Remove-Item $prefs -ErrorAction SilentlyContinue
 Set-Theme $false
+
+# ---- Runs 4+: the panel at other display scales (the friend's squashed panel). Same checks at each scale:
+# the page must be laid out at its designed size (400 x 600 DIP) whatever the scale, and fit on screen. ----
+. "$PSScriptRoot/dpi.ps1"
+Write-Host "Display scale range (min,current,max %): $(Dpi-Info)"
+$scales = @(125, 150, 175, 200, 100)
+$i = 0
+foreach ($sc in $scales) {
+  $i++
+  $res = Dpi-Set $sc
+  if ($res -ne 'ok') { Write-Host "scale $sc% not available on this machine ($res), skipped"; continue }
+  $jsonS = Join-Path $Shots "ludus-selftest-dpi$sc.json"
+  $pS = Start-App $Exe @('--test-open', "--selftest=$jsonS")
+  Check (Wait-File $jsonS 120) "scale ${sc}%: self-test file written"
+  $rs = Get-Content $jsonS -Raw | ConvertFrom-Json
+  $pg = $rs.page | ConvertFrom-Json
+  Write-Host "scale ${sc}%: monitorScale=$($rs.monitorScale) fitZoom=$($rs.fitZoom) panel=$($rs.panelBounds -join 'x') page=$($rs.page) screen=$($rs.screen -join 'x')"
+  Check ([math]::Abs($rs.monitorScale - $sc / 100.0) -lt 0.01) "scale ${sc}%: Windows reports that scale to the app"
+  Check (($rs.panelBounds[0] -ge 0) -and ($rs.panelBounds[1] -ge 0) -and (($rs.panelBounds[0] + $rs.panelBounds[2]) -le $rs.screen[0]) -and (($rs.panelBounds[1] + $rs.panelBounds[3]) -le $rs.screen[1])) "scale ${sc}%: panel fully on screen"
+  Check (([math]::Abs($pg.w - 400) -le 1) -and ([math]::Abs($pg.h - 600) -le 1)) "scale ${sc}%: page laid out at its designed 400x600 (got $($pg.w)x$($pg.h)), not squashed"
+  Check ($pg.sw -le $pg.w + 1) "scale ${sc}%: no sideways overflow"
+  Start-Sleep -Seconds 1
+  Save-Screen (Join-Path $Shots ("11-dpi-$sc-desktop.png"))
+  $b = $rs.panelBounds
+  Save-Crop (Join-Path $Shots ("11-dpi-$sc-panel.png")) $b[0] $b[1] $b[2] $b[3]
+  Check (Quit-App $Exe 'Ludus') "scale ${sc}%: clean quit"
+}
+[void](Dpi-Set 100)
 Finish
