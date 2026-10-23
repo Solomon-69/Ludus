@@ -10,6 +10,11 @@ All notable changes to Ludus. Versions follow the app's version number (`Info.pl
 - **Online page:** the 3-4 Player games moved into Online; filter chips All, Arcade, Puzzle, Duel, 2 Player and Online.
 - **Polish:** new covers for Hole.io, Paper.io, Sokoban and Slither, a redrawn Rock Paper Scissors fist with a spring rebound, and fixes for toasts overlapping the result bar.
 - **Windows:** better handling of display scaling and zoom.
+- **Geo Guess (new game):** a street-level photo from somewhere on Earth; look around, move along the road, pin the place on the map. Solo or online for 2 to 4 players with the same places for everyone.
+- **Online lobby:** two tabs, Single game and Tournament, with cover cards for picking games. Rejoin brings back the same room code.
+- **Rock Paper Scissors** plays against the bot on its own; play a friend through Online (picks stay secret).
+- **Hole.io:** buildings no longer twitch or shift while you move. **Snake:** a little slower, with a bump and spark burst on a crash.
+- **The panel always opens on All games, scrolled to the top.**
 
 ## 1.6.0 (2026-10-23)
 
