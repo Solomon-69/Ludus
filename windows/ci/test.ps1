@@ -46,6 +46,20 @@ Save-Crop (Join-Path $Shots '05-ludus-wide-game-dark.png') $b[0] $b[1] $b[2] $b[
 Save-TrayCorner (Join-Path $Shots '06-ludus-tray-dark.png')
 Check (Quit-App $Exe 'Ludus') 'wide run: clean quit'
 
+# ---- Run 2b: Geo Guess opens (its photo and map need the internet; the screenshot shows what loaded) ----
+Set-Theme $false
+$json2b = Join-Path $Shots 'ludus-selftest-geo.json'
+$p2b = Start-App $Exe @('--test-open', '--test-game=geoguess', "--selftest=$json2b")
+[void](Promote-TrayIcon 'Ludus.exe' 10)
+Check (Wait-File $json2b 120) 'geo run: self-test file written'
+$r2b = Get-Content $json2b -Raw | ConvertFrom-Json
+Check $r2b.ready 'geo run: WebView2 loaded the games page'
+Check ($r2b.panelBounds[2] -gt $r2b.panelBounds[3]) 'geo run: Geo Guess opens the panel landscape'
+Start-Sleep -Seconds 14
+$b2 = $r2b.panelBounds
+Save-Crop (Join-Path $Shots '05b-ludus-geoguess.png') $b2[0] $b2[1] $b2[2] $b2[3]
+Check (Quit-App $Exe 'Ludus') 'geo run: clean quit'
+
 # ---- Run 3: invisible icon, opened with Ctrl+Alt+G ----
 @{ size = 'compact'; invisible = $true } | ConvertTo-Json | Set-Content $prefs
 $json3 = Join-Path $Shots 'ludus-selftest-invisible.json'
