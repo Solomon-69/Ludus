@@ -127,10 +127,10 @@
     const go = () => { const c = L.net.extractCode(code.value) || L.net.cleanCode(code.value); if (!L.net.validCode(c)) { msg.textContent = 'Room codes are 5 letters or digits.'; code.focus(); return; } msg.textContent = 'Joining room ' + c + '...'; L.sfx('click'); joinFromInvite(c, true); };
     code.addEventListener('input', () => { const v = code.value, m = L.net.extractCode(v); code.value = m || L.net.cleanCode(v); msg.textContent = !m && v.replace(/\s/g, '').length > 6 ? 'No room code found in that text.' : ''; });
     code.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); go(); } });
-    page.appendChild(code); page.appendChild(msg);
-    const jb = el('button', 'btn', 'Join room'); jb.type = 'button'; jb.id = 'opJoin'; jb.onclick = go;
-    page.appendChild(jb);
-    page.appendChild(el('p', 'lobby-note', 'Paste the 5 character code, the invite message or a ludus:// link. Needs the internet; anyone with the code can join.'));
+    const jb = el('button', 'btn primary', 'Join'); jb.type = 'button'; jb.id = 'opJoin'; jb.onclick = go;
+    const jr = el('div', 'join-row'); jr.appendChild(code); jr.appendChild(jb);   // the code and the Join button side by side
+    page.appendChild(jr); page.appendChild(msg);
+    page.appendChild(el('p', 'lobby-note', 'Code, invite message or ludus:// link. Needs the internet.'));
     grid.appendChild(page);
   }
   function fmt(n) { return n >= 10000 ? (n / 1000).toFixed(n >= 100000 ? 0 : 1) + 'k' : String(n); }

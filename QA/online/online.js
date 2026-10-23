@@ -14,10 +14,11 @@ const S = {
     check('guest has no pickers', (await B.$$('#lobbyCard .pick-chips')).length === 0);
     await A.click('#lobbyCard button.primary');
     const order = ['Pong', 'Air Hockey'], plan = [[0, 0, 1], [0, 1, 0]];
-    let a = 0, b = 0;
+    let a = 0, b = 0, gwA = 0, gwB = 0;
     for (let g = 0; g < 2; g++) for (let r = 0; r < 3; r++) {
-      await playRound([A, B], plan[g][r]); if (plan[g][r] === 0) a++; else b++;
-      await Promise.all([waitCard(A, 'Wins so far'), waitCard(B, 'Wins so far')]);
+      await playRound([A, B], plan[g][r]); gwA += plan[g][r] === 0 ? 1 : 0; gwB += plan[g][r] === 1 ? 1 : 0;
+      if (r === 2) { if (gwA > gwB) a++; else if (gwB > gwA) b++; else { a++; b++; } gwA = gwB = 0; }   // one point per game won
+      await Promise.all([waitCard(A, 'Wins so far|Points'), waitCard(B, 'Wins so far|Points')]);
       const last = g === 1 && r === 2, ng = r === 2 ? order[g + 1] : order[g], nr = r === 2 ? 1 : r + 2;
       const [ta, tb] = [await title(A), await title(B)];
       if (!last) check(`board g${g + 1}r${r + 1}: "Round ${nr} of 3 · Next: ${ng}" on both`, ta === tb && ta === `Round ${nr} of 3 · Next: ${ng}`, [ta, tb]);
@@ -28,7 +29,7 @@ const S = {
       if (!last) { await waitPlaying(A); await waitPlaying(B); const nm = await A.$eval('#gameName', e => e.textContent); check(`game screen shows ${ng}`, nm.includes(ng), nm); }
     }
     await Promise.all([waitCard(A, 'wins'), waitCard(B, 'wins')]);
-    check('final: Ann wins 4-2 on both', (await title(A)) === 'Ann wins' && (await title(B)) === 'Ann wins' && hasScore(await rows(B), 'Ann', 4) && hasScore(await rows(B), 'Bo', 2), [await title(A), await rows(B)]);
+    check('final: Ann wins 2-0 on both (1 point per game won)', (await title(A)) === 'Ann wins' && (await title(B)) === 'Ann wins' && hasScore(await rows(B), 'Ann', 2) && hasScore(await rows(B), 'Bo', 0), [await title(A), await rows(B)]);
     check('final: host has Rematch + Back to lobby, guest waits', /Rematch/.test(await lobbyText(A)) && /Back to lobby/.test(await lobbyText(A)) && !/Rematch/.test(await lobbyText(B)) && /Waiting for the host/.test(await lobbyText(B)));
     await shot(A, 'final');
     await A.click('#lobbyCard button:text-is("Rematch")'); await Promise.all([waitPlaying(A), waitPlaying(B)]);
@@ -43,13 +44,13 @@ const S = {
     await pick(A, ['Tag', 'Paper.io'], 1); await wait(500);
     await A.click('#lobbyCard button.primary');
     await playRound([A, B, C], 2);
-    await Promise.all([A, B, C].map(p => waitCard(p, 'Wins so far')));
+    await Promise.all([A, B, C].map(p => waitCard(p, 'Wins so far|Points')));
     check('3-player board: Cy has 1 win everywhere', (await Promise.all([A, B, C].map(rows))).every(r => hasScore(r, 'Cy', 1)));
     await C.evaluate(() => document.getElementById('leaveBtn').click()); await wait(2500);
     await A.click('#lobbyCard button.primary'); await Promise.all([waitPlaying(A), waitPlaying(B)]);
     const nm = await A.$eval('#gameName', e => e.textContent);
     check('after Cy left the tournament goes on with 2 (Paper.io)', /Paper/.test(nm), nm);
-    await playRound([A, B], 0); await Promise.all([waitCard(A, 'Wins so far|wins'), waitCard(B, 'Wins so far|wins')]);
+    await playRound([A, B], 0); await Promise.all([waitCard(A, 'Wins so far|Points|wins'), waitCard(B, 'Wins so far|Points|wins')]);
     await A.click('#lobbyCard button.primary'); await Promise.all([waitCard(A, 'wins|tie'), waitCard(B, 'wins|tie')]);
     const fr = await rows(A);
     check('final standings keep the player who left', hasScore(fr, 'Cy', 1) && hasScore(fr, 'Ann', 1), [await title(A), fr]);
@@ -61,11 +62,11 @@ const S = {
     const [A, B] = [await newPage(browser, br, { name: 'Ann' }), await newPage(browser, br, { name: 'Bo' })];
     const c = await flexCreate(A); await flexJoin(B, c);
     await pick(A, ['Pong', 'Air Hockey'], 3); await A.click('#lobbyCard button.primary');
-    await playRound([A, B], 1); await Promise.all([waitCard(A, 'Wins so far'), waitCard(B, 'Wins so far')]);
+    await playRound([A, B], 1); await Promise.all([waitCard(A, 'Wins so far|Points'), waitCard(B, 'Wins so far|Points')]);
     await A.click('#lobbyCard button.primary'); await Promise.all([waitPlaying(A), waitPlaying(B)]);
     await B.evaluate(() => document.getElementById('leaveBtn').click());
     await waitCard(A, 'A player left', 14000);
-    check('too few players: standings so far with a reason', (await title(A)) === 'Bo wins' && hasScore(await rows(A), 'Bo', 1), [await title(A), await lobbyText(A)]);
+    check('too few players: standings so far with a reason', (await title(A)) === 'No winner this time' && hasScore(await rows(A), 'Bo', 0) && hasScore(await rows(A), 'Ann', 0), [await title(A), await lobbyText(A)]);   // the first game was not finished, so nobody has a game point
     await shot(A, 'left');
     check('no page errors (host)', A.errors.length === 0, A.errors);
     br.close();
@@ -129,7 +130,7 @@ const S = {
       const w = await A.$eval('#lobbyCard', e => e.getBoundingClientRect().width);
       check(tag + ' card uses the panel width', w >= size.width - 40, w);
       await A.click('#lobbyCard .mode-tab:has-text("Tournament")'); await wait(200);
-      check(tag + ' tournament note', /Several games, one total score/.test(await lobbyText(A)));
+      check(tag + ' tournament note', /Several games, 1 point per game won/.test(await lobbyText(A)));
       await A.locator('#lobbyCard .game-grid .chip').nth(1).click(); await wait(200);
       const on = await A.$$eval('#lobbyCard .game-grid .chip.is-on', e => e.length);
       check(tag + ' tournament allows 2+ games', on >= 2, on);
@@ -305,7 +306,7 @@ S.layout = async browser => {
     await A.click('#lobbyCard button.primary'); await Promise.all([waitPlaying(A), waitPlaying(B)]); await wait(400);
     check(tag + ' in game (header with Leave): no overlap', (await overlap(A)).length === 0 && (await overlap(B)).length === 0, [await overlap(A), await overlap(B)]);
     await shot(B, 'game_guest_' + tag);
-    await playRound([A, B], 0); await Promise.all([waitCard(A, 'Wins so far'), waitCard(B, 'Wins so far')]);
+    await playRound([A, B], 0); await Promise.all([waitCard(A, 'Wins so far|Points'), waitCard(B, 'Wins so far|Points')]);
     await shot(A, 'board_host_' + tag); await shot(B, 'board_guest_' + tag);
     check(tag + ' scoreboard: no overlap', (await overlap(A)).length === 0 && (await overlap(B)).length === 0, [await overlap(A), await overlap(B)]);
     check(tag + ': no page errors', errs([A, B]) === 0, [A.errors, B.errors]);

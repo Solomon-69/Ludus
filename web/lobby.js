@@ -51,8 +51,9 @@
       if (p) dot.style.background = SEAT_COLORS[i % SEAT_COLORS.length];
       s.appendChild(dot);
       const label = p ? p.name + (i === mine ? ' (you)' : '') : 'Waiting';
-      s.appendChild(el('div', 'seat-name', label));
-      if (p && i === 0) s.appendChild(el('div', 'seat-tag', 'Host'));
+      const tx = el('div', 'seat-text'); tx.appendChild(el('div', 'seat-name', label));
+      if (p && i === 0) tx.appendChild(el('div', 'seat-badge', 'Host'));   // under the name, so the name always has the whole width
+      s.appendChild(tx);
       row.appendChild(s);
     }
     return row;
@@ -127,7 +128,7 @@
     });
     box.appendChild(tabs);
     const rn = plan.n === 0 ? 3 : plan.n;
-    box.appendChild(el('div', 'mode-note', mode === 'single' ? (rn === 1 ? 'One game, one round' : 'One game, best of ' + rn) : 'Several games, one total score'));
+    box.appendChild(el('div', 'mode-note', mode === 'single' ? (rn === 1 ? 'One game, one round' : 'One game, best of ' + rn) : 'Several games, 1 point per game won'));
     box.appendChild(el('div', 'field-label', mode === 'single' ? 'Pick a game' : 'Pick 2 or more games'));
     const chips = el('div', 'pick-chips game-grid');
     L.games.filter(g => g.online && g.online.max >= n && g.online.min <= session.max).forEach(g => {
@@ -253,7 +254,7 @@
       if (screen === 'board') {
         const nx = nextRound(ser);
         title(nx ? 'Round ' + (nx.ri + 1) + ' of ' + ser.n + ' \u00b7 Next: ' + gname(ser.gs[nx.gi]) : 'Last round done');
-        card.appendChild(el('p', 'lobby-sub', 'Wins so far'));
+        card.appendChild(el('p', 'lobby-sub', ser.gs.length > 1 ? 'Points: 1 for each game won' : 'Wins so far'));
         card.appendChild(standings(ser, false));
         card.appendChild(el('div', 'lobby-live', host ? 'Next round starts in a moment.' : 'Waiting for the host to start the next round.'));
         if (host) card.appendChild(btn(nx ? 'Start now' : 'Show results', 'primary', () => session.advance()));

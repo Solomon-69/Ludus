@@ -589,7 +589,17 @@
     const ser = this.ser;
     if (!ser || ser.st !== 'play') return;
     clearTimeout(ser.t1);
-    ser.sc.forEach(e => { if (ser.rep[e[0]] === 1) e[2]++; });
+    if (ser.gs.length === 1) ser.sc.forEach(e => { if (ser.rep[e[0]] === 1) e[2]++; });   // one game: the score is rounds won
+    else {
+      // several games: one point per GAME won. Rounds are tallied inside the game; whoever won most of them gets the point (a tie shares it)
+      ser.gw = ser.gw || {};
+      ser.sc.forEach(e => { if (ser.rep[e[0]] === 1) ser.gw[e[0]] = (ser.gw[e[0]] || 0) + 1; });
+      if (ser.ri >= ser.n - 1) {
+        const top = Math.max.apply(null, ser.sc.map(e => ser.gw[e[0]] || 0));
+        if (top > 0) ser.sc.forEach(e => { if ((ser.gw[e[0]] || 0) === top) e[2]++; });
+        ser.gw = {};
+      }
+    }
     ser.st = 'board';
     this._announce('board');
     ser.t2 = setTimeout(() => this.advance(), SERIES_PAUSE);
