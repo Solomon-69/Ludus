@@ -90,15 +90,16 @@
     hint: '<kbd>←</kbd><kbd>→</kbd> or <kbd>A</kbd><kbd>D</kbd> move · <kbd>Space</kbd> fire',
     art(ctx, w, h) {
       const s = Math.max(1, Math.floor(Math.min(w, h) / 46));
-      ctx.save(); ctx.imageSmoothingEnabled = false;
-      const kinds = ['squid', 'crab', 'octo'];
-      for (let r = 0; r < 3; r++) for (let c = 0; c < 4; c++) {
-        const k = kinds[r], img = spr(k, c % 2, 'rgba(255,255,255,0.9)');
-        ctx.drawImage(img, Math.round(w / 2 + (c - 2) * 15 * s + (14 - WIDTH[k]) * s / 2), Math.round(h * 0.16 + r * 11 * s), img.width * s, img.height * s);
+      ctx.save(); ctx.fillStyle = 'rgba(255,255,255,0.92)';
+      for (let r = 0; r < 2; r++) for (let c = 0; c < 5; c++) {
+        const x = w / 2 + (c - 2) * 12 * s + (r ? 6 * s : 0), y = h * 0.2 + r * 12 * s;
+        ctx.beginPath(); ctx.arc(x, y, 4.6 * s, 0, 7); ctx.fill();
+        ctx.fillStyle = '#5b6ee1'; ctx.beginPath(); ctx.arc(x, y, 1.7 * s, 0, 7); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,0.92)';
       }
-      ctx.fillStyle = 'rgba(255,255,255,0.9)'; ctx.fillRect(Math.round(w / 2), Math.round(h * 0.62), s, 4 * s);
-      const cn = spr('cannon', 0, '#fffaf2');
-      ctx.drawImage(cn, Math.round(w / 2 - 6.5 * s), Math.round(h * 0.8), 13 * s, 8 * s);
+      ctx.fillRect(Math.round(w / 2 - s * 0.5), Math.round(h * 0.52), s, 12 * s);
+      const sx = w / 2, sy = h * 0.8;
+      ctx.fillStyle = '#fffaf2'; ctx.beginPath(); ctx.moveTo(sx, sy - 6 * s); ctx.quadraticCurveTo(sx + 5 * s, sy + 1 * s, sx + 7 * s, sy + 6 * s);
+      ctx.lineTo(sx - 7 * s, sy + 6 * s); ctx.quadraticCurveTo(sx - 5 * s, sy + 1 * s, sx, sy - 6 * s); ctx.fill();
       ctx.restore();
       D.spark(ctx, w * 0.84, h * 0.84, 4 * s, '#fffaf2', 0);
     },
