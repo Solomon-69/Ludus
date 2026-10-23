@@ -40,8 +40,8 @@
     },
     create(stage, api) {
       // Seconds per cell. Easy is gentle, speed creeps up a little with every bite.
-      const STEP = [0.18, 0.12, 0.088][api.level];
-      const MIN_STEP = [0.12, 0.078, 0.055][api.level];
+      const STEP = [0.18, 0.12, 0.088].map(v => v * 1.18)[api.level];   // 18% slower than before at every level, same speed-up curve
+      const MIN_STEP = [0.12, 0.078, 0.055].map(v => v * 1.18)[api.level];
       // The grid is fixed for the whole run from the starting size; only the drawing scales on resize.
       const view = api.canvas();
       const { ctx, canvas } = view;
@@ -208,6 +208,14 @@
         const pts = [cellPos(snake[0], p)];
         for (let i = 1; i < snake.length; i++) pts.push(center(snake[i].x, snake[i].y));
         pts.push(cellPos(snake[snake.length - 1], p));
+        // the crash: the head bumps into the wall or body and recoils back into the snake with a spring, squashing for a moment
+        let bumpK = -1, bdx = 0, bdy = 0;
+        if (crash && !(dead && !food)) {
+          bumpK = (now - deadAt) / 250;
+          const a0 = center(snake[0].x, snake[0].y), b0 = center(crash.x, crash.y);
+          bdx = Math.sign(b0.x - a0.x); bdy = Math.sign(b0.y - a0.y);
+          if (!api.reduceMotion) { const k = Math.min(1, bumpK), off = cell * 0.16 * (1 - Math.exp(-9 * k) * Math.cos(14 * k)); pts[0] = { x: pts[0].x - bdx * off, y: pts[0].y - bdy * off }; }
+        }
         const body = dead && !food ? col.good : dead ? col.bad : col.accent;
         const stroke = (style, width, dx, dy) => {
           ctx.strokeStyle = style; ctx.lineWidth = width; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
@@ -222,7 +230,9 @@
         let hs = 1;
         const pop = (now - headPop) / 220;
         if (headPop && pop < 1 && !api.reduceMotion) hs = 1 + Math.sin(pop * Math.PI) * 0.22;
-        ctx.fillStyle = body; ctx.beginPath(); ctx.arc(hd.x, hd.y, cell * 0.44 * hs, 0, Math.PI * 2); ctx.fill();
+        const sq = bumpK >= 0 && !api.reduceMotion ? Math.exp(-6 * Math.min(1, bumpK)) : 0;
+        ctx.save(); ctx.translate(hd.x, hd.y); if (sq) ctx.rotate(Math.atan2(bdy, bdx)); if (sq) ctx.scale(1 - 0.24 * sq, 1 + 0.14 * sq);
+        ctx.fillStyle = body; ctx.beginPath(); ctx.arc(0, 0, cell * 0.44 * hs, 0, Math.PI * 2); ctx.fill(); ctx.restore();
         D.spark(ctx, hd.x, hd.y, cell * 0.34 * hs, '#fff8f2', api.reduceMotion ? 0 : t * 1.4);
 
         // particles
@@ -233,15 +243,15 @@
         });
         ctx.globalAlpha = 1;
 
-        // the crash: a red ring on the spot the head ran into
-        if (crash && !(dead && !food)) {
-          const k = api.reduceMotion ? 1 : Math.min(1, (now - deadAt) / 260);
-          const a = center(snake[0].x, snake[0].y), b = center(crash.x, crash.y);
-          const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
-          ctx.strokeStyle = col.bad; ctx.lineWidth = Math.max(2, cell * 0.12);
-          ctx.beginPath(); ctx.arc(mx, my, cell * (0.2 + 0.22 * D.ease.outBack(k)), 0, Math.PI * 2); ctx.stroke();
-          ctx.lineCap = 'round'; const q = cell * 0.2;
-          ctx.beginPath(); ctx.moveTo(mx - q, my - q); ctx.lineTo(mx + q, my + q); ctx.moveTo(mx + q, my - q); ctx.lineTo(mx - q, my + q); ctx.stroke();
+        // impact burst: short spark lines flying out from the spot of the hit (just this, held still, with reduced motion)
+        if (bumpK >= 0) {
+          const k = api.reduceMotion ? 0.4 : Math.min(1, bumpK * 1.1);
+          const a = center(snake[0].x, snake[0].y), b = center(crash.x, crash.y), mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+          ctx.strokeStyle = col.bad; ctx.lineCap = 'round'; ctx.lineWidth = Math.max(1.6, cell * 0.09); ctx.globalAlpha = api.reduceMotion ? 0.9 : 1 - k * k;
+          const r1 = cell * (0.12 + 0.34 * D.ease.outBack(Math.min(1, k * 1.3))), len = cell * 0.26 * (1 - k * 0.5);
+          ctx.beginPath();
+          for (let i = 0; i < 9; i++) { const an = (i / 9) * Math.PI * 2 + 0.3; ctx.moveTo(mx + Math.cos(an) * r1, my + Math.sin(an) * r1); ctx.lineTo(mx + Math.cos(an) * (r1 + len), my + Math.sin(an) * (r1 + len)); }
+          ctx.stroke(); ctx.globalAlpha = 1;
         }
         ctx.restore();
 
@@ -286,7 +296,7 @@
         }
         particles.forEach(q => { q.x += q.vx * dt; q.y += q.vy * dt; q.vx *= 0.9; q.vy *= 0.9; q.life -= dt * 2.2; });
         particles = particles.filter(q => q.life > 0);
-        if (shake > 0) shake = Math.max(0, shake - dt * 3);
+        if (shake > 0) shake = Math.max(0, shake - dt * 4);   // ~250 ms
         render(t, performance.now());
       });
       return {

@@ -110,32 +110,34 @@
       cap(-0.2, 0.4, 0.4, 0.16, 0.26);
       ctx.strokeStyle = GLOSS; ctx.lineWidth = 0.035; ctx.beginPath(); ctx.moveTo(-0.05, 0.34); ctx.lineTo(0.3, 0.2); ctx.stroke();
     } else if (kind === 'paper') {
-      sleeve();
-      ctx.beginPath(); ctx.moveTo(-0.6, -0.3); ctx.bezierCurveTo(-0.45, -0.52, -0.1, -0.5, 0.02, -0.42);
-      ctx.lineTo(0.02, 0.44); ctx.bezierCurveTo(-0.1, 0.52, -0.45, 0.5, -0.6, 0.34); ctx.closePath(); ctx.fill();
-      [[-0.33, 0.7], [-0.11, 0.78], [0.11, 0.72], [0.33, 0.56]].forEach(([yy, ex]) => cap(0.0, yy, ex, yy, 0.2));
-      cap(-0.28, -0.38, 0.12, -0.7, 0.22);
-      ctx.strokeStyle = LINE; ctx.lineWidth = lw; ctx.beginPath(); ctx.moveTo(-0.3, -0.04); ctx.quadraticCurveTo(-0.15, 0.06, 0.0, 0.0); ctx.stroke();
+      ctx.restore(); ctx.save(); ctx.translate(x, y); if (flip) ctx.scale(-1, 1);   // original paper drawing
+      ctx.fillStyle = col; ctx.strokeStyle = col; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      Ludus.draw.roundRect(ctx, -r * 0.5, -r * 0.62, r * 1.0, r * 1.24, r * 0.14); ctx.fill();
+      ctx.strokeStyle = ink; ctx.globalAlpha = 0.25; ctx.lineWidth = r * 0.07;
+      for (let i = 0; i < 4; i++) { const yy = -r * 0.32 + i * r * 0.22; ctx.beginPath(); ctx.moveTo(-r * 0.3, yy); ctx.lineTo(r * 0.3, yy); ctx.stroke(); }
+      ctx.globalAlpha = 1;
     } else {
-      sleeve(); back();
-      // ring and pinky curled, thumb across them, index and middle out in a V
-      cap(0.0, 0.2, 0.42, 0.2, 0.2); cap(0.0, 0.4, 0.36, 0.4, 0.2);
-      cap(0.15, -0.02, 0.78, -0.5, 0.2);
-      cap(0.15, -0.2, 0.8, 0.0, 0.2);
-      cap(-0.2, 0.46, 0.28, 0.28, 0.22);
+      ctx.restore(); ctx.save(); ctx.translate(x, y); if (flip) ctx.scale(-1, 1);   // original scissors drawing
+      ctx.fillStyle = col; ctx.strokeStyle = col; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      ctx.lineWidth = r * 0.16;
+      ctx.beginPath(); ctx.moveTo(-r * 0.2, r * 0.18); ctx.lineTo(r * 0.62, -r * 0.5); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-r * 0.2, -r * 0.18); ctx.lineTo(r * 0.62, r * 0.5); ctx.stroke();
+      ctx.lineWidth = r * 0.13;
+      ctx.beginPath(); ctx.arc(-r * 0.42, -r * 0.3, r * 0.22, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(-r * 0.42, r * 0.3, r * 0.22, 0, Math.PI * 2); ctx.stroke();
     }
     ctx.restore();
   }
 
   Ludus.register({
-    id: 'decider', name: 'Rock Paper Scissors', aka: 'The Decider', tag: 'Duel', tint: PINK, versus: true, online: { min: 2, max: 2 },
+    id: 'decider', name: 'Rock Paper Scissors', aka: 'The Decider', tag: 'Duel', tint: PINK, online: { min: 2, max: 2 },
     onlineHint: 'Pick with <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd>, <kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> or a click. Picks are secret until both players have locked in. First to 3',
-    hint: 'Pick with <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd>, <kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> or a click. Rock beats scissors, scissors beat paper, paper beats rock. First to 3. vs Friend: secret picks, Player 1 <kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>, Player 2 <kbd>J</kbd><kbd>K</kbd><kbd>L</kbd>',
+    hint: 'Pick with <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd>, <kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> or a click. Rock beats scissors, scissors beat paper, paper beats rock. First to 3. To play a friend, use Online.',
     _rules: { makeBrain, outcome, BEATS, COUNTER }, _hand: drawHand,
     art(ctx, w, h) {
-      const r = Math.min(w, h) * 0.36;
+      const r = Math.min(w, h) * 0.34;
       drawHand(ctx, 'rock', w * 0.3, h * 0.52, r, 'rgba(255,255,255,0.95)', '#7a1d43', false);
-      drawHand(ctx, 'paper', w * 0.7, h * 0.52, r, 'rgba(255,255,255,0.75)', '#7a1d43', true);
+      drawHand(ctx, 'scissors', w * 0.7, h * 0.52, r, 'rgba(255,255,255,0.75)', '#7a1d43', true);
       Ludus.draw.text(ctx, 'VS', w / 2, h * 0.52, r * 0.42, 'rgba(255,255,255,0.85)', 800);
     },
     create(stage, api) {

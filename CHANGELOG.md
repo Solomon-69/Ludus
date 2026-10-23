@@ -3,6 +3,14 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.7.0 (2026-10-23)
+
+- **Online tournaments and parties:** pick several games and rounds, play them in a row with a scoreboard, rejoin your party, and a rematch button on the final standings. Still works with friends on 1.6.x (they play one game per room).
+- **Smoother online action games:** guests now predict their own paddle or player and ease out the host's corrections, so Pong, Air Hockey, Tag, Hole.io, Paper.io and Slither feel responsive on slow connections.
+- **Online page:** the 3-4 Player games moved into Online; filter chips All, Arcade, Puzzle, Duel, 2 Player and Online.
+- **Polish:** new covers for Hole.io, Paper.io, Sokoban and Slither, a redrawn Rock Paper Scissors fist with a spring rebound, and fixes for toasts overlapping the result bar.
+- **Windows:** better handling of display scaling and zoom.
+
 ## 1.6.0 (2026-10-23)
 
 - **Play online (opt-in):** create a room, share the 5 character code (or the Copy invite link,

@@ -39,6 +39,7 @@ async function flexCreate(page) { await onlineTab(page); await page.click('#opCr
 async function flexJoin(page, c) { await onlineTab(page); await page.fill('#opCode', c); await page.click('#opJoin'); await page.waitForSelector('.plan', { timeout: 9000 }); }
 const esc = n => new RegExp('^' + n.replace(/[.]/g, '\\.') + '$');
 async function pick(page, names, rounds) {
+  await page.locator('#lobbyCard .mode-tab', { hasText: names.length > 1 ? 'Tournament' : 'Single game' }).click();
   const first = page.locator('#lobbyCard .pick-chips').first();
   for (const n of names) { const c = first.locator('.chip', { hasText: esc(n) }); if ((await c.getAttribute('aria-pressed')) !== 'true') await c.click(); }
   const on = await first.locator('.chip.is-on').evaluateAll(els => els.map(e => e.textContent));

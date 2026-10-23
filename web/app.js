@@ -354,7 +354,7 @@
   function createFlexRoom(party) {   // from the Online page: no game yet, the host picks them in the room
     showOnlineShell();
     online = { game: null, session: null, started: false };
-    const s = L.lobby.openRoom(lobbyOps(null));
+    const s = L.lobby.openRoom(lobbyOps(null), party && party.code);
     if (!s) return;
     trackParty(s, 'host');
     if (party && party.games && party.games.length) s.on('ready', () => { s.setPlan(party.games.filter(id => L.games.some(g => g.id === id && g.online)), party.n); });
@@ -600,8 +600,8 @@
   function toast(text) {
     let t = document.querySelector('.toast');
     if (!t) { t = document.createElement('div'); t.className = 'toast'; $('app').appendChild(t); }
-    t.textContent = text; t.classList.add('show');
-    clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), 1600);
+    t.textContent = text; t.classList.add('show'); $('app').classList.add('toasting');
+    clearTimeout(toast.t); toast.t = setTimeout(() => { t.classList.remove('show'); $('app').classList.remove('toasting'); }, 1600);
   }
   /* Volume: elastic slider (after React Bits' Elastic Slider). A slim bar with no knob that thickens
      while touched, and a rubber-band stretch past either end that springs back. Keyboard: arrows, Home, End. */
@@ -725,6 +725,13 @@
       reset.dataset.armed = '1'; reset.textContent = 'Sure?'; setTimeout(() => { reset.textContent = 'Reset'; delete reset.dataset.armed; }, 2500);
     };
     appRows.push(row('Reset best scores', 'Clears every high score', reset, 'danger'));
+    if (window.__LUDUS_NATIVE__ && window.__LUDUS_PLATFORM__ !== 'windows') {
+      const sh = el('button', 'small-btn', 'Share'); sh.id = 'shareFriend';
+      sh.onclick = () => { const b = sh.getBoundingClientRect(); L.native('share', { x: b.left, y: b.top, w: b.width, h: b.height }); };
+      const shRow = row('Share with a friend', 'Friend: right-click the app and choose Open the first time.', sh);
+      window.ludusShareError = m => { const e = shRow.querySelector('.row-sub'); if (e) e.textContent = m; };
+      appRows.push(shRow);
+    }
     if (window.__LUDUS_NATIVE__) {
       const q = el('button', 'small-btn', 'Quit'); q.onclick = () => L.native('quit');
       appRows.push(row('Quit Ludus', null, q));
@@ -741,20 +748,22 @@
     if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
     // Ludus always opens on All games, wherever it was left. A game left open is saved and waits
     // in the "Continue" card at the top.
-    if (view !== 'home' && !online) { root.classList.add('instant'); goHome(); }   // safety net; normally done on close (a room stays open)
+    if (view !== 'home' && !(online && online.started)) { root.classList.add('instant'); goHome(); }   // an online round that is being played stays; a room being set up does not (its code is remembered for Rejoin)   // safety net; normally done on close (a room stays open)
     if (S.filter !== 'All') { S.filter = 'All'; L.save(); renderFilters(); renderCards(); }
-    replayCards();
+    const top = () => { const g = $('grid'); if (g) g.scrollTop = 0; };
+    top(); replayCards(); top();   // always the very top of All, never wherever it was left
     // Next frame, once the home screen has been laid out without transitions.
-    requestAnimationFrame(() => root.classList.remove('instant'));
+    requestAnimationFrame(() => { top(); root.classList.remove('instant'); requestAnimationFrame(top); });
   };
   // Go back to All games while the panel is closing, with transitions off, so the next open shows
   // the finished home screen straight away instead of the game flashing and sliding out.
   window.ludusClosed = () => {
-    if (view !== 'home' && !online) {
+    if (view !== 'home' && !(online && online.started)) {
       root.classList.add('instant');
       if (view === 'game') goHome(); else { show('home'); renderCards(); }
     }
     if (S.filter !== 'All') { S.filter = 'All'; renderFilters(); renderCards(); }
+    { const g = $('grid'); if (g) g.scrollTop = 0; }
     L.save(true);
   };
   window.ludusOpenGame = id => start(id);

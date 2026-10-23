@@ -83,6 +83,22 @@
     b.onclick = () => { L.sfx('click'); fn(); };
     return b;
   }
+  let modeFor = { s: null, mode: '' };   // the host's Single game / Tournament tab for this room
+  const coverCache = {};
+  // a small cover (the same art as the game card) for the game picker, drawn once per game and look
+  function cover(g) {
+    const c = L.colors(), key = g.id + (c.dark ? 'd' : 'l'), im = el('img', 'gcard-cover'); im.alt = ''; im.draggable = false;
+    if (!coverCache[key]) {
+      try {
+        const w = 120, h = 46, cv = document.createElement('canvas'); cv.width = w * 2; cv.height = h * 2;
+        const ctx = cv.getContext('2d'); ctx.scale(2, 2); ctx.fillStyle = g.tint || '#888'; ctx.fillRect(0, 0, w, h);
+        g.art && g.art(ctx, w, h, c); coverCache[key] = cv.toDataURL('image/png');
+      } catch (e) { coverCache[key] = ''; }
+    }
+    if (coverCache[key]) im.src = coverCache[key];
+    im.style.background = g.tint || 'var(--surface-2)';
+    return im;
+  }
   function planBlock(host) {
     const box = el('div', 'plan');
     const plan = session.plan, playable = session.playable();
@@ -96,21 +112,42 @@
       return box;
     }
     const n = Math.max(2, session.count());
-    box.appendChild(el('div', 'field-label', 'Games'));
-    const chips = el('div', 'pick-chips');
+    const mode = modeFor.s === session && modeFor.mode ? modeFor.mode : (plan.g.length > 1 || plan.n === 0 ? 'tournament' : 'single');
+    const setMode = m => {
+      modeFor = { s: session, mode: m };
+      if (m === 'single') session.setPlan(plan.g.slice(0, 1), plan.n === 0 ? 1 : plan.n);
+      else session.setPlan(plan.g, plan.n === 1 || plan.n === 0 ? 3 : plan.n);
+      render();
+    };
+    const tabs = el('div', 'mode-tabs'); tabs.setAttribute('role', 'tablist');
+    [['single', 'Single game'], ['tournament', 'Tournament']].forEach(([m, t]) => {
+      const tb = el('button', 'mode-tab' + (mode === m ? ' is-on' : ''), t); tb.type = 'button'; tb.setAttribute('role', 'tab'); tb.setAttribute('aria-selected', String(mode === m));
+      tb.onclick = () => { if (mode !== m) { L.sfx('click'); setMode(m); } };
+      tabs.appendChild(tb);
+    });
+    box.appendChild(tabs);
+    const rn = plan.n === 0 ? 3 : plan.n;
+    box.appendChild(el('div', 'mode-note', mode === 'single' ? (rn === 1 ? 'One game, one round' : 'One game, best of ' + rn) : 'Several games, one total score'));
+    box.appendChild(el('div', 'field-label', mode === 'single' ? 'Pick a game' : 'Pick 2 or more games'));
+    const chips = el('div', 'pick-chips game-grid');
     L.games.filter(g => g.online && g.online.max >= n && g.online.min <= session.max).forEach(g => {
       const on = plan.g.includes(g.id);
-      chips.appendChild(chip(gname(g.id), on, () => {
+      const c = chip('', on, () => {
+        if (mode === 'single') { if (!on) session.setPlan([g.id], plan.n === 0 ? 1 : plan.n); return; }
         const next = on ? plan.g.filter(x => x !== g.id) : plan.g.concat(g.id);
         if (next.length) session.setPlan(next, plan.n);
-      }));
+      });
+      c.classList.add('gcard'); c.appendChild(cover(g)); c.appendChild(el('span', 'gcard-name', gname(g.id)));
+      chips.appendChild(c);
     });
     box.appendChild(chips);
-    box.appendChild(el('div', 'field-label', 'Rounds per game'));
+    box.appendChild(el('div', 'field-label', mode === 'single' ? 'Rounds' : 'Rounds per game'));
     const rr = el('div', 'pick-chips');
-    [[1, '1'], [3, '3'], [5, '5'], [0, 'Tournament']].forEach(([v, t]) => rr.appendChild(chip(t, plan.n === v, () => session.setPlan(plan.g, v), v === 0 ? 'Every picked game once, in order' : '')));
+    [[1, '1'], [3, '3'], [5, '5']].forEach(([v, t]) => rr.appendChild(chip(t, rn === v, () => session.setPlan(plan.g, v))));
     box.appendChild(rr);
-    if (plan.g.length && !playable.length) box.appendChild(el('p', 'lobby-note', 'None of the picked games fit ' + session.count() + ' players. Pick another game.'));
+    if (session.count() < 2) box.appendChild(el('p', 'lobby-note', 'Waiting for a friend to join'));
+    else if (mode === 'tournament' && plan.g.length < 2) box.appendChild(el('p', 'lobby-note', 'Pick at least 2 games for a tournament.'));
+    else if (plan.g.length && !playable.length) box.appendChild(el('p', 'lobby-note', 'None of the picked games fit ' + session.count() + ' players. Pick another game.'));
     else if (playable.length < plan.g.length) box.appendChild(el('p', 'lobby-note', 'Some picked games need a different number of players and will be skipped.'));
     return box;
   }
@@ -198,14 +235,14 @@
       row.appendChild(cb); row.appendChild(connChip(session.conn));
       card.appendChild(row);
       const n = session.count(), mx = session.max;
-      live.textContent = host ? (n >= session.min ? 'Ready to start. ' + n + '/' + mx + ' players' : 'Waiting for players ' + n + '/' + mx) : 'Waiting for the host to start. ' + n + '/' + mx + ' players';
+      live.textContent = host ? (n >= session.min ? 'Ready to start. ' + n + '/' + mx + ' players' : n < 2 ? 'Waiting for a friend to join' : 'Waiting for players ' + n + '/' + mx) : 'Waiting for the host to start. ' + n + '/' + mx + ' players';
       card.appendChild(live);
       card.appendChild(avatars(n, mx));
       if (session.flex || session.plan.g.length) card.appendChild(planBlock(host));
       if (host) {
         // a room for more than two: the host may start once enough are in, without waiting for every seat
         const s = btn(mx > 2 && n >= session.min && n < mx ? 'Start now' : 'Start game', 'primary', () => session && session.start());
-        s.disabled = session.flex && !session.legacy ? !session.playable().length : n < session.min;
+        s.disabled = session.flex && !session.legacy ? (!session.playable().length || (session.plan.g.length > 1 || (modeFor.s === session && modeFor.mode === 'tournament')) && session.plan.g.length < 2) : n < session.min;
         card.appendChild(s);
       }
       card.appendChild(btn('Leave', 'ghost', cancel));
@@ -255,17 +292,18 @@
     offs.push(s.on('error', e => { const w = WHY[e.code] || WHY.offline; discard(); if (e.code === 'no-room' || e.code === 'full' || e.code === 'started' || e.code === 'game' || e.code === 'update') { screen = e.code === 'update' ? 'notice' : 'join'; if (e.code === 'update') { error = [w[0], w[1], 'OK']; ops.noticeOk = ops.onCancel; } else error = w[1]; } else { screen = 'choose'; error = ''; ops.toast && ops.toast(w[0]); } render(); }));
     offs.push(s.on('closed', e => { const w = WHY[e.reason] || WHY['host-left']; discard(); screen = 'notice'; error = [w[0], w[1], 'OK']; ops.noticeOk = ops.onCancel; render(); }));
     offs.push(s.on('start', e => {
+      if (s.appHooked) { unhook(); session = null; return; }   // the app already runs this room's rounds
       const keep = session; unhook(); session = null;
       hide();
       ops.onStart(keep, e);
     }));
   }
-  function createRoom() {
+  function createRoom(code) {
     screen = 'creating'; render();
     if (game) hookSession(L.net.createRoom({ gameId: game.id, min: game.online.min, max: game.online.max, name: nameValue() }));
     else {   // from the Online page: a room for up to 4 whose games the host picks in the lobby
       const first = L.games.find(g => g.id === L.state.last && g.online && g.online.min <= 2) || L.games.find(g => g.online && g.online.min <= 2 && g.online.max >= 2);
-      hookSession(L.net.createRoom({ gameId: first ? first.id : '', min: 2, max: 4, name: nameValue() }));
+      hookSession(L.net.createRoom({ gameId: first ? first.id : '', min: 2, max: 4, name: nameValue(), code: typeof code === 'string' ? code : '' }));
     }
   }
   function joinRoom(code) {
@@ -301,7 +339,7 @@
     close() { discard(); if (sheet) sheet.hidden = true; },
     hide,
     // A room made from the Online page: no game yet, the host picks games in the lobby.
-    openRoom(o) { ensure(); discard(); game = null; ops = o; error = ''; sheet.hidden = false; createRoom(); return session; },
+    openRoom(o, code) { ensure(); discard(); game = null; ops = o; error = ''; sheet.hidden = false; createRoom(code); return session; },
     // Scoreboard between rounds ('board') or the final standings ('final') for a session that is playing a tournament.
     series(s, kind, o) { ensure(); unhook(); session = s; ops = o || ops; screen = kind; sheet.hidden = false; render(); },
     // Back to the waiting room (after a tournament, "Back to lobby").

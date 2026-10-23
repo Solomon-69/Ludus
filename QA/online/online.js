@@ -82,11 +82,84 @@ const S = {
     await A.click('#opRejoin'); await A.waitForSelector('.code-ch', { timeout: 8000 }); await wait(900);
     const on = await A.$$eval('#lobbyCard .pick-chips .chip.is-on', els => els.map(e => e.textContent));
     check('Rejoin reopens a room with the same games and rounds', on.includes('Pong') && on.includes('Air Hockey') && on.includes('5'), on);
+    check('Rejoin 1 keeps the same room code', (await code(A)) === c, [await code(A), c]);
+    await A.evaluate(() => document.getElementById('backBtn').click()); await wait(500); await onlineTab(A);
+    await A.click('#opRejoin'); await A.waitForSelector('.code-ch', { timeout: 12000 }); await wait(900);
+    check('Rejoin 2 keeps the same room code', (await code(A)) === c, [await code(A), c]);
+    await A.evaluate(() => document.getElementById('backBtn').click()); await wait(500); await onlineTab(A);
+    // a guest rejoining reaches the same code
+    check('Create room makes a new code', await (async () => { await A.click('#opCreate'); await A.waitForSelector('.code-ch', { timeout: 8000 }); const n2 = await code(A); return n2 && n2 !== c; })());
     await A.evaluate(() => document.getElementById('backBtn').click()); await wait(500); await onlineTab(A);
     check('leaving the room does not delete the party', (await A.$('.party-card')) !== null);
     await A.click('#opForget'); await wait(300);
     check('Forget removes it', (await A.$('.party-card')) === null && (await A.evaluate(() => JSON.parse(localStorage.getItem('ludus.v1')).party)) === null);
     check('no page errors', errs([A, B]) === 0, [A.errors, B.errors]);
+    br.close();
+  },
+  async reopen(browser) {
+    const br = await broker.start(); const A = await newPage(browser, br, { name: 'Ann' });
+    await A.evaluate(() => { document.getElementById('grid').scrollTop = 400; });
+    const before = await A.evaluate(() => document.getElementById('grid').scrollTop);
+    await A.evaluate(() => { ludusClosed(); ludusOpened(); }); await wait(300);
+    const top = await A.evaluate(() => document.getElementById('grid').scrollTop);
+    check('reopen: All is at the very top (was ' + before + ')', top === 0, top);
+    const c = await flexCreate(A);
+    await A.evaluate(() => { document.getElementById('backBtn') && 0; });
+    await A.evaluate(() => { ludusClosed(); ludusOpened(); }); await wait(500);
+    const act = await A.$eval('#filters .chip.is-on', e => e.textContent);
+    check('reopen after a room: the All tab is shown', act === 'All', act);
+    check('reopen after a room: scrolled to top', (await A.evaluate(() => document.getElementById('grid').scrollTop)) === 0);
+    const saved = await A.evaluate(() => JSON.parse(localStorage.getItem('ludus.v1')).party);
+    check('room memory kept with the same code', saved && saved.code === c, [saved, c]);
+    check('room left, lobby closed', await A.$eval('#lobbySheet', e => e.hidden));
+    await onlineTab(A);
+    const card = await A.$eval('.party-card', e => e.innerText).catch(() => '');
+    check('Online shows Last party with Rejoin', /Rejoin/.test(card), card);
+    check('no page errors', errs([A]) === 0, A.errors); br.close();
+  },
+  async lobbyui(browser) {
+    const br = await broker.start();
+    for (const dark of [false, true]) for (const size of [{ width: 400, height: 600 }, { width: 520, height: 740 }]) {
+      const tag = (dark ? 'dark' : 'light') + '_' + size.width;
+      const A = await newPage(browser, br, { name: 'Ann', size, dark });
+      await flexCreate(A);
+      await A.waitForSelector('#lobbyCard .mode-tab');
+      check(tag + ' alone: waiting for a friend text', /Waiting for a friend to join/.test(await lobbyText(A)) && !/fit 1/.test(await lobbyText(A)), await lobbyText(A));
+      await shot(A, 'lobby_single_' + tag);
+      const w = await A.$eval('#lobbyCard', e => e.getBoundingClientRect().width);
+      check(tag + ' card uses the panel width', w >= size.width - 40, w);
+      await A.click('#lobbyCard .mode-tab:has-text("Tournament")'); await wait(200);
+      check(tag + ' tournament note', /Several games, one total score/.test(await lobbyText(A)));
+      await A.locator('#lobbyCard .game-grid .chip').nth(1).click(); await wait(200);
+      const on = await A.$$eval('#lobbyCard .game-grid .chip.is-on', e => e.length);
+      check(tag + ' tournament allows 2+ games', on >= 2, on);
+      const rd = await A.$eval('#lobbyCard .pick-chips:not(.game-grid) .chip.is-on', e => e.textContent);
+      check(tag + ' tournament rounds default 3', rd === '3', rd);
+      await shot(A, 'lobby_tournament_' + tag);
+      await A.click('#lobbyCard .mode-tab:has-text("Single game")'); await wait(200);
+      check(tag + ' single mode has exactly one game', (await A.$$eval('#lobbyCard .game-grid .chip.is-on', e => e.length)) === 1);
+      check(tag + ' single note', /One game/.test(await lobbyText(A)), await lobbyText(A));
+      check(tag + ' no overflow sideways', await A.$eval('#lobbyCard', e => e.scrollWidth <= e.clientWidth + 1));
+      check(tag + ' no page errors', errs([A]) === 0, A.errors);
+      await A.context().close();
+    }
+    br.close();
+  },
+  async toast(browser) {
+    const br = await broker.start();
+    for (const size of [{ width: 400, height: 600 }, { width: 520, height: 740 }]) for (const dark of [false, true]) {
+      const A = await newPage(browser, br, { name: 'Ann', size, dark });
+      await A.evaluate(() => ludusOpenGame('fourup')); await wait(600);
+      await A.click('#vsToggle button[data-vs="friend"]'); await wait(700);
+      const r = await A.evaluate(() => { const t = document.querySelector('.toast'), h = document.getElementById('hint'); const a = t.getBoundingClientRect(); const hs = getComputedStyle(h);
+        // any visible text under the toast?
+        const els = Array.from(document.querySelectorAll('#app *')).filter(e => e !== t && e.childNodes.length && Array.from(e.childNodes).some(n => n.nodeType === 3 && n.textContent.trim()));
+        const hit = els.filter(e => { const b = e.getBoundingClientRect(); const o = parseFloat(getComputedStyle(e).opacity); return b.width && o > 0.05 && getComputedStyle(e).visibility !== 'hidden' && !(b.right < a.left || b.left > a.right || b.bottom < a.top || b.top > a.bottom) && e.closest('.hint') === null && e.closest('.view.is-active, .sheet:not([hidden]), .topbar'); }).map(e => e.textContent.trim().slice(0, 30));
+        return { op: hs.opacity, hit, shown: t.classList.contains('show') }; });
+      check('toast over nothing (' + size.width + (dark ? ' dark' : '') + ')', r.shown && Number(r.op) < 0.3 && r.hit.length === 0, r);
+      await shot(A, 'toast_fourup_' + size.width + (dark ? 'd' : 'l'));
+      await A.context().close();
+    }
     br.close();
   },
   async compat(browser) {

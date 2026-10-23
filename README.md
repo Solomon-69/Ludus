@@ -10,7 +10,7 @@
 <p><b>37 little games in your menu bar. Take a little break.</b></p>
 
 <p>
-  <a href="https://github.com/Solomon-69/Ludus/releases/latest"><img alt="Version 1.6.0" src="https://img.shields.io/badge/version-1.6.0-d97757?style=flat-square"></a>
+  <a href="https://github.com/Solomon-69/Ludus/releases/latest"><img alt="Version 1.7.0" src="https://img.shields.io/badge/version-1.7.0-d97757?style=flat-square"></a>
   <img alt="macOS 14 or later" src="https://img.shields.io/badge/macOS-14%2B-1f1d1a?style=flat-square&logo=apple&logoColor=white">
   <img alt="Windows 10 or 11" src="https://img.shields.io/badge/Windows-10%20%7C%2011-1f1d1a?style=flat-square">
   <a href="LICENSE"><img alt="MIT licence" src="https://img.shields.io/badge/licence-MIT-5b8a5a?style=flat-square"></a>

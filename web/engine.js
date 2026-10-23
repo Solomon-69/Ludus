@@ -101,6 +101,7 @@
   function savedFor(game) {
     const snap = (state.saves && state.saves[game.id]) || null;
     if (snap && game.versus && (snap.vsMode || 'bot') !== versusMode(game)) return null;
+    if (snap && !game.versus && snap.vsMode === 'friend') return null;   // a game that no longer has a local friend mode: an old friend-mode save is dropped and it starts against the bot
     return snap;
   }
 

@@ -27,7 +27,7 @@
     let delay = baseDelay, off = null, jit = 0;  // off: guest clock minus host clock at the quickest delivery seen; jit: how late a typical copy is beyond that
     const MAXX = o.extrapolate == null ? 150 : o.extrapolate;   // when copies run late, carry on at the last speed for up to this many ms
     const t0 = performance.now(), buf = [];
-    let lastSend = 0, lastInAt = 0, lastInObj = null, sentCount = 0, fullId = 0, fullStr = null, latest = null, base = null, newest = null;
+    let lastInStr = '', lastSend = 0, lastInAt = 0, lastInObj = null, sentCount = 0, fullId = 0, fullStr = null, latest = null, base = null, newest = null;
     const acks = {};                            // host: seat -> { t: guest clock stamp of its newest input, at: when it arrived here }
     const lastIn = {};                          // host: seat -> the guest's full controls so far (deltas are merged into it)
     if (on.isHost) {
@@ -42,7 +42,8 @@
       on.on('st', (d, from) => {
         if (from !== 0 || !d || typeof d !== 'object' || Array.isArray(d)) return;
         let st;
-        if (d._f === 1) { st = Object.assign({}, d); base = { id: d._i, obj: st }; }
+        if (d._f !== 1 && d._b === undefined) { st = Object.assign({}, d); base = null; }   // a plain copy from a Ludus 1.6.x host
+        else if (d._f === 1) { st = Object.assign({}, d); base = { id: d._i, obj: st }; }
         else if (base && d._b === base.id) st = Object.assign({}, base.obj, d);
         else return;                            // a change on top of a full copy we never got: wait for the next full one
         Object.keys(META).forEach(k => delete st[k]);
@@ -72,6 +73,7 @@
           const s = o.snapshot && o.snapshot();
           if (!s) return;
           const ak = {}; Object.keys(acks).forEach(k => { ak[k] = [acks[k].t, Math.round(now - acks[k].at)]; });
+          if (on.legacy) { on.sendFast('st', s); return; }   // 1.6.x guests only understand plain full copies
           s.ak = ak; s._ts = Math.round(now);
           // Only what changed since the last full copy goes out; a full copy about every 10th time heals a lost one.
           const strs = {}; Object.keys(s).forEach(k => { strs[k] = JSON.stringify(s[k]); });
@@ -83,6 +85,7 @@
           }
         } else if (o.input) {
           const i = o.input(), idle = now - lastInAt;
+          if (on.legacy) { const k = JSON.stringify(i); if ((k !== lastInStr && idle >= 1000 / inHz) || idle > 200) { lastInStr = k; lastInAt = now; on.sendFastTo(0, 'in', i); } return; }
           // only the controls that changed (at most inHz a second); every 150 ms the full set again in case one was lost
           if (idle > 150 || !lastInObj) { lastInAt = now; lastInObj = i; on.sendFastTo(0, 'in', Object.assign({ f: 1, t: Math.round(now - t0) }, i)); }
           else if (idle >= 1000 / inHz) {

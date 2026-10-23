@@ -420,8 +420,7 @@
       }
       // perspective-like lean: tops of tall things lean away from the screen centre (the player's hole); nearer (lower) things are taller
       function setLean(x, y) {
-        SH = -clamp((x - cam.x) * cam.s / (view.w * 0.5), -1, 1) * 0.4;
-        ZV = ZK * (1 + 0.28 * clamp((y - cam.y) * cam.s * TILT / (view.h * 0.5), -1, 1));
+        SH = SHEAR0; ZV = ZK;   // rigid world: the lean does not depend on where the camera is (see the sprite cache)
       }
       const sxOf = x => (x - cam.x) * cam.s + view.w / 2, syOf = y => (y - cam.y) * cam.s * TILT + view.h / 2 + cam.yoff;
 
@@ -669,7 +668,9 @@
       }
 
       // ---------- sprite cache: each object style is drawn once per (lean, height, theme) and then stamped ----------
-      const SHL = [-0.4, -0.2, 0, 0.2, 0.4], ZVL = [0.7, 0.9, 1.1], SPR_BUDGET = 2.4e7, MAKE_PER_FRAME = 8;
+      // Every object leans the same fixed way (SHEAR0 / ZK), whatever the camera does: a building is one rigid picture that is only
+      // moved, so it can never change shape, snap between sprite variants or shift against its neighbours while the camera moves.
+      const NSH = 1, NZV = 1, SHL = [SHEAR0], ZVL = [ZK], SPR_BUDGET = 3e7, MAKE_PER_FRAME = 10;
       const styleIds = new Map(), spr = []; let sprPx = 0, madeNow = 0;
       function styleId(k) { let i = styleIds.get(k); if (i === undefined) { i = styleIds.size; styleIds.set(k, i); } return i; }
       function sprScale(t) { return t === 'person' || t === 'cone' || t === 'lamp' ? 4 : t === 'shop' || t === 'tower' ? 1.6 : 2.5; }
@@ -688,8 +689,8 @@
       }
       // stamp object o (SH/ZV already set by setLean) with its base centre at screen (sx, sy)
       function stampObj(o, sx, sy, dark) {
-        const shi = clamp(Math.round((SH + 0.4) / 0.2), 0, 4), zvi = ZV < 0.8 ? 0 : ZV < 1.0 ? 1 : 2;
-        const idx = ((o.sk * 2 + (dark ? 1 : 0)) * 5 + shi) * 3 + zvi;
+        const shi = 0, zvi = 0;
+        const idx = ((o.sk * 2 + (dark ? 1 : 0)) * NSH + shi) * NZV + zvi;
         let s = spr[idx];
         if (!s) {
           if (madeNow >= MAKE_PER_FRAME) { ctx.save(); ctx.translate(sx, sy); ctx.scale(cam.s, cam.s); drawObj(ctx, o, dark); ctx.restore(); return; }

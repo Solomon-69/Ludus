@@ -295,7 +295,9 @@
     me.over = false;            // closed or left
     me.ready = false;           // host: code claimed; guest: accepted into the room
     const urls = NET.brokers();
-    me.client = new Mqtt({ urls, clientId: 'ludus_' + hex(randBytes(8)), start: role === 'guest' ? NET.codeBroker(opts.code, urls.length) : 0 });
+    me.wantCode = role === 'host' && opts.code ? NET.extractCode(opts.code) : '';   // a host coming back to the same room code (Rejoin)
+    me.wantTries = 0;
+    me.client = new Mqtt({ urls, clientId: 'ludus_' + hex(randBytes(8)), start: role === 'guest' ? NET.codeBroker(opts.code, urls.length) : me.wantCode ? NET.codeBroker(me.wantCode, urls.length) : 0 });
     me.client.onState(s => me._conn(s));
     me.lastHost = Date.now();
     me.tick = setInterval(() => me._tick(), HEARTBEAT);
@@ -322,7 +324,7 @@
     this._emit('closed', { reason });
   };
   Session.prototype._stop = function () {
-    clearInterval(this.tick); clearTimeout(this.guard); clearInterval(this.claimTimer); clearInterval(this.joinTimer); clearTimeout(this.claimWait);
+    clearInterval(this.tick); clearTimeout(this.guard); if (this.ser) { clearTimeout(this.ser.t1); clearTimeout(this.ser.t2); } clearInterval(this.claimTimer); clearInterval(this.joinTimer); clearTimeout(this.claimWait);
     const c = this.client;
     setTimeout(() => c.close(), 120);
   };
@@ -339,7 +341,11 @@
   };
   Session.prototype._subscribeCandidate = function () {
     const me = this;
-    if (me.role === 'host') me.candidate = NET.codeFor(me.client.curIdx, me.client.urls.length);
+    if (me.role === 'host') {
+      const n = me.client.urls.length;
+      if (me.wantCode && me.wantTries < 4 && NET.codeBroker(me.wantCode, n) === me.client.curIdx % n) { me.wantTries++; me.candidate = me.wantCode; }
+      else me.candidate = NET.codeFor(me.client.curIdx, n);
+    }
     const topic = topicOf(me.candidate);
     me.client.subscribe(topic, txt => me._recv(txt));
     if (me.role === 'host') {
@@ -348,7 +354,10 @@
       me.claimWait = setTimeout(() => {
         if (me.over) return;
         if (me.collision) {
-          me.client.unsubscribe(topic); me.candidate = NET.newCode(); me._subscribeCandidate(); return;
+          me.client.unsubscribe(topic);
+          // our own code may still look taken for a moment (the old room just closed): try it again a few times before giving up on it
+          if (me.wantCode && me.candidate === me.wantCode && me.wantTries < 4) { me.claimWait = setTimeout(() => { if (!me.over) me._subscribeCandidate(); }, 2000); return; }
+          me.candidate = NET.newCode(); me._subscribeCandidate(); return;
         }
         me.code = me.candidate; me.ready = true; me.client.pin();
         me.roster.set(0, { seat: 0, name: me._nameFor(0), cid: me.cid });
@@ -592,7 +601,7 @@
   // next round, next game, or the final standings
   Session.prototype.advance = function () {
     const ser = this.ser;
-    if (this.role !== 'host' || !ser || ser.st !== 'board') return false;
+    if (this.role !== 'host' || this.over || !ser || ser.st !== 'board') return false;
     clearTimeout(ser.t2);
     let gi = ser.gi, ri = ser.ri + 1;
     if (ri >= ser.n) { ri = 0; gi++; }
@@ -659,6 +668,7 @@
     if (!list.some(p => p.cid === this.cid)) { this._close('removed'); return; }
     if (before !== list.map(p => p.cid).join() || list.length !== this.roster.size) {
       this.roster = new Map(list.map(p => [p.seat, p]));
+      const meE = list.find(p => p.cid === this.cid); if (meE) this.seat = meE.seat;
       list.forEach(p => { if (!this.seen[p.cid]) this.seen[p.cid] = Date.now(); });
       this._emit('roster', this.rosterList());
       gone.forEach(p => { delete this.rxq[p.cid]; if (this.started && this.active) this.active._left(p.seat, p.name, false); this._emit('left', { seat: p.seat, name: p.name, why: 'gone' }); });
@@ -674,7 +684,7 @@
     const list = cleanRoster(m.p);
     if (list) this._setRoster(list);
     if (Array.isArray(m.gm) && m.gm.length === 2 && m.gm.every(Number.isInteger)) { this.gmin = Math.max(2, m.gm[0]); this.gmax = Math.min(MAX_SEATS, m.gm[1]); }
-    if (m.sr) this._applySr(m.sr);
+    if (m.sr) this._applySr(m.sr); else if (this.ser && this.ser.st === 'final') this.ser = null;   // a rematch with a new plan
     this._startFrom(m.gen, m.sd, m.g);
   };
   Session.prototype._startFrom = function (gen, seed, game) {
@@ -773,6 +783,7 @@
       get count() { return s.roster.size; },
       get names() { const a = []; for (let i = 0; i < s.gmax; i++) { const p = s.roster.get(i); a.push(p ? p.name : ''); } return a; },
       get connected() { return s.conn === 'online' && !s.over; },
+      get legacy() { return !!s.legacy || (s.role === 'host' && Object.keys(s.peerPv).some(c => s.peerPv[c] < 2)); },   // somebody in the room is on Ludus 1.6.x: use the plain realtime format
       send(type, data) { return s.send(type, data); },
       sendTo(seat, type, data) { return Number.isInteger(seat) && seat >= 0 && seat < MAX_SEATS ? s.send(type, data, seat) : false; },
       sendFast(type, data) { return s.sendFast(type, data); },
