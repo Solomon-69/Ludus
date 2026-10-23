@@ -94,7 +94,7 @@ Everything registered with `on`, `queue` or `onLeave` is cleaned up automaticall
 `online: { min: 2, max: 4 }` makes a room with four seats. The room starts by itself when every seat is taken; before
 that the host sees **Start now** as soon as `min` players are in. Seats are 0-3 (host = 0); the colours are the
 accent, blue, green and purple. When a player leaves and at least `min` remain, the game goes on (use `onLeave`);
-below `min` the app ends the room. The home screen's **3-4 Player** tab lists every game with `online.max >= 3`.
+below `min` the app ends the room. The home screen has no 3-4 Player tab any more: parties of 2, 3 or 4 all start from the **Online** tab (the host picks games that fit the party).
 
 ## Real-time games (Pong, Air Hockey, Tag, Paper.io, Hole.io)
 
@@ -153,7 +153,8 @@ Run two to four pages against an in-memory broker (no internet needed): a tiny M
 two headless pages, with `__LUDUS_BROKERS__` pointing at it. `Ludus.net.WebSocket` can also be replaced with a fake.
 `window.ludusSnapshot()` (the game's own `save()`) is handy for comparing the two boards.
 
-`broker.latency = { base, jitter }` (test folder) delays every delivery per receiver while keeping order; `games_online.js lag*`
-and `watchall` run Pong, Hockey, Tag and Hole.io at 150-300 ms and check the guest's own thing moves within 60 ms of a key press,
-converges with the host, and that the host's thing moves on many guest frames. `twopage.js tournament|tleave|tleave2|party|compat|futurehost`
-cover tournaments, leaving mid-tournament, party memory and old/new rooms (the old pages are `git archive v1.6.0 web`).
+Tests live in `QA/online/` (`npm i` once; `node online.js [scenario]`: tournament tleave tleave2 party compat futurehost paper layout lag_pong lag_hockey lag_tag lag_holeio;
+`node run.js ../smoke.js [--size large --dark]` for the smoke test). `broker.js` is an in-memory MQTT relay; `broker.latency = { base, jitter }`
+delays every delivery per receiver (order kept). The lag scenarios run at 150-300 ms and check that the guest's own thing moves within
+60 ms of a key press, converges with the host, and that the host's thing moves on many guest frames without jumps. The old pages for the
+compat scenarios come from `git archive v1.6.0 web` (made on first run into `QA/online/.old`).

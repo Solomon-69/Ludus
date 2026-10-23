@@ -142,6 +142,16 @@ const S = {
     { const br = await broker.start(); const { pages } = await party(browser, br, 'Tag', 3);
       check('new + new (3 players) start the game', pages.length === 3 && errs(pages) === 0, pages.map(p => p.errors)); br.close(); }
   },
+  async paper(browser) {   // Paper.io with a guest: the guest steers locally, both screens agree, no errors
+    const br = await broker.start(); const { pages: [A, B] } = await party(browser, br, 'Paper.io', 2); await wait(2200);
+    br.latency = { base: 150, jitter: 150 };
+    await Promise.all([hold(A, 'a', 1200), hold(B, 'd', 1200)]); await wait(1500);
+    const g = p => p.evaluate(() => { const s = ludusDebug.paperio.state(); return s.players.filter(q => q.human).map(q => [Math.round(q.x), Math.round(q.y)]); });
+    const [ga, gb] = [await g(A), await g(B)];
+    check('Paper.io: host and guest see both players about the same place (latency 150-300 ms)', ga.length === 2 && gb.length === 2 && ga.every((q, i) => Math.hypot(q[0] - gb[i][0], q[1] - gb[i][1]) < 8), [ga, gb]);
+    check('Paper.io: no page errors', errs([A, B]) === 0, [A.errors, B.errors]);
+    br.close();
+  },
   async futurehost(browser) {
     const br = await broker.start(); const N = await newPage(browser, br, { name: 'New' });
     br.filter = (topic, payload) => { try { const m = JSON.parse(payload); if (m.t === 'join') { const out = { t: 'welcome', to: m.c, s: 1, p: [[0, 'Host', 'h0'], [1, 'You', m.c]], mx: 2, mn: 2, g: 'fourup', pv: 9, mp: 9, v: 1, c: 'h0' }; br.conns.forEach(o => { if (o.subs.has(topic)) o.send(br.rawFrame(topic, JSON.stringify(out))); }); } } catch (e) {} };
@@ -193,7 +203,7 @@ S.watch = S.lag;
 const overlap = page => page.evaluate(() => {
   const out = [];
   ['#lobbyCard', '.game-bar', '#overSheet', '.online-page', '.topbar'].forEach(sel => {
-    const root = document.querySelector(sel); if (!root || !root.getClientRects().length) return;
+    const root = document.querySelector(sel); if (!root || !root.getClientRects().length || (root.closest('.view') && !root.closest('.view.is-active'))) return;
     const els = [...root.querySelectorAll('*')].filter(e => e.children.length === 0 && e.textContent.trim() && e.getBoundingClientRect().width > 0 && getComputedStyle(e).visibility !== 'hidden');
     for (let i = 0; i < els.length; i++) {
       const a = els[i].getBoundingClientRect();
@@ -213,6 +223,7 @@ S.layout = async browser => {
   for (const [sn, size] of Object.entries(sizes)) for (const dark of [false, true]) {
     const tag = sn + (dark ? '_dark' : '_light'), br = await broker.start();
     const A = await newPage(browser, br, { name: 'Alexandria', size, dark }), B = await newPage(browser, br, { name: 'Bartholome', size, dark });
+    check(tag + ' chip row fits (All, Arcade, Puzzle, Duel, 2 Player, Online) with no clipping', await A.$eval('#filters', e => e.scrollWidth <= e.clientWidth + 1 && [...e.children].every(c => c.getBoundingClientRect().right <= e.getBoundingClientRect().right + 1)));
     await onlineTab(A); await shot(A, 'online_page_' + tag);
     check(tag + ' Online page: no overlap', (await overlap(A)).length === 0, await overlap(A));
     const c = await flexCreate(A); await flexJoin(B, c); await pick(A, ['Pong', 'Air Hockey', 'Connect Four'], 3); await wait(500);

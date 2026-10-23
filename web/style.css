@@ -504,3 +504,6 @@ svg { display: block; }
 .party-games { color: var(--ink-2); font-weight: 500; }
 .party-card .lobby-row { justify-content: flex-start; margin-top: 4px; }
 .online-page .party-card .btn { width: auto; }
+/* a toast never covers the result bar (Rematch, Leave...): it moves to the top while the bar is up */
+#app:has(#overSheet:not([hidden])) .toast, #app:has(#overPeek:not([hidden])) .toast { bottom: auto; top: 76px; transform: translate(-50%, -20px); }
+#app:has(#overSheet:not([hidden])) .toast.show, #app:has(#overPeek:not([hidden])) .toast.show { transform: translate(-50%, 0); }

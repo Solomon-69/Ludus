@@ -5,7 +5,7 @@
   const $ = id => document.getElementById(id);
   const root = document.documentElement;
   const ACCENTS = ['#d97757', '#5b8def', '#4f9d69', '#9b6dd6', '#e0a526', '#e05d8b', '#3aa6a6'];
-  const FILTERS = ['All', 'Arcade', 'Puzzle', 'Duel', '2 Player', '3-4 Player', 'Online'];
+  const FILTERS = ['All', 'Arcade', 'Puzzle', 'Duel', '2 Player', 'Online'];   // 2, 3 and 4 player online play all live under Online
   const ONLINE = 'Online';                 // the tab that opens the Online page instead of a list of games
   const TWO = '2 Player';
   const PARTY = '3-4 Player';              // games that 3 or 4 people can play together (online, some also on one keyboard)
@@ -124,7 +124,7 @@
     const code = el('input', 'code-input'); code.type = 'text'; code.maxLength = 300; code.placeholder = 'K7M2Q'; code.id = 'opCode';
     code.autocomplete = 'off'; code.spellcheck = false; code.autocapitalize = 'characters'; code.setAttribute('aria-label', 'Room code, invite or link');
     const msg = el('div', 'lobby-error', ''); msg.setAttribute('role', 'alert');
-    const go = () => { const c = L.net.extractCode(code.value) || L.net.cleanCode(code.value); if (!L.net.validCode(c)) { msg.textContent = 'Room codes are 5 letters or digits.'; code.focus(); return; } msg.textContent = ''; L.sfx('click'); joinFromInvite(c); };
+    const go = () => { const c = L.net.extractCode(code.value) || L.net.cleanCode(code.value); if (!L.net.validCode(c)) { msg.textContent = 'Room codes are 5 letters or digits.'; code.focus(); return; } msg.textContent = 'Joining room ' + c + '...'; L.sfx('click'); joinFromInvite(c, true); };
     code.addEventListener('input', () => { const v = code.value, m = L.net.extractCode(v); code.value = m || L.net.cleanCode(v); msg.textContent = !m && v.replace(/\s/g, '').length > 6 ? 'No room code found in that text.' : ''; });
     code.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); go(); } });
     page.appendChild(code); page.appendChild(msg);
@@ -375,11 +375,11 @@
   // A room invite: the code typed or pasted, or a ludus://join/CODE link opened by the Mac / Windows app. The link does not
   // say which game, so the room tells us. A newer host (tournament rooms) lets the host pick games, so we just show the room;
   // a 1.6 host plays one game, so that game's screen opens with the room already joined.
-  function joinFromInvite(text) {
+  function joinFromInvite(text, quiet) {
     const code = L.net.extractCode(text);
     if (!code) { toast('No room code found'); return false; }
     leaveOnline(); stop(); hideOver(); $('pauseSheet').hidden = true;
-    toast('Joining room ' + code);
+    if (!quiet) toast('Joining room ' + code);
     const s = L.net.joinRoom(code, { gameId: '', name: L.net.cleanName(S.onlineName, '') });
     online = { game: null, session: s, started: false };
     trackParty(s, 'guest');
@@ -811,7 +811,7 @@
                   : 'Click the controller icon at the top of your screen to open it. Click outside to put it away.',
         items: [
           [ic('M6 5h4v14H6zM14 5h4v14h-4z'), 'Close it mid-game', 'Every game saves itself and waits for you'],
-          [ic('M4 6h16M4 12h10M4 18h7'), 'Pick a tab', 'All, Arcade, Puzzle, Duel, 2 Player, 3-4 Player or Online'],
+          [ic('M4 6h16M4 12h10M4 18h7'), 'Pick a tab', 'All, Arcade, Puzzle, Duel, 2 Player or Online'],
           [ic('M11 4a2 2 0 1 1 2 0v1a7 7 0 0 1 5 6.7V15l2 3H4l2-3v-3.3A7 7 0 0 1 11 5z'), 'Make it yours', 'Colours, sound and light or dark in Settings'],
         ] },
       { art: ic('M8 5v14l11-7z'), title: 'Ready to play', text: 'Start with something quick. Your best scores are kept on this computer only.' },

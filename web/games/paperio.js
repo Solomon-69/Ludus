@@ -414,16 +414,6 @@
             if (p.respawn <= 0) { spawn(p); p.kills = 0; }
           } else if (p.human) p.deathT += dt;
         }
-        const mine = meP(), lat = link.latest();
-        if (mine && lat && mine.alive && started && !finished) {
-          const tgt = ownTarget(mine); if (myAng !== null) mine.ang = myAng;
-          meL.frame(dt, v => {
-            mine.tgt = tgt; mine.ang += clamp(angDiff(mine.ang, tgt), -TURN * dt, TURN * dt);
-            const d = SPEED * (mine.spd || 1) * dt;
-            v[0] = clamp(v[0] + Math.cos(mine.ang) * d, 0.3, N - 0.3); v[1] = clamp(v[1] + Math.sin(mine.ang) * d, 0.3, N - 0.3);
-          });
-          mine.x = meL.v[0]; mine.y = meL.v[1]; myAng = mine.ang;
-        } else if (mine && lat) { myAng = null; const k = players.indexOf(mine), q = lat.p && lat.p[k]; if (q && num(q[0])) meL.set([q[0], q[1]]); }
         for (const q of parts) { q.t += dt; q.x += q.vx * dt; q.y += q.vy * dt; q.vx *= 0.94; q.vy *= 0.94; }
         parts = parts.filter(q => q.t < q.life);
         for (const f of flashes) f.t += dt;
@@ -792,6 +782,16 @@
             if (p.alive && p.pts.length) { const l = p.pts[p.pts.length - 1]; if (Math.hypot(l.x - p.x, l.y - p.y) > 0.3) p.pts.push({ x: p.x, y: p.y }); }
           });
         }
+        const mine = meP(), lat = link.latest();
+        if (mine && lat && mine.alive && started && !finished) {
+          const tgt = ownTarget(mine); if (myAng !== null) mine.ang = myAng;
+          meL.frame(dt, v => {
+            mine.tgt = tgt; mine.ang += clamp(angDiff(mine.ang, tgt), -TURN * dt, TURN * dt);
+            const d = SPEED * (mine.spd || 1) * dt;
+            v[0] = clamp(v[0] + Math.cos(mine.ang) * d, 0.3, N - 0.3); v[1] = clamp(v[1] + Math.sin(mine.ang) * d, 0.3, N - 0.3);
+          });
+          mine.x = meL.v[0]; mine.y = meL.v[1]; myAng = mine.ang;
+        } else if (mine && lat) { myAng = null; const k = players.indexOf(mine), q = lat.p && lat.p[k]; if (q && num(q[0])) meL.set([q[0], q[1]]); }
         for (const q of parts) { q.t += dt; q.x += q.vx * dt; q.y += q.vy * dt; q.vx *= 0.94; q.vy *= 0.94; }
         parts = parts.filter(q => q.t < q.life);
         if (toastT > 0) toastT -= dt;
