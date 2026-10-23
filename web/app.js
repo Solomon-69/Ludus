@@ -97,30 +97,22 @@
   }
   // ---------- the Online page: make a room or join one ----------
   function renderOnlinePage(grid) {
-    const page = el('div', 'online-page');
-    page.appendChild(el('div', 'op-title', 'Play online'));
-    page.appendChild(el('p', 'lobby-sub', 'Make a room and share its code, or join a friend. The host picks the games and how many rounds.'));
+    // Three groups (heading, your room, joining one) spread over the page's full height, so the page has no empty band
+    // at the bottom whatever its size; the panel itself keeps the same size as every other tab.
+    const page = el('div', 'online-page'), head = el('div', 'op-group op-head'), mid = el('div', 'op-group'), join = el('div', 'op-group');
+    page.appendChild(head); page.appendChild(mid); page.appendChild(join);
+    head.appendChild(el('div', 'op-title', 'Play online'));
+    head.appendChild(el('p', 'lobby-sub', 'Create a room and share its code, or join a friend. The host picks the games and how many rounds.'));
     const f = el('label', 'field');
     f.appendChild(el('span', 'field-label', 'Your name (optional)'));
     const nm = el('input'); nm.type = 'text'; nm.maxLength = 10; nm.placeholder = 'Player'; nm.value = L.net.cleanName(S.onlineName, ''); nm.autocomplete = 'off'; nm.spellcheck = false; nm.setAttribute('aria-label', 'Your name');
     nm.addEventListener('input', () => { S.onlineName = L.net.cleanName(nm.value, ''); L.save(); });
-    f.appendChild(nm); page.appendChild(f);
-    if (S.party && S.party.code) {
-      const p = S.party, card = el('div', 'party-card');
-      card.appendChild(el('div', 'party-head', 'Last party'));
-      const line = el('div', 'party-line'); line.textContent = (p.role === 'host' ? 'You hosted' : 'Room ' + p.code) + ' \u00b7 ' + (p.names || []).join(', ');
-      card.appendChild(line);
-      const gl = el('div', 'party-games'); gl.textContent = (p.games || []).map(id => { const g = L.games.find(x => x.id === id); return g ? dispName(g) : id; }).join(', '); if (gl.textContent) card.appendChild(gl);
-      const row = el('div', 'lobby-row');
-      const rj = el('button', 'btn small primary', 'Rejoin'); rj.type = 'button'; rj.id = 'opRejoin'; rj.onclick = () => { L.sfx('click'); rejoinParty(); };
-      const fg = el('button', 'btn small ghost', 'Forget'); fg.type = 'button'; fg.id = 'opForget'; fg.onclick = () => { L.sfx('click'); S.party = null; L.save(); renderCards(); };
-      row.appendChild(rj); row.appendChild(fg); card.appendChild(row);
-      page.appendChild(card);
-    }
+    f.appendChild(nm); mid.appendChild(f);
+    if (S.party && S.party.code) mid.appendChild(partyCard(S.party));
     const mk = el('button', 'btn primary', 'Create room'); mk.type = 'button'; mk.id = 'opCreate';
     mk.onclick = () => { L.sfx('click'); createFlexRoom(); };
-    page.appendChild(mk);
-    page.appendChild(el('div', 'op-or', 'or join a room'));
+    mid.appendChild(mk);
+    join.appendChild(el('div', 'op-or', 'or join a room'));
     const code = el('input', 'code-input'); code.type = 'text'; code.maxLength = 300; code.placeholder = 'K7M2Q'; code.id = 'opCode';
     code.autocomplete = 'off'; code.spellcheck = false; code.autocapitalize = 'characters'; code.setAttribute('aria-label', 'Room code, invite or link');
     const msg = el('div', 'lobby-error', ''); msg.setAttribute('role', 'alert');
@@ -129,10 +121,33 @@
     code.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); go(); } });
     const jb = el('button', 'btn primary', 'Join'); jb.type = 'button'; jb.id = 'opJoin'; jb.onclick = go;
     const jr = el('div', 'join-row'); jr.appendChild(code); jr.appendChild(jb);   // the code and the Join button side by side
-    page.appendChild(jr); page.appendChild(msg);
-    page.appendChild(el('p', 'lobby-note', 'Code, invite message or ludus:// link. Needs the internet.'));
+    join.appendChild(jr); join.appendChild(msg);
+    join.appendChild(el('p', 'lobby-note', 'Code, invite message or ludus:// link. Needs the internet.'));
     grid.appendChild(page);
   }
+  // The last room you were in: one tidy card, a "Last party" tag and who hosted on top, the players as small name chips
+  // and the games underneath, Rejoin and Forget on the right.
+  function partyCard(p) {
+    const card = el('div', 'party-card'), info = el('div', 'party-info');
+    const top = el('div', 'party-top');
+    top.appendChild(el('span', 'party-tag', 'Last party'));
+    const who = el('span', 'party-who'); who.textContent = p.role === 'host' ? 'Hosted by you' : 'Room ' + p.code; top.appendChild(who);
+    info.appendChild(top);
+    const names = (p.names || []).filter(Boolean), games = (p.games || []).map(id => { const g = L.games.find(x => x.id === id); return g ? dispName(g) : id; }).join(', ');
+    if (names.length) {
+      const ppl = el('div', 'party-people');
+      names.forEach((n, i) => { const c = el('span', 'party-chip'), av = el('i', 'party-av'); av.textContent = String(n).trim().charAt(0).toUpperCase() || '?'; av.style.setProperty('--c', PARTY_COLS[i % PARTY_COLS.length]); c.appendChild(av); c.appendChild(document.createTextNode(n)); ppl.appendChild(c); });
+      info.appendChild(ppl);
+    }
+    if (games) { const gl = el('div', 'party-games'); gl.textContent = games; gl.title = games; info.appendChild(gl); }
+    const acts = el('div', 'party-acts');
+    const fg = el('button', 'btn small ghost', 'Forget'); fg.type = 'button'; fg.id = 'opForget'; fg.onclick = () => { L.sfx('click'); S.party = null; L.save(); renderCards(); };
+    const rj = el('button', 'btn small primary', 'Rejoin'); rj.type = 'button'; rj.id = 'opRejoin'; rj.onclick = () => { L.sfx('click'); rejoinParty(); };
+    acts.appendChild(fg); acts.appendChild(rj);
+    card.appendChild(info); card.appendChild(acts);
+    return card;
+  }
+  const PARTY_COLS = ['#d97757', '#5b8def', '#4f9d69', '#9b6dd6'];   // the seat colours used in online games
   function fmt(n) { return n >= 10000 ? (n / 1000).toFixed(n >= 100000 ? 0 : 1) + 'k' : String(n); }
   function renderCards() {
     const grid = $('grid'); grid.innerHTML = '';
