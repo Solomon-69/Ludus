@@ -20,6 +20,8 @@ Check (-not $p.HasExited) 'process alive'
 Check $r.ready 'WebView2 loaded the games page'
 Check (($r.cards -ge 33) -and ($r.cards -eq [int]$r.games)) "every game has a card (cards $($r.cards), games $($r.games))"
 Check ($r.filter -eq 'All') "opens on All games (tab: $($r.filter))"
+$c1 = $r.check | ConvertFrom-Json
+Check (($c1.covers.cards -ge 33) -and ($c1.covers.bad.Count -eq 0)) "every cover drawn true to shape ($($c1.covers.cards) covers, worst $($c1.covers.worst), bad: $($c1.covers.bad -join '; '))"
 Check $r.panelVisible 'panel opened (--test-open)'
 Check ($null -ne $r.tray) 'tray icon has a position on screen'
 Check $r.hotKey 'Ctrl+Alt+G registered'
@@ -59,6 +61,28 @@ Start-Sleep -Seconds 14
 $b2 = $r2b.panelBounds
 Save-Crop (Join-Path $Shots '05b-ludus-geoguess.png') $b2[0] $b2[1] $b2[2] $b2[3]
 Check (Quit-App $Exe 'Ludus') 'geo run: clean quit'
+# ---- Run 2c/2d: a Geo Guess game saved by Ludus 1.7 (the "blurred map, nothing opens" bug) ----
+$statePath = Join-Path $env:APPDATA 'Ludus\state.json'
+$geoSave = Get-Content (Join-Path $PSScriptRoot '..\..\QA\online\geo-save-1.7.json') -Raw | ConvertFrom-Json
+$keepState = if (Test-Path $statePath) { Get-Content $statePath -Raw } else { $null }
+foreach ($reset in @(0, 1)) {
+  $st = [ordered]@{ introDone = $true; geoReset = $reset; saves = @{ geoguess = $geoSave } }
+  ($st | ConvertTo-Json -Depth 20 -Compress) | Set-Content -Encoding UTF8 $statePath
+  $jsonG = Join-Path $Shots "ludus-selftest-georesume$reset.json"
+  $pG = Start-App $Exe @('--test-open', '--test-game=geoguess', "--selftest=$jsonG")
+  Check (Wait-File $jsonG 120) "geo resume ($reset): self-test file written"
+  $rG = Get-Content $jsonG -Raw | ConvertFrom-Json
+  $cG = $rG.check | ConvertFrom-Json
+  Write-Host "geo resume ($reset): $($rG.check)"
+  Check (-not $cG.blurredWithoutMenu) "geo resume ($reset): never blurred without a menu"
+  if ($reset -eq 0) { Check (-not $cG.paused) 'geo resume: first start after the update drops the 1.7 save (fresh game, no pause card)' }
+  else { Check ($cG.paused -and $cG.pauseOnTop) 'geo resume: an older save reopens with the Welcome back card visible on top' }
+  Start-Sleep -Seconds 4
+  $bG = $rG.panelBounds
+  Save-Crop (Join-Path $Shots "05c-ludus-geo-resume$reset.png") $bG[0] $bG[1] $bG[2] $bG[3]
+  Check (Quit-App $Exe 'Ludus') "geo resume ($reset): clean quit"
+}
+if ($keepState) { $keepState | Set-Content -Encoding UTF8 $statePath } else { Remove-Item $statePath -ErrorAction SilentlyContinue }
 
 # ---- Run 3: invisible icon, opened with Ctrl+Alt+G ----
 @{ size = 'compact'; invisible = $true } | ConvertTo-Json | Set-Content $prefs
@@ -101,6 +125,8 @@ foreach ($case in $cases) {
   Check (($rs.panelBounds[0] -ge 0) -and ($rs.panelBounds[1] -ge 0) -and (($rs.panelBounds[0] + $rs.panelBounds[2]) -le $rs.screen[0]) -and (($rs.panelBounds[1] + $rs.panelBounds[3]) -le $rs.screen[1])) "${tag}: panel fully on screen"
   Check (([math]::Abs($pg.w - 400) -le 1) -and ([math]::Abs($pg.h - 600) -le 1)) "${tag}: page laid out at its designed 400x600 (got $($pg.w)x$($pg.h)), not squashed"
   Check ($pg.sw -le $pg.w + 1) "${tag}: no sideways overflow"
+  $cs = $rs.check | ConvertFrom-Json
+  Check (($cs.covers.cards -ge 33) -and ($cs.covers.bad.Count -eq 0)) "${tag}: covers true to shape (worst $($cs.covers.worst), bad: $($cs.covers.bad -join '; '))"
   Start-Sleep -Seconds 1
   Save-Screen (Join-Path $Shots ("11-dpi-$tag-desktop.png"))
   $b = $rs.panelBounds
@@ -114,4 +140,16 @@ foreach ($case in $cases) {
 . "$PSScriptRoot/zoomtest.ps1"
 Test-NoZoom $Exe 'Ludus' $Shots
 Set-Theme $false
+# ---- Last run: Large panel, covers true to shape ----
+'{"size":"large","invisible":false}' | Set-Content -Encoding UTF8 $prefs
+$jsonL = Join-Path $Shots 'ludus-selftest-large.json'
+$pL = Start-App $Exe @('--test-open', "--selftest=$jsonL")
+Check (Wait-File $jsonL 120) 'large run: self-test file written'
+$rL = Get-Content $jsonL -Raw | ConvertFrom-Json
+$cL = $rL.check | ConvertFrom-Json
+Check (($cL.covers.cards -ge 33) -and ($cL.covers.bad.Count -eq 0)) "large run: covers true to shape (worst $($cL.covers.worst), bad: $($cL.covers.bad -join '; '))"
+$bL = $rL.panelBounds
+Save-Crop (Join-Path $Shots '12-ludus-large-panel.png') $bL[0] $bL[1] $bL[2] $bL[3]
+Check (Quit-App $Exe 'Ludus') 'large run: clean quit'
+Remove-Item $prefs -ErrorAction SilentlyContinue
 Finish

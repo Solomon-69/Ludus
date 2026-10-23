@@ -200,6 +200,7 @@ internal sealed class TrayContext : ApplicationContext
             var b = popup.Bounds;
             var t = TrayBounds();
             var page = await popup.Eval("JSON.stringify({w:innerWidth,h:innerHeight,dpr:devicePixelRatio,sw:document.documentElement.scrollWidth,sh:document.documentElement.scrollHeight})");
+            var selfCheck = await popup.Eval("window.ludusSelfCheck ? JSON.stringify(ludusSelfCheck()) : null");
             File.WriteAllText(options.SelfTestPath, JsonSerializer.Serialize(new
             {
                 app = "Ludus",
@@ -219,6 +220,7 @@ internal sealed class TrayContext : ApplicationContext
                 state = JsonSerializer.Deserialize<string?>(state),
                 filter = JsonSerializer.Deserialize<string?>(filter),
                 game = options.TestGame,
+                check = JsonSerializer.Deserialize<string?>(selfCheck),
             }, new JsonSerializerOptions { WriteIndented = true }));
             SaveIconSheet(Path.ChangeExtension(options.SelfTestPath, ".icons.png"));
         }

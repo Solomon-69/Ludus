@@ -10,7 +10,7 @@
 (function () {
   const D = Ludus.draw;
   const G = -1450, PR = 16, HR = 6, HL = 80, HMIN = 18, STEP = 1 / 240, VIEW = 360;
-  const SPRING = 26, HSPD = 720, VMAX = 1000, FLING = 580, REACT = 0.06, BOUNCE = 0.18, STICK = 1.5, STICKV = 380, SUP = 0.25;
+  const SPRING = 26, HSPD = 720, VMAX = 1000, FLING = 580, BOUNCE = 0.18, STICK = 1.5, STICKV = 380, SUP = 0.25;
   // Materials: head slip (share of sideways drag that slides), pot friction.
   const MAT = {
     rock: { slip: 0, mu: 0.9 }, orange: { slip: 0, mu: 0.8 }, wall: { slip: 1, mu: 0.3 }, wood: { slip: 0.03, mu: 0.8 },
@@ -215,10 +215,10 @@
     let ox = (T.x - s.o.x) * SPRING, oy = (T.y - s.o.y) * SPRING;
     const ol = Math.hypot(ox, oy); if (ol > HSPD) { ox *= HSPD / ol; oy *= HSPD / ol; }
     const mx = ox * dt, my = oy * dt;
-    // 2. the pot falls; swinging a free hammer in the air nudges it a little the other way
+    // 2. the pot falls. A hammer swung through the air pushes on nothing, so it does not move the pot: only a head
+    //    touching the terrain (below) moves it. In the air the pot flies its own arc, which makes long jumps possible.
     s.v.y += G * dt;
     let px = s.p.x + s.v.x * dt, py = s.p.y + s.v.y * dt;
-    if (!s.hc && !s.ground) { px -= mx * REACT; py -= my * REACT; }
     // 2b. only a head resting ON TOP of something (normal up) holds the pot up: it stays put while the pot hangs from it.
     //     Free or against a wall/ceiling the head just rides along with the pot (so gravity wins and the pot falls).
     const sup = s.hc && s.hn.y >= SUP;

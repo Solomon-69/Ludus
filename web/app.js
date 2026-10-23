@@ -82,7 +82,10 @@
   const norm = t => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
   const matches = g => { const q = norm(query); return !q || q.split(' ').every(w => norm([g.name, customName(g), g.tag, g.aka, g.id].join(' ')).includes(w)); };
   function visibleGames() {
-    if (norm(query)) return L.games.filter(g => !S.hidden.includes(g.id) && matches(g));
+    if (norm(query)) {   // best match first: the name starting with what you typed, then a word of the name, then anything else
+      const q = norm(query), rank = g => { const n = norm(customName(g) || g.name); return n.startsWith(q) ? 3 : (' ' + n).includes(' ' + q) ? 2 : n.includes(q) ? 1 : 0; };
+      return L.games.filter(g => !S.hidden.includes(g.id) && matches(g)).map((g, i) => [g, rank(g), i]).sort((a, b) => b[1] - a[1] || a[2] - b[2]).map(x => x[0]);
+    }
     return L.games.filter(g => !S.hidden.includes(g.id) && (S.filter === 'All' || g.tag === S.filter || (S.filter === TWO && g.versus) || (S.filter === PARTY && party(g))));
   }
   function renderFilters() {
@@ -238,19 +241,30 @@
     sh.appendChild(card);
     setTimeout(() => { try { input.focus({ preventScroll: true }); input.select(); } catch (e) {} }, 30);
   }
-  function drawCards() {
-    const c = L.colors();
-    document.querySelectorAll('.card').forEach(card => {
-      const g = L.games.find(x => x.id === card.dataset.id);
-      const cv = card.querySelector('canvas');
-      const r = cv.getBoundingClientRect();
-      if (!r.width) return;
-      const dpr = Math.min(3, devicePixelRatio || 1);
-      cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);
-      const ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      try { g.art && g.art(ctx, r.width, r.height, c); } catch (e) { /* a broken thumbnail must not break the grid */ }
-    });
+  // Card covers are drawn at the size the canvas has on screen. Each canvas is watched: whenever its size changes (the
+  // panel switching between wide and normal, Compact/Large, search results, a new screen scale) it is drawn again, so a
+  // cover can never be left stretched or squashed. Sizes come from layout (clientWidth), never from the on-screen box,
+  // which a card's slide-in animation scales.
+  const artSize = new ResizeObserver(entries => entries.forEach(e => drawArt(e.target)));
+  function drawArt(cv, force) {
+    const card = cv.closest('.card'), g = card && L.games.find(x => x.id === card.dataset.id);
+    const w = cv.clientWidth, h = cv.clientHeight;
+    if (!g || !w || !h) return;
+    const dpr = Math.min(3, devicePixelRatio || 1), key = w + 'x' + h + '@' + dpr;
+    if (!force && cv.dataset.drawn === key) return;
+    cv.dataset.drawn = key;
+    cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+    const ctx = cv.getContext('2d'); ctx.setTransform(cv.width / w, 0, 0, cv.height / h, 0, 0);
+    try { g.art && g.art(ctx, w, h, L.colors()); } catch (e) { /* a broken thumbnail must not break the grid */ }
   }
+  function drawCards() {
+    artSize.disconnect();
+    document.querySelectorAll('.card .art canvas').forEach(cv => { artSize.observe(cv); drawArt(cv, true); });
+  }
+  (function watchScale() {   // moving to a screen with another scale (or zooming) redraws the covers sharply
+    const mq = matchMedia('(resolution: ' + (devicePixelRatio || 1) + 'dppx)');
+    mq.addEventListener('change', () => { if (view === 'home') drawCards(); watchScale(); }, { once: true });
+  })();
   function replayCards() {
     document.querySelectorAll('.card').forEach(c => { c.style.animation = 'none'; void c.offsetWidth; c.style.animation = ''; });
   }
@@ -588,7 +602,7 @@
   $('overHideBtn').onclick = () => { $('overSheet').hidden = true; $('overPeek').hidden = false; };
   $('overPeek').onclick = () => { $('overPeek').hidden = true; $('overSheet').hidden = false; overAt = performance.now(); };
   const search = $('search');
-  search.addEventListener('input', () => { query = search.value; $('filters').classList.toggle('is-dim', !!norm(query)); renderCards(); });
+  search.addEventListener('input', () => { query = search.value; $('grid').scrollTop = 0; $('filters').classList.toggle('is-dim', !!norm(query)); renderCards(); });
   search.addEventListener('keydown', e => {
     if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); search.value = ''; query = ''; $('filters').classList.remove('is-dim'); renderCards(); search.blur(); }
     else if (e.key === 'Enter') { const first = visibleGames()[0]; if (first) { e.preventDefault(); start(first.id); } }
@@ -752,7 +766,7 @@
       appRows.push(row('Quit Ludus', null, q));
     }
     body.appendChild(group('App', appRows));
-    body.appendChild(el('div', 'foot', 'Ludus 1.5'));
+    body.appendChild(el('div', 'foot', 'Ludus 1.7.1'));
   }
   $('openSettings').onclick = () => { renderSettings(); show('settings'); L.sfx('tap'); };
   $('settingsBack').onclick = () => { show('home'); renderCards(); };
@@ -795,6 +809,24 @@
   window.ludusOpenLobby = () => { if (current && current.game && current.game.online) openLobby(current.game); };   // test helper: the old per-game room sheet (no button any more)
   window.ludusForceOver = won => { if (current) current.run.api.over({ score: 0, won: !!won, title: 'Test' }); };   // test helper: end the round now
   window.ludusSnapshot = () => { try { return current && current.instance && current.instance.save ? current.instance.save() : null; } catch (e) { return null; } };   // test helper   // test helper: the current room, if any
+  // Test helper (Mac harness and the Windows CI self-test): every cover's drawn shape against its shape on screen.
+  window.ludusCoverCheck = () => {
+    const out = { cards: 0, worst: 0, bad: [] };
+    document.querySelectorAll('#grid .card .art canvas').forEach(cv => {
+      const w = cv.clientWidth, h = cv.clientHeight; if (!w || !h) return;
+      out.cards++;
+      const d = cv.width && cv.height ? Math.abs((cv.width / cv.height) / (w / h) - 1) : 1;
+      out.worst = Math.max(out.worst, Math.round(d * 1000) / 1000);
+      if (d > 0.02) out.bad.push(cv.closest('.card').dataset.id + ' ' + cv.width + 'x' + cv.height + ' shown ' + w + 'x' + h);
+    });
+    return out;
+  };
+  // Windows CI self-test: covers true to shape, the pause card on top when paused, never blurred without a menu.
+  window.ludusSelfCheck = () => {
+    const sheet = $('pauseSheet'); let pauseOnTop = null;
+    if (!sheet.hidden) { const b = $('resumeBtn'), r = b.getBoundingClientRect(), h = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); pauseOnTop = !!h && (h === b || b.contains(h)); }
+    return { view, covers: view === 'home' ? window.ludusCoverCheck() : null, paused: !sheet.hidden, pauseOnTop, blurredWithoutMenu: !!document.querySelector('.geo.geo-paused') && sheet.hidden, saved: Object.keys(S.saves || {}), geoReset: S.geoReset || 0 };
+  };
   window.ludusTestOver = score => { if (current) current.run.api.over({ score }); };
   window.ludusState = () => JSON.stringify({ view, game: current && current.game.id, score: $('scoreNow').textContent, paused: !$('pauseSheet').hidden, over: overShown(), revealing: revealing(), games: L.games.length, theme: root.dataset.theme, saved: Object.keys(S.saves) });
 
