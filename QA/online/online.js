@@ -49,7 +49,7 @@ const S = {
     await C.evaluate(() => document.getElementById('leaveBtn').click()); await wait(2500);
     await A.click('#lobbyCard button.primary'); await Promise.all([waitPlaying(A), waitPlaying(B)]);
     const nm = await A.$eval('#gameName', e => e.textContent);
-    check('after Cy left the tournament goes on with 2 (Land Claim)', /Paper/.test(nm), nm);
+    check('after Cy left the tournament goes on with 2 (Land Claim)', /Land/.test(nm), nm);
     await playRound([A, B], 0); await Promise.all([waitCard(A, 'Wins so far|Points|wins'), waitCard(B, 'Wins so far|Points|wins')]);
     await A.click('#lobbyCard button.primary'); await Promise.all([waitCard(A, 'wins|tie'), waitCard(B, 'wins|tie')]);
     const fr = await rows(A);
