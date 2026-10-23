@@ -162,6 +162,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
         case "dock":
             UserDefaults.standard.set(body["on"] as? Bool ?? false, forKey: dockKey)
             applyDockPolicy()
+        case "share":
+            let r = NSRect(x: body["x"] as? Double ?? 0, y: body["y"] as? Double ?? 0,
+                           width: body["w"] as? Double ?? 1, height: body["h"] as? Double ?? 1)
+            ShareFriend.share(from: webView, rect: r) { [weak self] msg in
+                self?.webView.evaluateJavaScript("window.ludusShareError && ludusShareError(\(String(reflecting: msg)))")
+            }
         case "intro":
             // First run: open the panel by itself so the welcome is seen.
             if !popover.isShown { DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { self.openPopover() } }
@@ -466,7 +472,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
             "window.ludusOpened && ludusOpened(); await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));",
             arguments: [:], in: nil, in: .page) { _ in reveal() }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: reveal)   // never stay hidden
+        MenuBarStrip.startEsc(window: { [weak self] in self?.popover.contentViewController?.view.window }, close: { [weak self] in self?.closePopover() })
         clickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
+            if MenuBarStrip.contains() { return }   // clicks on other menu bar icons keep the panel open
             Task { @MainActor in self?.closePopover() }
         }
     }
@@ -479,6 +487,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
         anchorWindow?.orderOut(nil)
         statusItem.button?.highlight(false)
         if let monitor = clickMonitor { NSEvent.removeMonitor(monitor); clickMonitor = nil }
+        MenuBarStrip.stopEsc()
         if quitting {
             // The save message from ludusClosed was already handled; give the bridge a moment, then quit.
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { NSApp.terminate(nil) }
@@ -570,6 +579,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
         guard let command = note.object as? String else { return }
         switch command {
         case "panel": if !popover.isShown { openPopover() }
+        case "sharetest": ShareFriend.selfTest(report: "/tmp/ludus-share-test.txt")
         case "intro": webView.evaluateJavaScript("window.ludusShowIntro && ludusShowIntro(0)")
         case "close": closePopover()
         case "home": webView.evaluateJavaScript("document.getElementById('backBtn').click()")
