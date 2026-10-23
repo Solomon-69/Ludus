@@ -102,7 +102,9 @@ Copy-Item (Split-Path $Exe -Parent) $inst -Recurse; Copy-Item (Split-Path $Exe -
 Compress-Archive -Path $new -DestinationPath (Join-Path $srv 'Ludus-windows.zip')
 $hash = (Get-FileHash (Join-Path $srv 'Ludus-windows.zip') -Algorithm SHA256).Hash.ToLower()
 "$hash  Ludus-windows.zip" | Set-Content -Encoding ASCII (Join-Path $srv 'SHA256SUMS.txt')
-"0$($hash.Substring(1))  Ludus-windows.zip" | Set-Content -Encoding ASCII (Join-Path $srv 'SUMS-BAD.txt')
+# the wrong hash must really differ: swapping the first digit for "0" gave the real hash 1 time in 16 (hash starting with 0)
+$flip = if ($hash[0] -eq '0') { '1' } else { '0' }
+"$flip$($hash.Substring(1))  Ludus-windows.zip" | Set-Content -Encoding ASCII (Join-Path $srv 'SUMS-BAD.txt')
 $web = Start-Process python -ArgumentList '-m','http.server','8766','--bind','127.0.0.1' -WorkingDirectory $srv -PassThru -WindowStyle Hidden
 Start-Sleep -Seconds 2
 $resFile = Join-Path $Shots 'update-selftest.txt'

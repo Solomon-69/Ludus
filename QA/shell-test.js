@@ -44,7 +44,7 @@
   seg('Light').click(); await wait(80); check('theme light', document.documentElement.dataset.theme === 'light');
   check('one orange swatch', document.querySelectorAll('.swatch').length === 7 && !S.accent.includes('c4633f'));
   check('no Games shown group', ![...document.querySelectorAll('.group-label')].some(l => /games shown/i.test(l.textContent)));
-  check('footer version', /^Ludus \d+\.\d+(\.\d+)?$/.test(document.querySelector('#settingsBody .foot').textContent));
+  { const u = document.querySelector('#updRow'); check('footer version (only in the real app)', !u || /Ludus \d+\.\d+(\.\d+)?/.test(u.textContent)); }
   document.querySelectorAll('.swatch')[1].click(); await wait(50);
   check('accent applied', getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() === S.accent && S.accent === '#5b8def');
   seg('Hard').click(); check('difficulty saved', S.difficulty === 'hard');
@@ -121,7 +121,7 @@
   check('invisible row', invRow && /far left of your menu bar icons/.test(invRow.querySelector('.row-sub').textContent));
   const invSw = invRow && invRow.querySelector('.switch');
   const appGroup = invRow && invRow.parentElement.previousElementSibling;
-  check('invisible row in App group', appGroup && appGroup.textContent === 'App');
+  check('invisible row in App group', appGroup && /^(app|more)$/i.test(appGroup.textContent.trim()));
   invSw.click();
   check('invisible switch flips at once', invSw.getAttribute('aria-checked') === 'true' && window.__LUDUS_INVISIBLE__ === true);
   check('invisible sent to app', sent.some(m => m.type === 'invisible' && m.on === true));

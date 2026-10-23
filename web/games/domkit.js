@@ -87,7 +87,7 @@
 
   // Shared look for these games: Ludus tokens only, so light and dark follow the app.
   style('ludus-domkit', `
-.lk{position:absolute;inset:0;display:flex;flex-direction:column;gap:10px;padding:14px 16px 16px;color:var(--ink);font:13px/1.35 var(--font);overflow:hidden;user-select:none;-webkit-user-select:none}
+.lk{position:absolute;isolation:isolate;inset:0;display:flex;flex-direction:column;gap:10px;padding:14px 16px 16px;color:var(--ink);font:13px/1.35 var(--font);overflow:hidden;user-select:none;-webkit-user-select:none}
 .lk *{box-sizing:border-box}
 .lk [hidden]{display:none!important}
 .lk-row{display:flex;align-items:center;gap:8px;min-width:0}

@@ -9,7 +9,7 @@ const SHOTS = process.env.SHOTS || path.join(os.tmpdir(), 'ludus-shots'); fs.mkd
 let fails = 0; const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) fails++; };
 const wait = ms => new Promise(r => setTimeout(r, ms));
 // ---- fake release server: /ok (newer version), /same (same version), /gone (404), /broken (junk) ----
-let latest = '1.10.0';
+let latest = '1.11.0';
 const server = http.createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   const base = 'http://127.0.0.1:' + server.address().port;
@@ -63,7 +63,7 @@ window.chrome={webview:{postMessage:m=>{(window.__msgs=window.__msgs||[]).push(m
     let s = await rowState(t.page); ok(s.st === 'idle' && /Ludus 1.10.0/.test(s.text), 'Update: starts at Check (' + s.text + ')');
     await t.page.click('#updRow button'); await wait(60);
     await wait(500); s = await rowState(t.page);
-    ok(s.st === 'available' && /Update to 1.10.0/.test(s.text), 'Update: orange "Update to 1.10.0" (' + s.text + ')');
+    ok(s.st === 'available' && /Update to 1.11.0/.test(s.text), 'Update: orange "Update to 1.11.0" (' + s.text + ')');
     await t.page.screenshot({ path: path.join(SHOTS, 'update-available.png') });
     await t.page.click('#updRow button'); await wait(80); s = await rowState(t.page);
     ok(s.st === 'confirm', 'Update: tapping asks to confirm, nothing installs yet');
@@ -71,7 +71,7 @@ window.chrome={webview:{postMessage:m=>{(window.__msgs=window.__msgs||[]).push(m
     await t.page.click('#updRow .small-btn:first-child'); await wait(80); s = await rowState(t.page); ok(s.st === 'available', 'Update: "Not now" goes back');
     await t.page.click('#updRow button'); await wait(60); await t.page.click('#updRow .small-btn.warm'); await wait(120);
     const msg = await t.page.evaluate(() => (window.__msgs || []).filter(m => m.type === 'update')[0]);
-    ok(msg && msg.name === 'Ludus-mac.zip' && /SHA256SUMS\.txt$/.test(msg.sums) && msg.version === '1.10.0', 'Update: confirm sends zip + checksums + version to the app');
+    ok(msg && msg.name === 'Ludus-mac.zip' && /SHA256SUMS\.txt$/.test(msg.sums) && msg.version === '1.11.0', 'Update: confirm sends zip + checksums + version to the app');
     s = await rowState(t.page); ok(s.st === 'progress', 'Update: shows progress');
     await t.page.evaluate(() => window.ludusUpdateState('progress', 42)); await wait(80);
     s = await rowState(t.page); ok(/42%/.test(s.text), 'Update: progress follows the app (' + s.text + ')');
