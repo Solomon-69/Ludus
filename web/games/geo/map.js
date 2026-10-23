@@ -139,7 +139,13 @@
       const nz = end || Math.abs(dz) < 0.003 ? target : z + dz * 0.3;
       const half = map.getSize().divideBy(2), scale = map.getZoomScale(nz, z);
       const center = map.containerPointToLatLng(half.add(anchor.subtract(half).multiplyBy(1 - 1 / scale)));
-      if (end) { map._move(center, nz); map._moveEnd(true); target = null; return; }
+      if (end) {
+        // Settle without a hard reset: finish the zoom the same way the in-between frames moved (the tiles on screen stay),
+        // then ask each layer for the sharp level. Leaflet drops the old tiles only once the new ones have arrived.
+        map._move(center, nz, { pinch: true }); map._moveEnd(true); target = null;
+        map.eachLayer(l => { if (l instanceof L.GridLayer && l._map) l._setView(map.getCenter(), map.getZoom(), true, false); });
+        return;
+      }
       map._move(center, nz, { pinch: true });
       raf = requestAnimationFrame(tick);
     };
