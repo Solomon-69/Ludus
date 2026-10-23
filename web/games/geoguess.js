@@ -6,13 +6,18 @@
   const D = Ludus.draw;
   const API = 'https://api.panoramax.xyz/api';
   const TIMES = [[30, '30 s'], [60, '60 s'], [120, '2 min'], [0, 'No limit']];
-  const ROUNDS = [3, 5, 10];
+  const ROUNDS_N = 5;   // always five places per game
+  const MOVES = [['move', 'Move'], ['nomove', 'No move'], ['nmpz', 'NMPZ']];
+  const MOVE_NOTE = { move: 'Move along the road, look around and zoom.', nomove: 'No moving: you stay where you land, but you can still look around and zoom.', nmpz: 'No moving, panning or zooming: one fixed view.' };
   const MAX_POINTS = 5000, FALLOFF_KM = 1492.7;
   const SEAT = ['#d97757', '#5b8def', '#4f9d69', '#9b6dd6'];
+  // Clean, quiet basemap: coastlines, borders, light grey land, country names only (Esri Canvas Gray, free, no key; Carto's raster tiles now need a key).
+  const ESRI = k => `https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/${k}/MapServer/tile/{z}/{y}/{x}`;
   const TILES = [
-    { url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', max: 19, credit: '© OpenStreetMap contributors' },
-    { url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png', max: 19, credit: '© OpenStreetMap contributors © CARTO', sub: 'abcd' }
+    { url: dark => ESRI(dark ? 'World_Dark_Gray_Base' : 'World_Light_Gray_Base'), max: 18, native: 16, credit: 'Tiles © Esri, DeLorme, NAVTEQ · © OpenStreetMap contributors', short: '© Esri · OSM' },
+    { url: () => 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', max: 19, native: 19, credit: '© OpenStreetMap contributors', short: '© OSM', fallback: true }
   ];
+  const isDark = () => document.documentElement.dataset.theme === 'dark';
 
   // ---------- pure rules (also used by the tests) ----------
   const rad = d => d * Math.PI / 180;
@@ -70,18 +75,22 @@
         const r = await fetch(`${API}/collections/${encodeURIComponent(c)}/items/${encodeURIComponent(id)}`, { signal: ctl.signal });
         if (!r.ok) throw new Error('http ' + r.status);
         const j = await r.json();
-        const sd = j.assets && j.assets.sd && j.assets.sd.href, g = j.geometry && j.geometry.coordinates;
+        const sd = j.assets && j.assets.sd && j.assets.sd.href, hd = j.assets && j.assets.hd && j.assets.hd.href, g = j.geometry && j.geometry.coordinates;
         if (!sd || !Array.isArray(g)) throw new Error('bad item');
+        const ex = (j.properties && j.properties.exif) || {}, dims = j.properties && j.properties['pers:interior_orientation'] && j.properties['pers:interior_orientation'].sensor_array_dimensions;
+        const wpx = Number(ex['Exif.Photo.PixelXDimension']) || (dims && dims[0]) || 0;
+        // full-size picture when it fits a normal graphics card (8192 px wide), else the 2048 px copy
+        const src = hd && wpx >= 4096 && wpx <= 8192 ? hd : sd;
         const nb = rel => (j.links || []).filter(l => l.rel === rel && l.id && l.geometry && Array.isArray(l.geometry.coordinates))
           .map(l => ({ id: String(l.id), lat: l.geometry.coordinates[1], lon: l.geometry.coordinates[0] }));
-        return { id, c, lat: g[1], lon: g[0], az: Number(j.properties && j.properties['view:azimuth']) || 0, sd, prev: nb('prev'), next: nb('next') };
+        return { id, c, lat: g[1], lon: g[0], az: Number(j.properties && j.properties['view:azimuth']) || 0, sd, src, prev: nb('prev'), next: nb('next') };
       } finally { clearTimeout(t); }
     })();
     itemCache.set(key, p); p.catch(() => itemCache.delete(key));
     return p;
   }
   const warm = new Set();
-  function warmImage(url) { if (warm.has(url) || warm.size > 40) return; warm.add(url); const i = new Image(); i.crossOrigin = 'anonymous'; i.src = url; }
+  function warmImage(url) { if (warm.has(url) || warm.size > 30) return; warm.add(url); const i = new Image(); i.crossOrigin = 'anonymous'; i.src = url; }
 
   // ---------- styles (kept here so the game is one file plus its data) ----------
   const CSS = `
@@ -89,7 +98,7 @@
 .geo *{box-sizing:border-box}
 .geo-pano{position:absolute;inset:0}
 .geo-pano .pnlm-container{background:#15130f}
-.geo-pano{transition:filter .3s,transform .3s}
+.geo-pano{transition:filter .3s,transform .3s;will-change:transform}
 .geo[data-ph=setup] .geo-pano,.geo[data-ph=offline] .geo-pano,.geo[data-ph=final] .geo-pano{filter:blur(5px) brightness(.62);transform:scale(1.04)}
 .geo-pano .pnlm-load-box,.geo-pano .pnlm-about-msg,.geo-pano .pnlm-compass{display:none!important}
 .geo-glass{background:rgba(24,21,17,.62);-webkit-backdrop-filter:blur(10px) saturate(1.3);backdrop-filter:blur(10px) saturate(1.3);border:1px solid rgba(255,255,255,.14);box-shadow:0 6px 18px -8px rgba(0,0,0,.6)}
@@ -118,13 +127,22 @@
 .geo-home{position:absolute;left:10px;bottom:10px;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;cursor:pointer;color:#fff;padding:0}
 .geo-home svg{width:17px;height:17px}
 .geo-home:hover{background:rgba(24,21,17,.8)}
-.geo-mini{position:absolute;right:10px;bottom:10px;width:164px;display:flex;flex-direction:column;gap:6px;z-index:5;transition:width .22s var(--ease-out)}
-.geo-mini.open{width:min(360px,56%)}
-.geo-mapbox{position:relative;height:112px;border-radius:14px;overflow:hidden;opacity:.86;transition:height .22s var(--ease-out),opacity .2s;border:1px solid rgba(255,255,255,.28);box-shadow:0 8px 22px -8px rgba(0,0,0,.7);background:#cfd8dc}
-.geo-mini.open .geo-mapbox{height:min(250px,calc(var(--geo-h,400px) - 128px));opacity:1}
-.geo-minimap{position:absolute;inset:0}
+.geo-mini{position:absolute;right:10px;bottom:10px;width:164px;display:flex;flex-direction:column;gap:6px;z-index:5;transition:width .26s cubic-bezier(.22,1,.36,1);will-change:width}
+.geo-mini.open{width:var(--mini-w,360px)}
+.geo-mapbox{position:relative;height:112px;border-radius:14px;overflow:hidden;opacity:.9;transition:height .26s cubic-bezier(.22,1,.36,1),opacity .2s;border:1px solid rgba(255,255,255,.28);box-shadow:0 8px 22px -8px rgba(0,0,0,.7);background:#dfe5e8;transform:translateZ(0)}
+:root[data-theme="dark"] .geo-mapbox{background:#232a2e}
+.geo-mini.open .geo-mapbox{height:var(--mini-h,250px);opacity:1}
+/* the map keeps its big size the whole time and is only scaled down while closed, so opening never re-lays-out the tiles */
+.geo-minimap{position:absolute;left:50%;top:50%;width:var(--mini-w,360px);height:var(--mini-h,250px);transform:translate(-50%,-50%) scale(var(--mini-s,.45));transition:transform .26s cubic-bezier(.22,1,.36,1);will-change:transform}
+.geo-mini.open .geo-minimap{transform:translate(-50%,-50%) scale(1)}
+.geo .leaflet-tile-pane.geo-fallback{filter:none}
+:root[data-theme="dark"] .geo .geo-fallback{filter:invert(1) hue-rotate(180deg) brightness(.92) contrast(.88)}
+.geo-veil{position:absolute;inset:0;z-index:2;display:none;touch-action:none}
+.geo[data-mv=nmpz] .geo-veil{display:block}
+.geo[data-mv=nomove] .geo-hs,.geo[data-mv=nmpz] .geo-hs,.geo[data-mv=nomove] .geo-home,.geo[data-mv=nmpz] .geo-home{display:none!important}
 .geo-credit{position:absolute;right:0;bottom:0;z-index:600;font:500 9px/1 var(--font);color:#333;background:rgba(255,255,255,.78);padding:2px 5px;border-top-left-radius:6px;pointer-events:none;white-space:nowrap}
-.geo-mini:not(.open) .geo-credit{font-size:8px}
+.geo-credit b{font-weight:500}.geo-credit i{display:none;font-style:normal}
+.geo-mini:not(.open) .geo-credit b{display:none}.geo-mini:not(.open) .geo-credit i{display:inline}
 .geo-guess{height:38px;border:0;border-radius:12px;font:700 14px var(--font-round);letter-spacing:.02em;color:#fff;background:var(--good);cursor:pointer;box-shadow:0 6px 16px -6px rgba(0,0,0,.6);transition:transform .15s var(--spring),filter .15s,opacity .2s}
 .geo-guess:hover:not(:disabled){filter:brightness(1.08)}
 .geo-guess:active:not(:disabled){transform:scale(.97)}
@@ -171,6 +189,7 @@
 .geo-go{margin-top:16px;width:100%;height:42px;border:0;border-radius:13px;background:var(--accent);color:var(--accent-ink);font:700 14.5px var(--font-round);cursor:pointer;transition:transform .15s var(--spring),filter .15s}
 .geo-go:hover{filter:brightness(1.06)}
 .geo-go:active{transform:scale(.98)}
+.geo-card .note.small{margin:8px 0 0;font-size:11.5px}
 .geo-card .note{margin:14px 0 0;font:500 12px var(--font);color:var(--ink-3)}
 .geo-final table{width:100%;border-collapse:collapse;margin:8px 0 0;font:600 12px var(--font)}
 .geo-final td,.geo-final th{padding:6px 4px;text-align:right;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
@@ -184,7 +203,6 @@
 .geo-pin{filter:drop-shadow(0 2px 3px rgba(0,0,0,.5))}
 .geo .leaflet-tooltip.geo-lbl{background:rgba(24,21,17,.82);color:#fff;border:0;border-radius:8px;padding:3px 7px;font:650 11px var(--font);box-shadow:none}
 .geo .leaflet-tooltip-top.geo-lbl:before{border-top-color:rgba(24,21,17,.82)}
-:root[data-theme="dark"] .geo .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(.92) contrast(.88)}
 @media (prefers-reduced-motion:reduce){.geo-spin{animation-duration:2s}}
 `;
   let cssIn = false;
@@ -205,38 +223,58 @@
     onlineHint: '<b>Online</b> same places for everyone · drag to look · <kbd>↑</kbd><kbd>↓</kbd> or arrows to move · pin on the map, <kbd>Enter</kbd> to guess',
     _rules: { distKm, pointsFor, bearing, chooseOrder, MAX_POINTS },
     art(ctx, w, h) {
-      const g = ctx.createLinearGradient(0, 0, 0, h); g.addColorStop(0, 'rgba(255,255,255,0.22)'); g.addColorStop(0.62, 'rgba(255,255,255,0.02)'); g.addColorStop(0.62, 'rgba(0,0,0,0.12)'); g.addColorStop(1, 'rgba(0,0,0,0.04)');
-      ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
-      // road to the horizon
-      const hz = h * 0.62;
-      ctx.fillStyle = 'rgba(255,255,255,0.16)'; ctx.beginPath(); ctx.moveTo(w * 0.22, h); ctx.lineTo(w * 0.47, hz); ctx.lineTo(w * 0.53, hz); ctx.lineTo(w * 0.78, h); ctx.closePath(); ctx.fill();
-      ctx.strokeStyle = 'rgba(255,248,242,0.7)'; ctx.lineWidth = Math.max(1.5, h * 0.025); ctx.lineCap = 'round'; ctx.setLineDash([h * 0.08, h * 0.09]);
-      ctx.beginPath(); ctx.moveTo(w * 0.5, h); ctx.lineTo(w * 0.5, hz); ctx.stroke(); ctx.setLineDash([]);
-      // globe
-      const gx = w * 0.27, gy = h * 0.38, gr = h * 0.27;
-      ctx.strokeStyle = 'rgba(255,248,242,0.85)'; ctx.lineWidth = Math.max(1.4, h * 0.03);
-      ctx.beginPath(); ctx.arc(gx, gy, gr, 0, Math.PI * 2); ctx.stroke();
-      ctx.lineWidth = Math.max(1, h * 0.02); ctx.strokeStyle = 'rgba(255,248,242,0.55)';
-      ctx.beginPath(); ctx.ellipse(gx, gy, gr * 0.42, gr, 0, 0, Math.PI * 2); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(gx - gr, gy); ctx.lineTo(gx + gr, gy); ctx.stroke();
-      ctx.beginPath(); ctx.ellipse(gx, gy - gr * 0.5, gr * 0.86, gr * 0.2, 0, 0, Math.PI * 2); ctx.stroke();
+      // A flat map filling the whole card: river, parks, roads, a red pin with its shadow and a small compass. Folds kept faint.
+      const u = h / 78, TAU = Math.PI * 2, pw = w / 3;
+      ctx.fillStyle = '#f6efdc'; ctx.fillRect(0, 0, w, h);
+      ctx.fillStyle = '#efe6cf'; ctx.fillRect(pw, 0, pw, h);
+      ctx.fillStyle = '#b9dca0';
+      const blob = (x, y, bw, bh, r) => { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + bw, y, x + bw, y + bh, r); ctx.arcTo(x + bw, y + bh, x, y + bh, r); ctx.arcTo(x, y + bh, x, y, r); ctx.arcTo(x, y, x + bw, y, r); ctx.closePath(); ctx.fill(); };
+      blob(pw * 0.12, h * 0.62, pw * 0.78, h * 0.5, 5 * u); blob(pw * 2.18, -4 * u, pw * 0.66, h * 0.4, 5 * u);
+      ctx.strokeStyle = '#9fd0e6'; ctx.lineWidth = 7 * u; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(-6, h * 0.3); ctx.bezierCurveTo(pw * 0.9, h * 0.04, pw * 1.6, h * 0.66, w + 6, h * 0.5); ctx.stroke();
+      const roads = () => {
+        ctx.beginPath(); ctx.moveTo(pw * 0.42, -4); ctx.lineTo(pw * 0.72, h + 4);
+        ctx.moveTo(-4, h * 0.76); ctx.lineTo(w + 4, h * 0.4);
+        ctx.moveTo(pw * 1.92, -4); ctx.bezierCurveTo(pw * 1.7, h * 0.5, pw * 2.4, h * 0.72, pw * 2.32, h + 4);
+      };
+      ctx.strokeStyle = '#e0d2b0'; ctx.lineWidth = 5.6 * u; roads(); ctx.stroke();
+      ctx.strokeStyle = '#fffaf0'; ctx.lineWidth = 3.8 * u; roads(); ctx.stroke();
+      ctx.strokeStyle = '#ecdcb8'; ctx.lineWidth = 1 * u; ctx.setLineDash([3 * u, 3 * u]); ctx.beginPath(); ctx.moveTo(pw * 1.3, h * 0.22); ctx.lineTo(pw * 1.3, h); ctx.stroke(); ctx.setLineDash([]);
+      for (let i = 1; i < 3; i++) {   // faint folds
+        const fx = i * pw, g = ctx.createLinearGradient(fx - 5 * u, 0, fx + 5 * u, 0);
+        g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(0.5, 'rgba(0,0,0,0.07)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = g; ctx.fillRect(fx - 5 * u, 0, 10 * u, h);
+        ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.fillRect(fx, 0, 0.8 * u, h);
+      }
+      // compass, bottom-left
+      const kx = 15 * u, ky = h - 15 * u;
+      ctx.fillStyle = 'rgba(0,0,0,0.14)'; ctx.beginPath(); ctx.arc(kx, ky + 1.2 * u, 9 * u, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#fff8f2'; ctx.beginPath(); ctx.arc(kx, ky, 9 * u, 0, TAU); ctx.fill();
+      ctx.strokeStyle = '#2f8f83'; ctx.lineWidth = 1.1 * u; ctx.beginPath(); ctx.arc(kx, ky, 7.2 * u, 0, TAU); ctx.stroke();
+      ctx.fillStyle = '#e5483f'; ctx.beginPath(); ctx.moveTo(kx, ky - 6.6 * u); ctx.lineTo(kx + 2.2 * u, ky); ctx.lineTo(kx - 2.2 * u, ky); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#6b7f86'; ctx.beginPath(); ctx.moveTo(kx, ky + 6.6 * u); ctx.lineTo(kx + 2.2 * u, ky); ctx.lineTo(kx - 2.2 * u, ky); ctx.closePath(); ctx.fill();
       // pin
-      const px = w * 0.74, py = h * 0.62, pr = h * 0.17;
-      ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.beginPath(); ctx.ellipse(px, py + pr * 1.7, pr * 0.9, pr * 0.28, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#fff8f2'; ctx.beginPath(); ctx.arc(px, py - pr * 0.5, pr, Math.PI, 0); ctx.quadraticCurveTo(px + pr, py + pr * 0.4, px, py + pr * 1.7); ctx.quadraticCurveTo(px - pr, py + pr * 0.4, px - pr, py - pr * 0.5); ctx.fill();
-      ctx.fillStyle = '#d97757'; ctx.beginPath(); ctx.arc(px, py - pr * 0.5, pr * 0.42, 0, Math.PI * 2); ctx.fill();
+      const x = w * 0.62, y = h * 0.82, r = 12 * u, cy = y - r * 1.55;
+      ctx.fillStyle = 'rgba(0,0,0,0.24)'; ctx.beginPath(); ctx.ellipse(x, y + 0.5 * u, 7 * u, 2.2 * u, 0, 0, TAU); ctx.fill();
+      ctx.save(); ctx.beginPath(); ctx.moveTo(x, y); ctx.bezierCurveTo(x - r * 0.35, y - r * 0.55, x - r, cy + r * 0.7, x - r, cy); ctx.arc(x, cy, r, Math.PI, 0); ctx.bezierCurveTo(x + r, cy + r * 0.7, x + r * 0.35, y - r * 0.55, x, y); ctx.closePath();
+      const pg = ctx.createLinearGradient(x - r, cy - r, x + r, y); pg.addColorStop(0, '#ff6a57'); pg.addColorStop(1, '#d63a30'); ctx.fillStyle = pg; ctx.fill(); ctx.clip();
+      ctx.fillStyle = 'rgba(0,0,0,0.14)'; ctx.fillRect(x, cy - r * 2, r * 2, r * 4);
+      ctx.fillStyle = 'rgba(255,255,255,0.28)'; ctx.beginPath(); ctx.ellipse(x - r * 0.45, cy - r * 0.45, r * 0.28, r * 0.5, 0.5, 0, TAU); ctx.fill(); ctx.restore();
+      ctx.fillStyle = '#fff8f2'; ctx.beginPath(); ctx.arc(x, cy, r * 0.42, 0, TAU); ctx.fill();
+      ctx.fillStyle = 'rgba(0,0,0,0.10)'; ctx.beginPath(); ctx.arc(x, cy + r * 0.05, r * 0.42, 0, Math.PI); ctx.fill();
     },
     create(stage, api) {
       injectCss();
       const on = api.online, host = !on || on.isHost, mySeat = on ? on.seat : 0;
       const S = api.settings;
       const saved = S.geo && typeof S.geo === 'object' ? S.geo : {};
-      let cfg = { time: TIMES.some(t => t[0] === saved.time) ? saved.time : 60, rounds: ROUNDS.includes(saved.rounds) ? saved.rounds : 5 };
+      let cfg = { time: TIMES.some(t => t[0] === saved.time) ? saved.time : 60, move: MOVES.some(m => m[0] === saved.move) ? saved.move : 'move', rounds: ROUNDS_N };
       const nameOf = seat => on ? (on.names[seat] || 'P' + (seat + 1)) : 'You';
 
       // ----- DOM -----
       const root = el('div', 'geo'); stage.appendChild(root);
       const panoEl = el('div', 'geo-pano'); root.appendChild(panoEl);
+      const veil = el('div', 'geo-veil'); root.appendChild(veil);
       const loadEl = el('div', 'geo-load', '<div class="geo-spin"></div>'); loadEl.hidden = true; root.appendChild(loadEl);
       const roundPill = txt('div', 'geo-pill geo-glass geo-round', ''); root.appendChild(roundPill);
       const top = el('div', 'geo-top'); root.appendChild(top);
@@ -247,7 +285,7 @@
       const mini = el('div', 'geo-mini'); root.appendChild(mini);
       const mapBox = el('div', 'geo-mapbox'); mini.appendChild(mapBox);
       const miniMapEl = el('div', 'geo-minimap'); mapBox.appendChild(miniMapEl);
-      const miniCredit = txt('div', 'geo-credit', '© OpenStreetMap'); mapBox.appendChild(miniCredit);
+      const miniCredit = el('div', 'geo-credit'); mapBox.appendChild(miniCredit);
       const guessBtn = txt('button', 'geo-guess', 'Guess'); guessBtn.disabled = true; mini.appendChild(guessBtn);
       const waitEl = txt('div', 'geo-pill geo-glass geo-wait', ''); waitEl.hidden = true; root.appendChild(waitEl);
       const resEl = el('div', 'geo-res'); resEl.hidden = true; root.appendChild(resEl);
@@ -266,7 +304,7 @@
       const place = r => pool[order[r]];
 
       // ----- the compass strip -----
-      const cctx = compass.getContext('2d');
+      const cctx = compass.getContext('2d'); let lastHead = -1;
       function drawCompass() {
         const dpr = Math.min(3, window.devicePixelRatio || 1), w = 176, h = 30;
         if (compass.width !== w * dpr) { compass.width = w * dpr; compass.height = h * dpr; }
@@ -287,21 +325,28 @@
       }
 
       // ----- maps -----
+      const MAP_OPTS = { zoomControl: false, attributionControl: false, worldCopyJump: true, minZoom: 1, zoomSnap: 0.25, zoomDelta: 0.5, wheelPxPerZoomLevel: 110, wheelDebounceTime: 35,
+        inertia: true, inertiaDeceleration: 2600, inertiaMaxSpeed: 1800, easeLinearity: 0.22, zoomAnimation: true, fadeAnimation: true, markerZoomAnimation: true,
+        preferCanvas: true, bounceAtZoomLimits: false, doubleClickZoom: false, maxBoundsViscosity: 0.6 };
+      const themed = [];
       function tileLayer(map, credit) {
         let layer = null;
         const make = i => {
           const t = TILES[i]; tileSet = i;
           if (layer) map.removeLayer(layer);
-          layer = L.tileLayer(t.url, { maxZoom: t.max, subdomains: t.sub || 'abc', detectRetina: true, crossOrigin: false, keepBuffer: 1 }).addTo(map);
+          const o = { maxZoom: t.max, maxNativeZoom: t.native, crossOrigin: false, keepBuffer: 2, updateWhenZooming: false, updateWhenIdle: false, updateInterval: 120 };
+          layer = L.tileLayer(t.url(isDark()), o).addTo(map);
+          const tp = map.getPane('tilePane'); tp.classList.toggle('geo-fallback', !!t.fallback);
           layer.on('tileload', () => { tileLoads++; });
           layer.on('tileerror', () => { tileErrs++; if (tileSet === 0 && tileLoads === 0 && tileErrs >= 4) { make(1); setCredit(); } });
           setCredit();
         };
-        const setCredit = () => { credit.textContent = TILES[tileSet].credit; };
+        const setCredit = () => { credit.innerHTML = '<b>' + TILES[tileSet].credit + '</b><i>' + TILES[tileSet].short + '</i>'; };
         make(0);
+        themed.push(() => { const t = TILES[tileSet]; if (layer && !t.fallback) layer.setUrl(t.url(isDark())); });
       }
       function makeMaps() {
-        miniMap = L.map(miniMapEl, { zoomControl: false, attributionControl: false, worldCopyJump: true, minZoom: 1, zoomSnap: 0.5, doubleClickZoom: false }).setView([25, 10], 1);
+        sizeMini(); miniMap = L.map(miniMapEl, MAP_OPTS).setView([25, 10], 1);
         tileLayer(miniMap, miniCredit);
         miniLayer = L.layerGroup().addTo(miniMap);
         miniMap.on('click', e => {
@@ -313,10 +358,18 @@
           L.marker([pin.lat, pin.lon], { icon: L.divIcon({ className: '', html: pinHtml(SEAT[mySeat], false), iconSize: [28, 36], iconAnchor: [14, 34] }), interactive: false }).addTo(miniLayer);
           guessBtn.disabled = false; guessBtn.textContent = 'Guess'; api.sfx('tap');
         });
-        new ResizeObserver(() => { if (miniMap) miniMap.invalidateSize(false); }).observe(mapBox);
+        const mo = new MutationObserver(() => themed.forEach(f => f())); mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] }); offs.push(() => mo.disconnect());
+      }
+      // The mini map is laid out once at its big size (and again only when the window changes); closed, it is just scaled down.
+      function sizeMini() {
+        const rw = stage.clientWidth || 600, rh = stage.clientHeight || 400;
+        const W = Math.round(Math.min(360, rw * 0.56)), H = Math.round(Math.max(90, Math.min(250, rh - 128)));
+        root.style.setProperty('--mini-w', W + 'px'); root.style.setProperty('--mini-h', H + 'px');
+        root.style.setProperty('--mini-s', String(Math.max(160 / W, 108 / H).toFixed(4)));
+        if (miniMap) miniMap.invalidateSize(false);
       }
       let hoverT = 0, pinned = false;
-      function openMini(on_) { clearTimeout(hoverT); mini.classList.toggle('open', on_); if (miniMap) { setTimeout(() => miniMap && miniMap.invalidateSize(false), 240); } }
+      function openMini(on_) { clearTimeout(hoverT); mini.classList.toggle('open', on_); }
       api.on(mini, 'pointerenter', e => { if (e.pointerType === 'touch') return; openMini(true); });
       api.on(mini, 'pointerleave', e => { if (e.pointerType === 'touch') return; clearTimeout(hoverT); hoverT = setTimeout(() => { if (!pinned) openMini(false); }, 320); });
       api.on(root, 'pointerdown', e => { if (!mini.contains(e.target) && mini.classList.contains('open')) { pinned = false; openMini(false); } }, true);
@@ -327,15 +380,16 @@
           createTooltipFunc: d => { d.innerHTML = '<i>' + ARROW + '</i>'; }, clickHandlerFunc: () => step(nb) };
       }
       function sceneFor(item) {
-        const spots = item.next.slice(0, 1).concat(item.prev.slice(0, 1)).map(nb => arrowSpot(item, nb));
-        return { type: 'equirectangular', panorama: item.sd, hotSpots: spots, autoLoad: true, crossOrigin: 'anonymous' };
+        const spots = cfg.move !== 'move' ? [] : item.next.slice(0, 1).concat(item.prev.slice(0, 1)).map(nb => arrowSpot(item, nb));
+        return { type: 'equirectangular', panorama: item.src, hotSpots: spots, autoLoad: true, crossOrigin: 'anonymous' };
       }
-      const NO_UI = { showControls: false, showFullscreenCtrl: false, showZoomCtrl: false, compass: false, mouseZoom: true, hfov: 100, minHfov: 45, maxHfov: 120, pitch: 0, yaw: 0, disableKeyboardCtrl: true, sceneFadeDuration: 250, friction: 0.12 };
-      function showItem(item, keepHeading, onDone) {
+      const NO_UI = { showControls: false, showFullscreenCtrl: false, showZoomCtrl: false, compass: false, mouseZoom: true, hfov: 90, minHfov: 50, maxHfov: 110, pitch: 0, yaw: 0, disableKeyboardCtrl: true, sceneFadeDuration: 250, friction: 0.1, touchPanSpeedCoeffFactor: 1, autoRotate: 0 };
+      function showItem(item, keepHeading, onDone0) {
+        const onDone = ok => { if (!ok && item.src !== item.sd) { item.src = item.sd; showItem(item, keepHeading, onDone0); return; } onDone0 && onDone0(ok); };
         const token = ++loadToken;
         const prevScene = curScene, id = 's' + (++sceneN);
         const hd = keepHeading ? heading : item.az;
-        const yaw = wrap180(hd - item.az), pitch = viewer ? viewer.getPitch() : 0, hfov = viewer ? viewer.getHfov() : 100;
+        const yaw = wrap180(hd - item.az), pitch = viewer ? viewer.getPitch() : 0, hfov = viewer ? viewer.getHfov() : 90;
         loadEl.hidden = false;
         let fin = false;
         const done = ok => { if (fin) return; fin = true; if (token === loadToken) loadEl.hidden = true; onDone && onDone(ok); };
@@ -353,17 +407,17 @@
         item._token = token;
       }
       function prefetch(item) {
-        item.next.slice(0, 1).concat(item.prev.slice(0, 1)).forEach(nb => getItem(item.c, nb.id).then(it => { warmImage(it.sd); }, () => {}));
+        item.next.slice(0, 1).concat(item.prev.slice(0, 1)).forEach(nb => getItem(item.c, nb.id).then(it => { warmImage(it.src); }, () => {}));
       }
       let moving = false;
       async function step(nb) {
-        if (phase !== 'play' || moving || !cur) return;
+        if (phase !== 'play' || moving || !cur || cfg.move !== 'move') return;
         moving = true; api.sfx('move');
         try { const it = await getItem(cur.c, nb.id); showItem(it, true, ok => { moving = false; if (!ok) api.toast('Could not load that view'); }); }
         catch (e) { moving = false; api.toast('Could not load that view'); }
       }
       function stepDir(dir) {   // dir 1 = the way you face, -1 = behind you
-        if (phase !== 'play' || !cur) return;
+        if (phase !== 'play' || !cur || cfg.move !== 'move') return;
         let best = null, bestD = 100;
         cur.next.slice(0, 1).concat(cur.prev.slice(0, 1)).forEach(nb => {
           const d = Math.abs(wrap180(bearing(cur, nb) - (heading + (dir < 0 ? 180 : 0))));
@@ -372,7 +426,7 @@
         if (best && bestD <= 90) step(best);
       }
       async function toStart() {
-        const p = place(round); if (phase !== 'play' || moving) return;
+        const p = place(round); if (phase !== 'play' || moving || cfg.move !== 'move') return;
         moving = true;
         try { const it = await getItem(p.c, p.id); showItem(it, false, () => { moving = false; }); } catch (e) { moving = false; }
       }
@@ -411,10 +465,11 @@
 
       // ----- the round -----
       function setCard(show) { card.hidden = !show; }
+      function applyMove() { root.dataset.mv = cfg.move; }
       function hud(vis) { [roundPill, top, scoreEl, homeBtn, mini].forEach(e => { e.style.visibility = vis ? 'visible' : 'hidden'; }); }
       function startRound(r) {
         if (destroyed || r >= cfg.rounds) return;
-        round = r; phase = 'load'; ready = new Set(); pin = null; moving = false;
+        round = r; phase = 'load'; ready = new Set(); pin = null; moving = false; applyMove();
         resEl.hidden = true; waitEl.hidden = true; setCard(false); hud(true);
         if (miniLayer) miniLayer.clearLayers();
         if (miniMap) { miniMap.setView([25, 10], 1); }
@@ -462,8 +517,8 @@
       function resultMap() {
         if (resMap) return resMap;
         const holder = el('div', 'geo-resmap'); resEl.appendChild(holder);
-        resMap = L.map(holder, { zoomControl: false, attributionControl: false, worldCopyJump: true, minZoom: 1, zoomSnap: 0.25 });
-        const cred = txt('div', 'geo-credit', TILES[tileSet].credit); cred.style.fontSize = '10px'; resEl.appendChild(cred);
+        resMap = L.map(holder, MAP_OPTS);
+        const cred = el('div', 'geo-credit'); cred.style.fontSize = '10px'; resEl.appendChild(cred);
         tileLayer(resMap, cred);
         return resMap;
       }
@@ -609,19 +664,20 @@
         card.appendChild(txt('p', '', on ? (host ? 'Same places for everyone. Pick the rules, then start.' : 'The host is choosing the rules.') : 'Look around, move along the road, then pin where you are.'));
         card.appendChild(txt('span', 'lab', 'Time per round'));
         card.appendChild(chipRow(TIMES, cfg.time, v => { cfg.time = v; remember(); showSetup(); }, !host));
-        card.appendChild(txt('span', 'lab', 'Rounds'));
-        card.appendChild(chipRow(ROUNDS.map(n => [n, String(n)]), cfg.rounds, v => { cfg.rounds = v; remember(); showSetup(); }, !host));
+        card.appendChild(txt('span', 'lab', 'Movement'));
+        card.appendChild(chipRow(MOVES, cfg.move, v => { cfg.move = v; remember(); showSetup(); }, !host));
+        card.appendChild(txt('p', 'note small', MOVE_NOTE[cfg.move]));
         if (host) {
           const go = txt('button', 'geo-go', 'Start'); go.onclick = begin; card.appendChild(go);
           if (on) card.appendChild(txt('p', 'note', `${on.count} of ${on.max} players here`));
         } else card.appendChild(txt('p', 'note', 'Waiting for the host to start…'));
         setCard(true);
       }
-      const remember = () => { if (host) { S.geo = { time: cfg.time, rounds: cfg.rounds }; Ludus.save(); if (on) on.send('cfg', { t: cfg.time, n: cfg.rounds }); } };
+      const remember = () => { if (host) { S.geo = { time: cfg.time, move: cfg.move }; Ludus.save(); if (on) on.send('cfg', { t: cfg.time, m: cfg.move }); } };
       function begin() {
         if (phase !== 'setup' || !host) return;
         started = true; api.sfx('click');
-        if (on) { on.send('cfg', { t: cfg.time, n: cfg.rounds }); on.send('rnd', { r: 0 }); }
+        applyMove(); if (on) { on.send('cfg', { t: cfg.time, m: cfg.move }); on.send('rnd', { r: 0 }); }
         startRound(0);
       }
 
@@ -636,8 +692,8 @@
           if (d.r === round) { checkDone(); if (phase === 'play') renderScore(round); }
         });
         on.on('cfg', (d, from) => {
-          if (from !== 0 || host || !d || !TIMES.some(t => t[0] === d.t) || !ROUNDS.includes(d.n)) return;
-          cfg = { time: d.t, rounds: d.n }; if (phase === 'setup') showSetup();
+          if (from !== 0 || host || !d || !TIMES.some(t => t[0] === d.t) || !MOVES.some(m => m[0] === d.m)) return;
+          cfg = { time: d.t, move: d.m, rounds: ROUNDS_N }; applyMove(); if (phase === 'setup') showSetup();
         });
         on.on('rnd', (d, from) => {
           if (from !== 0 || host || !d || !okInt(d.r, 0, cfg.rounds - 1) || !pool) return;
@@ -647,7 +703,7 @@
         on.on('ready', (d, from) => { if (!host || !d || d.r !== round) return; ready.add(from); maybeAdvance(); });
         on.on('hello', (d, from) => {
           if (!host) return;
-          on.sendTo(from, 'cfg', { t: cfg.time, n: cfg.rounds }); if (started) on.sendTo(from, 'rnd', { r: round });
+          on.sendTo(from, 'cfg', { t: cfg.time, m: cfg.move }); if (started) on.sendTo(from, 'rnd', { r: round });
         });
         on.onLeave(() => { checkDone(); maybeAdvance(); if (phase === 'play' || phase === 'wait') renderScore(round); });
       }
@@ -681,6 +737,7 @@
           if (k === 'Enter') { if (pin) submit(false); return; }
           if (k === 'ArrowUp' || k === 'w' || k === 'W') { stepDir(1); return; }
           if (k === 'ArrowDown' || k === 's' || k === 'S') { stepDir(-1); return; }
+          if (cfg.move === 'nmpz') return;
           if ((k === 'ArrowLeft' || k === 'a' || k === 'A') && viewer) viewer.setYaw(viewer.getYaw() - 12, false);
           if ((k === 'ArrowRight' || k === 'd' || k === 'D') && viewer) viewer.setYaw(viewer.getYaw() + 12, false);
           if ((k === '+' || k === '=') && viewer) viewer.setHfov(viewer.getHfov() - 8, false);
@@ -689,11 +746,11 @@
         else if (phase === 'setup' && host && k === 'Enter') begin();
       });
       guessBtn.onclick = () => submit(false);
-      new ResizeObserver(() => { root.style.setProperty('--geo-h', stage.clientHeight + 'px'); if (viewer) try { viewer.resize(); } catch (e) {} if (resMap) resMap.invalidateSize(false); if (miniMap) miniMap.invalidateSize(false); }).observe(stage);
+      new ResizeObserver(() => { root.style.setProperty('--geo-h', stage.clientHeight + 'px'); if (viewer) try { viewer.resize(); } catch (e) {} if (resMap) resMap.invalidateSize(false); sizeMini(); }).observe(stage);
       root.style.setProperty('--geo-h', stage.clientHeight + 'px');
       api.loop(dt => {
         if (viewer && cur && (phase === 'play' || phase === 'load')) heading = wrap360(cur.az + viewer.getYaw());
-        drawCompass();
+        if (Math.abs(wrap180(heading - lastHead)) > 0.05 || lastHead === -1) { lastHead = heading; drawCompass(); }
         if (root.dataset.ph !== phase) root.dataset.ph = phase;
         if (phase === 'play') {
           elapsed += dt;
@@ -709,7 +766,7 @@
       if (window.ludusDebug) window.ludusGeoTest = {
         pin: (lat, lon) => { pin = { lat, lon }; guessBtn.disabled = false; },
         guess: auto => submit(!!auto), state: () => ({ phase, round, left }),
-        nextBtn: () => resultFocus && resultFocus.click(), begin, time: t => { cfg.time = t; }, set: c => { Object.assign(cfg, c); showSetup(); }
+        nextBtn: () => resultFocus && resultFocus.click(), begin, time: t => { cfg.time = t; }, set: c => { Object.assign(cfg, c); applyMove(); showSetup(); }
       };
       return {
         pause() {}, resume() {},
