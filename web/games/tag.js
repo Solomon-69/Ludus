@@ -1083,12 +1083,14 @@
       }
       // A restored game counts as in progress; a fresh one only once a player has pressed something.
       const restored = !!(api.saved && restore(api.saved));
+      if (window.ludusDebug) window.ludusDebug.tagMe = id => { const p = players.find(q => q.id === (id || myId)); return p ? { x: p.x, y: p.y } : null; };
       if (window.ludusDebug) window.ludusDebug.tag = () => ({ friend, bot: friend ? null : { path: ai.path.map(e => e.kind), info: ai.info, nodes: (navs[mapIdx] || { nodes: [] }).nodes.length, edges: (navs[mapIdx] || { nodes: [] }).nodes.reduce((a, n) => a + n.edges.length, 0) }, phase, focus, sel, mapIdx, map: map.name, it, wins, timer, tagCool, round, mt,
         items: items.map(i => ({ x: i.x, y: i.y, type: i.type })), menu: phase === 'menu' ? menuLayout().tiles.map(t => [t.x, t.y, t.w, t.h, t.map]) : null,
         ps: players.map(p => ({ x: p.x, y: p.y, w: p.w, vx: p.vx, vy: p.vy, ground: p.ground, surf: p.surf, onM: p.onM, frozen: p.frozen, hold: p.hold, dead: p.dead,
           speedT: p.speedT, jumpT: p.jumpT, ghostT: p.ghostT, shrinkT: p.shrinkT, shieldT: p.shieldT })) });
       // ---------- online: the host runs the match; guests send their keys and draw the host's copy ----------
       let link = null, finished = false;
+      const presses = { j: 0, a: 0, n: 0 };   // guest: how many times each key was pressed; the host acts on the count going up
       const r1 = v => Math.round(v * 10) / 10, num = v => typeof v === 'number' && isFinite(v);
       function finishOnline(win) {
         if (finished) return; finished = true;
@@ -1101,12 +1103,10 @@
           ids, w: ids.map(id => wins[id] || 0), items: items.map(i => [r1(i.x), r1(i.y), PKEYS.indexOf(i.type)]),
           ps: players.map(p => [r1(p.x), r1(p.y), p.w, p.h, p.face, r1(p.frozen), p.dead ? 1 : 0, p.hold ? PKEYS.indexOf(p.hold) : -1].concat(TIMED.map(k => r1(p[k]))))
         });
-        let presses = { j: 0, a: 0, n: 0 };
         link = Ludus.rt(api, {
-          hz: 18, snapshot,
+          hz: 30, snapshot,
           input: () => {
             const pd = pads[myId];
-            if (pads.take(myId, 'up')) presses.j++; if (pads.take(myId, 'act')) presses.a++; if (pads.take(myId, 'down')) presses.n++;
             return { l: pd.left ? 1 : 0, r: pd.right ? 1 : 0, u: pd.up ? 1 : 0, d: pd.down ? 1 : 0, j: presses.j, a: presses.a, n: presses.n };
           },
           onInput: (seat, d) => {
@@ -1168,6 +1168,26 @@
         if (phase === 'count' && was.ph !== 'count') lastTick = -1;
         api.score(maxWins());
       }
+      // The guest moves its own player here, on this screen, with the host's own physics (step) and its own keys, so it answers
+      // on the next frame; the host's copy only eases it back into line. Everyone else is drawn from the host's copies.
+      const me = guest && link ? link.predictor({ pick: s => { const k = Array.isArray(s.ids) ? s.ids.indexOf(myId) : -1, q = k >= 0 && Array.isArray(s.ps) ? s.ps[k] : null; return q && num(q[0]) && num(q[1]) ? [q[0], q[1]] : null; }, snap: 90, init: null }) : null;
+      let ghost = null;
+      function predictMine(dt) {
+        const pd = pads[myId];
+        if (pd.hit.up) presses.j++; if (pd.hit.act) presses.a++; if (pd.hit.down) presses.n++;
+        const real = players.find(q => q.id === myId);
+        if (phase === 'menu' || !real || !link.latest()) { pads.take(myId, 'up'); pads.take(myId, 'act'); pads.take(myId, 'down'); return null; }
+        if (!ghost) ghost = Object.assign({}, real);
+        const live = phase === 'play' && !real.dead && real.frozen <= 0;
+        if (!live) {
+          pads.take(myId, 'up'); pads.take(myId, 'act'); pads.take(myId, 'down');
+          Object.assign(ghost, real); me.set([real.x, real.y]); return real;
+        }
+        ['w', 'h', 'speedT', 'jumpT', 'shrinkT', 'frozen', 'dead', 'ghostT', 'shieldT'].forEach(k => { ghost[k] = real[k]; });
+        ghost.hold = null;
+        me.frame(dt, v => { ghost.x = v[0]; ghost.y = v[1]; step(ghost, true, dt); v[0] = ghost.x; v[1] = ghost.y; });
+        return ghost;
+      }
       function guestUpdate(dt) {
         clock += dt; shake = Math.max(0, shake - dt * 2.5); flash = Math.max(0, flash - dt * 3);
         const sm = link.sample();
@@ -1179,6 +1199,10 @@
             p.x = ok ? M(qa[0], qb[0], t, 60) : qb[0]; p.y = ok ? M(qa[1], qb[1], t, 60) : qb[1];
           });
           if (num(a.mt) && num(b.mt)) { mt = M(a.mt, b.mt, t, 1); placeMovers(map, mt); }
+        }
+        {
+          const g = predictMine(dt), real = players.find(q => q.id === myId);
+          if (g && real && g !== real) { real.x = g.x; real.y = g.y; real.face = g.face; real.sq = g.sq; real.vx = g.vx; real.vy = g.vy; real.ground = g.ground; }
         }
         if (phase === 'count') { const n = Math.ceil(phaseT / (COUNT / 3)); if (n !== lastTick && n > 0) { lastTick = n; api.sfx('tick'); } }
         else if (phase === 'play') { const sc = Math.ceil(timer); if (sc <= 10 && sc !== lastTick && sc > 0) { lastTick = sc; api.sfx('tick'); } }

@@ -136,6 +136,9 @@
         p.power = Math.max(0, p.power - dt);
         const live = phase !== 'over';
         const dir = live ? (isBot ? botDir(dt) : (pad.down ? 1 : 0) - (pad.up ? 1 : 0)) : 0;
+        stepPad(p, dir, dt);
+      }
+      function stepPad(p, dir, dt) {
         if (dir) p.v += dir * padAcc * dt * (p.v * dir < 0 ? 1.8 : 1);
         else p.v -= Math.sign(p.v) * Math.min(Math.abs(p.v), padAcc * 1.3 * dt);
         p.v = Math.max(-padMax, Math.min(padMax, p.v));
@@ -328,7 +331,7 @@
         let lastHits = 0;
         const R2 = v => Math.round(v * 10) / 10;
         link = Ludus.rt(api, {
-          hz: 20,
+          hz: 30,
           snapshot: () => ({ W, s: [score.p1, score.p2], y: [R2(paddles.p1.y), R2(paddles.p2.y)], pw: [paddles.p1.power > 0 ? 1 : 0, paddles.p2.power > 0 ? 1 : 0], b: [R2(ball.x), R2(ball.y), Math.round(ball.vx * 1000) / 1000, Math.round(ball.vy * 1000) / 1000], ph: phase, sd: serveDir, r: rally }),
           input: () => { const p = pads.p2; if (pads.take('p2', 'act')) lastHits++; return { u: p.up ? 1 : 0, d: p.down ? 1 : 0, h: lastHits }; },
           onInput: (seat, d) => {
@@ -351,17 +354,27 @@
         if (guest) on.on('end', d => { if (d && Number.isInteger(d.p1) && Number.isInteger(d.p2)) { score = { p1: d.p1, p2: d.p2 }; phase = 'over'; finishOnline(); } });
       }
       const num = v => typeof v === 'number' && isFinite(v);
+      // the guest moves its own paddle from its own keys at once; the host's copy only nudges it back into line
+      const me = guest && link ? link.predictor({ pick: s => Array.isArray(s.y) && s.y.length === 2 ? [s.y[1]] : null, snap: 70, init: [paddles.p2.y] }) : null;
+      let myV = 0;
       function guestFrame(dt) {
         clock += dt;
         const sm = link.sample();
         if (sm) {
           const { a, b, t } = sm, M = Ludus.rt.mix;
-          if (Array.isArray(a.y) && Array.isArray(b.y) && a.y.length === 2 && b.y.length === 2 && a.y.concat(b.y).every(num)) { paddles.p1.y = M(a.y[0], b.y[0], t); paddles.p2.y = M(a.y[1], b.y[1], t); }
+          if (Array.isArray(a.y) && Array.isArray(b.y) && a.y.length === 2 && b.y.length === 2 && a.y.concat(b.y).every(num)) { paddles.p1.y = M(a.y[0], b.y[0], t); }
           if (Array.isArray(b.pw)) { paddles.p1.power = b.pw[0] ? 0.1 : 0; paddles.p2.power = b.pw[1] ? 0.1 : 0; }
           if (Array.isArray(a.b) && Array.isArray(b.b) && a.b.concat(b.b).every(num)) {
             ball.x = M(a.b[0], b.b[0], t, 120); ball.y = M(a.b[1], b.b[1], t, 120); ball.vx = b.b[2]; ball.vy = b.b[3];
           }
         }
+        const p2 = paddles.p2, pad2 = pads.p2;
+        me.frame(dt, v => {
+          p2.y = v[0]; p2.v = myV;
+          stepPad(p2, phase !== 'over' ? (pad2.down ? 1 : 0) - (pad2.up ? 1 : 0) : 0, dt);
+          v[0] = p2.y; myV = p2.v;
+        });
+        p2.y = me.v[0];
         if (phase === 'play') { trail.unshift({ x: ball.x, y: ball.y }); if (trail.length > 8) trail.pop(); } else trail = [];
         parts.forEach(q => { q.x += q.vx * dt; q.y += q.vy * dt; q.vx *= 0.96; q.vy *= 0.96; q.life -= dt; });
         parts = parts.filter(q => q.life > 0);

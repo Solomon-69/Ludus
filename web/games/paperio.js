@@ -414,6 +414,16 @@
             if (p.respawn <= 0) { spawn(p); p.kills = 0; }
           } else if (p.human) p.deathT += dt;
         }
+        const mine = meP(), lat = link.latest();
+        if (mine && lat && mine.alive && started && !finished) {
+          const tgt = ownTarget(mine); if (myAng !== null) mine.ang = myAng;
+          meL.frame(dt, v => {
+            mine.tgt = tgt; mine.ang += clamp(angDiff(mine.ang, tgt), -TURN * dt, TURN * dt);
+            const d = SPEED * (mine.spd || 1) * dt;
+            v[0] = clamp(v[0] + Math.cos(mine.ang) * d, 0.3, N - 0.3); v[1] = clamp(v[1] + Math.sin(mine.ang) * d, 0.3, N - 0.3);
+          });
+          mine.x = meL.v[0]; mine.y = meL.v[1]; myAng = mine.ang;
+        } else if (mine && lat) { myAng = null; const k = players.indexOf(mine), q = lat.p && lat.p[k]; if (q && num(q[0])) meL.set([q[0], q[1]]); }
         for (const q of parts) { q.t += dt; q.x += q.vx * dt; q.y += q.vy * dt; q.vx *= 0.94; q.vy *= 0.94; }
         parts = parts.filter(q => q.t < q.life);
         for (const f of flashes) f.t += dt;
@@ -723,7 +733,7 @@
         started = false;
         api.timeout(() => { started = true; }, 1600);   // a moment to find yourself before everyone moves
         link = Ludus.rt(api, {
-          hz: 18,
+          hz: 30,
           snapshot: () => { sendRows(); return {
             st: started ? 1 : 0, c: Math.round(clock * 10) / 10, f: finished ? 1 : 0,
             pl: players.map(p => [p.human, p.name, PALETTE.indexOf(p.color)]),
@@ -767,6 +777,9 @@
         });
         const me = meP(); if (me && me.best > bestPct) { bestPct = me.best; api.score(Math.round(bestPct)); }
       }
+      // the guest steers and moves its own player here at once (same speed and turn rate as the host); the host's copy eases it back
+      const meL = guest && link ? link.predictor({ pick: s => { const q = Array.isArray(s.p) && s.p[Math.max(0, players.indexOf(meP()))]; return q && num(q[0]) && num(q[1]) ? [q[0], q[1]] : null; }, snap: 4, init: null }) : null;
+      let myAng = null;
       function guestUpdate(dt) {
         const sm = link.sample();
         if (sm && Array.isArray(sm.a.p) && Array.isArray(sm.b.p)) {

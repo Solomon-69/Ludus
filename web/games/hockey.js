@@ -122,6 +122,9 @@
         const m = mallets[id], p = net && id === 'p2' ? net : dirs(pads[id]), live = phase === 'play' || phase === 'ready';
         let ax = live ? (p.right ? 1 : 0) - (p.left ? 1 : 0) : 0, ay = live ? (p.down ? 1 : 0) - (p.up ? 1 : 0) : 0;
         if (id === 'p2' && !api.friend) { [ax, ay] = live ? botAxes(dt) : [0, 0]; }
+        stepMallet(id, m, ax, ay, dt);
+      }
+      function stepMallet(id, m, ax, ay, dt) {
         if (ax && ay) { ax *= Math.SQRT1_2; ay *= Math.SQRT1_2; }
         const damp = Math.exp(-9 * dt);
         if (ax) m.vx += ax * ACC * dt * (m.vx * ax < 0 ? 1.7 : 1); else m.vx *= damp;
@@ -347,7 +350,7 @@
         if (on.isHost) net = { up: false, down: false, left: false, right: false };
         const R1 = v => Math.round(v * 10) / 10;
         link = Ludus.rt(api, {
-          hz: 20,
+          hz: 30,
           snapshot: () => ({ H, s: [score.p1, score.p2], m: [R1(mallets.p1.x), R1(mallets.p1.y), R1(mallets.p2.x), R1(mallets.p2.y)], p: [R1(puck.x), R1(puck.y)], ph: phase, g: lastGoal ? lastGoal.who : '' }),
           input: () => { const d = dirs(pads.p2); return { u: d.up ? 1 : 0, d: d.down ? 1 : 0, l: d.left ? 1 : 0, r: d.right ? 1 : 0 }; },
           onInput: (seat, d) => { if (seat === 1) { net.up = d.u === 1; net.down = d.d === 1; net.left = d.l === 1; net.right = d.r === 1; } },
@@ -364,14 +367,25 @@
         });
         if (guest) on.on('end', d => { if (d && Number.isInteger(d.p1) && Number.isInteger(d.p2)) { score = { p1: d.p1, p2: d.p2 }; phase = 'over'; if (!lastGoal) lastGoal = { who: d.p1 > d.p2 ? 'p1' : 'p2', x: W / 2, y: 0, t: clock }; finishOnline(); } });
       }
+      // the guest moves its own mallet from its own keys at once; the host's copy only nudges it back into line
+      const me = guest && link ? link.predictor({ pick: s => Array.isArray(s.m) && s.m.length === 4 ? [s.m[2], s.m[3]] : null, snap: 90, init: [mallets.p2.x, mallets.p2.y] }) : null;
+      const mine = { x: 0, y: 0, vx: 0, vy: 0 };
       function guestFrame(dt) {
         clock += dt;
         const sm = link.sample();
         if (sm && Array.isArray(sm.a.m) && Array.isArray(sm.b.m) && Array.isArray(sm.a.p) && Array.isArray(sm.b.p) && sm.a.m.concat(sm.b.m, sm.a.p, sm.b.p).every(num) && sm.b.m.length === 4) {
           const { a, b, t } = sm, M = Ludus.rt.mix;
           mallets.p1.x = M(a.m[0], b.m[0], t); mallets.p1.y = M(a.m[1], b.m[1], t);
-          mallets.p2.x = M(a.m[2], b.m[2], t); mallets.p2.y = M(a.m[3], b.m[3], t);
           puck.x = M(a.p[0], b.p[0], t, 80); puck.y = M(a.p[1], b.p[1], t, 80);
+        }
+        {
+          const live = phase === 'play' || phase === 'ready', d = dirs(pads.p2);
+          me.frame(dt, v => {
+            mine.x = v[0]; mine.y = v[1];
+            stepMallet('p2', mine, live ? (d.right ? 1 : 0) - (d.left ? 1 : 0) : 0, live ? (d.down ? 1 : 0) - (d.up ? 1 : 0) : 0, dt);
+            v[0] = mine.x; v[1] = mine.y;
+          });
+          mallets.p2.x = me.v[0]; mallets.p2.y = me.v[1];
         }
         if (phase === 'play') { trail.unshift({ x: puck.x, y: puck.y }); if (trail.length > 7) trail.pop(); } else trail = [];
         parts.forEach(q => { q.x += q.vx * dt; q.y += q.vy * dt; q.vx *= 0.95; q.vy *= 0.95; q.life -= dt; });
