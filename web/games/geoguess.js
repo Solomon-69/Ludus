@@ -117,7 +117,7 @@
 
   // ---------- styles (kept here so the game is one file plus its data) ----------
   const CSS = `
-.geo{position:absolute;inset:0;overflow:hidden;border-radius:inherit;background:#15130f;color:#fff;font-family:var(--font);user-select:none;-webkit-user-select:none}
+.geo{position:absolute;inset:0;z-index:0;isolation:isolate;overflow:hidden;border-radius:inherit;background:#15130f;color:#fff;font-family:var(--font);user-select:none;-webkit-user-select:none}
 .geo *{box-sizing:border-box}
 .geo-pano{position:absolute;inset:0}
 .geo-pano .pnlm-container{background:#15130f}
@@ -384,7 +384,7 @@
         offs.push(GM.smoothWheel(map, el_));
       }
       function setPin(ll, quiet) {
-        pin = { lat: ll.lat, lon: ll.lon };
+        pin = { lat: ll.lat, lon: ll.lon !== undefined ? ll.lon : ll.lng };
         if (miniLayer) { miniLayer.clearLayers(); L.marker([pin.lat, pin.lon], { icon: pinIcon(SEAT[mySeat], !quiet && !api.reduceMotion), interactive: false }).addTo(miniLayer); }
         guessBtn.disabled = false; guessLabel(); if (!quiet) api.sfx('tap');
       }
@@ -409,7 +409,7 @@
         root.style.setProperty('--mini-w', W + 'px'); root.style.setProperty('--mini-h', H + 'px');
         root.style.setProperty('--mini-cw', CW + 'px'); root.style.setProperty('--mini-ch', CH + 'px');
         root.style.setProperty('--mini-s', String(Math.max(CW / W, CH / H).toFixed(4)));
-        if (miniMap) miniMap.invalidateSize({ animate: false });
+        if (miniMap) { miniMap.invalidateSize({ animate: false }); keepPinVisible(false); }
         biggerBtn.disabled = sizeLv >= MAP_SIZES.length - 1; smallerBtn.disabled = sizeLv <= 0;
         lockBtn.classList.toggle('on', pinned); lockBtn.title = pinned ? 'Let the map close again' : 'Keep the map open';
       }
@@ -418,7 +418,28 @@
       biggerBtn.onclick = () => resize(1); smallerBtn.onclick = () => resize(-1);
       lockBtn.onclick = () => { pinned = !pinned; sizeMini(); keepMapPrefs(); api.sfx('click'); if (pinned) openMini(true); };
       let hoverT = 0;
-      function openMini(on_) { clearTimeout(hoverT); mini.classList.toggle('open', on_ || pinned); }
+      function openMini(on_) {
+        clearTimeout(hoverT);
+        const was = mini.classList.contains('open'), now = !!(on_ || pinned);
+        mini.classList.toggle('open', now);
+        if (was && !now) keepPinVisible(true);
+      }
+      // Closed, the map is scaled down and cropped to the small box: if the pin would sit outside that box (or under its
+      // edge), slide the map so the whole pin stays in view.
+      function keepPinVisible(animate) {
+        if (!miniMap || !pin || mini.classList.contains('open')) return;
+        const css = n => parseFloat(root.style.getPropertyValue(n)) || 0;
+        const s = css('--mini-s'), cw = css('--mini-cw'), ch = css('--mini-ch');
+        if (!(s > 0) || !cw || !ch) return;
+        const PAD = 16;   // pin radius (12) plus a little room, in map pixels
+        const half = miniMap.getSize().divideBy(2);
+        const vx = Math.max(0, cw / 2 / s - PAD), vy = Math.max(0, ch / 2 / s - PAD);
+        const c = miniMap.getCenter(), lon = pin.lon + 360 * Math.round((c.lng - pin.lon) / 360);
+        const d = miniMap.latLngToContainerPoint([pin.lat, lon]).subtract(half);
+        const sx = d.x > vx ? d.x - vx : d.x < -vx ? d.x + vx : 0, sy = d.y > vy ? d.y - vy : d.y < -vy ? d.y + vy : 0;
+        if (Math.abs(sx) < 0.5 && Math.abs(sy) < 0.5) return;
+        miniMap.panBy([sx, sy], animate && !api.reduceMotion ? { animate: true, duration: 0.3, easeLinearity: 0.4 } : { animate: false });
+      }
       api.on(mini, 'pointerenter', e => { if (e.pointerType === 'touch') return; openMini(true); });
       api.on(mini, 'pointerleave', e => { if (e.pointerType === 'touch') return; clearTimeout(hoverT); hoverT = setTimeout(() => { if (!pinned) openMini(false); }, 450); });
       api.on(root, 'pointerdown', e => { if (!pinned && !mini.contains(e.target) && mini.classList.contains('open')) openMini(false); }, true);
@@ -435,7 +456,28 @@
       const NO_UI = { showControls: false, showFullscreenCtrl: false, showZoomCtrl: false, compass: false, mouseZoom: true, hfov: 90, minHfov: 50, maxHfov: 110, pitch: 0, yaw: 0, disableKeyboardCtrl: true, sceneFadeDuration: 250, friction: 0.1, touchPanSpeedCoeffFactor: 1, autoRotate: 0 };
       // One picture load at a time: Pannellum breaks ('Cannot set properties of undefined') when a scene is swapped while
       // the previous picture is still downloading, so a new request waits for the current one to finish.
-      let busy = false, queued = null;
+      let busy = false, queued = null, activeReq = null, rebuilt = 0;
+      // The graphics card can drop the street view's drawing surface (sleep, low memory, many views): the picture goes
+      // blank. Start a fresh viewer on the same spot and view, finishing whatever load was under way.
+      function rebuildViewer() {
+        if (destroyed || !viewer) return;
+        let view = null;
+        try { view = { yaw: viewer.getYaw(), pitch: viewer.getPitch(), hfov: viewer.getHfov() }; } catch (e) {}
+        const req = activeReq || (cur ? [cur, true, null, view] : null), q = queued;
+        try { viewer.destroy(); } catch (e) {}
+        panoEl.innerHTML = '';
+        viewer = null; busy = false; queued = null; activeReq = null; pendingDone = null; curScene = ''; rebuilt = ++loadToken;
+        if (req) showItem(req[0], req[1], req[2], req[3] || view);
+        if (q) queued = q;
+      }
+      let lostT = 0;
+      panoEl.addEventListener('webglcontextlost', e => { e.preventDefault(); clearTimeout(lostT); lostT = later(rebuildViewer, 120); }, true);
+      api.on(document, 'visibilitychange', () => {   // back from sleep / hidden: a canvas whose context died is rebuilt too
+        if (document.hidden || !viewer) return;
+        const cv = panoEl.querySelector('canvas'); let gl = null;
+        try { gl = cv && (cv.getContext('webgl2') || cv.getContext('webgl') || cv.getContext('experimental-webgl')); } catch (e) {}
+        if (cv && gl && gl.isContextLost()) rebuildViewer();
+      });
       // A picture download that fails half way makes Pannellum throw from inside its own loader (FileReader / image src):
       // treat that as a failed load (retried with the smaller copy) instead of a page error.
       const onPanoError = e => {
@@ -446,6 +488,7 @@
       window.addEventListener('error', onPanoError); offs.push(() => window.removeEventListener('error', onPanoError));
       function showItem(item, keepHeading, onDone0, view) {
         if (busy) { queued = [item, keepHeading, onDone0, view]; return; }
+        activeReq = [item, keepHeading, onDone0, view];
         const onDone = ok => { if (!ok && item.src !== item.sd) { item.src = item.sd; showItem(item, keepHeading, onDone0, view); return; } onDone0 && onDone0(ok); };
         const token = ++loadToken;
         const prevScene = curScene, id = 's' + (++sceneN);
@@ -454,7 +497,7 @@
         loadEl.hidden = false; busy = true;
         let fin = false;
         const done = ok => {
-          if (fin) return; fin = true; busy = false;
+          if (fin || token < rebuilt) return; fin = true; busy = false; activeReq = null;
           if (token === loadToken) loadEl.hidden = true;
           if (!destroyed) onDone && onDone(ok);
           if (!busy && queued && !destroyed) { const q = queued; queued = null; showItem(...q); }
@@ -536,7 +579,17 @@
       }
       function hud(vis) { [roundPill, top, scoreEl, homeBtn, mini].forEach(e => { e.style.visibility = vis ? 'visible' : 'hidden'; }); }
       // snap: a saved game being resumed (place along the road, view, time left, pin, map view)
-      function startRound(r, snap) {
+      // A place whose photo will not load: solo games swap in an unused place (the pool has hundreds); online games,
+      // where everybody must see the same place, try the same one again before showing the retry card.
+      let spare = -1;
+      function swapPlace(r) {
+        if (on || !pool || order.length <= cfg.rounds) return false;
+        if (spare < cfg.rounds) spare = cfg.rounds;
+        if (spare >= order.length) return false;
+        const k = spare++; [order[r], order[k]] = [order[k], order[r]];
+        return true;
+      }
+      function startRound(r, snap, tries = 0) {
         if (destroyed || r >= cfg.rounds) return;
         round = r; phase = 'load'; ready = new Set(); pin = null; moving = false; applyMove();
         resEl.hidden = true; waitEl.hidden = true; setCard(false); hud(true);
@@ -549,20 +602,27 @@
         renderScore(r);
         const p = place(r), at = snap && snap.at;
         const first = at ? getItem(at.c, at.id).catch(() => getItem(p.c, p.id)) : getItem(p.c, p.id);
+        const retry = () => {
+          if (destroyed || round !== r || phase !== 'load') return;
+          if (tries >= 4 || (on && tries >= 1)) { fail(); return; }
+          if (tries >= 1 || !snap) swapPlace(r);   // the first retry of a resumed spot tries the place's own start
+          later(() => { if (!destroyed && round === r && phase === 'load') startRound(r, tries >= 1 ? null : snap && Object.assign({}, snap, { at: null }), tries + 1); }, 300);
+        };
         first.then(it => {
           if (destroyed || round !== r || phase !== 'load') return;
           showItem(it, false, ok => {
             if (destroyed || round !== r || phase !== 'load') return;
-            if (!ok) { fail(); return; }
+            if (!ok) { retry(); return; }
+            if (!snap) restoring = null;
             phase = 'play'; left = snap ? snap.left : cfg.time; timerEl.hidden = !cfg.time; if (cfg.time) drawTimer();
             if (snap) {
               elapsed = snap.elapsed || 0;
               if (snap.map && miniMap) miniMap.setView([snap.map[0], snap.map[1]], snap.map[2], { animate: false });
-              if (snap.pin) setPin(snap.pin, true);
+              if (snap.pin) { setPin(snap.pin, true); keepPinVisible(false); }
               restoring = null;
             }
           }, snap && at && it.id === at.id ? snap.view : null);
-        }, () => fail());
+        }, retry);
       }
       function drawTimer() {
         timerEl.textContent = fmtTime(Math.max(0, Math.ceil(left)));
@@ -828,7 +888,8 @@
         else if (phase === 'setup' && host && k === 'Enter') begin();
       });
       guessBtn.onclick = () => submit(false);
-      new ResizeObserver(() => { root.style.setProperty('--geo-h', stage.clientHeight + 'px'); if (viewer) try { viewer.resize(); } catch (e) {} if (resMap) resMap.invalidateSize(false); sizeMini(); }).observe(stage);
+      const ro = new ResizeObserver(() => { if (destroyed) return; root.style.setProperty('--geo-h', stage.clientHeight + 'px'); if (viewer) try { viewer.resize(); } catch (e) {} if (resMap) resMap.invalidateSize(false); sizeMini(); });
+      ro.observe(stage); offs.push(() => ro.disconnect());
       root.style.setProperty('--geo-h', stage.clientHeight + 'px');
       api.loop(dt => {
         if (viewer && cur && (phase === 'play' || phase === 'load')) heading = wrap360(cur.az + viewer.getYaw());
