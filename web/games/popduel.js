@@ -102,7 +102,8 @@
   const RULES = { classic: { n: 'Classic', cash: 900, lives: 150, bonus: 110, d: 'Survive as many waves as you can.' },
     relaxed: { n: 'Relaxed', cash: 1000, lives: 250, bonus: 120, spd: 0.85, disc: 0.85, d: 'Slower balloons, more lives, cheaper towers.' },
     rush: { n: 'Rush', cash: 900, lives: 150, bonus: 220, brk: 1.5, spd: 1.1, d: 'No breathers between waves, double pay.' },
-    deflation: { n: 'Deflation', cash: 6000, lives: 150, bonus: 0, noIncome: 1, d: '$6,000 now and not a cent more.' } };
+    deflation: { n: 'Deflation', cash: 6000, lives: 150, bonus: 0, noIncome: 1, d: '$6,000 now and not a cent more.' },
+    sandbox: { n: 'Sandbox', cash: 999999, lives: 999999, bonus: 110, sandbox: 1, d: 'Endless cash and lives. Try any tower or combo.' } };
   const SOLO_KEYS = Object.keys(RULES);
   const DUEL = { cash: 750, lives: 100, bonus: 100 };
   function stats(t) { const T = TW[t.k]; const s = { kind: T.kind, camo: 0, bigBonus: 1, tgt: 'first', ...T.base }; for (let p = 0; p < 3; p++) for (let i = 0; i < (t.up ? t.up[p] : 0); i++) T.paths[p].t[i].f(s); return s; }
@@ -272,6 +273,7 @@
     step(dt) {
       if (this.dead) return;
       this.t += dt; this.sendCd = Math.max(0, this.sendCd - dt); this.msgT = Math.max(0, this.msgT - dt);
+      if (this.R.sandbox) this.cash = Math.max(this.cash, this.R.cash);
       while (waveStart(this.wave + 1, this.R.brk) <= this.t) {
         this.wave++; this.queueWave(this.wave);
         if (this.wave > 1 && !this.R.noIncome) this.cash += (this.R.bonus ?? 100) + this.inc;
@@ -290,7 +292,7 @@
         if (auras.length) { const p = at(b.d); for (const t of auras) if (Math.hypot(p[0] - t.x, p[1] - t.y) <= t.s.range) f *= t.s.aura; }
         if (b.dead) continue;
         b.d += K.sp * f * dt * (this.R.spd || 1);
-        if (b.d >= LEN) { b.dead = true; this.lives -= rbe(b.k); this.leak = 0.4; this.sfx('hit'); }
+        if (b.d >= LEN) { b.dead = true; if (!this.R.sandbox) this.lives -= rbe(b.k); this.leak = 0.4; this.sfx('hit'); }
       }
       this.leak = Math.max(0, (this.leak || 0) - dt);
       for (const tr of this.traps) {
@@ -419,6 +421,8 @@
   Ludus.register({
     id: 'popduel', name: 'Bloons TD Battles', aka: 'Pop Duel balloon tower defence', tag: 'Duel', wide: true, versus: true, tint: '#4f9a4a',
     hint: 'Pick a tower, click grass to build · click it to upgrade · vs Friend: P1 left track, P2 right · <kbd>1</kbd>-<kbd>0</kbd> towers · <kbd>Space</kbd> speed',
+    online: { min: 2, max: 2 },
+    onlineHint: '<b>Online</b> You defend your own track, your friend defends theirs · same waves on the same clock · Send balloons at them from the Send tab · <kbd>1</kbd>-<kbd>0</kbd> towers',
     _rules: { TW, SENDS, wave, waveStart, canUp, stats, Board, aiThink },
     art(ctx, w, h) {
       const s = Math.min(w / 160, h / 110);
@@ -437,20 +441,28 @@
     create(stage, api) {
       const view = api.canvas();
       const { ctx, canvas } = view;
-      const friend = api.friend;
-      let mode = 'duel', rule = 'classic', phase = 'menu', clock = 0, speed = 1, boards = [], active = 0, aiT = 0, overT = 0, winner = -1, lastPop = 0, menuHover = null;
-      let hits = [], mouse = null, restored = false;
+      // Online (api.online): this screen runs its own track only; the rival's track is a copy drawn from their snapshots.
+      const on = api.online || null, friend = api.friend && !on;
+      const me = on && on.seat === 1 ? 1 : 0, foe = 1 - me;
+      let mode = 'duel', rule = 'classic', phase = 'menu', clock = 0, speed = 1, boards = [], active = me, aiT = 0, overT = 0, winner = -1, lastPop = 0, menuHover = null;
+      let hits = [], mouse = null, restored = false, netT = 0, foeDead = null, myDeadT = -1;
 
       function makeBoards() {
         const common = { live: () => phase === 'play', sfx: n => api.sfx(n), pop: B => { const now = performance.now(); if (B.human && now - lastPop > 70) { lastPop = now; api.sfx('tick'); } } };
         if (mode === 'solo') { boards = [new Board({ ...common, human: true, solo: true, rules: RULES[rule], who: 'you', onSend() {} })]; return; }
+        if (on) {
+          const mine = new Board({ ...common, human: true, who: me ? 'p2' : 'p1', onSend: (k, n) => netSend(k, n) });
+          const theirs = new Board({ ...common, human: false, remote: true, who: foe ? 'p2' : 'p1', onSend() {} });
+          boards = me ? [theirs, mine] : [mine, theirs];
+          return;
+        }
         const a = new Board({ ...common, human: true, who: friend ? 'p1' : 'you', onSend: (k, n) => b.receive(k, n) });
         const b = new Board({ ...common, human: friend, who: friend ? 'p2' : 'bot', onSend: (k, n) => a.receive(k, n) });
         boards = [a, b];
       }
       function startRun(m, r) {
         mode = m; if (r) rule = r;
-        makeBoards(); clock = 0; phase = 'play'; winner = -1; active = 0; aiT = 0;
+        makeBoards(); clock = 0; phase = 'play'; winner = -1; active = me; aiT = 0; netT = 0; foeDead = null; myDeadT = -1;
         api.score(0); api.sfx('score');
       }
       makeBoards();
@@ -478,15 +490,15 @@
           const bw = Math.min((w - 30) / 2, (h - TOP - 16 - PANEL_MIN) * 1.5), bh = bw / 1.5, x0 = (w - 2 * bw - 10) / 2;
           L.boards.push({ i: 0, x: x0, y: TOP, w: bw, h: bh }, { i: 1, x: x0 + bw + 10, y: TOP, w: bw, h: bh });
           const py = TOP + bh + 8, ph = h - py - 8, pw = Math.max(2 * bw + 10, Math.min(w - 20, 760));
-          L.panels.push({ i: friend ? active : 0, x: (w - pw) / 2, y: py, w: pw, h: ph, shared: friend });
+          L.panels.push({ i: friend ? active : me, x: (w - pw) / 2, y: py, w: pw, h: ph, shared: friend });
         } else if (friend) {
           const bh = Math.min((w - 20) / 1.5, (h - TOP - 24 - 150) / 2), bw = bh * 1.5;
           L.boards.push({ i: 0, x: (w - bw) / 2, y: TOP, w: bw, h: bh }, { i: 1, x: (w - bw) / 2, y: TOP + bh + 8, w: bw, h: bh });
           L.panels.push({ i: active, x: 10, y: TOP + 2 * bh + 16, w: w - 20, h: h - TOP - 2 * bh - 24, shared: true });
         } else {
           const bw = Math.min(w - 20, (h - TOP - 216) * 1.5), bh = bw / 1.5;
-          L.boards.push({ i: 0, x: (w - bw) / 2, y: TOP, w: bw, h: bh });
-          L.panels.push({ i: 0, x: 10, y: TOP + bh + 8, w: w - 20, h: h - TOP - bh - 16, rival: true });
+          L.boards.push({ i: me, x: (w - bw) / 2, y: TOP, w: bw, h: bh });
+          L.panels.push({ i: me, x: 10, y: TOP + bh + 8, w: w - 20, h: h - TOP - bh - 16, rival: true });
         }
         return L;
       }
@@ -503,11 +515,14 @@
       api.on(canvas, 'contextmenu', e => { e.preventDefault(); boards.forEach(B => { B.pick = null; B.selT = null; }); });
       api.keys(e => {
         if (phase !== 'play') return;
-        if (e.key === ' ') { speed = speed === 1 ? 2 : 1; api.sfx('click'); return; }
+        if (e.key === ' ') { if (!on) { speed = nextSpeed(); api.sfx('click'); } return; }
         const n = '1234567890'.indexOf(e.key);
         const B = boards[active];
         if (n >= 0 && B && B.human) { const k = TKEYS[n]; B.pick = B.pick === k ? null : k; B.selT = null; B.tab = 'towers'; api.sfx('click'); }
       });
+
+      // Solo goes up to triple speed; a duel on one screen up to double; online keeps both screens on the real clock.
+      function nextSpeed() { const top = mode === 'solo' ? 3 : 2; return speed >= top ? 1 : speed + 1; }
 
       /* ---------- drawing ---------- */
       let col = api.colors(), P = pal(col);
@@ -625,8 +640,9 @@
         }, B.pick ? 'crosshair' : 'default');
       }
       function drawHud(B, R) {
-        const name = B.opt.who === 'bot' ? 'Bot' : B.opt.who === 'p2' ? 'P2' : B.opt.who === 'p1' ? 'P1' : 'You';
-        const parts = mode === 'solo' || R.w < 280 ? [`${B.lives} lives`, `$${B.cash}`] : [name, `${B.lives} lives`, `$${B.cash}`];
+        const name = on ? nameOf(boards.indexOf(B)) : B.opt.who === 'bot' ? 'Bot' : B.opt.who === 'p2' ? 'P2' : B.opt.who === 'p1' ? 'P1' : 'You';
+        const lv = B.R.sandbox ? '\u221e lives' : `${B.lives} lives`, cs = B.R.sandbox ? '$\u221e' : `$${B.cash}`;
+        const parts = mode === 'solo' || R.w < 280 ? [lv, cs] : [name, lv, cs];
         const s = parts.join('  ·  ');
         ctx.save(); ctx.font = FONT(11, 700);
         const tw = Math.min(R.w - 16, ctx.measureText(s).width + 30);
@@ -700,16 +716,16 @@
         return 'Abilities from tier 3 upgrades';
       }
       function drawRival(x, y, w, h) {
-        const B = boards[1]; if (!B) return '';
+        const B = boards[foe]; if (!B) return '';
         const bh = Math.min(h, (w * 0.62) / 1.5), bw = bh * 1.5;
-        drawBoard(B, { x, y, w: bw, h: bh }, 1);
+        drawBoard(B, { x, y, w: bw, h: bh }, foe);
         const tx = x + bw + 12, tw = x + w - tx;
         if (tw > 50) {
           [['Lives', B.lives], ['Cash', '$' + B.cash], ['Towers', B.towers.length], ['Wave', B.wave]].forEach(([a, b], i) => {
             fit1(ctx, a, tx, y + 10 + i * 30, tw, 10, col.ink2, 600, 'left'); fit1(ctx, String(b), tx, y + 23 + i * 30, tw, 13, col.ink, 700, 'left');
           });
         }
-        return 'The bot’s track';
+        return on ? nameOf(foe) + '’s track' : 'The bot’s track';
       }
       function drawUpgrades(B, x, y, w, h, R) {
         const t = B.selT, T = TW[t.k];
@@ -764,10 +780,11 @@
       function drawHeader() {
         const w = view.w;
         const a = boards[0], b = boards[1];
-        const L = a ? { who: a.opt.who, label: a.opt.who === 'p1' ? 'P1' : 'You', score: a.lives + ' lives' } : null;
+        const lives = B => (B.R.sandbox ? '\u221e' : B.lives) + ' lives';
+        const L = a ? { who: a.opt.who, label: on ? nameOf(0) : a.opt.who === 'p1' ? 'P1' : 'You', score: lives(a) } : null;
         let Rt = null;
-        if (mode === 'duel' && b) Rt = { who: b.opt.who, label: b.opt.who === 'p2' ? 'P2' : 'Bot', score: b.lives + ' lives' };
-        const thinking = !friend && mode === 'duel' && phase === 'play';
+        if (mode === 'duel' && b) Rt = { who: b.opt.who, label: on ? nameOf(1) : b.opt.who === 'p2' ? 'P2' : 'Bot', score: lives(b) };
+        const thinking = !friend && !on && mode === 'duel' && phase === 'play';
         D.duelHeader(ctx, 10, 8, w - 20, { left: L, right: Rt, turn: thinking ? 'right' : null, status: '', thinking }, col);
         const pw = Math.min(132, (w - 20) * 0.34), mx = 10 + pw + 10, mw = w - 20 - 2 * pw - 20;
         if (mode === 'solo') fit1(ctx, RULES[rule].n + ' solo', w - 10 - pw / 2, 28, pw, 12, col.ink2, 700);
@@ -778,7 +795,7 @@
           if (phase === 'over') status = 'Game over';
         }
         fit1(ctx, status, mx + mw / 2, 20, mw, 12, col.accent, 700);
-        if (phase === 'play' && mw > 40) button(mx + mw / 2 - 18, 32, 36, 16, { label: speed === 1 ? '1x' : '2x', tip: 'Game speed', r: 8, size: 9.5, on: speed === 2, fn: () => { speed = speed === 1 ? 2 : 1; api.sfx('click'); } });
+        if (phase === 'play' && mw > 40 && !on) button(mx + mw / 2 - 18, 32, 36, 16, { label: speed + 'x', tip: 'Game speed (Space)', r: 8, size: 9.5, on: speed > 1, fn: () => { speed = nextSpeed(); api.sfx('click'); } });
       }
 
       function drawMenu() {
@@ -791,7 +808,7 @@
         D.fitText(ctx, sub, x + cw / 2, y + 52, cw - 36, 11.5, col.ink2, 600, 10);
         button(x + 18, y + 76, cw - 36, 36, { label: friend ? 'Start duel: P1 vs P2' : 'Start duel vs bot', primary: true, r: 12, size: 12.5, fn: () => startRun('duel') });
         fit1(ctx, 'Or play solo, endless waves', x + cw / 2, y + 128, cw - 36, 10.5, col.ink3, 650);
-        const bw = (cw - 36 - 18) / 4;
+        const bw = (cw - 36 - 6 * (SOLO_KEYS.length - 1)) / SOLO_KEYS.length;
         menuHover = null;
         SOLO_KEYS.forEach((k, i) => {
           const bx = x + 18 + i * (bw + 6);
@@ -818,7 +835,9 @@
       }
 
       /* ---------- flow ---------- */
+      function nameOf(i) { return (on && on.names && String(on.names[i] || '').trim()) || 'Player ' + (i + 1); }
       function endText() {
+        if (on) { const wv = boards[winner].wave; return winner === me ? { title: 'You win the duel', message: `${nameOf(foe)} fell on wave ${boards[foe].wave || wv}` } : { title: nameOf(foe) + ' wins', message: `Your track fell on wave ${boards[me].wave}` }; }
         if (mode === 'solo') { const B = boards[0]; return { title: 'Overrun on wave ' + B.wave, message: RULES[rule].n + ' solo · ' + B.pops + ' balloons popped' }; }
         const [a, b] = boards, wv = boards[winner].wave;
         if (friend) return { title: (winner ? 'P2' : 'P1') + ' wins the duel', message: `${winner ? 'P2' : 'P1'} held the line to wave ${wv}` };
@@ -826,13 +845,14 @@
       }
       function update(dt) {
         if (phase !== 'play') {
-          if (phase === 'over') { overT -= dt; if (overT <= 0 && !api.ended) { const m = endText(); const sc = mode === 'solo' ? boards[0].wave : boards[winner].wave; api.over({ score: sc, won: mode === 'solo' ? undefined : (friend || winner === 0), title: m.title, message: m.message }); } }
+          if (phase === 'over') { overT -= dt; if (overT <= 0 && !api.ended) { const m = endText(); const sc = mode === 'solo' ? boards[0].wave : boards[winner].wave; api.over({ score: sc, won: on ? winner === me : mode === 'solo' ? undefined : (friend || winner === 0), title: m.title, message: m.message }); } }
           return;
         }
         if (!dt) return;   // a still frame while paused
         clock += dt * speed;
+        if (on) { netTick(dt); return; }
         boards.forEach(B => B.advance(clock));
-        if (mode === 'duel' && !friend) { aiT -= dt * speed; if (aiT <= 0) { aiT = [0.6, 0.3, 0.2][api.level]; aiThink(boards[1], api.level); } }
+        if (mode === 'duel' && !friend && !on) { aiT -= dt * speed; if (aiT <= 0) { aiT = [0.6, 0.3, 0.2][api.level]; aiThink(boards[1], api.level); } }
         api.score(Math.max(...boards.map(B => B.wave)));
         if (mode === 'solo') { if (boards[0].dead) end(-1); return; }
         const [a, b] = boards;
@@ -841,12 +861,81 @@
       function end(w) {
         phase = 'over'; winner = w; overT = 1.8;
         boards.forEach(B => { B.pick = null; B.selT = null; });
-        api.sfx(mode === 'solo' ? 'over' : (friend || w === 0) ? 'win' : 'lose');
+        api.sfx(mode === 'solo' ? 'over' : (on ? w === me : (friend || w === 0)) ? 'win' : 'lose');
+      }
+
+      /* ---------- online: my track runs here, the rival's is a copy from their snapshots ---------- */
+      const KK = Object.keys(KIND), SNAP_EVERY = 0.2, MAX_BL = 120, MAX_MSG = 3600;
+      const int = (v, lo, hi) => Number.isInteger(v) && v >= lo && v <= hi;
+      function netSend(k, n) {
+        const i = SENDS.findIndex(s => s.k === k && s.n === n);
+        if (on && i >= 0) on.send('send', { i });
+      }
+      function snapshot() {
+        const B = boards[me];
+        const tw = B.towers.slice(0, GC * GR).map(t => [TKEYS.indexOf(t.k), t.c, t.r, t.up[0], t.up[1], t.up[2], Math.round((t.ang || 0) * 10)]);
+        let bl = B.bl.filter(b => !b.dead).sort((x, y) => y.d - x.d).slice(0, MAX_BL).map(b => [KK.indexOf(b.k), Math.round(b.d), b.camo ? 1 : 0]);
+        const msg = () => ({ l: Math.max(0, Math.round(B.lives)), c: Math.round(B.cash), w: B.wave, d: B.dead ? 1 : 0, tw, bl });
+        let m = msg();
+        while (bl.length && JSON.stringify(m).length > MAX_MSG) { bl = bl.slice(0, Math.floor(bl.length / 2)); m = msg(); }
+        return m;
+      }
+      function applySnap(m) {
+        const R = boards[foe];
+        if (!R || !m || typeof m !== 'object' || !int(m.l, 0, 1e7) || !int(m.c, -1e7, 1e7) || !int(m.w, 0, 10000) || !Array.isArray(m.tw) || !Array.isArray(m.bl)) return;
+        if (m.tw.length > GC * GR || m.bl.length > MAX_BL) return;
+        const towers = [];
+        for (const a of m.tw) {
+          if (!Array.isArray(a) || a.length !== 7 || !int(a[0], 0, TKEYS.length - 1) || !int(a[1], 0, GC - 1) || !int(a[2], 0, GR - 1) || !a.slice(3, 6).every(u => int(u, 0, 3)) || !int(a[6], -100, 100)) return;
+          const t = { k: TKEYS[a[0]], c: a[1], r: a[2], x: (a[1] + 0.5) * CS, y: (a[2] + 0.5) * CS, up: a.slice(3, 6), ang: a[6] / 10, cd: 0, spent: 0, abCd: 0, boost: 0 };
+          t.s = stats(t); t.tgt = t.s.tgt; towers.push(t);
+        }
+        const bl = [];
+        for (const a of m.bl) {
+          if (!Array.isArray(a) || a.length !== 3 || !int(a[0], 0, KK.length - 1) || !int(a[1], 0, Math.ceil(LEN)) || !int(a[2], 0, 1)) return;
+          const k = KK[a[0]]; bl.push({ id: -1, k, hp: KIND[k].hp, d: a[1], fz: 0, gl: 0, gs: 1, burn: 0, kb: 0, camo: !!a[2] });
+        }
+        if (m.l < R.lives) R.leak = 0.4;
+        R.lives = m.l; R.cash = m.c; R.wave = m.w; R.towers = towers; R.bl = bl; R.pr = []; R.traps = []; R.fx = [];
+        if (m.d) R.dead = true;
+      }
+      // Who lost: the first track to fall on its own clock; a dead heat goes to seat 0. Results can cross on the wire,
+      // so the end card waits a moment (overT) before api.over and settles the winner again if the rival's result lands.
+      function settle() {
+        if (myDeadT >= 0 && foeDead) return myDeadT > foeDead.t ? me : myDeadT < foeDead.t ? foe : 0;
+        if (foeDead) return me;
+        return foe;
+      }
+      function netTick(dt) {
+        const B = boards[me];
+        B.advance(clock);
+        api.score(B.wave);
+        netT -= dt;
+        if (netT <= 0) { netT = SNAP_EVERY; try { on.sendFast('st', snapshot()); } catch (e) {} }
+        if (B.dead && myDeadT < 0) {
+          myDeadT = Math.round(B.deadT * 1000) / 1000;   // the same precision the rival receives, so both screens compare equal numbers
+          try { on.sendFast('st', snapshot()); on.send('dead', { t: Math.round(myDeadT * 1000), w: B.wave }); } catch (e) {}
+          end(settle());
+        } else if (foeDead && phase === 'play') end(settle());
+      }
+      if (on) {
+        on.on('st', d => { try { applySnap(d); } catch (e) {} });
+        on.on('send', (d, from) => {
+          if (from === me || !d || !int(d.i, 0, SENDS.length - 1) || phase !== 'play') return;
+          const B = boards[me]; if (B.dead) return;
+          const s = SENDS[d.i]; B.receive(s.k, s.n);
+        });
+        on.on('dead', (d, from) => {
+          if (from === me || foeDead || !d || !int(d.t, 0, 1e9) || !int(d.w, 0, 10000)) return;
+          foeDead = { t: d.t / 1000, w: d.w };
+          const R = boards[foe]; if (R) { R.dead = true; R.wave = Math.max(R.wave, d.w); R.lives = 0; R.bl = []; }
+          if (phase === 'over' && !api.ended) winner = settle();
+        });
       }
 
       /* ---------- save / restore ---------- */
       function save() {
-        if (phase !== 'play' || api.ended || (!restored && !api.touched)) return null;
+        if (on || phase !== 'play' || api.ended || (!restored && !api.touched)) return null;
         return { v: 1, mode, rule, speed, active,
           boards: boards.map(B => ({ cash: B.cash, lives: B.lives, wave: B.wave, inc: B.inc, aiI: B.aiI, pops: B.pops,
             towers: B.towers.map(t => ({ k: t.k, c: t.c, r: t.r, up: t.up.slice(), spent: t.spent, tgt: t.tgt, abCd: Math.max(0, t.abCd) })) })) };
@@ -861,7 +950,7 @@
           if (!b.towers.every(t => TW[t.k] && Number.isInteger(t.c) && Number.isInteger(t.r) && Array.isArray(t.up) && t.up.length === 3 && t.up.every(u => Number.isInteger(u) && u >= 0 && u <= 3) && num(t.spent) && TGT.includes(t.tgt))) return false;
         }
         mode = s.mode; rule = s.mode === 'solo' ? s.rule : 'classic'; makeBoards();
-        speed = s.speed === 2 ? 2 : 1; active = s.active === 1 && boards.length === 2 ? 1 : 0;
+        speed = [1, 2, 3].includes(s.speed) ? Math.min(s.speed, s.mode === 'solo' ? 3 : 2) : 1; active = s.active === 1 && boards.length === 2 ? 1 : 0;
         const wv = s.boards[0].wave;
         clock = wv > 0 ? waveStart(wv, boards[0].R.brk) : 0;
         boards.forEach((B, i) => {
@@ -874,7 +963,8 @@
         api.score(wv);
         return true;
       }
-      restored = !!(api.saved && restore(api.saved));
+      restored = !on && !!(api.saved && restore(api.saved));
+      if (on) startRun('duel');
 
       if (window.ludusDebug) window.ludusDebug.popduel = () => ({ phase, mode, rule, clock, speed, winner, layout: layout(),
         boards: boards.map(B => ({ who: B.opt.who, cash: B.cash, lives: B.lives, wave: B.wave, towers: B.towers.map(t => t.k + ':' + t.up.join('')), bl: B.bl.length, pops: B.pops, dead: B.dead })) });
