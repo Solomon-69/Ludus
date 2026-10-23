@@ -171,6 +171,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
         case "intro":
             // First run: open the panel by itself so the welcome is seen.
             if !popover.isShown { DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { self.openPopover() } }
+        case "log":
+            // A game error (never shown to the player): appended to ~/Library/Logs/Ludus/errors.log for us.
+            if let line = body["line"] as? String {
+                let dir = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/Ludus")
+                try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+                let url = dir.appendingPathComponent("errors.log"), data = Data((String(line.prefix(2000)) + "\n").utf8)
+                if let h = try? FileHandle(forWritingTo: url) { h.seekToEndOfFile(); h.write(data); try? h.close() } else { try? data.write(to: url) }
+            }
         case "quit":
             // Let the panel fold away with its normal animation, then quit (popoverDidClose).
             // Write the running game's snapshot first, then fold the panel away and quit.

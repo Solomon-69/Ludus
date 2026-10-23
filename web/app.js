@@ -508,21 +508,76 @@
     const run = L.makeApi(g, stage, {
       onScore: setScore,
       onOver: res => finish(g, res),
-      toast
+      toast,
+      onCrash: (e, kind) => gameCrashed(g, run, e, kind)
     }, onlineApi);
-    current = { game: g, run, instance: null };
+    current = { game: g, run, instance: null, online: !!onlineApi };
     try { current.instance = g.create(stage, run.api) || {}; }
     catch (e) {
-      // A saved game that no longer loads must not lock the player out: drop it and start fresh.
-      if (run.api.saved) { delete S.saves[g.id]; L.save(); run.destroy(); return launch(g, onlineApi); }
-      const msg = el('div', 'foot', ''); msg.style.padding = '40px'; msg.textContent = 'This game hit a problem: ' + e.message;
-      stage.innerHTML = ''; stage.appendChild(msg);
+      // A saved game that no longer loads must not lock the player out: set the save aside and start fresh.
+      if (run.api.saved) { logError(g.id, 'load', e); quarantine(g.id); run.destroy(); return launch(g, onlineApi); }
+      current.instance = {}; run.crash(e, 'start');
     }
     if (!onlineApi && current.instance && current.instance.save) current.saver = setInterval(() => { if (!run.api.paused) persist(); }, SAVE_EVERY_MS);
   }
+  // ---------- crash failsafe: a game that throws, freezes or loses its graphics gets a calm recovery card ----------
+  function logError(id, kind, e) {
+    const entry = { t: new Date().toISOString(), game: id, kind, msg: String((e && e.message) || e || '').slice(0, 300), stack: String((e && e.stack) || '').slice(0, 800) };
+    try { const k = 'ludus.errors', a = JSON.parse(localStorage.getItem(k) || '[]'); a.push(entry); localStorage.setItem(k, JSON.stringify(a.slice(-50))); } catch (x) {}
+    L.native('log', { line: JSON.stringify(entry) });   // the app appends it to a local log file
+  }
+  function quarantine(id) {
+    if (!S.saves[id]) return;
+    S.quarantine = Object.assign({}, S.quarantine, { [id]: { at: Date.now(), snap: S.saves[id] } });
+    delete S.saves[id]; L.save();
+  }
+  function gameCrashed(g, run, e, kind) {
+    if (!current || current.run !== run) return;
+    logError(g.id, kind, e);
+    clearInterval(current.saver);   // the last good save stays; a broken state is never saved over it
+    if (current.retryAt && performance.now() - current.retryAt < 8000) quarantine(g.id);   // the save itself is the problem
+    $('pauseSheet').hidden = true;
+    const art = $('crashArt'), box = art.parentElement; box.style.setProperty('--tint', g.tint || '');
+    $('crashRetry').hidden = $('crashNew').hidden = !!current.online;
+    $('crashSheet').hidden = false;
+    requestAnimationFrame(() => {
+      const w = art.clientWidth, h = art.clientHeight, dpr = Math.min(3, devicePixelRatio || 1);
+      if (w && h) { art.width = Math.round(w * dpr); art.height = Math.round(h * dpr); const c = art.getContext('2d'); c.setTransform(dpr, 0, 0, dpr, 0, 0); try { g.art && g.art(c, w, h, L.colors()); } catch (x) {} }
+    });
+  }
+  const crashShown = () => !$('crashSheet').hidden;
+  function hideCrash() { $('crashSheet').hidden = true; }
+  $('crashRetry').onclick = () => { if (!current) return; const g = current.game; hideCrash(); stop(); hideOver(); launch(g); if (current) current.retryAt = performance.now(); L.sfx('click'); };
+  $('crashNew').onclick = () => { if (!current) return; const g = current.game; hideCrash(); forget(g.id); stop(); hideOver(); launch(g); L.sfx('click'); };
+  $('crashBack').onclick = () => { hideCrash(); goHome(); };
+  // errors from a game's own files, promises it left unhandled, and graphics it did not recover itself
+  window.addEventListener('error', e => {
+    if (!current || current.run.crashed) return;
+    const src = e.target && e.target !== window ? (e.target.src || '') : (e.filename || '');
+    if (!/\/games\//.test(src)) return;
+    const run = current.run;
+    setTimeout(() => { if (!e.defaultPrevented && current && current.run === run) run.crash(e.error || e.message || 'load', e.target && e.target !== window ? 'asset' : 'error'); });
+  }, true);
+  window.addEventListener('unhandledrejection', e => {
+    if (!current || current.run.crashed || !/\/games\//.test(String(e.reason && e.reason.stack || ''))) return;
+    current.run.crash(e.reason, 'promise');
+  });
+  $('stage').addEventListener('webglcontextlost', e => {
+    const run = current && current.run;
+    setTimeout(() => { if (run && current && current.run === run && !e.defaultPrevented) run.crash('graphics context lost', 'webgl'); }, 50);
+  }, true);
+  let visibleSince = performance.now();
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) visibleSince = performance.now(); });
+  setInterval(() => {   // a game whose drawing has stopped for 5 s while on screen counts as frozen
+    if (view !== 'game' || !current || document.hidden || !$('pauseSheet').hidden || overShown() || crashShown()) return;
+    const now = performance.now();
+    if (now - visibleSince > 6000 && current.run.stalledFor(now) > 5000) current.run.crash('no frames for 5 s', 'stall');
+  }, 1000);
+  window.ludusCrashTest = kind => { if (!current) return false; if (kind === 'stall') { current.run.noteFrame = null; } current.run.crash(new Error('test ' + kind), kind || 'test'); return true; };   // test helper
+
   // Keep the running game's snapshot so leaving and coming back finds it exactly as it was.
   function persist() {
-    if (online || !current || current.run.ended || !current.instance || !current.instance.save) return;
+    if (online || !current || current.run.crashed || current.run.ended || !current.instance || !current.instance.save) return;
     const id = current.game.id;
     try {
       const snap = current.instance.save();
@@ -579,6 +634,7 @@
     launch(g);
   }
   function pause() {
+    if (crashShown()) return;
     if (online || !current || current.run.ended || !$('pauseSheet').hidden) return;
     $('pauseTitle').textContent = 'Paused'; $('pauseSheet').classList.remove('welcome');
     current.run.pause(); current.instance && current.instance.pause && current.instance.pause();
@@ -589,7 +645,7 @@
     $('pauseSheet').hidden = true;
     current.run.resume(); current.instance && current.instance.resume && current.instance.resume();
   }
-  function goHome() { leaveOnline(); persist(); stop(); hideOver(); $('pauseSheet').hidden = true; show('home'); renderCards(); L.native('playing', { id: null }); L.native('wide', { on: false }); }
+  function goHome() { hideCrash(); leaveOnline(); persist(); stop(); hideOver(); $('pauseSheet').hidden = true; show('home'); renderCards(); L.native('playing', { id: null }); L.native('wide', { on: false }); }
 
   $('backBtn').onclick = goHome;
   $('leaveBtn').onclick = goHome;
