@@ -95,4 +95,9 @@ foreach ($case in $cases) {
 }
 [void](Dpi-Set 100)
 [void](Res-Set 1024 768)
+
+# ---- No zooming: Ctrl+wheel (= trackpad pinch), Ctrl and plus/minus/0 must do nothing ----
+. "$PSScriptRoot/zoomtest.ps1"
+Test-NoZoom $Exe 'Ludus' $Shots
+Set-Theme $false
 Finish

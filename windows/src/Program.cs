@@ -7,6 +7,8 @@ namespace Ludus;
 /// --test-open (open the panel once the games have loaded) and --selftest=PATH (write a result file).</summary>
 internal sealed record LaunchOptions(bool TestOpen, bool Quit, string? SelfTestPath, string? TestGame, string? JoinCode)
 {
+    public bool ZoomProbe => Environment.GetCommandLineArgs().Contains("--test-zoomprobe", StringComparer.OrdinalIgnoreCase);
+
     public static LaunchOptions Parse(string[] args)
     {
         string? path = null, game = null, join = null;

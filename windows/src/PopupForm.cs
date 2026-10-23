@@ -134,6 +134,9 @@ internal sealed class PopupForm : Form
 
             core.Settings.AreDefaultContextMenusEnabled = false;
             core.Settings.IsZoomControlEnabled = false;
+            core.Settings.IsPinchZoomEnabled = false;   // trackpad pinch: nothing
+            // Whatever gets through (Ctrl+wheel, Ctrl +/-/0) is put straight back to the fit-to-screen zoom: users never zoom.
+            web.ZoomFactorChanged += (_, _) => { if (Math.Abs(web.ZoomFactor - fitZoom) > 0.001) web.ZoomFactor = fitZoom; };
             core.Settings.IsStatusBarEnabled = false;
             core.Settings.AreBrowserAcceleratorKeysEnabled = false;   // no F5 / Ctrl+R / Ctrl+P inside the panel
             core.Settings.IsPasswordAutosaveEnabled = false;
@@ -301,6 +304,31 @@ internal sealed class PopupForm : Form
 
     private static string? StringProp(JsonElement obj, string name) =>
         obj.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
+
+    /// <summary>Test aid: writes the zoom/layout state, waits for the test to press keys and scroll, writes it again (twice).</summary>
+    public async Task ZoomProbe(string basePath)
+    {
+        async Task Write(string name)
+        {
+            var page = await Eval("JSON.stringify({w:innerWidth,h:innerHeight,dpr:devicePixelRatio})");
+            var b = Bounds;
+            File.WriteAllText(basePath + name, JsonSerializer.Serialize(new
+            {
+                zoom = web.ZoomFactor,
+                page = JsonSerializer.Deserialize<string>(page),
+                bounds = new[] { b.X, b.Y, b.Width, b.Height },
+            }));
+        }
+        async Task Gate(string go)
+        {
+            for (var i = 0; i < 400 && !File.Exists(basePath + go); i++) await Task.Delay(150);
+            await Task.Delay(800);
+        }
+        await Task.Delay(1200);
+        await Write(".z0");
+        await Gate(".go1"); await Write(".z1");
+        await Gate(".go2"); await Write(".z2");
+    }
 
     /// <summary>Runs JavaScript and returns its JSON result (used by the automated test).</summary>
     public async Task<string> Eval(string js) => web.CoreWebView2 == null ? "null" : await web.ExecuteScriptAsync(js);

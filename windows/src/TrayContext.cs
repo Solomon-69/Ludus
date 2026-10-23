@@ -183,6 +183,7 @@ internal sealed class TrayContext : ApplicationContext
             popup.JoinRoom(options.JoinCode);
         }
         if (options.SelfTestPath == null) return;
+        if (options.ZoomProbe) { await popup.ZoomProbe(options.SelfTestPath); return; }
         await Task.Delay(2500);
         if (options.TestGame != null)
         {
