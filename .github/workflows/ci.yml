@@ -1,0 +1,75 @@
+name: CI
+
+# Builds the Mac and Windows apps on every push to a branch and on pull requests.
+# Release builds (on version tags) live in release.yml.
+on:
+  push:
+    branches: ['**']
+    paths-ignore: ['docs/**', '**/*.md']
+  pull_request:
+    paths-ignore: ['docs/**', '**/*.md']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  mac:
+    name: Mac app
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use the newest stable Xcode
+        uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Build Ludus.app (ad-hoc signed, CI has no certificate)
+        env:
+          SIGN_ID: '-'
+          LUDUS_OUT: ${{ runner.temp }}/ludus-build
+        run: RELEASE=1 ./build.sh --no-install
+
+      - name: Zip
+        run: ditto -c -k --keepParent "$RUNNER_TEMP/ludus-build/Ludus.app" Ludus-mac.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Ludus-mac
+          path: Ludus-mac.zip
+          retention-days: 7
+
+  windows:
+    name: Windows app
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Publish Ludus.exe
+        shell: pwsh
+        run: dotnet publish windows/Ludus.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o out/Ludus
+
+      - name: Check the game files came along
+        shell: pwsh
+        run: |
+          if (-not (Test-Path out/Ludus/Ludus.exe)) { throw "Ludus.exe missing" }
+          if (-not (Test-Path out/Ludus/web/index.html)) { throw "web/index.html missing" }
+          Get-ChildItem out/Ludus | Format-Table Name, Length
+
+      - name: Zip
+        shell: pwsh
+        run: Compress-Archive -Path out/Ludus -DestinationPath Ludus-windows.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Ludus-windows
+          path: Ludus-windows.zip
+          retention-days: 7

@@ -1,0 +1,96 @@
+Ludus
+Copyright (c) 2026 Solomon
+Released under the MIT License (see LICENSE). See THIRD_PARTY.md for third-party material and credits.
+
+This product includes third-party material, listed below.
+
+------------------------------------------------------------------------------
+1. Lucide icons (settings gear)
+------------------------------------------------------------------------------
+
+The settings gear icon path in web/index.html (symbol "i-gear") comes from
+Lucide, https://lucide.dev, used under the ISC License:
+
+ISC License
+
+Copyright (c) for portions of Lucide are held by Cole Bemis 2013-2022 as part
+of Feather (MIT). All other copyright (c) for Lucide are held by Lucide
+Contributors 2022.
+
+Permission to use, copy, modify, and/or distribute this software for any
+purpose with or without fee is hereby granted, provided that the above
+copyright notice and this permission notice appear in all copies.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
+SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR
+IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+------------------------------------------------------------------------------
+2. Microsoft Edge WebView2 SDK (Windows version only)
+------------------------------------------------------------------------------
+
+The Windows app references the Microsoft.Web.WebView2 NuGet package
+(https://www.nuget.org/packages/Microsoft.Web.WebView2), which is
+Copyright (c) Microsoft Corporation and distributed under its own licence
+terms (BSD-style; see the package's LICENSE.txt). The published Ludus.exe
+contains the package's managed libraries and WebView2Loader.dll. The WebView2
+Runtime itself is part of Windows and is not shipped with Ludus.
+
+------------------------------------------------------------------------------
+3. .NET (Windows version only)
+------------------------------------------------------------------------------
+
+The Windows app is built with .NET 8 and Windows Forms, Copyright (c) .NET
+Foundation and Contributors, MIT License (https://github.com/dotnet/runtime,
+https://github.com/dotnet/winforms). The .NET runtime is installed separately
+and is not shipped with Ludus.
+
+------------------------------------------------------------------------------
+Trademarks
+------------------------------------------------------------------------------
+
+Ludus is an independent project and is not affiliated with or endorsed by
+Anthropic. "Claude" is a trademark of Anthropic. Mac and macOS are trademarks
+of Apple Inc. Windows is a trademark of Microsoft Corporation. Game genre
+names are used descriptively.
+
+
+Five Letters word list
+----------------------
+The allowed-guess list in web/games/words.js is taken from Webster's New International Dictionary (1934),
+which is in the public domain (as distributed in /usr/share/dict/words on macOS and BSD systems), plus plurals
+formed from its four-letter words.
+
+
+Flag Quiz flag images
+---------------------
+The country flags in web/games/flags/ (used by the Flag Quiz game) come from the flag-icons project
+(https://github.com/lipis/flag-icons, 4x3 set), Copyright (c) 2013 Panayiotis Lipiridis, MIT License.
+The SVG files are bundled unchanged except for size optimisation (SVGO) and explicit width and height attributes.
+
+
+Map Hunt libraries and data
+----------------------------
+web/vendor/pannellum.* (Pannellum 2.5.6, Matthew Petroff, MIT License, https://pannellum.org) shows the 360 street photos (two small local patches: a picture that finishes loading after its viewer was closed, or a download that failed, is not read again).
+web/vendor/maplibre-gl.* (MapLibre GL JS 5.7.0, MapLibre contributors, BSD 3-Clause License, https://maplibre.org) draws the guess maps on the graphics card.
+web/vendor/leaflet.* (Leaflet 1.9.4, Volodymyr Agafonkin, BSD 2-Clause License, https://leafletjs.com) draws the plain flat fallback map when MapLibre cannot run.
+Map data comes from OpenFreeMap (https://openfreemap.org) vector tiles built from OpenMapTiles (https://openmaptiles.org, schema, CC-BY 4.0) and OpenStreetMap
+(c) OpenStreetMap contributors, ODbL; the fonts for the labels (Noto Sans, SIL Open Font License) are served by the same host. The map look is drawn in
+web/games/geo/mapstyle.js. Street photos come from the Panoramax public instance (https://api.panoramax.xyz), pictures under their authors' open licences (mostly Etalab 2.0, CC-BY,
+CC-BY-SA). The game fetches them live and stores nothing; the list of places is web/games/geo/pool.js.
+
+
+Clue Spotter, Tongue Twister and Mosaic Hunt data (maps)
+--------------------------------------------------
+web/games/metaspot/data.js: clue notes compiled from geohints.com, plonkit.net and Wikipedia (each entry keeps its source link).
+The pictures are simple drawings made in code, not photos.
+web/games/tongue/data.js: sample sentences from the Unicode UDHR collection (https://github.com/unicode-org/udhr), language
+families and map points from Glottolog (https://glottolog.org, CC-BY 4.0), speaker numbers from the sources linked in each entry.
+web/games/invhunt/data.js: original, made-up creature mosaics at invented spots around each city centre (no real artworks or positions).
+The eight pixel creatures are drawn in web/games/invhunt.js.
+Map tiles in web/games/tongue/tiles/ and web/games/invhunt/tiles/: (c) OpenStreetMap contributors (ODbL,
+https://www.openstreetmap.org/copyright), bundled so the games work offline.

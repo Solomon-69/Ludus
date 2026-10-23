@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ludus</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="style.css">
+<script>/* startup watch: a script error before the page is ready is reported to the app shell, which shows a fallback screen if the page never comes up */
+(function(){window.addEventListener('error',function(e){if(window.__ludusReady)return;var m={type:'uifail',line:String(e.message||'error')+' '+String(e.filename||'')+':'+(e.lineno||0)};
+try{window.webkit.messageHandlers.ludus.postMessage(m)}catch(a){try{window.chrome.webview.postMessage(m)}catch(b){}}});})();</script>
+</head>
+<body>
+<div id="app" class="app">
+  <!-- Home -->
+  <section id="home" class="view view-home is-active" aria-label="Games">
+    <header class="topbar">
+      <div class="brand">
+        <svg class="logo" viewBox="0 0 88 55" aria-hidden="true"><use href="#ludus-mark"/></svg>
+        <div>
+          <div class="brand-name">Ludus</div>
+          <div class="brand-sub" id="brandSub">Take a little break</div>
+        </div>
+      </div>
+      <button class="icon-btn" id="openSettings" aria-label="Settings">
+        <svg viewBox="0 0 24 24"><use href="#i-gear"/></svg>
+      </button>
+    </header>
+    <label class="search" id="searchBox">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-search"/></svg>
+      <input id="search" type="search" placeholder="Search games" autocomplete="off" spellcheck="false" aria-label="Search games">
+      <kbd>/</kbd>
+    </label>
+    <div class="filters" id="filters" role="tablist"></div>
+    <div class="grid" id="grid"></div>
+  </section>
+
+  <!-- Game -->
+  <section id="game" class="view view-game" aria-label="Game">
+    <header class="topbar game-bar">
+      <button class="icon-btn" id="backBtn" aria-label="Back to games">
+        <svg viewBox="0 0 24 24"><use href="#i-back"/></svg>
+      </button>
+      <div class="game-title">
+        <div class="game-name" id="gameName"></div>
+        <div class="scores" id="gameScores">
+          <span>Score <b id="scoreNow">0</b></span>
+          <span>Best <b id="scoreBest">0</b></span>
+        </div>
+        <div class="vs-toggle" id="vsToggle" role="group" aria-label="Opponent" hidden>
+          <button type="button" data-vs="bot">vs Bot</button>
+          <button type="button" data-vs="friend">vs Friend</button>
+          <button type="button" data-vs="online" hidden>Online</button>
+        </div>
+        <div class="online-chip" id="onlineChip" role="status" hidden>
+          <i class="dot" aria-hidden="true"></i><span id="onlineState">Online</span><b id="onlineCode"></b>
+        </div>
+      </div>
+      <div class="bar-right">
+        <button class="icon-btn" id="orientBtn" aria-label="Switch between wide and tall" title="Wide or tall" hidden>
+          <svg viewBox="0 0 24 24"><use id="orientUse" href="#i-rotate"/></svg>
+        </button>
+        <button class="btn leave-btn" id="leaveBtn" hidden>Leave</button>
+        <button class="icon-btn" id="gameSettings" aria-label="Settings" title="Settings">
+          <svg viewBox="0 0 24 24"><use href="#i-gear"/></svg>
+        </button>
+        <button class="icon-btn" id="pauseBtn" aria-label="Pause">
+          <svg viewBox="0 0 24 24"><use href="#i-pause"/></svg>
+        </button>
+      </div>
+    </header>
+    <div class="stage-wrap">
+      <div class="stage" id="stage"></div>
+      <div class="sheet" id="pauseSheet" hidden>
+        <div class="sheet-card">
+          <div class="sheet-title" id="pauseTitle">Paused</div>
+          <button class="btn primary" id="resumeBtn">Resume</button>
+          <button class="btn" id="restartBtn">Restart</button>
+          <button class="btn ghost" id="quitBtn">All games</button>
+        </div>
+      </div>
+      <div class="sheet crash-sheet" id="crashSheet" role="alertdialog" aria-labelledby="crashTitle" hidden>
+        <div class="sheet-card crash-card">
+          <div class="crash-art"><canvas id="crashArt"></canvas></div>
+          <div class="sheet-title" id="crashTitle">Something went wrong</div>
+          <p class="crash-line" id="crashLine">This game stopped unexpectedly. Your last save is safe.</p>
+          <button class="btn primary" id="crashRetry">Try again</button>
+          <button class="btn" id="crashNew">New game</button>
+          <button class="btn ghost" id="crashBack">Back to games</button>
+        </div>
+      </div>
+      <div class="sheet lobby" id="lobbySheet" role="dialog" aria-modal="true" aria-label="Play online" hidden>
+        <div class="lobby-card" id="lobbyCard"></div>
+      </div>
+      <button class="over-peek" id="overPeek" hidden>Show result</button>
+    </div>
+    <div class="over-bar" id="overSheet" hidden>
+        <div class="over-info">
+          <div class="over-title" id="overTitle">Game over</div>
+          <div class="over-line"><b id="overScore">0</b><small id="overBest"></small></div>
+        </div>
+        <div class="over-actions">
+          <button class="btn primary" id="againBtn">Play again</button>
+          <button class="btn ghost" id="overQuitBtn">All games</button>
+          <button class="btn ghost see-board" id="overHideBtn" aria-label="Hide this bar to see the board"><svg viewBox="0 0 24 24"><use href="#i-down"/></svg>See board</button>
+        </div>
+      </div>
+    <footer class="hint" id="hint"></footer>
+  </section>
+
+  <!-- Settings -->
+  <section id="settings" class="view view-settings" aria-label="Settings">
+    <header class="topbar">
+      <button class="icon-btn" id="settingsBack" aria-label="Back">
+        <svg viewBox="0 0 24 24"><use href="#i-back"/></svg>
+      </button>
+      <div class="brand-name">Settings</div>
+      <span style="width:32px;flex:none" aria-hidden="true"></span>
+    </header>
+    <div class="settings-body" id="settingsBody"></div>
+  </section>
+</div>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="ludus-mark" viewBox="6 27 88 55"><path fill="currentColor" fill-rule="evenodd" d="M89 48C92 60 93 70 88 75C83 80 76 77.5 72 71L67.5 63.5C65.8 61 63.5 60 60 60L40 60C36.5 60 34.2 61 32.5 63.5L28 71C24 77.5 17 80 12 75C7 70 8 60 11 48C13.5 36 20 29 32 29L68 29C80 29 86.5 36 89 48ZM66.4 39.1A3.1 3.1 0 1 0 72.6 39.1A3.1 3.1 0 1 0 66.4 39.1ZM72.3 45A3.1 3.1 0 1 0 78.5 45A3.1 3.1 0 1 0 72.3 45ZM66.4 50.9A3.1 3.1 0 1 0 72.6 50.9A3.1 3.1 0 1 0 66.4 50.9ZM60.5 45A3.1 3.1 0 1 0 66.7 45A3.1 3.1 0 1 0 60.5 45ZM28.7 36C27.9 36 27.2 36.7 27.2 37.5L27.2 41.7L23 41.7C22.2 41.7 21.5 42.4 21.5 43.2L21.5 46.8C21.5 47.6 22.2 48.3 23 48.3L27.2 48.3L27.2 52.5C27.2 53.3 27.9 54 28.7 54L32.3 54C33.1 54 33.8 53.3 33.8 52.5L33.8 48.3L38 48.3C38.8 48.3 39.5 47.6 39.5 46.8L39.5 43.2C39.5 42.4 38.8 41.7 38 41.7L33.8 41.7L33.8 37.5C33.8 36.7 33.1 36 32.3 36Z"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></g></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></g></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M15 5l-7 7 7 7"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M6 9l6 6 6-6"/></symbol>
+  <symbol id="i-rotate" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="8" width="11" height="12" rx="2.5"/><path d="M13 3.5h2.5A4.5 4.5 0 0 1 20 8v2"/><path d="M17.5 8 20 10.5 22.5 8"/></g></symbol>
+  <symbol id="i-rotate-back" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="10" width="13" height="10" rx="2.5"/><path d="M20.5 13V8A4.5 4.5 0 0 0 16 3.5h-3"/><path d="M15 1 12.5 3.5 15 6"/></g></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24"><path fill="currentColor" d="M7 5h3.2v14H7zM13.8 5H17v14h-3.2z"/></symbol>
+</svg>
+
+<script src="engine.js"></script>
+<script src="net.js"></script>
+<script src="lobby.js"></script>
+<script src="rt.js"></script>
+<script src="status.js"></script>
+<script src="unlock.js"></script>
+<script src="games/g2048.js"></script>
+<script src="games/blocks.js"></script>
+<script src="games/flappy.js"></script>
+<script src="games/chomp.js"></script>
+<script src="games/snake.js"></script>
+<script src="games/mines.js"></script>
+<script src="games/breakout.js"></script>
+<script src="games/fourup.js"></script>
+<script src="games/boxit.js"></script>
+<script src="games/ninesq.js"></script>
+<script src="games/lastwire.js"></script>
+<script src="games/wallrun.js"></script>
+<script src="games/crossing.js"></script>
+<script src="games/decider.js"></script>
+<script src="games/deadcentre.js"></script>
+<script src="games/finalpush.js"></script>
+<script src="games/tag.js"></script>
+<script src="games/pong.js"></script>
+<script src="games/hockey.js"></script>
+<script src="games/tanks.js"></script>
+<script src="games/slither.js"></script>
+<script src="games/invaders.js"></script>
+<script src="games/rocks.js"></script>
+<script src="games/memory.js"></script>
+<script src="games/words.js"></script>
+<script src="games/crates.js"></script>
+<script src="games/jumper.js"></script>
+<script src="games/garden.js"></script>
+<script src="games/climb.js"></script>
+<script src="games/solitaire.js"></script>
+<script src="games/sudoku.js"></script>
+<script src="games/match3.js"></script>
+<script src="games/stack.js"></script>
+<script src="games/holeio.js"></script>
+<script src="games/paperio.js"></script>
+<script src="games/popduel.js"></script>
+<script src="games/flags.js"></script>
+<script src="games/geoguess.js"></script>
+<script src="games/popfusion.js"></script>
+<script src="games/stickbrawl.js"></script>
+<script src="games/domkit.js"></script>
+<script src="games/metaspot.js"></script>
+<script src="games/tongue.js"></script>
+<script src="games/invhunt.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

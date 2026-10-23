@@ -1,0 +1,50 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>Ludus</RootNamespace>
+    <AssemblyName>Ludus</AssemblyName>
+    <ApplicationIcon>assets\Ludus.ico</ApplicationIcon>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <ApplicationVisualStyles>true</ApplicationVisualStyles>
+
+    <Product>Ludus</Product>
+    <Description>Take a little break</Description>
+    <Company>Solomon</Company>
+    <Copyright>Copyright (c) 2026 Solomon</Copyright>
+    <Version>1.5</Version>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+
+    <!-- One self-contained Ludus.exe (no .NET install needed); the WebView2 loader DLL rides inside it. -->
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <PublishReferencesDocumentationFiles>false</PublishReferencesDocumentationFiles>
+    <DebugType>embedded</DebugType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3912.50" />
+  </ItemGroup>
+
+  <!-- The shared game files (../web) sit next to Ludus.exe in a "web" folder, loose, not bundled. -->
+  <ItemGroup>
+    <Content Include="..\web\**\*"
+             Exclude="..\web\**\.DS_Store;..\web\**\.harness-*;..\web\**\.harness-*\**"
+             Link="web\%(RecursiveDir)%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest"
+             ExcludeFromSingleFile="true" />
+  </ItemGroup>
+
+</Project>

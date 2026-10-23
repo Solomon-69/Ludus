@@ -1,0 +1,45 @@
+--- layout
+PASS compact_light chip row fits (All, Arcade, Puzzle, Duel, 2 Player, Online) with no clipping
+PASS compact_light Online page: no overlap
+PASS compact_light room (host, guest): no overlap
+PASS compact_light in game (header with Leave): no overlap
+PASS compact_light scoreboard: no overlap
+PASS compact_light: no page errors
+PASS compact_light result bar (Rematch / Ask for rematch): no overlap
+PASS compact_dark chip row fits (All, Arcade, Puzzle, Duel, 2 Player, Online) with no clipping
+PASS compact_dark Online page: no overlap
+PASS compact_dark room (host, guest): no overlap
+PASS compact_dark in game (header with Leave): no overlap
+PASS compact_dark scoreboard: no overlap
+PASS compact_dark: no page errors
+PASS compact_dark result bar (Rematch / Ask for rematch): no overlap
+PASS large_light chip row fits (All, Arcade, Puzzle, Duel, 2 Player, Online) with no clipping
+PASS large_light Online page: no overlap
+PASS large_light room (host, guest): no overlap
+PASS large_light in game (header with Leave): no overlap
+PASS large_light scoreboard: no overlap
+PASS large_light: no page errors
+PASS large_light result bar (Rematch / Ask for rematch): no overlap
+PASS large_dark chip row fits (All, Arcade, Puzzle, Duel, 2 Player, Online) with no clipping
+PASS large_dark Online page: no overlap
+PASS large_dark room (host, guest): no overlap
+PASS large_dark in game (header with Leave): no overlap
+PASS large_dark scoreboard: no overlap
+PASS large_dark: no page errors
+PASS large_dark result bar (Rematch / Ask for rematch): no overlap
+PASS wide_light chip row fits (All, Arcade, Puzzle, Duel, 2 Player, Online) with no clipping
+PASS wide_light Online page: no overlap
+PASS wide_light room (host, guest): no overlap
+PASS wide_light in game (header with Leave): no overlap
+PASS wide_light scoreboard: no overlap
+PASS wide_light: no page errors
+PASS wide_light result bar (Rematch / Ask for rematch): no overlap
+PASS wide_dark chip row fits (All, Arcade, Puzzle, Duel, 2 Player, Online) with no clipping
+PASS wide_dark Online page: no overlap
+PASS wide_dark room (host, guest): no overlap
+PASS wide_dark in game (header with Leave): no overlap
+PASS wide_dark scoreboard: no overlap
+PASS wide_dark: no page errors
+PASS wide_dark result bar (Rematch / Ask for rematch): no overlap
+
+42/42 passed

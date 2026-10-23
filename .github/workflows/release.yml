@@ -1,0 +1,217 @@
+name: Release
+
+# Push a tag like v1.5 to build both apps and publish a GitHub Release with:
+#   Ludus.dmg          Mac disk image (drag to Applications)
+#   Ludus-mac.zip      the same Mac app, zipped
+#   Ludus-windows.zip  the Windows app
+#   SHA256SUMS.txt     checksums for all of the above
+# The website (docs/index.html) links to releases/latest/download/<file>, so it always
+# serves the newest release.
+#
+# Optional Apple signing and notarisation
+# ---------------------------------------
+# Without these secrets the Mac app is ad-hoc signed and people need the one-time
+# "Open Anyway" step. Add all of them under Settings > Secrets and variables > Actions
+# to ship a Developer ID signed, notarised build instead. If any one is missing, the
+# signing steps are skipped and the release still goes out.
+#
+#   MACOS_CERT_P12           base64 of your "Developer ID Application" certificate exported as .p12
+#                            (base64 -i cert.p12 | pbcopy)
+#   MACOS_CERT_PASSWORD      the password you gave the .p12 when exporting it
+#   MACOS_SIGN_IDENTITY      e.g. "Developer ID Application: Your Name (TEAMID)"
+#   NOTARY_APPLE_ID          the Apple Account email used for notarisation
+#   NOTARY_TEAM_ID           your 10-character Team ID
+#   NOTARY_PASSWORD          an app-specific password from account.apple.com
+#
+# Never commit any of these values to the repository.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  mac:
+    name: Mac app
+    runs-on: macos-latest
+    env:
+      LUDUS_OUT: /tmp/ludus-build
+      HAS_SIGNING: ${{ secrets.MACOS_CERT_P12 != '' && secrets.MACOS_CERT_PASSWORD != '' && secrets.MACOS_SIGN_IDENTITY != '' }}
+      HAS_NOTARY: ${{ secrets.NOTARY_APPLE_ID != '' && secrets.NOTARY_TEAM_ID != '' && secrets.NOTARY_PASSWORD != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use the newest stable Xcode
+        uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1
+        with:
+          xcode-version: latest-stable
+
+      # Optional: only runs when the signing secrets exist (see the top of this file).
+      - name: Import the Developer ID certificate
+        if: env.HAS_SIGNING == 'true'
+        env:
+          CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
+          CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+        run: |
+          set -euo pipefail
+          KEYCHAIN="$RUNNER_TEMP/signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(uuidgen)"
+          echo "$CERT_P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security import "$RUNNER_TEMP/cert.p12" -P "$CERT_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN"
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN" >/dev/null
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+          rm -f "$RUNNER_TEMP/cert.p12"
+
+      - name: Build Ludus.app
+        env:
+          SIGN_IDENTITY: ${{ secrets.MACOS_SIGN_IDENTITY }}
+        run: |
+          set -euo pipefail
+          if [ "$HAS_SIGNING" = "true" ]; then
+            export SIGN_ID="$SIGN_IDENTITY"
+          else
+            echo "No signing secrets: building an ad-hoc signed app."
+            export SIGN_ID='-'
+          fi
+          RELEASE=1 ./build.sh --no-install
+
+      # build.sh signs with --deep. Developer ID builds also need the hardened runtime and a
+      # secure timestamp before Apple will notarise them, so re-sign here.
+      - name: Re-sign with the hardened runtime
+        if: env.HAS_SIGNING == 'true'
+        env:
+          SIGN_IDENTITY: ${{ secrets.MACOS_SIGN_IDENTITY }}
+        run: |
+          set -euo pipefail
+          codesign --force --deep --options runtime --timestamp --sign "$SIGN_IDENTITY" "$LUDUS_OUT/Ludus.app"
+          codesign --verify --strict --verbose=2 "$LUDUS_OUT/Ludus.app"
+
+      - name: Make Ludus.dmg
+        env:
+          SIGN_IDENTITY: ${{ secrets.MACOS_SIGN_IDENTITY }}
+        run: |
+          set -euo pipefail
+          STAGE="$RUNNER_TEMP/dmg"
+          rm -rf "$STAGE"; mkdir -p "$STAGE"
+          ditto "$LUDUS_OUT/Ludus.app" "$STAGE/Ludus.app"
+          ln -s /Applications "$STAGE/Applications"
+          hdiutil create -volname "Ludus" -srcfolder "$STAGE" -fs HFS+ -format UDZO -ov Ludus.dmg
+          if [ "$HAS_SIGNING" = "true" ]; then
+            codesign --force --timestamp --sign "$SIGN_IDENTITY" Ludus.dmg
+          fi
+
+      # Optional: only runs when both the signing and the notary secrets exist.
+      - name: Notarise and staple
+        if: env.HAS_SIGNING == 'true' && env.HAS_NOTARY == 'true'
+        env:
+          NOTARY_APPLE_ID: ${{ secrets.NOTARY_APPLE_ID }}
+          NOTARY_TEAM_ID: ${{ secrets.NOTARY_TEAM_ID }}
+          NOTARY_PASSWORD: ${{ secrets.NOTARY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          xcrun notarytool submit Ludus.dmg \
+            --apple-id "$NOTARY_APPLE_ID" --team-id "$NOTARY_TEAM_ID" --password "$NOTARY_PASSWORD" \
+            --wait --timeout 30m
+          xcrun stapler staple Ludus.dmg
+          xcrun stapler staple "$LUDUS_OUT/Ludus.app"
+          spctl --assess --type open --context context:primary-signature --verbose Ludus.dmg
+
+      - name: Zip the app
+        run: ditto -c -k --keepParent "$LUDUS_OUT/Ludus.app" Ludus-mac.zip
+
+      - name: Note how this build was signed
+        run: |
+          if [ "$HAS_SIGNING" = "true" ] && [ "$HAS_NOTARY" = "true" ]; then
+            echo "signed-notarised" > mac-signing.txt
+          elif [ "$HAS_SIGNING" = "true" ]; then
+            echo "signed" > mac-signing.txt
+          else
+            echo "adhoc" > mac-signing.txt
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Ludus-mac
+          path: |
+            Ludus.dmg
+            Ludus-mac.zip
+            mac-signing.txt
+
+  windows:
+    name: Windows app
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Publish Ludus.exe
+        shell: pwsh
+        run: |
+          $version = "$env:GITHUB_REF_NAME".TrimStart('v')
+          dotnet publish windows/Ludus.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:Version=$version -o out/Ludus
+
+      - name: Check the game files came along
+        shell: pwsh
+        run: |
+          if (-not (Test-Path out/Ludus/Ludus.exe)) { throw "Ludus.exe missing" }
+          if (-not (Test-Path out/Ludus/web/index.html)) { throw "web/index.html missing" }
+
+      - name: Zip
+        shell: pwsh
+        run: Compress-Archive -Path out/Ludus -DestinationPath Ludus-windows.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Ludus-windows
+          path: Ludus-windows.zip
+
+  release:
+    name: GitHub Release
+    needs: [mac, windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: Ludus-*
+          path: dist
+          merge-multiple: true
+
+      - name: Checksums
+        run: |
+          cd dist
+          sha256sum Ludus.dmg Ludus-mac.zip Ludus-windows.zip | tee SHA256SUMS.txt
+
+      - name: Release notes
+        run: |
+          {
+            echo "Download **Ludus.dmg** for Mac or **Ludus-windows.zip** for Windows."
+            echo
+            case "$(cat dist/mac-signing.txt 2>/dev/null)" in
+              signed-notarised) echo "The Mac app is signed with a Developer ID and notarised by Apple." ;;
+              *) echo "The Mac app in this release is not notarised. The first time, right-click Ludus in Applications and choose **Open**, or use **Open Anyway** in System Settings > Privacy & Security." ;;
+            esac
+          } > notes.md
+
+      - name: Create the release (or refresh its files on a re-run)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          ls -la dist
+          tag="$GITHUB_REF_NAME"
+          files="dist/Ludus.dmg dist/Ludus-mac.zip dist/Ludus-windows.zip dist/SHA256SUMS.txt"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" $files --clobber
+          else
+            gh release create "$tag" $files --title "Ludus ${tag#v}" --notes-file notes.md --generate-notes
+          fi
