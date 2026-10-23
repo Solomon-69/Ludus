@@ -73,6 +73,16 @@
           <button class="btn ghost" id="quitBtn">All games</button>
         </div>
       </div>
+      <div class="sheet crash-sheet" id="crashSheet" role="alertdialog" aria-labelledby="crashTitle" hidden>
+        <div class="sheet-card crash-card">
+          <div class="crash-art"><canvas id="crashArt"></canvas></div>
+          <div class="sheet-title" id="crashTitle">Something went wrong</div>
+          <p class="crash-line" id="crashLine">This game stopped unexpectedly. Your last save is safe.</p>
+          <button class="btn primary" id="crashRetry">Try again</button>
+          <button class="btn" id="crashNew">New game</button>
+          <button class="btn ghost" id="crashBack">Back to games</button>
+        </div>
+      </div>
       <div class="sheet lobby" id="lobbySheet" role="dialog" aria-modal="true" aria-label="Play online" hidden>
         <div class="lobby-card" id="lobbyCard"></div>
       </div>

@@ -44,7 +44,7 @@
   seg('Light').click(); await wait(80); check('theme light', document.documentElement.dataset.theme === 'light');
   check('one orange swatch', document.querySelectorAll('.swatch').length === 7 && !S.accent.includes('c4633f'));
   check('no Games shown group', ![...document.querySelectorAll('.group-label')].some(l => /games shown/i.test(l.textContent)));
-  check('footer version', /^Ludus 1\.5$/.test(document.querySelector('#settingsBody .foot').textContent));
+  check('footer version', /^Ludus \d+\.\d+(\.\d+)?$/.test(document.querySelector('#settingsBody .foot').textContent));
   document.querySelectorAll('.swatch')[1].click(); await wait(50);
   check('accent applied', getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() === S.accent && S.accent === '#5b8def');
   seg('Hard').click(); check('difficulty saved', S.difficulty === 'hard');

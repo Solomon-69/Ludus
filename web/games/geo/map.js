@@ -105,8 +105,10 @@
       map.getPane('tilePane').classList.toggle('geo-nomap', !t.low);
       if (t.low) {
         const C = t.recolor ? recoloredClass() : L.TileLayer;
-        const low = new C(t.low(), Object.assign({ mode: 'street', maxZoom: SWITCH - 0.001, maxNativeZoom: SWITCH - 1, zIndex: 1, crossOrigin: t.recolor ? 'anonymous' : false }, o));
-        const high = new C(t.high(), Object.assign({ mode: 'grey', minZoom: SWITCH, maxZoom: 18, maxNativeZoom: 16, zIndex: 1, crossOrigin: t.recolor ? 'anonymous' : false }, o));
+        // The country map stays underneath the city map for a few levels (its last tiles, enlarged), so crossing into
+        // city zoom never shows an empty map while the city tiles arrive.
+        const low = new C(t.low(), Object.assign({ mode: 'street', maxZoom: SWITCH + 4, maxNativeZoom: SWITCH - 1, zIndex: 1, crossOrigin: t.recolor ? 'anonymous' : false }, o));
+        const high = new C(t.high(), Object.assign({ mode: 'grey', minZoom: SWITCH, maxZoom: 18, maxNativeZoom: 16, zIndex: 2, crossOrigin: t.recolor ? 'anonymous' : false }, o));
         const ref = L.tileLayer(REF(), Object.assign({ minZoom: SWITCH, maxZoom: 18, maxNativeZoom: 16, zIndex: 3 }, o));
         layers = [low, high, ref]; layers.forEach(l => l.addTo(map));
         [low, high].forEach(l => {
@@ -124,7 +126,7 @@
   // keeping the point under the pointer still (Leaflet's own wheel zoom jumps in steps).
   // When the wheel goes quiet the zoom settles on the nearest whole level, where the tiles are sharp (no scaled, seamed tiles).
   function smoothWheel(map, el) {
-    let target = null, anchor = null, raf = 0, quiet = 0;
+    let target = null, anchor = null, raf = 0, quiet = 0, dir = 0;
     const tick = () => {
       raf = 0;
       if (!map._loaded || target === null) return;
@@ -143,10 +145,18 @@
       const k = e.ctrlKey ? 0.011 : 0.0034;   // trackpad pinch arrives as ctrl + wheel with small deltas
       if (target === null) { target = map.getZoom(); map._stop(); map._moveStart(true, false); }
       target = Math.max(map.getMinZoom(), Math.min(map.getMaxZoom(), target - dy * k));
+      if (dy) dir = dy < 0 ? 1 : -1;
       anchor = map.mouseEventToContainerPoint(e);
       if (!raf) raf = requestAnimationFrame(tick);
       clearTimeout(quiet);
-      quiet = setTimeout(() => { if (target === null) return; target = Math.round(target); if (!raf) raf = requestAnimationFrame(tick); }, 160);
+      // settle on a whole level in the direction you were zooming (never back the way you came, which made the map
+      // bounce in and out between slow wheel clicks)
+      quiet = setTimeout(() => {
+        if (target === null) return;
+        const lv = dir > 0 ? Math.ceil(target - 0.12) : dir < 0 ? Math.floor(target + 0.12) : Math.round(target);
+        target = Math.max(map.getMinZoom(), Math.min(map.getMaxZoom(), lv));
+        if (!raf) raf = requestAnimationFrame(tick);
+      }, 240);
     };
     el.addEventListener('wheel', onWheel, { passive: false });
     return () => { el.removeEventListener('wheel', onWheel); cancelAnimationFrame(raf); clearTimeout(quiet); };

@@ -82,7 +82,10 @@
   const norm = t => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
   const matches = g => { const q = norm(query); return !q || q.split(' ').every(w => norm([g.name, customName(g), g.tag, g.aka, g.id].join(' ')).includes(w)); };
   function visibleGames() {
-    if (norm(query)) return L.games.filter(g => !S.hidden.includes(g.id) && matches(g));
+    if (norm(query)) {   // best match first: the name starting with what you typed, then a word of the name, then anything else
+      const q = norm(query), rank = g => { const n = norm(customName(g) || g.name); return n.startsWith(q) ? 3 : (' ' + n).includes(' ' + q) ? 2 : n.includes(q) ? 1 : 0; };
+      return L.games.filter(g => !S.hidden.includes(g.id) && matches(g)).map((g, i) => [g, rank(g), i]).sort((a, b) => b[1] - a[1] || a[2] - b[2]).map(x => x[0]);
+    }
     return L.games.filter(g => !S.hidden.includes(g.id) && (S.filter === 'All' || g.tag === S.filter || (S.filter === TWO && g.versus) || (S.filter === PARTY && party(g))));
   }
   function renderFilters() {
@@ -97,30 +100,22 @@
   }
   // ---------- the Online page: make a room or join one ----------
   function renderOnlinePage(grid) {
-    const page = el('div', 'online-page');
-    page.appendChild(el('div', 'op-title', 'Play online'));
-    page.appendChild(el('p', 'lobby-sub', 'Make a room and share its code, or join a friend. The host picks the games and how many rounds.'));
+    // Three groups (heading, your room, joining one) spread over the page's full height, so the page has no empty band
+    // at the bottom whatever its size; the panel itself keeps the same size as every other tab.
+    const page = el('div', 'online-page'), head = el('div', 'op-group op-head'), mid = el('div', 'op-group'), join = el('div', 'op-group');
+    page.appendChild(head); page.appendChild(mid); page.appendChild(join);
+    head.appendChild(el('div', 'op-title', 'Play online'));
+    head.appendChild(el('p', 'lobby-sub', 'Create a room and share its code, or join a friend. The host picks the games and how many rounds.'));
     const f = el('label', 'field');
     f.appendChild(el('span', 'field-label', 'Your name (optional)'));
     const nm = el('input'); nm.type = 'text'; nm.maxLength = 10; nm.placeholder = 'Player'; nm.value = L.net.cleanName(S.onlineName, ''); nm.autocomplete = 'off'; nm.spellcheck = false; nm.setAttribute('aria-label', 'Your name');
     nm.addEventListener('input', () => { S.onlineName = L.net.cleanName(nm.value, ''); L.save(); });
-    f.appendChild(nm); page.appendChild(f);
-    if (S.party && S.party.code) {
-      const p = S.party, card = el('div', 'party-card');
-      card.appendChild(el('div', 'party-head', 'Last party'));
-      const line = el('div', 'party-line'); line.textContent = (p.role === 'host' ? 'You hosted' : 'Room ' + p.code) + ' \u00b7 ' + (p.names || []).join(', ');
-      card.appendChild(line);
-      const gl = el('div', 'party-games'); gl.textContent = (p.games || []).map(id => { const g = L.games.find(x => x.id === id); return g ? dispName(g) : id; }).join(', '); if (gl.textContent) card.appendChild(gl);
-      const row = el('div', 'lobby-row');
-      const rj = el('button', 'btn small primary', 'Rejoin'); rj.type = 'button'; rj.id = 'opRejoin'; rj.onclick = () => { L.sfx('click'); rejoinParty(); };
-      const fg = el('button', 'btn small ghost', 'Forget'); fg.type = 'button'; fg.id = 'opForget'; fg.onclick = () => { L.sfx('click'); S.party = null; L.save(); renderCards(); };
-      row.appendChild(rj); row.appendChild(fg); card.appendChild(row);
-      page.appendChild(card);
-    }
+    f.appendChild(nm); mid.appendChild(f);
+    if (S.party && S.party.code) mid.appendChild(partyCard(S.party));
     const mk = el('button', 'btn primary', 'Create room'); mk.type = 'button'; mk.id = 'opCreate';
     mk.onclick = () => { L.sfx('click'); createFlexRoom(); };
-    page.appendChild(mk);
-    page.appendChild(el('div', 'op-or', 'or join a room'));
+    mid.appendChild(mk);
+    join.appendChild(el('div', 'op-or', 'or join a room'));
     const code = el('input', 'code-input'); code.type = 'text'; code.maxLength = 300; code.placeholder = 'K7M2Q'; code.id = 'opCode';
     code.autocomplete = 'off'; code.spellcheck = false; code.autocapitalize = 'characters'; code.setAttribute('aria-label', 'Room code, invite or link');
     const msg = el('div', 'lobby-error', ''); msg.setAttribute('role', 'alert');
@@ -129,10 +124,33 @@
     code.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); go(); } });
     const jb = el('button', 'btn primary', 'Join'); jb.type = 'button'; jb.id = 'opJoin'; jb.onclick = go;
     const jr = el('div', 'join-row'); jr.appendChild(code); jr.appendChild(jb);   // the code and the Join button side by side
-    page.appendChild(jr); page.appendChild(msg);
-    page.appendChild(el('p', 'lobby-note', 'Code, invite message or ludus:// link. Needs the internet.'));
+    join.appendChild(jr); join.appendChild(msg);
+    join.appendChild(el('p', 'lobby-note', 'Code, invite message or ludus:// link. Needs the internet.'));
     grid.appendChild(page);
   }
+  // The last room you were in: one tidy card, a "Last party" tag and who hosted on top, the players as small name chips
+  // and the games underneath, Rejoin and Forget on the right.
+  function partyCard(p) {
+    const card = el('div', 'party-card'), info = el('div', 'party-info');
+    const top = el('div', 'party-top');
+    top.appendChild(el('span', 'party-tag', 'Last party'));
+    const who = el('span', 'party-who'); who.textContent = p.role === 'host' ? 'Hosted by you' : 'Room ' + p.code; top.appendChild(who);
+    info.appendChild(top);
+    const names = (p.names || []).filter(Boolean), games = (p.games || []).map(id => { const g = L.games.find(x => x.id === id); return g ? dispName(g) : id; }).join(', ');
+    if (names.length) {
+      const ppl = el('div', 'party-people');
+      names.forEach((n, i) => { const c = el('span', 'party-chip'), av = el('i', 'party-av'); av.textContent = String(n).trim().charAt(0).toUpperCase() || '?'; av.style.setProperty('--c', PARTY_COLS[i % PARTY_COLS.length]); c.appendChild(av); c.appendChild(document.createTextNode(n)); ppl.appendChild(c); });
+      info.appendChild(ppl);
+    }
+    if (games) { const gl = el('div', 'party-games'); gl.textContent = games; gl.title = games; info.appendChild(gl); }
+    const acts = el('div', 'party-acts');
+    const fg = el('button', 'btn small ghost', 'Forget'); fg.type = 'button'; fg.id = 'opForget'; fg.onclick = () => { L.sfx('click'); S.party = null; L.save(); renderCards(); };
+    const rj = el('button', 'btn small primary', 'Rejoin'); rj.type = 'button'; rj.id = 'opRejoin'; rj.onclick = () => { L.sfx('click'); rejoinParty(); };
+    acts.appendChild(fg); acts.appendChild(rj);
+    card.appendChild(info); card.appendChild(acts);
+    return card;
+  }
+  const PARTY_COLS = ['#d97757', '#5b8def', '#4f9d69', '#9b6dd6'];   // the seat colours used in online games
   function fmt(n) { return n >= 10000 ? (n / 1000).toFixed(n >= 100000 ? 0 : 1) + 'k' : String(n); }
   function renderCards() {
     const grid = $('grid'); grid.innerHTML = '';
@@ -223,19 +241,30 @@
     sh.appendChild(card);
     setTimeout(() => { try { input.focus({ preventScroll: true }); input.select(); } catch (e) {} }, 30);
   }
-  function drawCards() {
-    const c = L.colors();
-    document.querySelectorAll('.card').forEach(card => {
-      const g = L.games.find(x => x.id === card.dataset.id);
-      const cv = card.querySelector('canvas');
-      const r = cv.getBoundingClientRect();
-      if (!r.width) return;
-      const dpr = Math.min(3, devicePixelRatio || 1);
-      cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);
-      const ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      try { g.art && g.art(ctx, r.width, r.height, c); } catch (e) { /* a broken thumbnail must not break the grid */ }
-    });
+  // Card covers are drawn at the size the canvas has on screen. Each canvas is watched: whenever its size changes (the
+  // panel switching between wide and normal, Compact/Large, search results, a new screen scale) it is drawn again, so a
+  // cover can never be left stretched or squashed. Sizes come from layout (clientWidth), never from the on-screen box,
+  // which a card's slide-in animation scales.
+  const artSize = new ResizeObserver(entries => entries.forEach(e => drawArt(e.target)));
+  function drawArt(cv, force) {
+    const card = cv.closest('.card'), g = card && L.games.find(x => x.id === card.dataset.id);
+    const w = cv.clientWidth, h = cv.clientHeight;
+    if (!g || !w || !h) return;
+    const dpr = Math.min(3, devicePixelRatio || 1), key = w + 'x' + h + '@' + dpr;
+    if (!force && cv.dataset.drawn === key) return;
+    cv.dataset.drawn = key;
+    cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+    const ctx = cv.getContext('2d'); ctx.setTransform(cv.width / w, 0, 0, cv.height / h, 0, 0);
+    try { g.art && g.art(ctx, w, h, L.colors()); } catch (e) { /* a broken thumbnail must not break the grid */ }
   }
+  function drawCards() {
+    artSize.disconnect();
+    document.querySelectorAll('.card .art canvas').forEach(cv => { artSize.observe(cv); drawArt(cv, true); });
+  }
+  (function watchScale() {   // moving to a screen with another scale (or zooming) redraws the covers sharply
+    const mq = matchMedia('(resolution: ' + (devicePixelRatio || 1) + 'dppx)');
+    mq.addEventListener('change', () => { if (view === 'home') drawCards(); watchScale(); }, { once: true });
+  })();
   function replayCards() {
     document.querySelectorAll('.card').forEach(c => { c.style.animation = 'none'; void c.offsetWidth; c.style.animation = ''; });
   }
@@ -479,21 +508,76 @@
     const run = L.makeApi(g, stage, {
       onScore: setScore,
       onOver: res => finish(g, res),
-      toast
+      toast,
+      onCrash: (e, kind) => gameCrashed(g, run, e, kind)
     }, onlineApi);
-    current = { game: g, run, instance: null };
+    current = { game: g, run, instance: null, online: !!onlineApi };
     try { current.instance = g.create(stage, run.api) || {}; }
     catch (e) {
-      // A saved game that no longer loads must not lock the player out: drop it and start fresh.
-      if (run.api.saved) { delete S.saves[g.id]; L.save(); run.destroy(); return launch(g, onlineApi); }
-      const msg = el('div', 'foot', ''); msg.style.padding = '40px'; msg.textContent = 'This game hit a problem: ' + e.message;
-      stage.innerHTML = ''; stage.appendChild(msg);
+      // A saved game that no longer loads must not lock the player out: set the save aside and start fresh.
+      if (run.api.saved) { logError(g.id, 'load', e); quarantine(g.id); run.destroy(); return launch(g, onlineApi); }
+      current.instance = {}; run.crash(e, 'start');
     }
     if (!onlineApi && current.instance && current.instance.save) current.saver = setInterval(() => { if (!run.api.paused) persist(); }, SAVE_EVERY_MS);
   }
+  // ---------- crash failsafe: a game that throws, freezes or loses its graphics gets a calm recovery card ----------
+  function logError(id, kind, e) {
+    const entry = { t: new Date().toISOString(), game: id, kind, msg: String((e && e.message) || e || '').slice(0, 300), stack: String((e && e.stack) || '').slice(0, 800) };
+    try { const k = 'ludus.errors', a = JSON.parse(localStorage.getItem(k) || '[]'); a.push(entry); localStorage.setItem(k, JSON.stringify(a.slice(-50))); } catch (x) {}
+    L.native('log', { line: JSON.stringify(entry) });   // the app appends it to a local log file
+  }
+  function quarantine(id) {
+    if (!S.saves[id]) return;
+    S.quarantine = Object.assign({}, S.quarantine, { [id]: { at: Date.now(), snap: S.saves[id] } });
+    delete S.saves[id]; L.save();
+  }
+  function gameCrashed(g, run, e, kind) {
+    if (!current || current.run !== run) return;
+    logError(g.id, kind, e);
+    clearInterval(current.saver);   // the last good save stays; a broken state is never saved over it
+    if (current.retryAt && performance.now() - current.retryAt < 8000) quarantine(g.id);   // the save itself is the problem
+    $('pauseSheet').hidden = true;
+    const art = $('crashArt'), box = art.parentElement; box.style.setProperty('--tint', g.tint || '');
+    $('crashRetry').hidden = $('crashNew').hidden = !!current.online;
+    $('crashSheet').hidden = false;
+    requestAnimationFrame(() => {
+      const w = art.clientWidth, h = art.clientHeight, dpr = Math.min(3, devicePixelRatio || 1);
+      if (w && h) { art.width = Math.round(w * dpr); art.height = Math.round(h * dpr); const c = art.getContext('2d'); c.setTransform(dpr, 0, 0, dpr, 0, 0); try { g.art && g.art(c, w, h, L.colors()); } catch (x) {} }
+    });
+  }
+  const crashShown = () => !$('crashSheet').hidden;
+  function hideCrash() { $('crashSheet').hidden = true; }
+  $('crashRetry').onclick = () => { if (!current) return; const g = current.game; hideCrash(); stop(); hideOver(); launch(g); if (current) current.retryAt = performance.now(); L.sfx('click'); };
+  $('crashNew').onclick = () => { if (!current) return; const g = current.game; hideCrash(); forget(g.id); stop(); hideOver(); launch(g); L.sfx('click'); };
+  $('crashBack').onclick = () => { hideCrash(); goHome(); };
+  // errors from a game's own files, promises it left unhandled, and graphics it did not recover itself
+  window.addEventListener('error', e => {
+    if (!current || current.run.crashed) return;
+    const src = e.target && e.target !== window ? (e.target.src || '') : (e.filename || '');
+    if (!/\/games\//.test(src)) return;
+    const run = current.run;
+    setTimeout(() => { if (!e.defaultPrevented && current && current.run === run) run.crash(e.error || e.message || 'load', e.target && e.target !== window ? 'asset' : 'error'); });
+  }, true);
+  window.addEventListener('unhandledrejection', e => {
+    if (!current || current.run.crashed || !/\/games\//.test(String(e.reason && e.reason.stack || ''))) return;
+    current.run.crash(e.reason, 'promise');
+  });
+  $('stage').addEventListener('webglcontextlost', e => {
+    const run = current && current.run;
+    setTimeout(() => { if (run && current && current.run === run && !e.defaultPrevented) run.crash('graphics context lost', 'webgl'); }, 50);
+  }, true);
+  let visibleSince = performance.now();
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) visibleSince = performance.now(); });
+  setInterval(() => {   // a game whose drawing has stopped for 5 s while on screen counts as frozen
+    if (view !== 'game' || !current || document.hidden || !$('pauseSheet').hidden || overShown() || crashShown()) return;
+    const now = performance.now();
+    if (now - visibleSince > 6000 && current.run.stalledFor(now) > 5000) current.run.crash('no frames for 5 s', 'stall');
+  }, 1000);
+  window.ludusCrashTest = kind => { if (!current) return false; if (kind === 'stall') { current.run.noteFrame = null; } current.run.crash(new Error('test ' + kind), kind || 'test'); return true; };   // test helper
+
   // Keep the running game's snapshot so leaving and coming back finds it exactly as it was.
   function persist() {
-    if (online || !current || current.run.ended || !current.instance || !current.instance.save) return;
+    if (online || !current || current.run.crashed || current.run.ended || !current.instance || !current.instance.save) return;
     const id = current.game.id;
     try {
       const snap = current.instance.save();
@@ -550,6 +634,7 @@
     launch(g);
   }
   function pause() {
+    if (crashShown()) return;
     if (online || !current || current.run.ended || !$('pauseSheet').hidden) return;
     $('pauseTitle').textContent = 'Paused'; $('pauseSheet').classList.remove('welcome');
     current.run.pause(); current.instance && current.instance.pause && current.instance.pause();
@@ -560,7 +645,7 @@
     $('pauseSheet').hidden = true;
     current.run.resume(); current.instance && current.instance.resume && current.instance.resume();
   }
-  function goHome() { leaveOnline(); persist(); stop(); hideOver(); $('pauseSheet').hidden = true; show('home'); renderCards(); L.native('playing', { id: null }); L.native('wide', { on: false }); }
+  function goHome() { hideCrash(); leaveOnline(); persist(); stop(); hideOver(); $('pauseSheet').hidden = true; show('home'); renderCards(); L.native('playing', { id: null }); L.native('wide', { on: false }); }
 
   $('backBtn').onclick = goHome;
   $('leaveBtn').onclick = goHome;
@@ -573,7 +658,7 @@
   $('overHideBtn').onclick = () => { $('overSheet').hidden = true; $('overPeek').hidden = false; };
   $('overPeek').onclick = () => { $('overPeek').hidden = true; $('overSheet').hidden = false; overAt = performance.now(); };
   const search = $('search');
-  search.addEventListener('input', () => { query = search.value; $('filters').classList.toggle('is-dim', !!norm(query)); renderCards(); });
+  search.addEventListener('input', () => { query = search.value; $('grid').scrollTop = 0; $('filters').classList.toggle('is-dim', !!norm(query)); renderCards(); });
   search.addEventListener('keydown', e => {
     if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); search.value = ''; query = ''; $('filters').classList.remove('is-dim'); renderCards(); search.blur(); }
     else if (e.key === 'Enter') { const first = visibleGames()[0]; if (first) { e.preventDefault(); start(first.id); } }
@@ -737,7 +822,7 @@
       appRows.push(row('Quit Ludus', null, q));
     }
     body.appendChild(group('App', appRows));
-    body.appendChild(el('div', 'foot', 'Ludus 1.5'));
+    body.appendChild(el('div', 'foot', 'Ludus 1.8.0'));
   }
   $('openSettings').onclick = () => { renderSettings(); show('settings'); L.sfx('tap'); };
   $('settingsBack').onclick = () => { show('home'); renderCards(); };
@@ -780,11 +865,32 @@
   window.ludusOpenLobby = () => { if (current && current.game && current.game.online) openLobby(current.game); };   // test helper: the old per-game room sheet (no button any more)
   window.ludusForceOver = won => { if (current) current.run.api.over({ score: 0, won: !!won, title: 'Test' }); };   // test helper: end the round now
   window.ludusSnapshot = () => { try { return current && current.instance && current.instance.save ? current.instance.save() : null; } catch (e) { return null; } };   // test helper   // test helper: the current room, if any
+  // Test helper (Mac harness and the Windows CI self-test): every cover's drawn shape against its shape on screen.
+  window.ludusCoverCheck = () => {
+    const out = { cards: 0, worst: 0, bad: [] };
+    document.querySelectorAll('#grid .card .art canvas').forEach(cv => {
+      const w = cv.clientWidth, h = cv.clientHeight; if (!w || !h) return;
+      out.cards++;
+      const d = cv.width && cv.height ? Math.abs((cv.width / cv.height) / (w / h) - 1) : 1;
+      out.worst = Math.max(out.worst, Math.round(d * 1000) / 1000);
+      if (d > 0.02) out.bad.push(cv.closest('.card').dataset.id + ' ' + cv.width + 'x' + cv.height + ' shown ' + w + 'x' + h);
+    });
+    return out;
+  };
+  // Windows CI self-test: covers true to shape, the pause card on top when paused, never blurred without a menu.
+  window.ludusSelfCheck = () => {
+    const sheet = $('pauseSheet'); let pauseOnTop = null;
+    if (!sheet.hidden) { const b = $('resumeBtn'), r = b.getBoundingClientRect(), h = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); pauseOnTop = !!h && (h === b || b.contains(h)); }
+    return { view, covers: view === 'home' ? window.ludusCoverCheck() : null, paused: !sheet.hidden, pauseOnTop, blurredWithoutMenu: !!document.querySelector('.geo.geo-paused') && sheet.hidden, saved: Object.keys(S.saves || {}), geoReset: S.geoReset || 0 };
+  };
   window.ludusTestOver = score => { if (current) current.run.api.over({ score }); };
   window.ludusState = () => JSON.stringify({ view, game: current && current.game.id, score: $('scoreNow').textContent, paused: !$('pauseSheet').hidden, over: overShown(), revealing: revealing(), games: L.games.length, theme: root.dataset.theme, saved: Object.keys(S.saves) });
 
   // ---------- boot ----------
   if (S.filter !== 'All') { S.filter = 'All'; L.save(); }   // Ludus always opens on the All tab
+  // 1.7.1: a Geo Guess save from 1.7 could reopen behind an invisible pause card (blurred map, nothing to press).
+  // Drop that save once, so the game starts clean after the update.
+  if (S.geoReset !== 1) { if (S.saves && S.saves.geoguess) delete S.saves.geoguess; S.geoReset = 1; L.save(); }
   if (S.hidden.length) { S.hidden = []; L.save(); }   // the "Games shown" setting is gone: every game shows
   if (!ACCENTS.includes(S.accent)) { S.accent = ACCENTS[0]; L.save(); }   // e.g. the removed second orange
   applyTheme();

@@ -282,6 +282,11 @@ internal sealed class PopupForm : Form
                     Store.SaveInvisible(hide);
                     InvisibleChanged?.Invoke(hide);
                     break;
+                case "log":
+                    // A game error (never shown to the player), kept in the app's own log file for us.
+                    if (msg.TryGetProperty("line", out var lineProp) && lineProp.ValueKind == JsonValueKind.String)
+                        Store.Log("game error " + (lineProp.GetString() ?? "")[..Math.Min(2000, (lineProp.GetString() ?? "").Length)]);
+                    break;
                 case "quit":
                     // Leave the WebView2 event first; quitting disposes the control.
                     BeginInvoke((MethodInvoker)Quit);

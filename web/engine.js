@@ -115,6 +115,14 @@
     let touched = false; // the player pressed a key or clicked at least once this run
     let ended = false;   // after api.over: input is ignored but drawing continues so the final board can be seen
     let score = 0;
+    // The game stopped working (threw, stalled, lost its graphics): stop it and let the app show the recovery card.
+    let crashed = false, lastFrame = performance.now();
+    const crash = (e, kind) => {
+      if (crashed) return; crashed = true; paused = true;
+      loops.forEach(l => { l.running = false; });
+      try { hooks.onCrash ? hooks.onCrash(e, kind) : hooks.toast('This game hit a problem'); } catch (x) {}
+    };
+    const guard = (fn, kind) => function () { if (crashed) return; try { return fn.apply(this, arguments); } catch (e) { crash(e, kind); } };
     const api = {
       settings: state, colors, sfx,
       difficulty: state.difficulty,
@@ -144,7 +152,8 @@
           if (type === 'keydown' || type === 'pointerdown') touched = true;
           if (type === 'keydown' && e.key) held.set(e.key, e.code);
           if (type === 'keyup' && e.key) held.delete(e.key);
-          fn(e);
+          if (crashed) return;
+          try { fn(e); } catch (x) { crash(x, 'input'); }
         };
         target.addEventListener(type, wrapped, opts);
         cleanups.push(() => target.removeEventListener(type, wrapped, opts));
@@ -179,8 +188,8 @@
           entry.needsFrame = false;
           id = requestAnimationFrame(tick);
           if (step) {
-            try { fn(paused ? 0 : dt, (now - t0) / 1000); }
-            catch (e) { if (!entry.failed) { entry.failed = true; hooks.toast('This game hit a problem'); setTimeout(() => { throw e; }); } }
+            try { fn(paused ? 0 : dt, (now - t0) / 1000); lastFrame = now; }
+            catch (e) { if (!entry.failed) { entry.failed = true; crash(e, 'loop'); } }
           }
         };
         entry.reset = () => { last = performance.now(); };
@@ -189,7 +198,7 @@
         cleanups.push(() => { entry.running = false; cancelAnimationFrame(id); });
         return entry;
       },
-      timeout(fn, ms) { const id = setTimeout(() => { if (!paused) fn(); else api.timeout(fn, 60); }, ms); cleanups.push(() => clearTimeout(id)); return id; },
+      timeout(fn, ms) { fn = guard(fn, 'timer'); const id = setTimeout(() => { if (crashed) return; if (!paused) fn(); else api.timeout(fn, 60); }, ms); cleanups.push(() => clearTimeout(id)); return id; },
       // Full-stage canvas sized for the screen's pixel density. onResize(w, h) fires on start and on resize.
       canvas(onResize) {
         const c = document.createElement('canvas');
@@ -230,10 +239,16 @@
     };
     return {
       api,
+      crash,
+      get crashed() { return crashed; },
+      // a loop that should be drawing has not finished a frame for this long (ms); 0 when nothing is expected
+      stalledFor(now) { return !crashed && !paused && !ended && loops.size ? now - lastFrame : 0; },
+      noteFrame() { lastFrame = performance.now(); },
       pause() { paused = true; loops.forEach(l => { l.needsFrame = true; }); },
       get ended() { return ended; },
       resume() {
-        paused = false; loops.forEach(l => l.reset && l.reset());
+        if (crashed) return;
+        paused = false; lastFrame = performance.now(); loops.forEach(l => l.reset && l.reset());
         // A key let go while the panel was closed never sent keyup: release it now so nothing stays stuck down.
         const keys = [...held]; held.clear();
         keys.forEach(([key, code]) => window.dispatchEvent(new KeyboardEvent('keyup', { key, code })));

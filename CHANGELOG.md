@@ -3,6 +3,22 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.8.0 (2026-10-23)
+
+- Crash failsafe: if a game throws, freezes or loses its graphics, a calm recovery card (Try again, New game, Back to
+  games) replaces it; a save that keeps crashing is set aside; errors go to a local log file, never on screen.
+
+- Geo Guess: a saved game no longer reopens as a blurred map with nothing to press (the game's map sat on top of the
+  Paused / Welcome back card). The pause card is always on top; a 1.7 Geo Guess save is cleared once after updating.
+- Geo Guess: a street photo that will not load is retried, then swapped for another place (solo); the "Needs internet"
+  card has a New game button; the street view recovers if the graphics card drops it; clicking the map to pin works.
+- Geo Guess map: zooming settles in the direction you zoom (no bounce back between wheel clicks), the country map stays
+  underneath while city tiles load, and your pin stays fully in view when the map shrinks back.
+- Card covers are redrawn whenever their size changes, so they are never squashed or stretched (panel back from a wide
+  game, Compact/Large, screen scale). Search lists the best name match first (Geo finds Geo Guess) and starts at the top.
+- Online page: fills the panel with no empty band, tidier Last party card, "Create a room" wording.
+- Getting Over It: swinging the hammer in the air no longer pushes the pot, so long jumps fly their full arc.
+
 ## 1.7.0 (2026-10-23)
 
 - **Online tournaments and parties:** pick several games and rounds, play them in a row with a scoreboard, rejoin your party, and a rematch button on the final standings. Still works with friends on 1.6.x (they play one game per room).
