@@ -6,6 +6,9 @@
 <title>Ludus</title>
 <link rel="icon" href="data:,">
 <link rel="stylesheet" href="style.css">
+<script>/* startup watch: a script error before the page is ready is reported to the app shell, which shows a fallback screen if the page never comes up */
+(function(){window.addEventListener('error',function(e){if(window.__ludusReady)return;var m={type:'uifail',line:String(e.message||'error')+' '+String(e.filename||'')+':'+(e.lineno||0)};
+try{window.webkit.messageHandlers.ludus.postMessage(m)}catch(a){try{window.chrome.webview.postMessage(m)}catch(b){}}});})();</script>
 </head>
 <body>
 <div id="app" class="app">
@@ -58,6 +61,9 @@
           <svg viewBox="0 0 24 24"><use id="orientUse" href="#i-rotate"/></svg>
         </button>
         <button class="btn leave-btn" id="leaveBtn" hidden>Leave</button>
+        <button class="icon-btn" id="gameSettings" aria-label="Settings" title="Settings">
+          <svg viewBox="0 0 24 24"><use href="#i-gear"/></svg>
+        </button>
         <button class="icon-btn" id="pauseBtn" aria-label="Pause">
           <svg viewBox="0 0 24 24"><use href="#i-pause"/></svg>
         </button>
@@ -130,6 +136,8 @@
 <script src="net.js"></script>
 <script src="lobby.js"></script>
 <script src="rt.js"></script>
+<script src="status.js"></script>
+<script src="unlock.js"></script>
 <script src="games/g2048.js"></script>
 <script src="games/blocks.js"></script>
 <script src="games/flappy.js"></script>

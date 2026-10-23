@@ -5,7 +5,9 @@ import AppKit
 import SwiftUI
 
 enum ShareFriend {
-    static let hint = "Friend: right-click the app and choose Open the first time."
+    static let hint = "Send a copy by AirDrop or Messages"
+    /// The first-open tip lives in the share itself (a Read me file in the zip, and the Messages text), not in Settings.
+    static let tip = "Unzip it, then right-click Ludus and choose Open the first time."
     static let title = "Share with a friend"
 
     private static var appName: String {
@@ -21,13 +23,17 @@ enum ShareFriend {
         DispatchQueue.global(qos: .userInitiated).async {
             let fm = FileManager.default
             try? fm.removeItem(at: base)   // drop any older copy
+            let stage = base.appendingPathComponent("stage/\(appName)", isDirectory: true)
             let out = base.appendingPathComponent("\(appName).zip")
             let result: Result<URL, Error>
             do {
-                try fm.createDirectory(at: base, withIntermediateDirectories: true)
+                try fm.createDirectory(at: stage, withIntermediateDirectories: true)
+                try fm.copyItem(atPath: src, toPath: stage.appendingPathComponent("\(appName).app").path)
+                try "Welcome to \(appName)!\n\nFirst time only: right-click \(appName) and choose Open, then Open again.\nAfter that it opens like any other app.\n"
+                    .write(to: stage.appendingPathComponent("Read me first.txt"), atomically: true, encoding: .utf8)
                 let p = Process()
                 p.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
-                p.arguments = ["-c", "-k", "--keepParent", src, out.path]
+                p.arguments = ["-c", "-k", "--keepParent", stage.path, out.path]
                 let err = Pipe(); p.standardError = err; p.standardOutput = Pipe()
                 try p.run(); p.waitUntilExit()
                 guard p.terminationStatus == 0, fm.fileExists(atPath: out.path) else {
@@ -47,9 +53,9 @@ enum ShareFriend {
                 onError("Couldn't prepare the copy. Please try again.")
             case .success(let url):
                 guard let view, view.window != nil else { onError("Couldn't open sharing."); return }
-                let picker = NSSharingServicePicker(items: [url])
+                let picker = NSSharingServicePicker(items: [url, "Here is \(appName), little games in your menu bar. \(tip)"])
                 picker.delegate = AirDropFirst.shared
-                picker.show(relativeTo: rect ?? view.bounds, of: view, preferredEdge: .minY)
+                picker.show(relativeTo: rect ?? view.bounds, of: view, preferredEdge: .minX)   // opens to the left of the button, not over the rows below
             }
         }
     }

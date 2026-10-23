@@ -37,6 +37,15 @@ internal sealed class PopupForm : Form
     private Point anchor;
     private bool hasAnchor;
     private bool ready;
+    private bool uiReady;                 // the page itself said it started (the 'ready' message)
+    private System.Windows.Forms.Timer? failTimer;
+    private Panel? fallback;
+    private bool updating;
+    /// <summary>Test switches: pretend the page fails at start; talk to a local fake update server.</summary>
+    public static bool TestFailStart { get; set; }
+    public static string? TestUpdateApi { get; set; }
+    public bool UiReady => uiReady;
+    public bool FallbackShown => fallback != null;
     private bool quitting;
     private long lastHiddenAt;
     private string? bootScriptId;
@@ -170,7 +179,8 @@ internal sealed class PopupForm : Form
             core.NavigationCompleted += (_, e) =>
             {
                 ready = e.IsSuccess;
-                if (!e.IsSuccess) { Store.Log($"Page failed to load: {e.WebErrorStatus}"); return; }
+                if (!e.IsSuccess) { Store.Log($"Page failed to load: {e.WebErrorStatus}"); BeginInvoke((MethodInvoker)ShowFallback); return; }
+                ArmWatchdog(6000);
                 ApplyZoom();
                 if (Visible) RunScript("window.ludusOpened && ludusOpened()");
                 PageReady?.Invoke();
@@ -208,7 +218,7 @@ internal sealed class PopupForm : Form
     {
         try
         {
-            ready = false;
+            ready = false; uiReady = false;
             await RegisterBootScriptAsync();
             web.CoreWebView2.Navigate(StartPage);
         }
@@ -228,7 +238,10 @@ internal sealed class PopupForm : Form
                $"window.__LUDUS_LOGIN__ = {Bool(Store.LoginEnabled())};\n" +
                $"window.__LUDUS_DARK__ = {Bool(theme.SystemDark)};\n" +
                $"window.__LUDUS_INVISIBLE__ = {Bool(Store.LoadInvisible())};\n" +
-               $"window.__LUDUS_SKIP_INTRO__ = {Bool(SkipIntro)};\n";
+               $"window.__LUDUS_SKIP_INTRO__ = {Bool(SkipIntro)};\n" +
+               $"window.__LUDUS_VERSION__ = '{System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0"}';\n" +
+               (TestFailStart ? "window.__LUDUS_TEST_FAIL__ = true;\n" : "") +
+               (TestUpdateApi != null ? $"window.__LUDUS_UPDATE_API__ = '{TestUpdateApi}';\n" : "");
     }
 
     private void RunScript(string js)
@@ -237,6 +250,76 @@ internal sealed class PopupForm : Form
         web.ExecuteScriptAsync(js).ContinueWith(
             t => Store.Log($"Script failed: {t.Exception?.GetBaseException().Message}"),
             CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted, TaskScheduler.Default);
+    }
+
+
+    // ---------- Failsafe: if the page never starts, show a plain native screen instead of a blank panel ----------
+
+    private void ArmWatchdog(int ms)
+    {
+        failTimer?.Stop(); failTimer?.Dispose();
+        failTimer = new System.Windows.Forms.Timer { Interval = ms };
+        failTimer.Tick += (_, _) => { failTimer?.Stop(); if (!uiReady) ShowFallback(); };
+        failTimer.Start();
+    }
+
+    private void ShowFallback()
+    {
+        if (fallback != null || IsDisposed) return;
+        var panel = new Panel { Dock = DockStyle.Fill, BackColor = theme.EffectiveDark ? Color.FromArgb(27, 24, 20) : Color.FromArgb(244, 239, 230) };
+        var ink = theme.EffectiveDark ? Color.FromArgb(240, 233, 222) : Color.FromArgb(32, 28, 23);
+        var title = new Label { Text = "Ludus couldn’t start", AutoSize = false, TextAlign = ContentAlignment.MiddleCenter, Font = new Font("Segoe UI Semibold", 14f), ForeColor = ink, Size = new Size(300, 36) };
+        var note = new Label { Text = "Something went wrong while opening the games. Try reloading. If it keeps happening, reset Ludus’s saved data (best scores and settings).",
+            AutoSize = false, TextAlign = ContentAlignment.TopCenter, Font = new Font("Segoe UI", 9.5f), ForeColor = ink, Size = new Size(280, 70) };
+        var reload = new Button { Name = "fallbackReload", Text = "Reload Ludus", Size = new Size(200, 34), FlatStyle = FlatStyle.System };
+        var reset = new Button { Name = "fallbackReset", Text = "Reset this game’s data", Size = new Size(200, 34), FlatStyle = FlatStyle.System };
+        reload.Click += (_, _) => { HideFallback(); ReloadWithFreshState(); ArmWatchdog(6000); };
+        reset.Click += (_, _) =>
+        {
+            if (reset.Text != "Tap again to erase") { reset.Text = "Tap again to erase"; return; }   // two clicks, so a stray click cannot wipe scores
+            Store.ResetState(); HideFallback(); ReloadWithFreshState(); ArmWatchdog(6000);
+        };
+        void Place()
+        {
+            int y = Math.Max(20, (panel.Height - 200) / 2);
+            foreach (var c in new Control[] { title, note, reload, reset })
+            {
+                c.Left = (panel.Width - c.Width) / 2; c.Top = y; y += c.Height + 12;
+            }
+        }
+        panel.Controls.AddRange(new Control[] { title, note, reload, reset });
+        panel.Resize += (_, _) => Place();
+        Place();
+        Controls.Add(panel); panel.BringToFront(); fallback = panel;
+        Store.Log("web UI did not start: fallback screen shown");
+    }
+
+    private void HideFallback()
+    {
+        if (fallback == null) return;
+        Controls.Remove(fallback); fallback.Dispose(); fallback = null;
+    }
+
+    // ---------- Update (the page asks, Updater does the work) ----------
+
+    private async void StartUpdate(string? zip, string? sums, string? name)
+    {
+        if (updating || zip == null || sums == null || name == null) return;
+        if (!Uri.TryCreate(zip, UriKind.Absolute, out var zipUri) || !Uri.TryCreate(sums, UriKind.Absolute, out var sumsUri)) return;
+        updating = true;
+        try
+        {
+            var staged = await Updater.DownloadAsync(zipUri, sumsUri, name,
+                new Progress<double>(p => RunScript($"window.ludusUpdateState && ludusUpdateState('progress', {p.ToString(System.Globalization.CultureInfo.InvariantCulture)})")));
+            Updater.StartSwap(staged, AppContext.BaseDirectory.TrimEnd('\\', '/'), Environment.ProcessId);
+            Quit();   // the helper waits for this process to exit, swaps the files and opens Ludus again
+        }
+        catch (Exception ex)
+        {
+            Store.Log($"update failed: {ex.Message}");
+            RunScript("window.ludusUpdateState && ludusUpdateState('error')");
+        }
+        finally { updating = false; }
     }
 
     // ---------- Bridge: page -> app ----------
@@ -296,6 +379,15 @@ internal sealed class PopupForm : Form
                     break;
                 case "introDone":
                     BeginInvoke((MethodInvoker)(() => IntroDone?.Invoke()));
+                    break;
+                case "ready":
+                    uiReady = true; failTimer?.Stop(); BeginInvoke((MethodInvoker)HideFallback);
+                    break;
+                case "uifail":   // a startup error: unless the page still came up, show the fallback screen
+                    BeginInvoke((MethodInvoker)(() => ArmWatchdog(1500)));
+                    break;
+                case "update":
+                    BeginInvoke((MethodInvoker)(() => StartUpdate(StringProp(msg, "zip"), StringProp(msg, "sums"), StringProp(msg, "name"))));
                     break;
                 case "playing":
                     break;   // the Mac ignores this too; kept for future use

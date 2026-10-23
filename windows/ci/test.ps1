@@ -83,6 +83,40 @@ foreach ($reset in @(0, 1)) {
 }
 if ($keepState) { $keepState | Set-Content -Encoding UTF8 $statePath } else { Remove-Item $statePath -ErrorAction SilentlyContinue }
 
+# ---- Failsafe: the page fails to start (injected), so the app must show its own fallback screen ----
+$jsonF = Join-Path $Shots 'ludus-selftest-failstart.json'
+$pF = Start-App $Exe @('--test-open', '--test-failstart', "--selftest=$jsonF")
+Check (Wait-File $jsonF 120) 'failsafe: self-test file written'
+$rF = Get-Content $jsonF -Raw | ConvertFrom-Json
+Check ((-not $rF.uiReady) -and $rF.fallbackShown) "failsafe: page never started, native fallback screen is showing (uiReady $($rF.uiReady), fallback $($rF.fallbackShown))"
+$bF = $rF.panelBounds
+Save-Crop (Join-Path $Shots '05d-ludus-failsafe.png') $bF[0] $bF[1] $bF[2] $bF[3]
+Check (Quit-App $Exe 'Ludus') 'failsafe: clean quit'
+
+# ---- Update: real download, checksum, unzip and swap against a local fake release (no real release is touched) ----
+$u = Join-Path $env:TEMP 'ludus-upd'; Remove-Item $u -Recurse -Force -ErrorAction SilentlyContinue
+$srv = Join-Path $u 'srv'; $inst = Join-Path $u 'install'; $new = Join-Path $u 'new'
+New-Item -ItemType Directory -Force $srv | Out-Null
+Copy-Item (Split-Path $Exe -Parent) $inst -Recurse; Copy-Item (Split-Path $Exe -Parent) $new -Recurse
+'new version' | Set-Content (Join-Path $new 'UPDATED.txt')
+Compress-Archive -Path $new -DestinationPath (Join-Path $srv 'Ludus-windows.zip')
+$hash = (Get-FileHash (Join-Path $srv 'Ludus-windows.zip') -Algorithm SHA256).Hash.ToLower()
+"$hash  Ludus-windows.zip" | Set-Content -Encoding ASCII (Join-Path $srv 'SHA256SUMS.txt')
+"0$($hash.Substring(1))  Ludus-windows.zip" | Set-Content -Encoding ASCII (Join-Path $srv 'SUMS-BAD.txt')
+$web = Start-Process python -ArgumentList '-m','http.server','8766','--bind','127.0.0.1' -WorkingDirectory $srv -PassThru -WindowStyle Hidden
+Start-Sleep -Seconds 2
+$resFile = Join-Path $Shots 'update-selftest.txt'
+$upd = Start-Process (Join-Path $inst 'Ludus.exe') -ArgumentList "--update-selftest=http://127.0.0.1:8766;Ludus-windows.zip;$inst;$resFile" -PassThru   # paths have no spaces
+[void]$upd.WaitForExit(120000)
+Check (Test-Path $resFile) 'update: self-test result written'
+if (Test-Path $resFile) { Get-Content $resFile | ForEach-Object { Check ($_ -like 'PASS*') "update: $_" } }
+$swapped = $false; for ($i = 0; $i -lt 60 -and -not $swapped; $i++) { Start-Sleep -Milliseconds 500; $swapped = Test-Path (Join-Path $inst 'UPDATED.txt') }
+Check $swapped 'update: the swap helper copied the new files over the install folder'
+Start-Sleep -Seconds 6
+Check ([bool](Get-Process Ludus -ErrorAction SilentlyContinue)) 'update: Ludus was started again after the swap'
+Check (Quit-App (Join-Path $inst 'Ludus.exe') 'Ludus') 'update: relaunched app quits cleanly'
+Stop-Process -Id $web.Id -Force -ErrorAction SilentlyContinue
+
 # ---- Run 3: invisible icon, opened with Ctrl+Alt+G ----
 @{ size = 'compact'; invisible = $true } | ConvertTo-Json | Set-Content $prefs
 $json3 = Join-Path $Shots 'ludus-selftest-invisible.json'

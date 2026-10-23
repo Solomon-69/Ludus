@@ -77,6 +77,12 @@ internal static class Store
         }
     }
 
+    /// <summary>Forgets all saved scores and settings (the failsafe screen's reset).</summary>
+    public static void ResetState()
+    {
+        try { if (File.Exists(StatePath)) File.Delete(StatePath); } catch (Exception ex) { Log($"state reset failed: {ex.Message}"); }
+    }
+
     /// <summary>Writes the state atomically (temp file, then replace) so a crash never leaves half a file.</summary>
     public static void SaveState(JsonElement state)
     {

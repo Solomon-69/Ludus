@@ -28,6 +28,10 @@ internal sealed class TrayContext : ApplicationContext
         Store.EnsureStartMenuShortcut();
 
         PopupForm.SkipIntro = options.SelfTestPath != null;
+        var cmd = Environment.GetCommandLineArgs();
+        PopupForm.TestFailStart = cmd.Contains("--test-failstart", StringComparer.OrdinalIgnoreCase);
+        var api = cmd.FirstOrDefault(a => a.StartsWith("--test-update-api=", StringComparison.OrdinalIgnoreCase));
+        if (api != null) { PopupForm.TestUpdateApi = api["--test-update-api=".Length..].Trim('"'); Updater.TestHosts.Add(new Uri(PopupForm.TestUpdateApi).Host); }
         popup = new PopupForm(theme, ExitApp);
         // First run: the page asks for the panel so its welcome is seen, and keeps it open until it is done.
         popup.IntroRequested += () => { popup.StayOpen = true; popup.ShowPopup(TrayCenter()); };
@@ -184,7 +188,7 @@ internal sealed class TrayContext : ApplicationContext
         }
         if (options.SelfTestPath == null) return;
         if (options.ZoomProbe) { await popup.ZoomProbe(options.SelfTestPath); return; }
-        await Task.Delay(2500);
+        await Task.Delay(PopupForm.TestFailStart ? 9000 : 2500);   // a pretend startup failure needs the 6 s watchdog to fire first
         if (options.TestGame != null)
         {
             // Opens one game (a wide one makes the panel landscape) and records the panel size.
@@ -206,6 +210,8 @@ internal sealed class TrayContext : ApplicationContext
                 app = "Ludus",
                 pid = Environment.ProcessId,
                 ready = popup.IsReady,
+                uiReady = popup.UiReady,
+                fallbackShown = popup.FallbackShown,
                 panelVisible = popup.Visible,
                 panelBounds = new[] { b.X, b.Y, b.Width, b.Height },
                 monitorScale = Native.ScaleAt(new Point(b.X + b.Width / 2, b.Y + b.Height / 2)),

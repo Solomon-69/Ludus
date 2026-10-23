@@ -67,6 +67,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
         // UI test hook, compiled only into local test builds (build.sh adds -D LUDUS_TEST unless RELEASE=1).
         DistributedNotificationCenter.default().addObserver(
             self, selector: #selector(testCommand(_:)), name: testNotification, object: nil)
+        // A test copy started with LUDUS_TEST_OPEN=1 opens its panel by itself (so a screenshot can be taken without any notification).
+        if ProcessInfo.processInfo.environment["LUDUS_TEST_OPEN"] != nil {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { self.openPopover() }
+        }
         #endif
     }
 
@@ -86,7 +90,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
         if let dir = Bundle.main.resourceURL?.appendingPathComponent("web"),
            FileManager.default.fileExists(atPath: dir.appendingPathComponent("index.html").path) {
             webView.loadFileURL(dir.appendingPathComponent("index.html"), allowingReadAccessTo: dir)
-        }
+            armWatchdog()
+        } else { DispatchQueue.main.async { self.showFallback() } }
     }
 
     /// Runs before the page's own scripts: hands over saved scores/settings and the Mac's state.
@@ -99,6 +104,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
         window.__LUDUS_INVISIBLE__ = \(invisible);
         window.__LUDUS_DOCK__ = \(UserDefaults.standard.bool(forKey: dockKey));
         window.__LUDUS_DARK__ = \(isDark());
+        window.__LUDUS_VERSION__ = \(String(reflecting: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"));
+        \(testBoot())
         """
     }
 
@@ -120,6 +127,110 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
                  decisionHandler: @escaping @MainActor (WKNavigationActionPolicy) -> Void) {
         guard let url = action.request.url, url.isFileURL, let root = webRoot?.path else { return decisionHandler(.cancel) }
         decisionHandler(url.standardizedFileURL.path.hasPrefix(root + "/") ? .allow : .cancel)
+    }
+
+    // MARK: - Update (the page asks, Updater does the work)
+
+    private var updating = false
+    private func startUpdate(_ body: [String: Any]) {
+        guard !updating, let z = (body["zip"] as? String).flatMap(URL.init(string:)), let s = (body["sums"] as? String).flatMap(URL.init(string:)),
+              let name = body["name"] as? String else { return }
+        updating = true
+        let bundle = Bundle.main.bundleURL
+        let report: @Sendable (String) -> Void = { js in DispatchQueue.main.async { MainActor.assumeIsolated { self.webView.evaluateJavaScript(js) } } }
+        let noRelaunch = ProcessInfo.processInfo.environment["LUDUS_UPDATE_NO_RELAUNCH"] != nil
+        Task {
+            do {
+                try await Updater.install(zip: z, sums: s, name: name, bundle: bundle,
+                    progress: { p in report("window.ludusUpdateState && ludusUpdateState('progress', \(p))") },
+                    relaunch: { app in
+                        if noRelaunch { report("window.ludusUpdateState && ludusUpdateState('done')"); return }
+                        Updater.relaunchAfterExit(app)
+                        DispatchQueue.main.async { MainActor.assumeIsolated { self.quitting = true; NSApp.terminate(nil) } }
+                    })
+            } catch {
+                appendErrorLog("update failed: \(error)")
+                report("window.ludusUpdateState && ludusUpdateState('error')")
+            }
+            await MainActor.run { self.updating = false }
+        }
+    }
+
+    private func appendErrorLog(_ line: String) {
+        let dir = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/Ludus")
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let url = dir.appendingPathComponent("errors.log"), data = Data((line + "\n").utf8)
+        if let h = try? FileHandle(forWritingTo: url) { h.seekToEndOfFile(); h.write(data); try? h.close() } else { try? data.write(to: url) }
+    }
+
+    /// Extra boot lines for local test builds only: a pretend startup failure and a local update server.
+    private func testBoot() -> String {
+        #if LUDUS_TEST
+        let env = ProcessInfo.processInfo.environment
+        var js = ""
+        if env["LUDUS_FAIL_START"] != nil { js += "window.__LUDUS_TEST_FAIL__ = true;\n" }
+        if let api = env["LUDUS_UPDATE_API"], let host = URL(string: api)?.host {
+            js += "window.__LUDUS_UPDATE_API__ = \(String(reflecting: api));\n"; Updater.testHosts = [host]
+        }
+        return js
+        #else
+        return ""
+        #endif
+    }
+
+    // MARK: - Failsafe: if the web UI never starts, show a plain native screen instead of a blank panel
+
+    private var uiReady = false
+    private var failTimer: Timer?
+    private var fallbackView: NSView?
+
+    private func armWatchdog(after seconds: TimeInterval = 6) {
+        failTimer?.invalidate()
+        failTimer = Timer.scheduledTimer(withTimeInterval: seconds, repeats: false) { [weak self] _ in
+            Task { @MainActor in if let self, !self.uiReady { self.showFallback() } }
+        }
+    }
+
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) { if !uiReady { showFallback() } }
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) { if !uiReady { showFallback() } }
+    func webViewWebContentProcessDidTerminate(_ webView: WKWebView) { uiReady = false; showFallback() }
+
+    private func showFallback() {
+        guard fallbackView == nil, let host = webView.superview else { return }
+        let box = NSView(frame: host.bounds); box.autoresizingMask = [.width, .height]; box.wantsLayer = true
+        box.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
+        let title = NSTextField(labelWithString: "Ludus couldn\u{2019}t start"); title.font = .systemFont(ofSize: 18, weight: .semibold)
+        let note = NSTextField(wrappingLabelWithString: "Something went wrong while opening the games. Try reloading. If it keeps happening, reset Ludus\u{2019}s saved data (best scores and settings).")
+        note.alignment = .center; note.textColor = .secondaryLabelColor; note.preferredMaxLayoutWidth = 280
+        let reload = NSButton(title: "Reload Ludus", target: self, action: #selector(fallbackReload)); reload.bezelStyle = .rounded; reload.keyEquivalent = "\r"
+        let reset = NSButton(title: "Reset this game\u{2019}s data", target: self, action: #selector(fallbackReset(_:))); reset.bezelStyle = .rounded
+        reload.identifier = NSUserInterfaceItemIdentifier("fallbackReload"); reset.identifier = NSUserInterfaceItemIdentifier("fallbackReset")
+        let stack = NSStackView(views: [title, note, reload, reset]); stack.orientation = .vertical; stack.alignment = .centerX; stack.spacing = 12
+        stack.translatesAutoresizingMaskIntoConstraints = false; box.addSubview(stack)
+        NSLayoutConstraint.activate([stack.centerXAnchor.constraint(equalTo: box.centerXAnchor), stack.centerYAnchor.constraint(equalTo: box.centerYAnchor), stack.widthAnchor.constraint(lessThanOrEqualToConstant: 300)])
+        host.addSubview(box); fallbackView = box
+        appendErrorLog("web UI did not start: fallback screen shown")
+    }
+
+    private func hideFallback() { fallbackView?.removeFromSuperview(); fallbackView = nil }
+
+    @objc private func fallbackReload() {
+        hideFallback(); uiReady = false
+        if let dir = webRoot { webView.loadFileURL(dir.appendingPathComponent("index.html"), allowingReadAccessTo: dir) }
+        armWatchdog()
+    }
+
+    @objc private func fallbackReset(_ sender: NSButton) {
+        if sender.title != "Tap again to erase" {   // two taps, so a stray click cannot wipe scores
+            sender.title = "Tap again to erase"
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3) { sender.title = "Reset this game\u{2019}s data" }
+            return
+        }
+        UserDefaults.standard.removeObject(forKey: stateKey)
+        UserDefaults.standard.removeObject(forKey: sizeKey)
+        webView.configuration.userContentController.removeAllUserScripts()
+        webView.configuration.userContentController.addUserScript(WKUserScript(source: bootScript(), injectionTime: .atDocumentStart, forMainFrameOnly: true))
+        fallbackReload()
     }
 
     private func isDark() -> Bool {
@@ -170,6 +281,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
             ShareFriend.share(from: webView, rect: r) { [weak self] msg in
                 self?.webView.evaluateJavaScript("window.ludusShareError && ludusShareError(\(String(reflecting: msg)))")
             }
+        case "update": startUpdate(body)
+        case "ready": uiReady = true; failTimer?.invalidate()
+        case "uifail": DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { if !self.uiReady { self.showFallback() } }   // a startup error: unless the page still came up
         case "intro":
             // First run: open the panel by itself so the welcome is seen.
             if !popover.isShown { DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { self.openPopover() } }

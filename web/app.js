@@ -88,12 +88,26 @@
     }
     return L.games.filter(g => !S.hidden.includes(g.id) && (S.filter === 'All' || g.tag === S.filter || (S.filter === TWO && g.versus) || (S.filter === PARTY && party(g))));
   }
+  // The connection light: a 7px dot on the Online tab (and a hollow ring beside the title while offline).
+  const netWord = () => (L.conn.shown ? 'Online' : 'Offline');
+  function netDot() {
+    const d = el('i', 'net-dot'); d.setAttribute('role', 'img'); d.setAttribute('aria-label', netWord()); d.title = netWord();
+    d.innerHTML = '<b class="halo"></b><b class="core"></b><b class="ring"></b>';
+    return d;
+  }
+  function paintNet() {
+    document.querySelectorAll('.net-dot,.net-ring').forEach(d => { d.setAttribute('aria-label', netWord()); d.title = netWord(); });
+    if (view === 'home' && S.filter === ONLINE && !document.querySelector('.online-page .code-input:focus')) renderCards();
+  }
+  { const bn = document.querySelector('.brand-name'); const r = el('i', 'net-ring'); r.setAttribute('role', 'img'); bn.appendChild(r); }
+  L.conn.on(paintNet);
   function renderFilters() {
     const f = $('filters'); f.innerHTML = '';
     FILTERS.forEach(name => {
       const b = document.createElement('button');
       b.className = 'chip' + (S.filter === name ? ' is-on' : '');
-      b.textContent = name; b.setAttribute('role', 'tab');
+      b.setAttribute('role', 'tab');
+      if (name === ONLINE) { const lab = el('span', 'chip-lab', name); lab.appendChild(netDot()); b.appendChild(lab); } else b.textContent = name;
       b.onclick = () => { S.filter = name; L.save(); L.sfx('click'); renderFilters(); renderCards(); };
       f.appendChild(b);
     });
@@ -106,8 +120,9 @@
     page.appendChild(head); const mid = { appendChild: e => page.appendChild(e) };
     head.appendChild(el('div', 'op-title', 'Play online'));
     const steps = el('ol', 'op-steps');   // three short steps instead of a long sentence; each wraps to two lines when narrow
-    ['Create or join a room', 'Share the code', 'Host picks games'].forEach((t, i) => { const li = el('li'); li.appendChild(el('span', 'op-dot', String(i + 1))); li.appendChild(el('span', '', t)); steps.appendChild(li); });
+    ['Create or join', 'Share the code', 'Host picks games'].forEach((t, i) => { const li = el('li'); li.appendChild(el('span', 'op-dot', String(i + 1))); li.appendChild(el('span', '', t)); steps.appendChild(li); });
     head.appendChild(steps);
+    if (!L.conn.shown) head.appendChild(el('div', 'op-offline-note', "You're offline. Online games need the internet."));
     const f = el('label', 'field');
     f.appendChild(el('span', 'field-label', 'Your name (optional)'));
     const nm = el('input'); nm.type = 'text'; nm.maxLength = 10; nm.placeholder = 'Player'; nm.value = L.net.cleanName(S.onlineName, ''); nm.autocomplete = 'off'; nm.spellcheck = false; nm.setAttribute('aria-label', 'Your name');
@@ -128,6 +143,11 @@
     const jr = el('div', 'join-row'); jr.appendChild(code); jr.appendChild(jb);   // the code and the Join button side by side
     join.appendChild(jr); join.appendChild(msg);
     join.appendChild(el('p', 'lobby-note', 'Code, invite message or ludus:// link. Needs the internet.'));
+    if (!L.conn.shown) {   // offline: the name stays editable, everything that needs the internet is dimmed and does nothing
+      page.classList.add('op-offline');
+      [mk, jb, code].forEach(x => { x.disabled = true; });
+      page.querySelectorAll('.party-card button').forEach(x => { x.disabled = true; });
+    }
     page.appendChild(join);
     grid.appendChild(page);
   }
@@ -685,7 +705,7 @@
         e.preventDefault();
         if (!$('pauseSheet').hidden) resume(); else pause();
       }
-    } else if (view === 'settings' && e.key === 'Escape') { show('home'); renderCards(); }
+    } else if (view === 'settings' && e.key === 'Escape') closeSettings();
   });
   window.addEventListener('pagehide', persist);
 
@@ -778,6 +798,33 @@
     const g = el('div', 'group'); rows.forEach(r => g.appendChild(r)); frag.appendChild(g);
     return frag;
   }
+  // The Update row (Settings > App): one line of state, one button. See status.js for the states.
+  function updateRow() {
+    const U = L.update, r = el('div', 'row upd');
+    const t = el('div', 'row-text'), title = el('div', 'row-title'), sub = el('div', 'row-sub'), ctl = el('div', 'upd-ctl');
+    t.append(title, sub); r.append(t, ctl); r.id = 'updRow';
+    const btn = (label, cls, fn, off) => { const b = el('button', 'small-btn ' + (cls || ''), label); b.type = 'button'; b.onclick = () => { L.sfx('click'); fn(); }; if (off) b.disabled = true; return b; };
+    function draw() {
+      const st = !L.conn.shown && ['idle', 'cantcheck', 'uptodate', 'offline'].includes(U.state) ? 'offline' : U.state;
+      r.dataset.state = st; ctl.innerHTML = ''; sub.className = 'row-sub';
+      title.textContent = 'Ludus ' + U.version();
+      const say = (text, cls) => { sub.textContent = text; if (cls) sub.classList.add(cls); };
+      if (st === 'idle') { say('Check for updates'); ctl.append(btn('Check', '', U.check)); }
+      else if (st === 'checking') { say('Checking…'); ctl.appendChild(el('i', 'spin')); }
+      else if (st === 'uptodate') say('✓ Up to date', 'good');
+      else if (st === 'available') { say('A new version is ready'); ctl.append(btn('Update to ' + U.latest, 'warm', U.askInstall)); }
+      else if (st === 'confirm') { say('Ludus restarts when it is done.'); ctl.append(btn('Not now', '', U.cancel), btn('Install', 'warm', U.install)); }
+      else if (st === 'progress') { say(U.pct >= 100 ? 'Installing…' : 'Downloading… ' + Math.round(U.pct) + '%'); const bar = el('div', 'upd-bar'), fill = el('i'); fill.style.width = U.pct + '%'; bar.appendChild(fill); ctl.appendChild(bar); }
+      else if (st === 'error') { say('Couldn’t update. Try again.', 'bad'); ctl.append(btn('Try again', '', U.check)); }
+      else if (st === 'cantcheck') { say('Couldn’t check'); ctl.append(btn('Check', '', U.check)); }
+      else { say('Needs the internet.'); ctl.append(btn('Check', '', U.check, true)); }
+    }
+    draw();
+    const offA = U.on(() => { if (!r.isConnected) { offA(); offB(); return; } draw(); });
+    const offB = L.conn.on(() => { if (!r.isConnected) { offA(); offB(); return; } draw(); });
+    return r;
+  }
+  let settingsFrom = 'home';   // the screen the gear was pressed on: Back returns there (a game stays paused behind it)
   function renderSettings() {
     const body = $('settingsBody'); body.innerHTML = '';
     const sw8 = el('div', 'swatches');
@@ -787,6 +834,8 @@
       sw8.appendChild(b);
     });
     const vol = volumeSlider(S.volume, v => { S.volume = v; L.save(); }, () => L.sfx('score'));
+    const sv = el('div', 'sv'); vol.hidden = !S.sound;   // the slider only shows while sound is on
+    sv.append(vol, sw(S.sound, v => { S.sound = v; L.save(); vol.hidden = !v; if (v) L.sfx('score'); }, 'Sound'));
     body.appendChild(group('Look', [
       row('Appearance', null, seg(THEMES, S.theme, v => { S.theme = v; L.save(); applyTheme(); })),
       row('Accent colour', null, sw8),
@@ -795,22 +844,22 @@
     ]));
     body.appendChild(group('Play', [
       row('Difficulty', 'Speed and how clever the computer is', seg(DIFFS, S.difficulty, v => { S.difficulty = v; L.save(); })),
-      row('Sound', null, sw(S.sound, v => { S.sound = v; L.save(); if (v) L.sfx('score'); }, 'Sound')),
-      row('Volume', null, vol),
-      row('Show controls under games', null, sw(S.hints, v => { S.hints = v; L.save(); }, 'Show controls')),
-      row('Rename games', 'Click a game\u2019s name to give it your own', sw(!!S.renameGames, v => { S.renameGames = v; L.save(); }, 'Rename games')),
+      row('Sound & volume', null, sv, 'sv-row'),
     ]));
+    const native = !!window.__LUDUS_NATIVE__;
     const appRows = [];
-    if (window.__LUDUS_NATIVE__) {
+    if (native) appRows.push(updateRow());
+    if (native) {
       appRows.push(row('Open at login', null, sw(!!window.__LUDUS_LOGIN__, v => { window.__LUDUS_LOGIN__ = v; L.native('login', { on: v }); }, 'Open at login')));
-      // The app hands over __LUDUS_INVISIBLE__. Mac: an empty menu bar slot. Windows: no tray icon, Ctrl+Alt+G or the Start menu.
-      const invisibleHelp = window.__LUDUS_PLATFORM__ === 'windows'
-        ? 'Hides the tray icon. Open Ludus with Ctrl+Alt+G, or from the Start menu'
-        : 'Hidden in the menu bar. Click the empty space at the far left of your menu bar icons to open';
-      if (typeof window.__LUDUS_INVISIBLE__ === 'boolean') appRows.push(row('Invisible icon', invisibleHelp,
-        sw(!!window.__LUDUS_INVISIBLE__, v => { window.__LUDUS_INVISIBLE__ = v; L.native('invisible', { on: v }); }, 'Invisible icon')));
       if (typeof window.__LUDUS_DOCK__ === 'boolean') appRows.push(row('Show in Dock', 'Off: Ludus stays in the menu bar only',
         sw(!!window.__LUDUS_DOCK__, v => { window.__LUDUS_DOCK__ = v; L.native('dock', { on: v }); }, 'Show in Dock')));
+    }
+    if (native && window.__LUDUS_PLATFORM__ !== 'windows') {
+      const sh = el('button', 'small-btn', 'Share'); sh.id = 'shareFriend';
+      sh.onclick = () => { const b = sh.getBoundingClientRect(); L.native('share', { x: b.left, y: b.top, w: b.width, h: b.height }); };
+      const shRow = row('Share with a friend', 'Send a copy by AirDrop or Messages', sh);
+      window.ludusShareError = m => { const e = shRow.querySelector('.row-sub'); if (e) e.textContent = m; };
+      appRows.push(shRow);
     }
     const reset = el('button', 'small-btn bad', 'Reset');
     reset.onclick = () => {
@@ -818,22 +867,36 @@
       reset.dataset.armed = '1'; reset.textContent = 'Sure?'; setTimeout(() => { reset.textContent = 'Reset'; delete reset.dataset.armed; }, 2500);
     };
     appRows.push(row('Reset best scores', 'Clears every high score', reset, 'danger'));
-    if (window.__LUDUS_NATIVE__ && window.__LUDUS_PLATFORM__ !== 'windows') {
-      const sh = el('button', 'small-btn', 'Share'); sh.id = 'shareFriend';
-      sh.onclick = () => { const b = sh.getBoundingClientRect(); L.native('share', { x: b.left, y: b.top, w: b.width, h: b.height }); };
-      const shRow = row('Share with a friend', 'Friend: right-click the app and choose Open the first time.', sh);
-      window.ludusShareError = m => { const e = shRow.querySelector('.row-sub'); if (e) e.textContent = m; };
-      appRows.push(shRow);
-    }
-    if (window.__LUDUS_NATIVE__) {
-      const q = el('button', 'small-btn', 'Quit'); q.onclick = () => L.native('quit');
-      appRows.push(row('Quit Ludus', null, q));
-    }
     body.appendChild(group('App', appRows));
-    body.appendChild(el('div', 'foot', 'Ludus 1.8.3'));
+    // More: the rarely used switches, folded away until asked for.
+    const moreRows = [];
+    if (native && typeof window.__LUDUS_INVISIBLE__ === 'boolean') {
+      // The app hands over __LUDUS_INVISIBLE__. Mac: an empty menu bar slot. Windows: no tray icon, Ctrl+Alt+G or the Start menu.
+      const invisibleHelp = window.__LUDUS_PLATFORM__ === 'windows'
+        ? 'Hides the tray icon. Open Ludus with Ctrl+Alt+G, or from the Start menu'
+        : 'Hidden in the menu bar. Click the empty space at the far left of your menu bar icons to open';
+      moreRows.push(row('Invisible icon', invisibleHelp, sw(!!window.__LUDUS_INVISIBLE__, v => { window.__LUDUS_INVISIBLE__ = v; L.native('invisible', { on: v }); }, 'Invisible icon')));
+    }
+    moreRows.push(row('Rename games', 'Click a game’s name to give it your own', sw(!!S.renameGames, v => { S.renameGames = v; L.save(); }, 'Rename games')));
+    const moreBtn = el('button', 'group-label more-toggle', '<span>More</span><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-down"/></svg>');
+    moreBtn.type = 'button'; moreBtn.id = 'moreToggle'; moreBtn.setAttribute('aria-expanded', 'false');
+    const moreBox = el('div', 'group more-box'); moreBox.hidden = true; moreRows.forEach(x => moreBox.appendChild(x));
+    moreBtn.onclick = () => { const open = moreBox.hidden; moreBox.hidden = !open; moreBtn.setAttribute('aria-expanded', String(open)); L.sfx('click'); };
+    body.append(moreBtn, moreBox);
+    if (native) {
+      const q = el('button', 'small-btn', 'Quit'); q.onclick = () => L.native('quit');
+      const g = el('div', 'group quit-group'); g.appendChild(row('Quit Ludus', null, q)); body.appendChild(g);
+    }
   }
-  $('openSettings').onclick = () => { renderSettings(); show('settings'); L.sfx('tap'); };
-  $('settingsBack').onclick = () => { show('home'); renderCards(); };
+  function openSettings() {
+    settingsFrom = view === 'game' ? 'game' : 'home';
+    if (view === 'game') pause();   // a game is paused while settings are on top of it (not in an online room, which cannot pause)
+    renderSettings(); show('settings'); L.sfx('tap');
+  }
+  function closeSettings() { show(settingsFrom); if (settingsFrom === 'home') renderCards(); }
+  $('openSettings').onclick = openSettings;
+  $('gameSettings').onclick = openSettings;
+  $('settingsBack').onclick = closeSettings;
 
   // ---------- native hooks ----------
   window.ludusOpened = () => {
@@ -895,6 +958,7 @@
   window.ludusState = () => JSON.stringify({ view, game: current && current.game.id, score: $('scoreNow').textContent, paused: !$('pauseSheet').hidden, over: overShown(), revealing: revealing(), games: L.games.length, theme: root.dataset.theme, saved: Object.keys(S.saves) });
 
   // ---------- boot ----------
+  if (window.__LUDUS_TEST_FAIL__) throw new Error('Injected startup failure (test)');   // set only by test builds, to check the app shell's failsafe screen
   if (S.filter !== 'All') { S.filter = 'All'; L.save(); }   // Ludus always opens on the All tab
   // 1.7.1: a Geo Guess save from 1.7 could reopen behind an invisible pause card (blurred map, nothing to press).
   // Drop that save once, so the game starts clean after the update.
@@ -905,11 +969,13 @@
   if (S.best && typeof S.best === 'object') Object.keys(S.best).forEach(k => { const v = S.best[k]; if (typeof v !== 'number' || !Number.isFinite(v) || v < 0) { delete S.best[k]; } });
   else S.best = {};
   if (S.hidden.length) { S.hidden = []; L.save(); }   // the "Games shown" setting is gone: every game shows
+  S.hints = true;   // "Show controls under games" is gone: the hint line always shows
   if (!ACCENTS.includes(S.accent)) { S.accent = ACCENTS[0]; L.save(); }   // e.g. the removed second orange
   applyTheme();
   renderFilters();
   renderCards();
   maybeIntro();
+  window.__ludusReady = true; L.native('ready');   // tells the app shell the page started (otherwise it shows its own fallback screen)
 
   // ---------- first-run welcome ----------
   // Shown once to someone new (no games played yet). Three short pages over the home screen,
@@ -921,6 +987,15 @@
     if (!fresh || testing) { if (!testing) { S.introDone = true; L.save(); } return; }
     showIntro();
   }
+
+  // First launch: the logo and the cover tiles rise in like Apple's unlock animation (see unlock.js). Plays once.
+  function playUnlock() {
+    if (!window.LudusUnlock || view !== 'home') return;
+    const els = [document.querySelector('#home .logo'), ...document.querySelectorAll('#grid .card')].filter(Boolean);
+    const vis = els.filter(e => { const r = e.getBoundingClientRect(); return r.bottom > 0 && r.top < innerHeight; });   // only what is on screen
+    LudusUnlock(vis, { sweep: $('grid') });
+  }
+  window.ludusReplayUnlock = playUnlock;   // test hook
 
   function showIntro(startPage) {
     const win = window.__LUDUS_PLATFORM__ === 'windows';
@@ -942,7 +1017,12 @@
           [ic('M4 6h16M4 12h10M4 18h7'), 'Pick a tab', 'All, Arcade, Puzzle, Duel, 2 Player or Online'],
           [ic('M11 4a2 2 0 1 1 2 0v1a7 7 0 0 1 5 6.7V15l2 3H4l2-3v-3.3A7 7 0 0 1 11 5z'), 'Make it yours', 'Colours, sound and light or dark in Settings'],
         ] },
-      { art: ic('M8 5v14l11-7z'), title: 'Ready to play', text: 'Start with something quick. Your best scores are kept on this computer only.' },
+      { art: ic('M8 5v14l11-7z'), title: 'Ready to play', text: 'Start with something quick. Press / any time to search.', tight: true,
+        items: [
+          [ic('M5 4h14v11H5zM8 20h8M12 15v5'), win ? 'Saved on this PC' : 'Saved on this Mac', 'Games and best scores stay here'],
+          [ic(win ? 'M3 15h18v5H3zM12 4v7M9 8l3 3 3-3' : 'M3 5h18M7 9h10a4 4 0 0 1 0 8H7a4 4 0 0 1 0-8z'), win ? 'Open from the tray' : 'Open from the menu bar', win ? 'Click the Ludus icon next to the clock' : 'Click the controller at the top of your screen'],
+          [ic('M16 11a3 3 0 1 0-3-3M8 12a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM2 20c0-3 3-5 6-5s6 2 6 5M16 15c3 0 6 2 6 5'), 'Play a friend online', 'Share a room code from the Online tab'],
+        ] },
     ];
 
     const box = el('div', 'intro');
@@ -958,7 +1038,7 @@
     let page = -1;
 
     function build(p) {
-      const v = el('div', 'intro-page');
+      const v = el('div', 'intro-page' + (p.tight ? ' tight' : ''));
       let i = 0;
       const add = n => { n.style.setProperty('--i', i++); v.appendChild(n); };
       add(el('div', 'intro-art' + (p.app ? ' app' : ''), p.art));
@@ -987,7 +1067,9 @@
       L.sfx('click');
     }
     function close() {
-      S.introDone = true; L.save(true);
+      S.introDone = true;
+      if (!S.unlockDone) { S.unlockDone = true; setTimeout(playUnlock, 0); }   // the first launch only: the games rise in as the welcome leaves
+      L.save(true);
       box.classList.add('leaving');
       setTimeout(() => box.remove(), 260);
       L.native('introDone');

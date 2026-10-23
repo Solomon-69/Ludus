@@ -3,6 +3,24 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.9.0 (2026-10-23)
+
+- Online light: a small dot on the Online tab (green with a soft pulse when connected, a hollow ring when
+  offline, also shown next to the Ludus title). Offline, the Online page says so, dims Create, Join and Rejoin,
+  and keeps the name field editable.
+- Everything except Online, Geo Guess photos and updates works with no internet (checked with the network blocked).
+- Settings: the gear is now also inside every game (the game pauses behind it). Cleaner list: Look, Play
+  (Sound and volume in one row), App (Update first), a folded "More" (Invisible icon, Rename games), Quit last.
+  "Show controls under games" is gone (the controls always show).
+- Update button (Settings, App): Check, Up to date, orange Update to X.Y, progress, errors, and "Needs the
+  internet." offline. Downloads the latest release of Solomon-69/Ludus, checks its SHA-256, swaps the app and
+  reopens. Always asks first. One setting (`Ludus.UPDATE_API` in `web/status.js`) says where updates come from.
+- Failsafe: if the games screen ever fails to start, the app shows its own screen with Reload Ludus and Reset
+  this game's data instead of a blank panel.
+- Online page steps all fit on one line ("Create or join"). Share with a friend: short one-line text, the
+  "right-click, Open the first time" tip now travels with the copy (Read me file and the Messages text), and the
+  picker opens beside the button.
+
 ## 1.8.3 (2026-10-23)
 
 - Geo Guess map: zooming in and out no longer flashes blank patches. A coarse whole-world map now sits under the

@@ -1,4 +1,5 @@
 // Light headless Ludus harness. node QA/harness/run.js <test.js> [--size compact|large|wide|widelarge] [--dark] [--shot out.png] [--web dir]
+// Extra: --init file.js (runs before the page), --offline (network blocked from the start).
 // test.js is an async function expression evaluated in the page; its return value is printed as JSON.
 // Needs playwright-core (set PW_CORE to its folder if require() cannot find it) and a Chromium headless shell (set CHROME).
 const fs = require('fs'), path = require('path'), os = require('os');
@@ -7,11 +8,13 @@ const args = process.argv.slice(2);
 const opt = n => { const i = args.indexOf(n); return i >= 0 ? args[i + 1] : null; };
 const web = opt('--web') || path.join(__dirname, '../../web');
 const SIZES = { compact: [400, 600], large: [520, 740], wide: [760, 500], widelarge: [900, 600] };
-const [width, height] = SIZES[opt('--size')] || SIZES.compact;
+const _s = opt('--size') || ''; const [width, height] = SIZES[_s] || (/^\d+x\d+$/.test(_s) ? _s.split('x').map(Number) : SIZES.compact);
 const chrome = process.env.CHROME || path.join(os.homedir(), 'Library/Caches/ms-playwright/chromium_headless_shell-1243/chrome-headless-shell-mac-arm64/chrome-headless-shell');
 (async () => {
   const browser = await pw.chromium.launch({ executablePath: chrome });
-  const page = await browser.newPage({ viewport: { width, height }, colorScheme: args.includes('--dark') ? 'dark' : 'light', deviceScaleFactor: 2 });
+  const ctx = await browser.newContext({ viewport: { width, height }, colorScheme: args.includes('--dark') ? 'dark' : 'light', deviceScaleFactor: 2, offline: args.includes('--offline') });
+  const page = await ctx.newPage();
+  if (opt('--init')) await page.addInitScript(fs.readFileSync(opt('--init'), 'utf8'));
   const errors = [];
   page.on('pageerror', e => errors.push(String(e.stack || e)));
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
