@@ -306,7 +306,7 @@
         if (pass()) {
           const top = Math.max(...scores.slice(0, players)), win = [];
           for (let s = 0; s < players; s++) if (scores[s] === top) win.push(s);
-          api.over({ score: top, won: true, title: top === 0 ? 'Nobody scored' : win.length > 1 ? 'A tie' : `${seatName(win[0])} wins`, message: scores.slice(0, players).map((v, s) => `P${s + 1} ${v}`).join(' · ') });
+          api.over({ score: top, won: true, friends: true, title: top === 0 ? 'Nobody scored' : win.length > 1 ? 'A tie' : `${seatName(win[0])} wins`, message: scores.slice(0, players).map((v, s) => `P${s + 1} ${v}`).join(' · ') });
         } else api.over({ score, title: 'Out of lives', message: `${wins} language${wins === 1 ? '' : 's'} named` });
       }
 
@@ -399,7 +399,7 @@
       if (window.ludusDebug) window.ludusDebug.tongue = () => ({ phase, ans: ans && ans.name, ansI: ans && ans.i, guesses: guesses.map(g => [LANGS[g.i].name, g.by]), done, won, round, lives, score, players, turn, scores: scores.slice(0, players) });
       return {
         save: snapshot,
-        pause() {},
+        pause() { try { ta.input.blur(); } catch (e) {} },
         resume() { if (phase === 'play') ta.focus(); },
         destroy() { destroyed = true; try { ro.disconnect(); } catch (e) {} root.remove(); }
       };

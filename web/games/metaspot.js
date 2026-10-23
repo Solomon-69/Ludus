@@ -625,7 +625,7 @@
       if (window.ludusDebug) window.ludusDebug.metaspot = () => ({ phase, q, lives, streak, score, n, kind, region, typed, round, left, plan: plan && plan.length, answers: JSON.parse(JSON.stringify(answers)) });
       return {
         save: snapshot,
-        pause() {},
+        pause() { try { ta.input.blur(); } catch (e) {} },
         resume() { if (phase === 'ask' && typed && !on) ta.focus(); },
         destroy() { destroyed = true; offs.forEach(f => f()); try { ro.disconnect(); } catch (e) {} root.remove(); }
       };

@@ -543,7 +543,8 @@
   }
   function finish(g, res) {
     const prev = S.best[g.id] || 0;
-    const friends = g.tag === TWO || (g.versus && current && current.run.api.friend);
+    // res.friends: a pass-and-play round between people on one screen (Tongue Twister), so no personal best
+    const friends = !!res.friends || g.tag === TWO || (g.versus && current && current.run.api.friend);
     const record = res.score > prev && !friends;
     if (record) { S.best[g.id] = res.score; $('scoreBest').textContent = fmt(res.score); }
     forget(g.id); L.save();
