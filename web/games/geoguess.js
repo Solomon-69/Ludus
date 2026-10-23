@@ -367,7 +367,7 @@
 
       // ----- maps -----
       const MAP_OPTS = { zoomControl: false, attributionControl: false, worldCopyJump: true, minZoom: 1, zoomSnap: 0.25, zoomDelta: 0.5, scrollWheelZoom: false,
-        inertia: true, inertiaDeceleration: 1900, inertiaMaxSpeed: 2600, easeLinearity: 0.2, zoomAnimation: true, fadeAnimation: true, markerZoomAnimation: true,
+        inertia: true, inertiaDeceleration: 1900, inertiaMaxSpeed: 2600, easeLinearity: 0.2, zoomAnimation: true, fadeAnimation: false, markerZoomAnimation: true,
         preferCanvas: true, bounceAtZoomLimits: false, doubleClickZoom: false, maxBoundsViscosity: 0.6 };
       const themed = [];
       function styleMap(map, credit, el_) {
@@ -380,11 +380,20 @@
         if (miniLayer) { miniLayer.clearLayers(); L.marker([pin.lat, pin.lon], { icon: pinIcon(SEAT[mySeat], !quiet && !api.reduceMotion), interactive: false }).addTo(miniLayer); }
         guessBtn.disabled = false; guessLabel(); if (!quiet) api.sfx('tap');
       }
-      // The whole sentence only when it fits the bar; otherwise the short one. Never cut off.
+      // The whole sentence only when it fits the bar at the size the map is going to (open or closed), decided once per
+      // change, never from the width mid-animation; otherwise the short one. Never cut off.
+      const LONG = 'Place your pin on the map', SHORT = 'Place your pin';
+      let measureCtx = null;
+      const textW = t => {
+        const cs = getComputedStyle(guessBtn); measureCtx = measureCtx || document.createElement('canvas').getContext('2d');
+        measureCtx.font = cs.font; const ls = parseFloat(cs.letterSpacing) || 0;
+        return measureCtx.measureText(cs.textTransform === 'uppercase' ? t.toUpperCase() : t).width + ls * t.length;
+      };
       const guessLabel = () => {
-        if (!guessBtn.disabled) { guessBtn.textContent = 'Guess'; return; }
-        guessBtn.textContent = 'Place your pin on the map';
-        if (guessBtn.clientWidth && guessBtn.scrollWidth > guessBtn.clientWidth) guessBtn.textContent = 'Place your pin';
+        if (!guessBtn.disabled) { if (guessBtn.textContent !== 'Guess') guessBtn.textContent = 'Guess'; return; }
+        const open = mini.classList.contains('open'), w = parseFloat(root.style.getPropertyValue(open ? '--mini-w' : '--mini-cw')) || guessBtn.clientWidth;
+        const t = textW(LONG) <= w - 26 ? LONG : SHORT;
+        if (guessBtn.textContent !== t) guessBtn.textContent = t;
       };
       function makeMaps() {
         if (miniMap) return;
@@ -407,6 +416,7 @@
         root.style.setProperty('--mini-cw', CW + 'px'); root.style.setProperty('--mini-ch', CH + 'px');
         root.style.setProperty('--mini-s', String(Math.max(CW / W, CH / H).toFixed(4)));
         if (miniMap) { miniMap.invalidateSize({ animate: false }); keepPinVisible(false); }
+        guessLabel();
         biggerBtn.disabled = sizeLv >= MAP_SIZES.length - 1; smallerBtn.disabled = sizeLv <= 0;
         lockBtn.classList.toggle('on', pinned); lockBtn.title = pinned ? 'Let the map close again' : 'Keep the map open';
       }
@@ -415,11 +425,11 @@
       biggerBtn.onclick = () => resize(1); smallerBtn.onclick = () => resize(-1);
       lockBtn.onclick = () => { pinned = !pinned; sizeMini(); keepMapPrefs(); api.sfx('click'); if (pinned) openMini(true); };
       let hoverT = 0;
-      mini.addEventListener('transitionend', e => { if (e.target === mini && e.propertyName === 'width') guessLabel(); });
       function openMini(on_) {
         clearTimeout(hoverT);
         const was = mini.classList.contains('open'), now = !!(on_ || pinned);
         mini.classList.toggle('open', now);
+        if (was !== now) guessLabel();
         if (was && !now) keepPinVisible(true);
       }
       // Closed, the map is scaled down and cropped to the small box: if the pin would sit outside that box (or under its
@@ -894,7 +904,6 @@
       guessBtn.onclick = () => submit(false);
       const ro = new ResizeObserver(() => { if (destroyed) return; root.style.setProperty('--geo-h', stage.clientHeight + 'px'); if (viewer) try { viewer.resize(); } catch (e) {} if (resMap) resMap.invalidateSize(false); sizeMini(); });
       ro.observe(stage); offs.push(() => ro.disconnect());
-      const rb = new ResizeObserver(() => { if (!destroyed) guessLabel(); }); rb.observe(guessBtn); offs.push(() => rb.disconnect());
       root.style.setProperty('--geo-h', stage.clientHeight + 'px');
       api.loop(dt => {
         if (viewer && cur && (phase === 'play' || phase === 'load')) heading = wrap360(cur.az + viewer.getYaw());

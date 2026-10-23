@@ -3,6 +3,17 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.8.3 (2026-10-23)
+
+- Geo Guess map: zooming in and out no longer flashes blank patches. A coarse whole-world map now sits under the
+  detailed tiles, tiles no longer fade in, and the map is only redrawn when a zoom step settles
+  (test: 0 blank frames out of about 1,000, was 801).
+- Geo Guess pin bar: the text is picked from the map's final size, so it no longer swaps mid-animation.
+- Online page: "Play online" sits in its own box with three short steps (Create or join a room, Share the code,
+  Host picks games) instead of the long sentence.
+- Light mode: text fields, the Last party card, the room code boxes and the Online header use a slightly deeper
+  cream with a hairline edge so they stand out from the panel. Dark mode is unchanged.
+
 ## 1.8.2 (2026-10-23)
 
 - New covers: Flag Quiz (France and Seychelles, clean edges), 2048 (a real board mid-game), Ultimate tic-tac-toe

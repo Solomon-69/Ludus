@@ -105,7 +105,9 @@
     const page = el('div', 'online-page'), head = el('div', 'op-group op-head'), join = el('div', 'op-group');
     page.appendChild(head); const mid = { appendChild: e => page.appendChild(e) };
     head.appendChild(el('div', 'op-title', 'Play online'));
-    head.appendChild(el('p', 'lobby-sub', 'Create a room and share its code, or join a friend. The host picks the games and how many rounds.'));
+    const steps = el('ol', 'op-steps');   // three short steps instead of a long sentence; each wraps to two lines when narrow
+    ['Create or join a room', 'Share the code', 'Host picks games'].forEach((t, i) => { const li = el('li'); li.appendChild(el('span', 'op-dot', String(i + 1))); li.appendChild(el('span', '', t)); steps.appendChild(li); });
+    head.appendChild(steps);
     const f = el('label', 'field');
     f.appendChild(el('span', 'field-label', 'Your name (optional)'));
     const nm = el('input'); nm.type = 'text'; nm.maxLength = 10; nm.placeholder = 'Player'; nm.value = L.net.cleanName(S.onlineName, ''); nm.autocomplete = 'off'; nm.spellcheck = false; nm.setAttribute('aria-label', 'Your name');
@@ -828,7 +830,7 @@
       appRows.push(row('Quit Ludus', null, q));
     }
     body.appendChild(group('App', appRows));
-    body.appendChild(el('div', 'foot', 'Ludus 1.8.2'));
+    body.appendChild(el('div', 'foot', 'Ludus 1.8.3'));
   }
   $('openSettings').onclick = () => { renderSettings(); show('settings'); L.sfx('tap'); };
   $('settingsBack').onclick = () => { show('home'); renderCards(); };

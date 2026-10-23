@@ -96,7 +96,9 @@
   // Puts the basemap (country map, city map) and the city labels on a Leaflet map. Returns { retheme(), set }.
   function attach(map, credit) {
     let layers = [], set = 0, loads = 0, errs = 0;
-    const o = { keepBuffer: 3, updateWhenZooming: true, updateWhenIdle: false, updateInterval: 100 };
+    // While zooming the tiles already on screen are scaled (no new levels mid-zoom, which blanked and flickered); the
+    // sharp level loads once the zoom settles, with the old one kept until it is ready.
+    const o = { keepBuffer: 4, updateWhenZooming: false, updateWhenIdle: false, updateInterval: 100 };
     const setCredit = () => { const t = TILES[set]; credit.innerHTML = '<i>' + (t.short || '© Esri · OSM') + '</i>'; credit.title = t.credit || CREDIT; };
     const make = i => {
       set = i; loads = 0; errs = 0;
@@ -110,7 +112,10 @@
         const low = new C(t.low(), Object.assign({ mode: 'street', maxZoom: SWITCH + 4, maxNativeZoom: SWITCH - 1, zIndex: 1, crossOrigin: t.recolor ? 'anonymous' : false }, o));
         const high = new C(t.high(), Object.assign({ mode: 'grey', minZoom: SWITCH, maxZoom: 18, maxNativeZoom: 16, zIndex: 2, crossOrigin: t.recolor ? 'anonymous' : false }, o));
         const ref = L.tileLayer(REF(), Object.assign({ minZoom: SWITCH, maxZoom: 18, maxNativeZoom: 16, zIndex: 3 }, o));
-        layers = [low, high, ref]; layers.forEach(l => l.addTo(map));
+        // A coarse whole-world backdrop (a few low-detail tiles, enlarged) sits under everything, so zooming out never
+        // uncovers a blank area while the sharper tiles arrive.
+        const back = new C(t.low(), Object.assign({ mode: 'street', maxZoom: 18, maxNativeZoom: 3, zIndex: 0, crossOrigin: t.recolor ? 'anonymous' : false }, o, { keepBuffer: 2 }));
+        layers = [back, low, high, ref]; layers.forEach(l => l.addTo(map));
         [low, high].forEach(l => {
           l.on('tileload', () => { loads++; });
           l.on('tileerror', () => { errs++; if (loads === 0 && errs >= 4 && set < TILES.length - 1) make(set + 1); });
