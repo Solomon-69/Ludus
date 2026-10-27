@@ -343,20 +343,20 @@ const GAMES = {
   pong:   { name: 'Paddle Duel', own: 'ArrowDown', other: 'w', mine: '() => [0, ludusDebug.pongNet().p2]', host: '() => [0, ludusDebug.pongNet().p2]', seen: '() => [0, ludusDebug.pongNet().p1]', tol: 10 },
   hockey: { name: 'Air Hockey', own: 'a', other: 'd', mine: '() => { const m = ludusDebug.hockey().m2; return [m.x, m.y]; }', host: '() => { const m = ludusDebug.hockey().m2; return [m.x, m.y]; }', seen: '() => { const m = ludusDebug.hockey().m1; return [m.x, m.y]; }', tol: 14 },
   tag:    { name: 'Tag', own: 'ArrowRight', other: 'd', start: 'enter', mine: "() => { const p = ludusDebug.tagMe(); return [p.x, p.y]; }", host: "() => { const p = ludusDebug.tagMe('p2'); return [p.x, p.y]; }", seen: "() => { const p = ludusDebug.tagMe('p1'); return [p.x, p.y]; }", tol: 20 },
-  slither: { name: 'Worm Arena', own: 'ArrowRight', other: 'd', start: 'wait', mine: "() => { const w = ludusDebug.slither().humans.find(h => h.human === 2); return [w.ang * 100, 0]; }", host: "() => { const w = ludusDebug.slither().humans.find(h => h.human === 2); return [w.ang * 100, 0]; }", seen: "() => { const w = ludusDebug.slither().humans.find(h => h.human === 1); return [w.px[0], w.py[0]]; }", tol: 35, setup: "() => ludusDebug.slither().humans.forEach(h => { h.prot = 99; })" },
+  slither: { name: 'Worm Arena', own: 'ArrowRight', other: 'd', start: 'wait', mine: "() => { const w = ludusDebug.slither().humans.find(h => h.human === 2); return [w.ang * 100, 0]; }", host: "() => { const w = ludusDebug.slither().humans.find(h => h.human === 2); return [w.ang * 100, 0]; }", seen: "() => { const w = ludusDebug.slither().humans.find(h => h.human === 1); return [w.px[0], w.py[0]]; }", tol: 35, setup: "() => ludusDebug.slither().humans.forEach(h => { h.prot = 99; })", wait: 1200 },
   holeio: { name: 'City Swallow', own: 'd', other: 'd', start: 'wait', mine: "() => { const p = ludusDebug.holeMe(); return [p.x, p.y]; }", host: "() => { const p = ludusDebug.holeMe(2); return [p.x, p.y]; }", seen: "() => { const p = ludusDebug.holeMe(1); return [p.x, p.y]; }", tol: 30 },
 };
 async function lagGame(browser, id) {
   const G = GAMES[id], br = await broker.start();
   const { pages: [A, B] } = await party(browser, br, G.name, 2);
-  if (G.start === 'enter') { await A.keyboard.press('Enter'); await wait(3200); } else if (G.start === 'wait') await wait(5000); else await wait(800);
+  if (G.start === 'enter') { await A.keyboard.press('Enter'); await wait(3200); } else if (G.start === 'wait') await wait(G.wait || 5000);   // Worm Arena: its worms swim into the arena wall about 10 s after the start, so the lag steps must finish before that else await wait(800);
   if (G.setup) await A.evaluate(src => eval(src)(), G.setup);
   br.latency = { base: 150, jitter: 150 };
   // 1) the guest's own thing answers on the next frame
   await B.evaluate(src => { window.__p = eval(src); window.__s = []; window.__kd = null; addEventListener('keydown', () => { if (window.__kd === null) window.__kd = performance.now(); }, true); (function f() { window.__s.push({ t: performance.now(), p: window.__p() }); if (window.__s.length > 800) window.__s.shift(); requestAnimationFrame(f); })(); }, G.mine);
   await wait(300);
   await B.keyboard.down(G.own); await wait(180);
-  const r = await B.evaluate(() => { const kd = window.__kd, p0 = window.__s.filter(s => s.t < kd).pop(); const hit = window.__s.find(s => s.t >= kd && Math.hypot(s.p[0] - p0.p[0], s.p[1] - p0.p[1]) > 0.4); return { ms: hit ? hit.t - kd : null }; });
+  const r = await B.evaluate(() => { const kd = window.__kd, p0 = window.__s.filter(s => s.t < kd).pop(); const hit = window.__s.find(s => s.t >= kd && Math.hypot(s.p[0] - p0.p[0], s.p[1] - p0.p[1]) > 0.4); return { ms: hit ? hit.t - kd : null, kd }; });
   check(G.name + ': guest\'s own thing moves within 60 ms of the key (relay 150-300 ms)', r.ms !== null && r.ms < 60, r);
   await wait(700); await B.keyboard.up(G.own); await wait(3000);
   const [mine, theirs] = [await B.evaluate(() => window.__p()), await A.evaluate(src => eval(src)(), G.host)];
