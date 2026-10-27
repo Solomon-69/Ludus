@@ -939,8 +939,10 @@
   function openSettings() {
     settingsFrom = view === 'game' ? 'game' : 'home';
     if (view === 'game') pause();   // a game is paused while settings are on top of it (not in an online room, which cannot pause)
-    renderSettings(); show('settings'); L.sfx('tap');
+    renderSettings(); show('settings'); settingsTop(); L.sfx('tap');
   }
+  // Settings always opens at its top, never wherever it was last scrolled.
+  function settingsTop() { const b = $('settingsBody'); if (!b) return; b.scrollTop = 0; requestAnimationFrame(() => { b.scrollTop = 0; }); }
   function closeSettings() { show(settingsFrom); if (settingsFrom === 'home') renderCards(); }
   $('openSettings').onclick = openSettings;
   $('gameSettings').onclick = openSettings;
@@ -973,10 +975,10 @@
   window.ludusOpenGame = id => start(id);
   // Right-click on the menu bar / tray icon: show Settings (a game underneath is paused, as with the gear). Already there: stay.
   window.ludusOpenSettings = () => {
-    if (view === 'settings') return 'settings';
+    if (view === 'settings') { settingsTop(); return 'settings'; }
     settingsFrom = view === 'game' ? 'game' : 'home';
     if (view === 'game') pause();
-    renderSettings(); show('settings');
+    renderSettings(); show('settings'); settingsTop();
     return 'settings';
   };
   // The app has resized the panel for a game (wide or normal): start it once the page has the new size.
