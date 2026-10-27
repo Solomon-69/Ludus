@@ -9,17 +9,17 @@ const SHOTS = process.env.SHOTS || path.join(os.tmpdir(), 'ludus-shots'); fs.mkd
 let fails = 0; const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) fails++; };
 const wait = ms => new Promise(r => setTimeout(r, ms));
 // ---- fake release server: /ok (newer version), /same (same version), /gone (404), /broken (junk) ----
-let latest = '1.12.0';
+let latest = '1.12.1';
 const server = http.createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   const base = 'http://127.0.0.1:' + server.address().port;
   if (req.url === '/ok') { res.setHeader('content-type', 'application/json'); return res.end(JSON.stringify({ tag_name: 'v' + latest, assets: [
     { name: 'Ludus-mac.zip', browser_download_url: base + '/Ludus-mac.zip' }, { name: 'Ludus-windows.zip', browser_download_url: base + '/Ludus-windows.zip' }, { name: 'SHA256SUMS.txt', browser_download_url: base + '/SHA256SUMS.txt' }] })); }
-  if (req.url === '/same') { res.setHeader('content-type', 'application/json'); return res.end(JSON.stringify({ tag_name: 'v1.12.0', assets: [] })); }
+  if (req.url === '/same') { res.setHeader('content-type', 'application/json'); return res.end(JSON.stringify({ tag_name: 'v1.12.1', assets: [] })); }
   if (req.url === '/broken') return res.end('<html>nope');
   res.statusCode = 404; res.end('{"message":"Not Found"}');
 });
-const NATIVE = `window.__LUDUS_NATIVE__=true;window.__LUDUS_DOCK__=true;window.__LUDUS_INVISIBLE__=false;window.__LUDUS_LOGIN__=false;window.__LUDUS_VERSION__='1.12.0';
+const NATIVE = `window.__LUDUS_NATIVE__=true;window.__LUDUS_DOCK__=true;window.__LUDUS_INVISIBLE__=false;window.__LUDUS_LOGIN__=false;window.__LUDUS_VERSION__='1.12.1';
 window.chrome={webview:{postMessage:m=>{(window.__msgs=window.__msgs||[]).push(m);}}};`;
 (async () => {
   await new Promise(r => server.listen(0, '127.0.0.1', r));
@@ -44,7 +44,7 @@ window.chrome={webview:{postMessage:m=>{(window.__msgs=window.__msgs||[]).push(m
   { const t = await open({ api: '/same' }); await openSettings(t.page);
     const txt = (await settingsText(t.page)).toLowerCase();
     ok(!/Show controls/i.test(txt), 'Settings: "Show controls under games" is gone');
-    const order = ['Look', 'Appearance', 'Accent', 'Panel size', 'Reduce motion', 'Play', 'Difficulty', 'Sound & volume', '\napp\n', 'Ludus 1.12.0', 'Open at login', 'Show in Dock', 'Share with a friend', 'Reset best scores', '\nmore\n'].map(k => txt.indexOf(k.toLowerCase()));
+    const order = ['Look', 'Appearance', 'Accent', 'Panel size', 'Reduce motion', 'Play', 'Difficulty', 'Sound & volume', '\napp\n', 'Ludus 1.12.1', 'Open at login', 'Show in Dock', 'Share with a friend', 'Reset best scores', '\nmore\n'].map(k => txt.indexOf(k.toLowerCase()));
     ok(order.every((v, i) => v >= 0 && (i === 0 || v > order[i - 1])), 'Settings: order is Look, Play, App, More');
     ok(!/\bVolume\b/.test(txt.replace('Sound & volume', '')) && !/^Sound$/m.test(txt), 'Settings: Sound and Volume are one row');
     const more = await t.page.evaluate(() => ({ hidden: document.querySelector('.more-box').hidden, inv: document.querySelector('.more-box').innerText }));
@@ -60,10 +60,10 @@ window.chrome={webview:{postMessage:m=>{(window.__msgs=window.__msgs||[]).push(m
 
   // ===== 2. Update row against the fake server =====
   { const t = await open({ api: '/ok' }); await openSettings(t.page);
-    let s = await rowState(t.page); ok(s.st === 'idle' && /Ludus 1.12.0/.test(s.text), 'Update: starts at Check (' + s.text + ')');
+    let s = await rowState(t.page); ok(s.st === 'idle' && /Ludus 1.12.1/.test(s.text), 'Update: starts at Check (' + s.text + ')');
     await t.page.click('#updRow button'); await wait(60);
     await wait(500); s = await rowState(t.page);
-    ok(s.st === 'available' && /Update to 1.12.0/.test(s.text), 'Update: orange "Update to 1.12.0" (' + s.text + ')');
+    ok(s.st === 'available' && /Update to 1.12.1/.test(s.text), 'Update: orange "Update to 1.12.1" (' + s.text + ')');
     await t.page.screenshot({ path: path.join(SHOTS, 'update-available.png') });
     await t.page.click('#updRow button'); await wait(80); s = await rowState(t.page);
     ok(s.st === 'confirm', 'Update: tapping asks to confirm, nothing installs yet');
@@ -71,7 +71,7 @@ window.chrome={webview:{postMessage:m=>{(window.__msgs=window.__msgs||[]).push(m
     await t.page.click('#updRow .small-btn:first-child'); await wait(80); s = await rowState(t.page); ok(s.st === 'available', 'Update: "Not now" goes back');
     await t.page.click('#updRow button'); await wait(60); await t.page.click('#updRow .small-btn.warm'); await wait(120);
     const msg = await t.page.evaluate(() => (window.__msgs || []).filter(m => m.type === 'update')[0]);
-    ok(msg && msg.name === 'Ludus-mac.zip' && /SHA256SUMS\.txt$/.test(msg.sums) && msg.version === '1.12.0', 'Update: confirm sends zip + checksums + version to the app');
+    ok(msg && msg.name === 'Ludus-mac.zip' && /SHA256SUMS\.txt$/.test(msg.sums) && msg.version === '1.12.1', 'Update: confirm sends zip + checksums + version to the app');
     s = await rowState(t.page); ok(s.st === 'progress', 'Update: shows progress');
     await t.page.evaluate(() => window.ludusUpdateState('progress', 42)); await wait(80);
     s = await rowState(t.page); ok(/42%/.test(s.text), 'Update: progress follows the app (' + s.text + ')');
