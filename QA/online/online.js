@@ -157,14 +157,15 @@ const S = {
     const c = await flexCreate(A); await flexJoin(B, c); await pick(A, ['Paddle Duel', 'Air Hockey'], 5); await wait(800);
     const saved = await A.evaluate(() => JSON.parse(localStorage.getItem('ludus.v1')).party);
     check('party saved: code, names, games, rounds', saved && saved.code === c && saved.names.length === 2 && saved.games.length === 2 && saved.n === 5, saved);
-    await A.reload(); await wait(500); await onlineTab(A);
-    const card = await A.$eval('.party-card', e => e.innerText).catch(() => '');
-    check('after a restart the Online page offers Rejoin', /Rejoin/.test(card) && /Ann/.test(card) && /Paddle Duel/i.test(card), card);
-    await A.click('#opRejoin'); await A.waitForSelector('.code-ch', { timeout: 8000 }); await wait(900);
+    // 1.12.17: Ludus restarting while in a party goes straight back to it (its maker reopens the code when nobody hosts it)
+    await A.reload(); await A.waitForSelector('.code-ch', { timeout: 20000 }); await wait(900);
+    check('after a restart Ludus is back in the party by itself', true);
     const on = await A.$$eval('#lobbyCard .pick-chips .chip.is-on', els => els.map(e => e.textContent));
     check('Rejoin reopens a room with the same games and rounds', on.includes('Paddle Duel') && on.includes('Air Hockey') && on.includes('5'), on);
     check('Rejoin 1 keeps the same room code', (await code(A)) === c, [await code(A), c]);
     await A.evaluate(() => document.getElementById('backBtn').click()); await wait(500); await onlineTab(A);
+    const card = await A.$eval('.party-card', e => e.innerText).catch(() => '');
+    check('the Online page offers Rejoin', /Rejoin/.test(card) && /Ann/.test(card) && /Paddle Duel/i.test(card), card);
     await A.click('#opRejoin'); await A.waitForSelector('.code-ch', { timeout: 12000 }); await wait(900);
     check('Rejoin 2 keeps the same room code', (await code(A)) === c, [await code(A), c]);
     await A.evaluate(() => document.getElementById('backBtn').click()); await wait(500); await onlineTab(A);
@@ -340,11 +341,12 @@ const S = {
 
 // ---- real-time games under a slow relay (150-300 ms one way with jitter) ----
 const GAMES = {
-  pong:   { name: 'Paddle Duel', own: 'ArrowDown', other: 'w', mine: '() => [0, ludusDebug.pongNet().p2]', host: '() => [0, ludusDebug.pongNet().p2]', seen: '() => [0, ludusDebug.pongNet().p1]', tol: 10 },
-  hockey: { name: 'Air Hockey', own: 'a', other: 'd', mine: '() => { const m = ludusDebug.hockey().m2; return [m.x, m.y]; }', host: '() => { const m = ludusDebug.hockey().m2; return [m.x, m.y]; }', seen: '() => { const m = ludusDebug.hockey().m1; return [m.x, m.y]; }', tol: 14 },
-  tag:    { name: 'Tag', own: 'ArrowRight', other: 'd', start: 'enter', mine: "() => { const p = ludusDebug.tagMe(); return [p.x, p.y]; }", host: "() => { const p = ludusDebug.tagMe('p2'); return [p.x, p.y]; }", seen: "() => { const p = ludusDebug.tagMe('p1'); return [p.x, p.y]; }", tol: 20 },
+  pong:   { name: 'Paddle Duel', own: 'ArrowDown', other: 'w', back: 's', mine: '() => [0, ludusDebug.pongNet().p2]', host: '() => [0, ludusDebug.pongNet().p2]', seen: '() => [0, ludusDebug.pongNet().p1]', tol: 10 },
+  hockey: { name: 'Air Hockey', own: 'a', other: 'd', back: 'a', mine: '() => { const m = ludusDebug.hockey().m2; return [m.x, m.y]; }', host: '() => { const m = ludusDebug.hockey().m2; return [m.x, m.y]; }', seen: '() => { const m = ludusDebug.hockey().m1; return [m.x, m.y]; }', tol: 14 },
+  tag:    { name: 'Tag', own: 'ArrowRight', other: 'd', back: 'a', start: 'enter', mine: "() => { const p = ludusDebug.tagMe(); return [p.x, p.y]; }", host: "() => { const p = ludusDebug.tagMe('p2'); return [p.x, p.y]; }", seen: "() => { const p = ludusDebug.tagMe('p1'); return [p.x, p.y]; }", tol: 20 },
   slither: { name: 'Worm Arena', own: 'ArrowRight', other: 'd', start: 'wait', mine: "() => { const w = ludusDebug.slither().humans.find(h => h.human === 2); return [w.ang * 100, 0]; }", host: "() => { const w = ludusDebug.slither().humans.find(h => h.human === 2); return [w.ang * 100, 0]; }", seen: "() => { const w = ludusDebug.slither().humans.find(h => h.human === 1); return [w.px[0], w.py[0]]; }", tol: 35, setup: "() => ludusDebug.slither().humans.forEach(h => { h.prot = 99; })", wait: 1200 },
-  holeio: { name: 'City Swallow', own: 'd', other: 'd', start: 'wait', mine: "() => { const p = ludusDebug.holeMe(); return [p.x, p.y]; }", host: "() => { const p = ludusDebug.holeMe(2); return [p.x, p.y]; }", seen: "() => { const p = ludusDebug.holeMe(1); return [p.x, p.y]; }", tol: 30 },
+  paperio: { name: 'Land Claim', own: 'ArrowDown', other: 'd', back: 's', start: 'wait', wait: 2500, mine: "() => { const p = ludusDebug.paperio.players().find(q => q.human === 2) || ludusDebug.paperio.players()[1]; return [p.x * 10, p.y * 10]; }", host: "() => { const p = ludusDebug.paperio.players().find(q => q.human === 2) || ludusDebug.paperio.players()[1]; return [p.x * 10, p.y * 10]; }", seen: "() => { const p = ludusDebug.paperio.players().find(q => q.human === 1) || ludusDebug.paperio.players()[0]; return [p.x * 10, p.y * 10]; }", tol: 40 },
+  holeio: { name: 'City Swallow', own: 'd', other: 'd', back: 'a', start: 'wait', mine: "() => { const p = ludusDebug.holeMe(); return [p.x, p.y]; }", host: "() => { const p = ludusDebug.holeMe(2); return [p.x, p.y]; }", seen: "() => { const p = ludusDebug.holeMe(1); return [p.x, p.y]; }", tol: 30 },
 };
 async function lagGame(browser, id) {
   const G = GAMES[id], br = await broker.start();
@@ -372,7 +374,50 @@ async function lagGame(browser, id) {
   check(G.name + ': no jumps between frames (apart from a game reset)', jump < Math.max(40, span * 0.5), { jump, span });
   check(G.name + ': no page errors', errs([A, B]) === 0, [A.errors, B.errors]);
   br.close();
+  for (const p of [A, B]) await p.context().close().catch(() => {});   // free the pages: a busy browser starves the next game's frames
 }
+// ---- smoothness on the guest (1.12.17): every real-time game under 120 +- 40 ms one way and 2% of live copies lost.
+// While the host moves its own thing, the guest's copy of it must change on nearly every frame (no hold-then-jump),
+// with no step much bigger than the usual one and no hold longer than 3 frames. Numbers are printed for the report.
+async function smoothGame(browser, id) {
+  const G = GAMES[id], br = await broker.start();
+  const { pages: [A, B] } = await party(browser, br, G.name, 2);
+  if (G.start === 'enter') { await A.keyboard.press('Enter'); await wait(3200); } else if (G.start === 'wait') await wait(G.wait || 5000); else await wait(800);
+  if (G.setup) await A.evaluate(src => eval(src)(), G.setup);
+  const harsh = !!process.env.SMOOTH_HARSH;   // a bad home connection: 80-330 ms and 5% lost
+  br.latency = harsh ? { base: 80, jitter: 250 } : { base: 80, jitter: 80 };
+  let dropped = 0;
+  br.filter = (t, payload) => { if (/"t":"f"/.test(payload) && Math.random() < (harsh ? 0.05 : 0.02)) { dropped++; return false; } return true; };
+  await wait(1500);
+  const rec = src => { window.__w = eval(src); window.__ws = []; (function f() { window.__ws.push([Date.now(), ...window.__w()]); requestAnimationFrame(f); })(); };
+  await B.evaluate(rec, G.seen); await A.evaluate(rec, G.seen);
+  await wait(200); await B.evaluate(() => { window.__ws = []; }); await A.evaluate(() => { window.__ws = []; });
+  for (let k = 0; k < 3; k++) { await hold(A, G.other, 350); await hold(A, G.back || G.other, 350); }
+  await wait(100);
+  const raw = await B.evaluate(() => window.__ws), hs = await A.evaluate(() => window.__ws), ws = raw.map(r => [r[1], r[2]]);
+  // did the host's own thing move between two moments (host's screen)?
+  const hostMoved = (t0, t1) => { const seg = hs.filter(r => r[0] >= t0 && r[0] <= t1); return seg.length > 1 && seg.some(r => Math.hypot(r[1] - seg[0][1], r[2] - seg[0][2]) > 1); };
+  const steps = []; for (let i = 1; i < ws.length; i++) steps.push(Math.hypot(ws[i][0] - ws[i - 1][0], ws[i][1] - ws[i - 1][1]));
+  // jumps are judged on speed (step per ms), so a slow test frame (a longer step) is not taken for a jump
+  const speeds = steps.map((x, i) => x / Math.max(8, raw[i + 1][0] - raw[i][0]) * 16.7);
+  const moving = steps.filter(x => x > 0.05).length, srt = speeds.filter((x, i) => steps[i] > 0.05).sort((a, b) => a - b);
+  const med = srt[Math.floor(srt.length / 2)] || 0, big = srt[srt.length - 2] || 0;   // the biggest one may be a real reset
+  // a hold only counts while the host's thing was really moving (what the guest shows is about 0.3 s old: relay delay plus the drawing delay)
+  let hold3 = 0, run = 0;
+  for (let i = 0; i < steps.length; i++) {
+    if (steps[i] <= 0.05) { run++; const st = raw[i + 1 - run][0], en = raw[i + 1][0]; if (hostMoved(st - 320, en - 280)) { if (run > hold3 && process.env.SMOOTH_DEBUG) console.log('   hold', run, 'at', st - raw[0][0], 'ms', JSON.stringify(raw.slice(Math.max(0, i - run - 2), i + 3).map(r => [r[0] - raw[0][0], +r[1].toFixed(1), +r[2].toFixed(1)])), 'host', JSON.stringify(hs.filter(r => r[0] >= st - 400 && r[0] <= en).map(r => [r[0] - raw[0][0], +r[1].toFixed(1), +r[2].toFixed(1)]))); hold3 = Math.max(hold3, run); } } else run = 0;
+  }
+  const info = { frames: ws.length, movingFrames: moving, share: +(moving / Math.max(1, steps.length)).toFixed(2), medianStep: +med.toFixed(2), bigStep: +big.toFixed(2), longestHold: hold3, dropped };
+  console.log('  ' + G.name + ' ' + JSON.stringify(info));
+  check(G.name + ': guest view moves on nearly every frame under 120+-40 ms and 2% loss', info.share >= 0.8 && ws.length > 40, info);
+  check(G.name + ': no hold longer than 3 frames', hold3 <= 3, info);
+  check(G.name + ': no big jumps (biggest step < 4x the usual)', big < Math.max(4 * med, G.tol), info);
+  check(G.name + ': no page errors', errs([A, B]) === 0, [A.errors, B.errors]);
+  br.filter = null; br.close();
+  for (const p of [A, B]) await p.context().close().catch(() => {});
+}
+for (const id of Object.keys(GAMES)) S['smooth_' + id] = b => smoothGame(b, id);
+S.smooth = async browser => { for (const id of Object.keys(GAMES)) await smoothGame(browser, id); };
 S.lag = async browser => { for (const id of Object.keys(GAMES)) await lagGame(browser, id); };
 for (const id of Object.keys(GAMES)) S['lag_' + id] = b => lagGame(b, id);
 S.watch = S.lag;
@@ -428,7 +473,7 @@ S.layout = async browser => {
 (async () => {
   const only = process.argv.slice(2), browser = await L.launch();
   for (const [name, fn] of Object.entries(S)) {
-    if (name.startsWith('lag_') || name === 'watch') { if (!only.includes(name)) continue; }
+    if (name.startsWith('lag_') || name.startsWith('smooth') || name === 'watch') { if (!only.includes(name)) continue; }
     else if (only.length && !only.includes(name)) continue;
     console.log('--- ' + name);
     try { await fn(browser); } catch (e) { check(name + ' ran to the end', false, String(e.stack || e).slice(0, 500)); }

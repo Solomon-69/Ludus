@@ -3,8 +3,16 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
-## 1.12.17 (2026-10-28)
+## 1.12.18 (2026-10-28)
+- Online games are smooth for the guest: every live game (Paddle Duel, Air Hockey, Tag, Worm Arena, Land Claim, City Swallow) now plays the host's moves back on an even clock a little behind, blends between them, carries motion on briefly when the line hiccups and eases back instead of jumping. Copies that arrive late, twice or out of order no longer cause stutters, and a lost copy no longer freezes the picture.
+- Air Hockey online: the guest's puck is drawn where it really is now and bounces off your own mallet straight away. Mouse and trackpad steer your mallet inside your half. The rink is wide by default; the Rotate button in the header turns it tall and remembers it. Everyone has their own goal on their side (left when wide, bottom when tall).
+- Air Hockey and other games vs the bot: a bot no longer pins the puck or ball in a corner, circles in place or waits for ever; a puck stuck still against a wall gets nudged, and a long standstill is faced off again.
+- Parties: a room code can never be hosted twice. Rejoin always joins as a guest (only the player who made the code opens it again, and only if nobody hosts it). An old host who comes back joins the new leader's room. Closing and reopening Ludus keeps you in the party and brings back the room, not a half played game.
+- A player who goes quiet keeps their seat for 45 seconds, and someone who drops out gets the same seat and score back for 2 minutes.
+- The fallback relay for blocked networks sends less often, backs off when it is busy and replaces dead connections by itself.
+- Online page: fits the panel at every size with no scrolling (two columns when wide), the Last party card folds away and opens smoothly, the join boxes never show an old code, the host's suggestion card is cleaner, and suggesting games uses the same orange picker as the host with a small Host tag.
 
+## 1.12.17 (2026-10-28)
 - Windows: the in-app update now works. Before, pressing Install left the bar stuck at 0% because the app read the
   update request after it had already been thrown away, so the download never started. It now starts straight away,
   shows real progress, retries a second download link if the first stalls, and gives up after 30 seconds without data

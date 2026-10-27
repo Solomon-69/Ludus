@@ -380,7 +380,7 @@
     me.uid = typeof opts.uid === 'string' && /^[0-9a-f]{8,16}$/.test(opts.uid) ? opts.uid : '';   // this player's lasting id: the same seat comes back after a drop
     me.uids = {};               // host: cid -> lasting id
     me.held = [];               // host: seats kept for players who dropped out { u, seat, cid, name, until }
-    me.rejoin = !!opts.rejoin;  // guest: coming back to a party (asks a little longer before saying the room is gone)
+    me.rejoin = opts.rejoin === 'quick' ? 'quick' : !!opts.rejoin;  // guest: coming back to a party (asks a little longer before saying the room is gone)
     me.code = ''; me.seat = role === 'host' ? 0 : -1; me.hostCid = role === 'host' ? me.cid : '';
     me.roster = new Map();      // seat -> { seat, name, cid }
     me.seen = {};               // cid -> last time we heard from them
@@ -487,7 +487,7 @@
   Session.prototype._askJoin = function () {
     const me = this;
     me.code = me.candidate; me.tries = 0;
-    const limit = me.rejoin ? 12 : 8;
+    const limit = me.rejoin === 'quick' ? 5 : me.rejoin ? 12 : 8;   // quick: the maker of the code, who reopens it if nobody answers
     const ask = () => {
       if (me.over || me.ready || me.conn !== 'online') return;
       if (++me.tries > limit) { me._fail('no-room'); return; }

@@ -163,12 +163,26 @@ about 0.1 s late; if the host leaves the room closes.
 * One MQTT topic per room: `ludus/v1/<CODE>/m`. Messages are JSON: `v` version, `c` random sender id, `t` kind,
   `q` game message number, `r` round. Game messages are numbered per sender; a gap is noticed (also from the
   4 s heartbeat) and the missing messages are requested and sent again. Duplicates are ignored.
-* Presence: everyone sends a heartbeat every 4 s; silence for 16 s means gone. The host's heartbeat carries the
+* Presence: everyone sends a heartbeat every 4 s (15 s on ntfy); silence for 45 s (60 s on ntfy) means gone. A player who timed out keeps
+  their seat and score for 2 minutes: joins carry a lasting player id (`u`), and the same id gets the same seat back (also when the app
+  restarted and the old connection is still listed). Somebody joining while a round is played waits in the room for the next round (`gn`).
+* Claiming a code: a new host asks `hq` ("anybody hosting this?"; hosts answer with a heartbeat) and listens 1.1 s (4.5 s for a code used
+  before, longer than one heartbeat, so a Ludus that does not answer `hq` is heard too). Two hosts that still end up on one code: the one
+  alone gives way to the other room and joins it. Guests say whose room they are in (`h` in their heartbeat), so a host that seated them
+  by mistake lets go. Rejoin always joins as a guest; only the player who made the code opens it again, and only when nobody hosts it.
+* A guest (and a host reopening its own code) stays on the code's relay and waits up to 10 s for it to connect. The host's heartbeat carries the
   roster and the current round so a missed message heals itself. If the host leaves, the room is handed to
   another player when everybody can follow (see "Leader hand-over"), otherwise it closes. A connection that drops reconnects by itself (state `connecting` / `online` / `offline`).
 * Room codes are 5 characters from `ABCDEFGHJKMNPQRSTUVWXYZ23456789` (no `I L O 0 1`).
 
 ## Prediction and smoothing (real-time games)
+
+Guest playback (1.12.17): the guest draws the world on a smooth clock in host time: newest copy minus a delay of one and a half copy
+intervals plus the 90th percentile of the lateness of the last ~3 s of copies (at least 100 ms, at most 320 ms). The clock runs with the
+guest's frames and is only nudged; when copies run out it slows to half speed and carries the last motion on for at most 100 ms.
+Late, duplicate and out-of-order copies are dropped; a change whose full copy was lost is applied to the newest copy. `link.lead()` gives
+the time from the newest copy to the host's present (Air Hockey draws its puck there, with local bounces off the guest's own mallet),
+`link.rtt()` the round trip. Guest controls go as the full set on every change (at most 30/s) and every 100 ms.
 
 `Ludus.rt` sends only what changed (a full state about every 10th time), 24-30 times a second; the guest's own controls go as
 changes (at most 30/s) plus a full set every 150 ms, stamped with the guest's clock. The host echoes the stamp (`ak`) in each

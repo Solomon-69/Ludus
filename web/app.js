@@ -611,7 +611,7 @@
     if (!code) { toast('No room code found'); return false; }
     leaveOnline(); stop(); hideOver(); $('pauseSheet').hidden = true;
     if (!quiet) toast((how && how.rejoin ? 'Rejoining room ' : 'Joining room ') + code);
-    const s = L.net.joinRoom(code, { gameId: '', name: L.net.cleanName(S.onlineName, ''), uid: onlineId(), rejoin: !!(how && how.rejoin) });
+    const s = L.net.joinRoom(code, { gameId: '', name: L.net.cleanName(S.onlineName, ''), uid: onlineId(), rejoin: how && how.rejoin ? (how.fallback ? 'quick' : true) : false });
     online = { game: null, session: s, started: false };
     trackParty(s, 'guest');
     s.on('error', e => { online = null; if (e.code === 'no-room' && how && how.fallback) { how.fallback(); return; } if (how && how.rejoin && S.party && S.party.code === code) { S.party.live = false; L.save(); } if (e.code === 'update') L.lobby.notice(...L.lobby.why('update'), () => {}); else toast(L.lobby.why(e.code === 'no-room' || e.code === 'full' || e.code === 'started' ? e.code : 'offline')[0]); });

@@ -238,8 +238,10 @@
       let still = 0, wallStill = 0;
       function unstall(dt) {
         const sp = Math.hypot(puck.vx, puck.vy);
-        still = sp < 25 ? still + dt : 0;
         const byWall = puck.x < PR + 6 || puck.x > W - PR - 6 || (!inMouth(puck.x) && (puck.y < PR + 6 || puck.y > H - PR - 6));
+        const held = ['p1', 'p2'].some(id => Math.hypot(puck.x - mallets[id].x, puck.y - mallets[id].y) < MR + PR + 6);
+        // only a stuck puck counts (by a wall or under a mallet); a still puck in the open is simply waiting to be hit
+        still = sp < 25 && (byWall || held) ? still + dt : 0;
         wallStill = byWall && sp < 25 ? wallStill + dt : 0;
         if (wallStill > 1) {
           wallStill = 0;
@@ -447,7 +449,7 @@
       }
       // the guest moves its own mallet from its own keys at once; the host's copy only nudges it back into line
       const me = guest && link ? link.predictor({ pick: s => Array.isArray(s.m) && s.m.length === 4 ? [s.m[2], s.m[3]] : null, snap: 90, init: [mallets.p2.x, mallets.p2.y] }) : null;
-      const mine = { x: 0, y: 0, vx: 0, vy: 0 };
+      const mine = { x: 0, y: 0, vx: 0, vy: 0 }, mineV = { x: 0, y: 0 };
       /* The guest's puck. The host's copies are ~0.1 s old when drawn, which made the puck look late against the guest's own
          mallet (drawn "now"). A host that sends the puck's speed (v) lets the guest run the puck itself: it is carried forward
          to the host's present moment (walls and friction), bounces off the guest's own mallet straight away, and is eased
@@ -477,7 +479,7 @@
           const h = Math.min(1 / 240, left); left -= h; puckStep(lp, h);
           const m = mallets.p2, dx = lp.x - m.x, dy = lp.y - m.y, dd = Math.hypot(dx, dy);
           if (dd < MR + PR && dd > 0) {
-            const v = strike(lp, { x: m.x, y: m.y, vx: mine.vx, vy: mine.vy }, 0.9);
+            const v = strike(lp, { x: m.x, y: m.y, vx: mineV.x, vy: mineV.y }, 0.9);
             lp.vx = v.vx; lp.vy = v.vy; lp.x = m.x + dx / dd * (MR + PR); lp.y = m.y + dy / dd * (MR + PR);
             const sp = Math.hypot(lp.vx, lp.vy); if (sp > MAX_P) { lp.vx *= MAX_P / sp; lp.vy *= MAX_P / sp; }
             if (clock - lp.hitAt > 0.08) api.sfx('tap');
@@ -496,14 +498,14 @@
         clock += dt;
         {
           const live = phase === 'play' || phase === 'ready', d = dirs(pads.p2), a = live && !anyKey(d) ? myAim() : null;
-          const px = mine.x, py = mine.y;
+          const px = me.v[0], py = me.v[1];
           me.frame(dt, v => {
             mine.x = v[0]; mine.y = v[1];
             stepMallet('p2', mine, live ? (d.right ? 1 : 0) - (d.left ? 1 : 0) : 0, live ? (d.down ? 1 : 0) - (d.up ? 1 : 0) : 0, dt, a);
             v[0] = mine.x; v[1] = mine.y;
           });
           mallets.p2.x = me.v[0]; mallets.p2.y = me.v[1];
-          if (dt > 0) { mine.vx = (me.v[0] - px) / dt; mine.vy = (me.v[1] - py) / dt; }
+          if (dt > 0) { mineV.x = (me.v[0] - px) / dt; mineV.y = (me.v[1] - py) / dt; }   // how fast it moves on screen (for local puck hits)
         }
         const sm = link.sample(), st = link.latest();
         if (sm && Array.isArray(sm.a.m) && Array.isArray(sm.b.m) && Array.isArray(sm.a.p) && Array.isArray(sm.b.p) && sm.a.m.concat(sm.b.m, sm.a.p, sm.b.p).every(num) && sm.b.m.length === 4) {
