@@ -13,7 +13,7 @@
 <meta property="og:type" content="website">
 <link rel="icon" type="image/png" href="img/icon-light.png">
 <link rel="apple-touch-icon" href="img/icon-light.png">
-<meta property="og:image" content="img/panel-light.png">
+<meta property="og:image" content="img/og.png">
 <!--
   Download links point at the newest GitHub Release. Replace Solomon-69/Ludus (it appears in the
   three links marked data-repo below, and in the footer) with the real GitHub user and repository,
@@ -37,6 +37,7 @@
     --font-round: ui-rounded, "SF Pro Rounded", "Segoe UI Variable Display", -apple-system, system-ui, sans-serif;
     --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
     --spring: cubic-bezier(0.34, 1.4, 0.5, 1);
+    --panel: #f4efe6;
     color-scheme: light;
   }
   @media (prefers-color-scheme: dark) {
@@ -52,6 +53,7 @@
       --accent-soft: rgba(217, 119, 87, 0.18);
       --shadow: 0 1px 1px rgba(0, 0, 0, 0.3), 0 12px 30px -12px rgba(0, 0, 0, 0.7);
       --shadow-lift: 0 2px 2px rgba(0, 0, 0, 0.3), 0 30px 60px -24px rgba(0, 0, 0, 0.85);
+      --panel: #1b1814;
       color-scheme: dark;
     }
   }
@@ -114,12 +116,50 @@
 
   /* hero: a real screenshot of the panel under a drawn menu bar */
   .stagebox { position: relative; display: grid; place-items: center; }
-  .glow { position: absolute; inset: 8% 4%; background: radial-gradient(closest-side, var(--accent-soft), transparent); filter: blur(10px); }
+  @media (max-width: 880px) { .stagebox .glow { inset: -4% 0; } }
+  .glow { position: absolute; inset: -6% -10%; pointer-events: none; background: radial-gradient(closest-side, var(--accent-soft), transparent 92%); -webkit-mask-image: radial-gradient(closest-side, #000 55%, transparent 100%); mask-image: radial-gradient(closest-side, #000 55%, transparent 100%); }
   .menubar { position: relative; width: min(400px, 100%); }
-  .menubar .strip { height: 30px; border-radius: 10px; background: color-mix(in srgb, var(--ink) 7%, transparent); display: flex; justify-content: flex-end; align-items: center; gap: 14px; padding: 0 14px; }
+  /* menu bar: three columns with equal outer sides, so the icon sits on the panel's centre line (like the real app) */
+  .menubar .strip { height: 30px; border-radius: 10px; background: color-mix(in srgb, var(--ink) 7%, transparent); display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 14px; padding: 0 14px; }
+  .menubar .strip .side { display: flex; align-items: center; gap: 14px; }
+  .menubar .strip .side.l { justify-content: flex-end; }
+  .menubar .strip .side.r { justify-content: flex-start; }
+  .menubar .strip .side.r .clock { font-style: normal; margin-left: auto; font: 600 12px/1 var(--font); color: color-mix(in srgb, var(--ink) 70%, transparent); white-space: nowrap; }
   .menubar .strip span { width: 16px; height: 5px; border-radius: 3px; background: color-mix(in srgb, var(--ink) 18%, transparent); }
   .menubar .strip .pad { width: 22px; height: 18px; color: var(--ink); background: none; display: grid; place-items: center; }
   .menubar .strip .pad svg { width: 20px; height: 13px; }
+  /* the popover arrow: tip under the icon, base on the panel's top edge */
+  .shot .nub { position: absolute; left: 50%; top: 1px; width: 22px; height: 11px; transform: translate(-50%, -100%); z-index: 1; color: var(--panel); filter: drop-shadow(0 -1px 0 color-mix(in srgb, var(--ink) 12%, transparent)); }
+  .shot .nub svg { width: 100%; height: 100%; }
+  /* Windows: the tray sits under the panel */
+  .taskbar { display: none; position: relative; margin-top: 12px; height: 44px; border-radius: 10px; background: color-mix(in srgb, var(--ink) 7%, transparent); grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; padding: 0 12px; font-family: "Segoe UI Variable Text", "Segoe UI", var(--font); }
+  .taskbar .side { display: flex; align-items: center; gap: 12px; color: color-mix(in srgb, var(--ink) 72%, transparent); }
+  .taskbar .side.l { justify-content: flex-end; }
+  .taskbar svg { width: 15px; height: 15px; }
+  .taskbar .tray { width: 34px; height: 32px; border-radius: 6px; display: grid; place-items: center; color: var(--ink); background: color-mix(in srgb, var(--ink) 10%, transparent); position: relative; }
+  .taskbar .tray svg { width: 20px; height: 13px; }
+  .taskbar .tray::after { content: ""; position: absolute; left: 50%; bottom: 2px; width: 14px; height: 3px; border-radius: 2px; transform: translateX(-50%); background: var(--accent); }
+  .taskbar .clock { margin-left: auto; text-align: right; font-size: 11.5px; line-height: 1.3; color: var(--ink); white-space: nowrap; }
+  html[data-os="windows"] .menubar .strip { display: none; }
+  html[data-os="windows"] .taskbar { display: grid; }
+  html[data-os="windows"] .shot .nub { display: none; }
+
+  /* Mac / Windows switch */
+  .os-switch { display: inline-flex; gap: 2px; padding: 3px; border-radius: 12px; background: color-mix(in srgb, var(--ink) 6%, transparent); border: 1px solid var(--line); margin: 0 0 18px; }
+  .os-switch button { appearance: none; border: 0; background: none; color: var(--ink-2); font: 600 13px/1 var(--font); padding: 8px 12px; min-height: 32px; border-radius: 9px; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; transition: background .2s, color .2s, transform .12s; }
+  .os-switch button svg { width: 14px; height: 14px; }
+  .os-switch button:hover { color: var(--ink); }
+  .os-switch button:active { transform: scale(.97); }
+  .os-switch button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.08), 0 0 0 1px var(--line); }
+  .os-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .install .card { transition: box-shadow .3s; }
+  .install .card.mine { box-shadow: var(--shadow), 0 0 0 2px var(--accent-soft); }
+  html[data-os="windows"] .install .card.win { order: -1; }
+  .install .card .yours { display: none; margin-left: auto; font: 600 12px/1 var(--font); color: var(--accent-deep); background: var(--accent-soft); padding: 5px 8px; border-radius: 999px; }
+  .install .card.mine .yours { display: inline-block; }
+  /* previews: solid screens with a soft shadow that never ends in a line (a filter, not a clipped picture) */
+  .shot picture img, .gallery picture img { filter: drop-shadow(0 18px 28px rgba(60, 36, 20, .16)) drop-shadow(0 2px 4px rgba(60, 36, 20, .08)); }
+  @media (prefers-color-scheme: dark) { .shot picture img, .gallery picture img { filter: drop-shadow(0 18px 30px rgba(0, 0, 0, .5)) drop-shadow(0 2px 4px rgba(0, 0, 0, .3)); } }
 
   .appicon { display: block; width: 96px; height: 96px; margin: 0 0 18px -6px; animation: iconIn 1s var(--spring) both; }
   .appicon img { width: 100%; height: 100%; filter: drop-shadow(0 14px 22px rgba(120, 60, 30, .28)); }
@@ -241,6 +281,7 @@
       <h1>Ludus</h1>
       <p class="sub">Take a little break</p>
       <p class="lede">A small panel of games that lives in your menu bar or system tray. Click the controller, play a round of Snake, Sudoku or a quick duel against the computer, then get back to work. Your place is saved when you close it.</p>
+      <div class="os-switch" role="group" aria-label="Show the Mac or Windows version"><button type="button" data-os-pick="mac" aria-pressed="true"><svg aria-hidden="true"><use href="#apple"/></svg>Mac</button><button type="button" data-os-pick="windows" aria-pressed="false"><svg aria-hidden="true"><use href="#windows"/></svg>Windows</button></div>
       <div class="downloads">
         <a class="btn" id="dl-mac" data-os="mac" href="https://github.com/Solomon-69/Ludus/releases/latest/download/Ludus.dmg" target="_blank" rel="noopener" data-repo>
           <svg class="os" aria-hidden="true"><use href="#apple"/></svg>
@@ -259,12 +300,18 @@
     <div class="stagebox">
       <div class="glow" aria-hidden="true"></div>
       <div class="menubar">
-        <div class="strip" aria-hidden="true"><span></span><span></span><b class="pad"><svg viewBox="0 0 88 55"><use href="#ludus-mark"/></svg></b><span></span></div>
+        <div class="strip" aria-hidden="true"><div class="side l"><span></span><span></span></div><b class="pad"><svg viewBox="0 0 88 55"><use href="#ludus-mark"/></svg></b><div class="side r"><span></span><i class="clock">Wed 9:41</i></div></div>
         <div class="shot" id="heroShot">
-          <picture class="float">
+          <i class="nub" aria-hidden="true"><svg viewBox="0 0 22 11"><path fill="currentColor" d="M0 11C5 11 8 1.5 11 0.5C14 1.5 17 11 22 11Z"/></svg></i>
+          <picture class="float" data-shot="panel">
             <source media="(prefers-color-scheme: dark)" srcset="img/panel-dark.png">
-            <img src="img/panel-light.png" width="449" height="649" fetchpriority="high" alt="The Ludus panel open under the menu bar, with a Continue card for 2048 and a grid of games">
+            <img src="img/panel-light.png" width="448" height="648" fetchpriority="high" alt="The Ludus panel open under the menu bar, with a grid of games">
           </picture>
+        </div>
+        <div class="taskbar" aria-hidden="true">
+          <div class="side l"><svg viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M6 15l6-6 6 6"/></svg><svg viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M2 9a15 15 0 0 1 20 0M5.5 12.5a10 10 0 0 1 13 0M9 16a5 5 0 0 1 6 0"/><circle cx="12" cy="19.5" r="1.3" fill="currentColor"/></svg></div>
+          <b class="tray"><svg viewBox="0 0 88 55"><use href="#ludus-mark"/></svg></b>
+          <div class="side r"><svg viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" d="M4 9h4l5-4v14l-5-4H4z"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M16.5 9a4 4 0 0 1 0 6"/></svg><svg viewBox="0 0 24 24"><rect x="2.5" y="7" width="17" height="10" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><rect x="5" y="9.5" width="10" height="5" rx="1" fill="currentColor"/><path d="M21.5 10.5v3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span class="clock">9:41 AM<br>27/10/2026</span></div>
         </div>
       </div>
     </div>
@@ -379,18 +426,18 @@
     <div class="wrap">
       <p class="kicker reveal">A closer look</p>
       <h2 class="reveal">Small panel, lots to play</h2>
-      <p class="intro reveal">Screenshots of the panel. Ludus follows your light or dark setting, or you can pick one.</p>
+      <div class="os-row"><p class="intro reveal">Screenshots of the panel<span class="os-name"> on a Mac</span>. Ludus follows your light or dark setting, or you can pick one.</p><div class="os-switch" role="group" aria-label="Show the Mac or Windows version"><button type="button" data-os-pick="mac" aria-pressed="true"><svg aria-hidden="true"><use href="#apple"/></svg>Mac</button><button type="button" data-os-pick="windows" aria-pressed="false"><svg aria-hidden="true"><use href="#windows"/></svg>Windows</button></div></div>
       <div class="gallery">
         <figure class="reveal">
-          <picture><source media="(prefers-color-scheme: dark)" srcset="img/home-dark.png"><img src="img/home-light.png" width="449" height="649" loading="lazy" alt="The games list"></picture>
+          <picture data-shot="home"><source media="(prefers-color-scheme: dark)" srcset="img/home-dark.png"><img src="img/home-light.png" width="448" height="648" loading="lazy" alt="The games list"></picture>
           <figcaption>Every game in one list</figcaption>
         </figure>
         <figure class="reveal">
-          <picture><source media="(prefers-color-scheme: dark)" srcset="img/game-dark.png"><img src="img/game-light.png" width="449" height="649" loading="lazy" alt="A game of 2048 in progress"></picture>
+          <picture data-shot="game"><source media="(prefers-color-scheme: dark)" srcset="img/game-dark.png"><img src="img/game-light.png" width="448" height="648" loading="lazy" alt="A game of Sky Raiders in progress"></picture>
           <figcaption>Close it mid-game, it waits for you</figcaption>
         </figure>
         <figure class="reveal">
-          <picture><source media="(prefers-color-scheme: dark)" srcset="img/settings-dark.png"><img src="img/settings-light.png" width="449" height="649" loading="lazy" alt="The settings screen"></picture>
+          <picture data-shot="settings"><source media="(prefers-color-scheme: dark)" srcset="img/settings-dark.png"><img src="img/settings-light.png" width="448" height="648" loading="lazy" alt="The settings screen"></picture>
           <figcaption>Make it yours in Settings</figcaption>
         </figure>
       </div>
@@ -476,8 +523,8 @@
       <h2 class="reveal">Two minutes, then it lives by the clock</h2>
       <p class="intro reveal">Ludus is not sold through an app store, so your computer asks you to confirm the first time you open it. That is expected; the steps below show where to click.</p>
       <div class="install">
-        <div class="card reveal">
-          <h3><svg aria-hidden="true"><use href="#apple"/></svg>Mac</h3>
+        <div class="card mac reveal">
+          <h3><svg aria-hidden="true"><use href="#apple"/></svg>Mac<span class="yours">Your computer</span></h3>
           <p class="req">macOS 14 Sonoma or later, Apple silicon (M1 or newer)</p>
           <ol>
             <li><b>Download</b> Ludus.dmg and open it.</li>
@@ -487,8 +534,8 @@
           </ol>
           <p class="why">Why the extra step: builds that are not notarised by Apple need you to confirm once. A notarised build opens straight away. Homebrew install is coming soon.</p>
         </div>
-        <div class="card reveal">
-          <h3><svg aria-hidden="true"><use href="#windows"/></svg>Windows</h3>
+        <div class="card win reveal">
+          <h3><svg aria-hidden="true"><use href="#windows"/></svg>Windows<span class="yours">Your computer</span></h3>
           <p class="req">Windows 10 or 11, 64-bit</p>
           <ol>
             <li><b>Download</b> Ludus-windows.zip, right-click it and choose <b>Extract All</b>. Keep the Ludus folder somewhere permanent, for example Documents.</li>
@@ -557,17 +604,33 @@
     var root = document.documentElement;
     root.classList.add('js');
 
-    // Highlight the download that matches this computer.
+    // Mac or Windows: guess from this computer, let anyone flip it, and keep pictures, download and steps in step.
     var ua = navigator.userAgent || '';
     var platform = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || '';
-    var os = /Win/i.test(platform) || /Windows/i.test(ua) ? 'windows' : /Mac/i.test(platform) || /Mac OS X/i.test(ua) ? 'mac' : '';
-    var mine = os && document.querySelector('.btn[data-os="' + os + '"]');
-    if (mine) {
-      mine.classList.add('primary');
+    var guess = /Win/i.test(platform) || /Windows/i.test(ua) ? 'windows' : /Mac/i.test(platform) || /Mac OS X/i.test(ua) ? 'mac' : '';
+    var saved = null;
+    try { saved = localStorage.getItem('ludus.page.os'); } catch (e) {}
+    var dlMac = document.getElementById('dl-mac'), dlWin = document.getElementById('dl-win');
+    function setOS(os, remember) {
+      root.dataset.os = os;
+      var dir = os === 'windows' ? 'img/win/' : 'img/';
+      document.querySelectorAll('picture[data-shot]').forEach(function (p) {
+        var n = p.getAttribute('data-shot'), src = p.querySelector('source'), img = p.querySelector('img');
+        if (src) src.srcset = dir + n + '-dark.png';
+        img.src = dir + n + '-light.png';
+      });
+      var mine = os === 'windows' ? dlWin : dlMac, other = os === 'windows' ? dlMac : dlWin;
+      mine.classList.add('primary'); other.classList.remove('primary');
       mine.parentNode.insertBefore(mine, mine.parentNode.firstChild);
-    } else {
-      document.getElementById('dl-mac').classList.add('primary');
+      document.querySelectorAll('.install .card').forEach(function (c) { c.classList.toggle('mine', c.classList.contains(os === 'windows' ? 'win' : 'mac') && os === guess); });
+      document.querySelectorAll('.os-name').forEach(function (e) { e.textContent = os === 'windows' ? ' on Windows' : ' on a Mac'; });
+      document.querySelectorAll('[data-os-pick]').forEach(function (b) { b.setAttribute('aria-pressed', String(b.getAttribute('data-os-pick') === os)); });
+      if (remember) { try { localStorage.setItem('ludus.page.os', os); } catch (e) {} }
     }
+    setOS(saved === 'mac' || saved === 'windows' ? saved : (guess || 'mac'), false);
+    document.querySelectorAll('[data-os-pick]').forEach(function (b) {
+      b.addEventListener('click', function () { setOS(b.getAttribute('data-os-pick'), true); });
+    });
 
     // Header line once the page scrolls.
     var header = document.getElementById('top');
