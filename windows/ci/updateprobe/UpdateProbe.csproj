@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Test tool only (not shipped): runs Ludus's real Updater.cs against the real GitHub release, on the
+       Windows CI machine, the same way the app does (on a Windows Forms UI thread). UpdaterSrc picks which
+       Updater.cs to build in, so an older release's updater can be tested too. -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <UpdaterSrc Condition="'$(UpdaterSrc)' == ''">..\..\src\Updater.cs</UpdaterSrc>
+    <NoWarn>CS1998;CS8602;CS8604</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="$(UpdaterSrc)" Link="Updater.cs" />
+  </ItemGroup>
+</Project>

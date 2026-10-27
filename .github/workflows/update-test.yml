@@ -1,0 +1,109 @@
+name: Update test
+
+# Runs Ludus's real in-app updater on GitHub's own Windows and Mac machines (a different internet connection from
+# the developer's), against the real latest release: an older Ludus is installed, the updater downloads, checks and
+# installs the newest one, and the log records how fast progress moved. "current" = the updater in this commit,
+# a tag = the updater that shipped in that release (what friends who have not updated yet are running).
+on:
+  push:
+    branches: [main, update-probe]
+    paths: ['windows/src/Updater.cs', 'Sources/Updater.swift', 'windows/ci/updateprobe/**', 'ci/update-probe-mac.swift', '.github/workflows/update-test.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    name: Windows (${{ matrix.updater }} updater)
+    runs-on: windows-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        updater: [current, v1.12.16]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Pick the updater
+        shell: pwsh
+        run: |
+          $src = Join-Path $PWD 'windows\src\Updater.cs'
+          if ('${{ matrix.updater }}' -ne 'current') { $src = Join-Path $env:RUNNER_TEMP 'Updater.cs'; git show '${{ matrix.updater }}:windows/src/Updater.cs' | Set-Content -Encoding utf8 $src }
+          "UPD=$src" >> $env:GITHUB_ENV
+
+      - name: Install the release before the latest
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $from = gh release list -R $env:GITHUB_REPOSITORY --limit 2 --exclude-drafts --json tagName -q '.[1].tagName'
+          Write-Host "installing $from"
+          gh release download $from -R $env:GITHUB_REPOSITORY -p Ludus-windows.zip -D old
+          Expand-Archive old\Ludus-windows.zip old\x
+          $inst = (Get-ChildItem old\x -Recurse -Filter Ludus.exe | Select-Object -First 1).DirectoryName
+          "INST=$inst" >> $env:GITHUB_ENV
+
+      - name: Build the probe
+        shell: pwsh
+        run: dotnet build windows/ci/updateprobe/UpdateProbe.csproj -c Release -o probe "-p:UpdaterSrc=$env:UPD"
+
+      - name: Update the older Ludus with the real updater
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force logs | Out-Null
+          $res = Join-Path $PWD 'logs\update-${{ matrix.updater }}.txt'
+          $p = Start-Process probe\UpdateProbe.exe -ArgumentList "`"$res`" `"$env:INST`" ${{ matrix.updater }}" -PassThru -Wait
+          if (Test-Path $res) { Get-Content $res } else { Write-Host 'no result file' }
+          Get-Process Ludus -ErrorAction SilentlyContinue | Stop-Process -Force
+          exit $p.ExitCode
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: update-log-windows-${{ matrix.updater }}
+          path: logs
+          retention-days: 14
+
+  mac:
+    name: Mac (${{ matrix.updater }} updater)
+    runs-on: macos-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        updater: [current, v1.12.16]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build the probe and install the release before the latest
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          src=Sources/Updater.swift
+          if [ "${{ matrix.updater }}" != current ]; then src="$RUNNER_TEMP/Updater.swift"; git show "${{ matrix.updater }}:Sources/Updater.swift" > "$src"; fi
+          swiftc -O -parse-as-library "$src" ci/update-probe-mac.swift -o probe
+          from=$(gh release list -R "$GITHUB_REPOSITORY" --limit 2 --exclude-drafts --json tagName -q '.[1].tagName')
+          echo "installing $from"
+          gh release download "$from" -R "$GITHUB_REPOSITORY" -p Ludus-mac.zip -D old
+          ditto -x -k old/Ludus-mac.zip old/x
+
+      - name: Update the older Ludus with the real updater
+        run: |
+          mkdir -p logs
+          ./probe "logs/update-${{ matrix.updater }}.txt" old/x/Ludus.app
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: update-log-mac-${{ matrix.updater }}
+          path: logs
+          retention-days: 14
