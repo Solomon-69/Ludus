@@ -546,6 +546,8 @@
   // colours per app theme (light / dark) and side. On the dark board the black side gets a lighter rim so it never sinks in.
   const PAL = {
     light: { w: { face: '#dde5ee', rim: '#9aaec2', det: '#92a7bb', hi: '#fbfdff' }, b: { face: '#565e67', rim: '#30353b', det: '#2b3035', hi: '#6f7882' } },
+    // cover only: a charcoal piece with a light rim, so the fallen king reads on the green card
+    cover: { b: { face: '#2f353b', rim: '#dfe7ef', det: '#dfe7ef', hi: '#4a525a' } },
     dark: { w: { face: '#d9e2eb', rim: '#90a3b5', det: '#8a9db0', hi: '#f6f9fc' }, b: { face: '#56697a', rim: '#8ea2b2', det: '#2a3640', hi: '#6c8090' } }
   };
   const themeName = () => (document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light');
@@ -575,8 +577,8 @@
     return c;
   }
   const sprites = new Map();
-  function sprite(t, white, s, dpr) {
-    const px = Math.max(8, Math.round(s * dpr)), theme = themeName(), key = t + (white ? 'w' : 'b') + px + theme[0];
+  function sprite(t, white, s, dpr, look) {
+    const px = Math.max(8, Math.round(s * dpr)), theme = look || themeName(), key = t + (white ? 'w' : 'b') + px + theme[0];
     let c = sprites.get(key);
     if (c) return c;
     if (sprites.size > 96) sprites.clear();
@@ -585,9 +587,9 @@
     return c;
   }
   // a piece of size s centred on (x, y), from the sprite cache
-  function drawPieceVec(ctx, t, white, x, y, s) {
+  function drawPieceVec(ctx, t, white, x, y, s, look) {
     const m = ctx.getTransform(), dpr = Math.max(1, Math.min(4, Math.hypot(m.a, m.b) || 1)), box = s / 0.86;
-    ctx.drawImage(sprite(t, white, box, dpr), x - box / 2, y - box / 2, box, box);
+    ctx.drawImage(sprite(t, white, box, dpr, look), x - box / 2, y - box / 2, box, box);
   }
 
   const LEVELS = ['Easy', 'Medium', 'Hard', 'Expert'];
@@ -600,18 +602,20 @@
     onlineHint: 'Your pieces are at the bottom. Drag or click to move',
     _core: core,
     art(ctx, w, h) {
-      // checkmate: the white queen stands over the fallen black king, side by side at every card shape
-      const big = Math.min(h * 0.78, w * 0.36), cell = big * 0.28, gap = big * 0.95;
-      const qx = w / 2 - gap * 0.45, kx = qx + gap, oy = h * 0.5 + big * 0.12;
-      const cols = Math.ceil((gap + big * 1.3) / cell) | 1, bx = w / 2 - cols * cell / 2;
+      // checkmate: the white queen stands over the fallen black king on a pale board, side by side at every card shape
+      const big = Math.min(h * 0.74, w * 0.34), cell = big * 0.28, gap = big * 0.98;
+      const qx = w / 2 - gap * 0.45, kx = qx + gap, oy = h * 0.52 + big * 0.12;
+      const cols = Math.ceil((gap + big * 1.4) / cell) | 1, bx = w / 2 - cols * cell / 2;
+      const shadow = (x, y, rx, ry) => { ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); ctx.fill(); };
       ctx.save();
       for (let r = 0; r < 3; r++) for (let c = 0; c < cols; c++) {
-        ctx.fillStyle = (r + c) % 2 ? 'rgba(0,0,0,0.16)' : 'rgba(255,255,255,0.2)';
+        ctx.fillStyle = (r + c) % 2 ? 'rgba(255,255,255,0.62)' : 'rgba(255,255,255,0.4)';
         ctx.fillRect(bx + c * cell, oy + r * cell, cell, cell);
       }
+      shadow(qx, oy + big * 0.38, big * 0.24, big * 0.05); shadow(kx, oy + big * 0.33, big * 0.36, big * 0.06);
       drawPieceVec(ctx, 5, true, qx, oy - big * 0.08, big);
-      ctx.translate(kx, oy + big * 0.12); ctx.rotate(Math.PI / 2.3);
-      drawPieceVec(ctx, 6, false, 0, 0, big * 0.9);
+      ctx.translate(kx, oy + big * 0.1); ctx.rotate(Math.PI / 2.3);
+      drawPieceVec(ctx, 6, false, 0, 0, big * 0.9, 'cover');
       ctx.restore();
     },
     create(stage, api) {
