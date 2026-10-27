@@ -30,3 +30,10 @@ The guess map draws free vector tiles from OpenFreeMap (https://openfreemap.org,
 ## Trademarks
 
 Not affiliated with or endorsed by Anthropic, Apple, Microsoft, Google or the makers of any game Ludus resembles. All trademarks belong to their owners.
+
+## Privacy blur
+- MediaPipe Tasks Vision 0.10.14 (Google, Apache 2.0) and its BlazeFace short-range face model: downloaded at runtime only when Privacy blur is on and the web view has no built-in face finder; never bundled.
+
+## Mosaic Hunt data and photos
+- Mosaic locations: goguelnikov dataset, MIT licence (header of `web/games/invhunt/data.js`).
+- Mosaic close-up photos: loaded at runtime from invader-spotter.art, never bundled; credited on screen. Artworks by Invader; no affiliation.

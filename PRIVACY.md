@@ -3,6 +3,8 @@
 **Ludus collects no data.** No accounts, no analytics, no crash reporting, no ads, no tracking.
 
 - **Map Hunt uses the internet.** When you play Map Hunt, the app loads street photos from the free public Panoramax service (api.panoramax.xyz) and map pictures from the free OpenFreeMap servers (tiles.openfreemap.org). Those services see your internet address and the part of the world you look at, like any website would. Nothing else is sent, and there are no accounts. Ludus does not check for updates by itself.
+- **Mosaic Hunt uses the internet.** The close-up photos are loaded live from invader-spotter.art, and the map from OpenFreeMap / OpenStreetMap tiles. Those sites see your internet address, like any website would. Offline, Mosaic Hunt uses drawn pictures and bundled map tiles instead.
+- **Privacy blur (off until you turn it on) uses the camera.** It asks for camera permission the first time. Each camera frame is checked for faces in memory on your computer and thrown away at once: no picture is saved, recorded or sent anywhere. If the web view has no built-in face finder, the small open-source MediaPipe face detector (code from cdn.jsdelivr.net, model from storage.googleapis.com) is downloaded once; only that download touches the internet, never the camera picture.
 - **No other network unless you use Play online.** The games and sounds are bundled with the app. Ludus
   does not connect to the internet on its own, and the app refuses to load any page other than its
   own bundled files. The only exception is the optional **Play online** feature, described below.

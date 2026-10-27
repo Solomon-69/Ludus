@@ -12,9 +12,9 @@
 
   // H2 filters
   for (const f of ['Arcade', 'Puzzle', 'Duel', '2 Player', 'All'].filter(f => f === 'All' || Ludus.games.some(g => g.tag === f))) {
-    [...document.querySelectorAll('.chip')].find(c => c.textContent === f).click(); await wait(120);
+    [...document.querySelectorAll('.chip')].find(c => c.textContent === (f === '2 Player' ? 'Same laptop' : f)).click(); await wait(120);
     const ids = cards();
-    const ok = f === 'All' ? ids.length === Ludus.games.length : ids.every(id => { const g = Ludus.games.find(x => x.id === id); return g.tag === f || (f === '2 Player' && g.versus); });
+    const ok = f === 'All' ? ids.length === Ludus.games.length : ids.every(id => { const g = Ludus.games.find(x => x.id === id); return g.tag === f || (f === '2 Player' && g.versus && g.tag !== 'Duel') || id === Ludus.state.last; });
     check('filter ' + f, ok && ids.length > 0, ids.length);
   }
   // H3 thumbnails drawn (non-blank canvases)
@@ -22,7 +22,7 @@
     const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; for (let i = 3; i < d.length; i += 400) if (d[i]) return false; return true;
   }).length;
   check('thumbnails drawn', blank === 0, blank + ' blank');
-  check('2 Player chip', [...document.querySelectorAll('.chip')].some(c => c.textContent === '2 Player'));
+  check('2 Player chip says Same laptop', [...document.querySelectorAll('.chip')].some(c => c.textContent === 'Same laptop'));
   check('2 player section', !Ludus.games.some(g => g.tag === '2 Player') || [...document.querySelectorAll('.section-label')].some(l => /2 players/.test(l.textContent)));
   check('subtitle', $('brandSub').textContent === 'Take a little break');
   // Logo: the controller mark (not the old plain spark) next to "Ludus", in the accent colour.
@@ -120,8 +120,7 @@
   const invRow = [...document.querySelectorAll('.row')].find(r => r.querySelector('.row-title')?.textContent === 'Invisible icon');
   check('invisible row', invRow && /far left of your menu bar icons/.test(invRow.querySelector('.row-sub').textContent));
   const invSw = invRow && invRow.querySelector('.switch');
-  const appGroup = invRow && invRow.parentElement.previousElementSibling;
-  check('invisible row in App group', appGroup && /^(app|more)$/i.test(appGroup.textContent.trim()));
+  check('invisible row inside More settings', invRow && !!invRow.closest('#moreBox'));
   invSw.click();
   check('invisible switch flips at once', invSw.getAttribute('aria-checked') === 'true' && window.__LUDUS_INVISIBLE__ === true);
   check('invisible sent to app', sent.some(m => m.type === 'invisible' && m.on === true));

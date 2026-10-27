@@ -71,8 +71,8 @@
       function submit() {
         if (endAt >= 0 || clock < revealUntil) return;
         if (typed.length < 5) { shakeAt = clock; say('Five letters needed'); api.sfx('tick'); return; }
-        if (api.level > 0 && !isWord(typed)) { shakeAt = clock; say('Not in the word list'); api.sfx('hit'); return; }
-        if (api.level === 2) { const v = hardViolation(typed, history); if (v) { shakeAt = clock; say(v); api.sfx('hit'); return; } }
+        if (!isWord(typed)) { shakeAt = clock; say('Not in the word list'); api.sfx('hit'); return; }
+        // Normal NYT rules at every level: any real word is accepted, found letters need not be reused.
         const marks = grade(typed, answer);
         history.push({ word: typed, marks, at: clock });
         revealUntil = clock + STAGGER * 4 + FLIP;

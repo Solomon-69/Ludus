@@ -10,5 +10,5 @@ const SIZES = { compact: { width: 400, height: 600 }, large: { width: 520, heigh
   await p.addInitScript(() => { try { localStorage.clear(); } catch (e) {} });
   await p.goto('file://' + path.join(L.WEB, 'index.html')); await p.waitForTimeout(300);
   let result = null; try { result = await p.evaluate('(' + fs.readFileSync(a[0], 'utf8') + ')()'); } catch (e) { errors.push('TEST THREW: ' + e.message); }
-  console.log(JSON.stringify({ errors, result }).slice(0, 900)); await b.close(); process.exit(errors.length ? 1 : 0);
+  console.log(JSON.stringify({ errors, result }).slice(0, 4000)); await b.close(); process.exit(errors.length ? 1 : 0);
 })();

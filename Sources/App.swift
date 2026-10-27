@@ -737,6 +737,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
                 + "catcher=\(statusItem.button?.subviews.contains { $0 is ClickCatcher } ?? false) "
                 + "anchor=\(NSStringFromRect(anchorWindow?.frame ?? .zero)) panel=\(NSStringFromRect(popover.contentViewController?.view.window?.frame ?? .zero))\n"
             appendLog(line)
+        case "probe":
+            // Mosaic Hunt photo and camera support, as this real web view sees them.
+            webView.evaluateJavaScript("(()=>{const i=document.querySelector('.ih-photo img');return JSON.stringify({img:i?{src:i.currentSrc,ok:i.complete&&i.naturalWidth>0}:null,cam:!!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia),privacy:!!(window.LudusPrivacy&&LudusPrivacy.supported())})})()") { [weak self] result, _ in
+                self?.appendLog("\(Date()) probe \(result as? String ?? "nil")\n")
+            }
+        case "camera":
+            // Ask for the camera like Privacy blur does; logs granted / refused, or nothing while the system prompt is up.
+            webView.evaluateJavaScript("navigator.mediaDevices.getUserMedia({video:true}).then(s=>{s.getTracks().forEach(t=>t.stop());window.__camTest='granted'},e=>{window.__camTest='refused '+e.name});window.__camTest='asking';'asking'") { [weak self] result, _ in
+                self?.appendLog("\(Date()) camera \(result as? String ?? "nil")\n")
+            }
+        case "camstate":
+            webView.evaluateJavaScript("String(window.__camTest)") { [weak self] result, _ in self?.appendLog("\(Date()) camstate \(result as? String ?? "nil")\n") }
         case "state":
             webView.evaluateJavaScript("window.ludusState && ludusState()") { [weak self] result, _ in
                 self?.appendLog("\(Date()) \(result as? String ?? "nil")\n")

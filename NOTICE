@@ -77,6 +77,7 @@ Map Hunt libraries and data
 ----------------------------
 web/vendor/pannellum.* (Pannellum 2.5.6, Matthew Petroff, MIT License, https://pannellum.org) shows the 360 street photos (two small local patches: a picture that finishes loading after its viewer was closed, or a download that failed, is not read again).
 web/vendor/maplibre-gl.* (MapLibre GL JS 5.7.0, MapLibre contributors, BSD 3-Clause License, https://maplibre.org) draws the guess maps on the graphics card.
+web/privacy.js loads MediaPipe Tasks Vision 0.10.14 (Google, Apache License 2.0, https://github.com/google-ai-edge/mediapipe) and the BlazeFace face model at runtime when Privacy blur is on; they are not bundled.
 web/vendor/leaflet.* (Leaflet 1.9.4, Volodymyr Agafonkin, BSD 2-Clause License, https://leafletjs.com) draws the plain flat fallback map when MapLibre cannot run.
 Map data comes from OpenFreeMap (https://openfreemap.org) vector tiles built from OpenMapTiles (https://openmaptiles.org, schema, CC-BY 4.0) and OpenStreetMap
 (c) OpenStreetMap contributors, ODbL; the fonts for the labels (Noto Sans, SIL Open Font License) are served by the same host. The map look is drawn in
@@ -90,7 +91,7 @@ web/games/metaspot/data.js: clue notes compiled from geohints.com, plonkit.net a
 The pictures are simple drawings made in code, not photos.
 web/games/tongue/data.js: sample sentences from the Unicode UDHR collection (https://github.com/unicode-org/udhr), language
 families and map points from Glottolog (https://glottolog.org, CC-BY 4.0), speaker numbers from the sources linked in each entry.
-web/games/invhunt/data.js: original, made-up creature mosaics at invented spots around each city centre (no real artworks or positions).
+web/games/invhunt/data.js: public mosaic location dataset by goguelnikov (MIT licence, credited in the file header). Mosaic photos are not stored in this repository; the game loads them at runtime from invader-spotter.art and shows a credit line. The artworks are by the street artist Invader; Ludus is not affiliated with the artist.
 The eight pixel creatures are drawn in web/games/invhunt.js.
 Map tiles in web/games/tongue/tiles/ and web/games/invhunt/tiles/: (c) OpenStreetMap contributors (ODbL,
 https://www.openstreetmap.org/copyright), bundled so the games work offline.

@@ -43,3 +43,18 @@ Known: smoke flags Map Hunt "leaked 1" listener and a Pannellum FileReader error
 
 ## v1.11.1 pass (23 Oct 2026, headless)
 smoke (all 43 games): pass. shell-test: pass. offline-update-test: ALL PASSED. Mosaic Hunt: city hunt flow (pin, submit, +5000, plaque, map) pass, 45 spots in bounds per city. Garden Defence: cover and in-game art redrawn, smoke pass. Covers sheet re-rendered.
+
+## v1.12.0 pass (27 Oct 2026)
+Headless harness on the same web files + installed Mac test build (test hook) + Windows CI.
+
+| Check | Result |
+|---|---|
+| Chess (bot drag/click, Expert worker, friend, rules, online 2 tabs, resync) | pass, chess.js 27/27 |
+| Online suite: tournament, tleave, tleave2, party, reopen, lobbyui, toast, compat, paper, worm, futurehost, layout | pass (party/layout re-run alone after a load timeout) |
+| Real-time lag: Paddle Duel, Air Hockey, Tag, City Swallow, Worm Arena | pass one at a time; 2 pages in one run under Mac load starve rAF (~10 fps), not a game bug |
+| Worm Arena online (new): same worms + food ids on both screens, guest steers at once, round ends on both | pass (worm 6/6, lag_slither 5/5) |
+| rerun27.js: Original names (short text only, search), Same laptop tab, Duel vs Same laptop lists differ, tabs open at top, Continue per tab, vs Bot default, connection light green/red, Privacy blur with fake camera, Air Hockey upright + wide, Mosaic Hunt photo, light + dark, 390px + wide, small fixed map on hover/click, pin + Guess + result, offline map | pass 50/50 |
+| shell-test | pass 47/47 (invisible row test updated: it now lives in More settings) |
+| Mac app (installed test build): Mosaic Hunt live photo loads in WKWebView, camera request reaches macOS (pending system prompt, not refused) | pass |
+
+Fixed: Worm Arena had no online mode; Original names row missing; Mosaic Hunt offline map blank (GL map waited for a style that never loads offline; now the plain map with bundled tiles); 2 Player tab overlapped Duel; Continue only on All.

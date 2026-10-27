@@ -226,6 +226,28 @@ const S = {
     check('Land Claim: no page errors', errs([A, B]) === 0, [A.errors, B.errors]);
     br.close();
   },
+  async worm(browser) {   // Worm Arena online: same worms and food on both screens, guest steers, a death ends the round on both
+    const br = await broker.start(); const { pages: [A, B] } = await party(browser, br, 'Worm Arena', 2); await wait(3000);
+    await A.evaluate(() => ludusDebug.slither().humans.forEach(h => { h.prot = 99; }));   // no random deaths during the test
+    br.latency = { base: 120, jitter: 80 };
+    await Promise.all([hold(A, 'a', 600), hold(B, 'd', 600)]); await wait(1500);
+    const g = p => p.evaluate(() => { const s = ludusDebug.slither(); return { n: s.W.length, h: s.humans.map(q => [q.human, Math.round(q.px[0]), Math.round(q.py[0]), q.alive]), food: s.foodCount }; });
+    const [ga, gb] = [await g(A), await g(B)];
+    check('Worm Arena: guest has the same worms as the host', ga.n === gb.n && ga.h.length === 2 && gb.h.length === 2, [ga.n, gb.n]);
+    check('Worm Arena: both screens see both players about the same place', ga.h.every((q, i) => Math.hypot(q[1] - gb.h[i][1], q[2] - gb.h[i][2]) < 70), [ga.h, gb.h]);
+    check('Worm Arena: food counts agree', Math.abs(ga.food - gb.food) < 40, [ga.food, gb.food]);
+    br.latency = { base: 0, jitter: 0 }; await wait(1500);
+    const ids = p => p.evaluate(() => { const s = ludusDebug.slither(); return s.foodIds(); });
+    const [ia, ib] = [await ids(A), await ids(B)], setB = new Set(ib), miss = ia.filter(x => !setB.has(x)).length;
+    check('Worm Arena: the same food ids on both screens', miss < 30 && Math.abs(ia.length - ib.length) < 30, { host: ia.length, guest: ib.length, miss });
+    await A.evaluate(() => { const s = ludusDebug.slither(); s.humans.forEach(h => { h.prot = 0; }); s.kill(s.humans.find(h => h.human === 2), 'the wall'); });
+    await Promise.all([A, B].map(p => p.waitForFunction(() => /win/.test(document.getElementById('overTitle').textContent), null, { timeout: 8000 }).catch(() => null)));
+    const t = p => p.evaluate(() => document.getElementById('overTitle').textContent.trim());
+    const [ta, tb] = [await t(A), await t(B)];
+    check('Worm Arena: round ends on both screens (host wins)', ta === 'You win' && / wins$/.test(tb), [ta, tb]);
+    check('Worm Arena: no page errors', errs([A, B]) === 0, [A.errors, B.errors]);
+    br.close();
+  },
   async futurehost(browser) {
     const br = await broker.start(); const N = await newPage(browser, br, { name: 'New' });
     br.filter = (topic, payload) => { try { const m = JSON.parse(payload); if (m.t === 'join') { const out = { t: 'welcome', to: m.c, s: 1, p: [[0, 'Host', 'h0'], [1, 'You', m.c]], mx: 2, mn: 2, g: 'fourup', pv: 9, mp: 9, v: 1, c: 'h0' }; br.conns.forEach(o => { if (o.subs.has(topic)) o.send(br.rawFrame(topic, JSON.stringify(out))); }); } } catch (e) {} };
@@ -241,6 +263,7 @@ const GAMES = {
   pong:   { name: 'Paddle Duel', own: 'ArrowDown', other: 'w', mine: '() => [0, ludusDebug.pongNet().p2]', host: '() => [0, ludusDebug.pongNet().p2]', seen: '() => [0, ludusDebug.pongNet().p1]', tol: 10 },
   hockey: { name: 'Air Hockey', own: 'a', other: 'd', mine: '() => { const m = ludusDebug.hockey().m2; return [m.x, m.y]; }', host: '() => { const m = ludusDebug.hockey().m2; return [m.x, m.y]; }', seen: '() => { const m = ludusDebug.hockey().m1; return [m.x, m.y]; }', tol: 14 },
   tag:    { name: 'Tag', own: 'ArrowRight', other: 'd', start: 'enter', mine: "() => { const p = ludusDebug.tagMe(); return [p.x, p.y]; }", host: "() => { const p = ludusDebug.tagMe('p2'); return [p.x, p.y]; }", seen: "() => { const p = ludusDebug.tagMe('p1'); return [p.x, p.y]; }", tol: 20 },
+  slither: { name: 'Worm Arena', own: 'ArrowRight', other: 'd', start: 'wait', mine: "() => { const w = ludusDebug.slither().humans.find(h => h.human === 2); return [w.ang * 100, 0]; }", host: "() => { const w = ludusDebug.slither().humans.find(h => h.human === 2); return [w.ang * 100, 0]; }", seen: "() => { const w = ludusDebug.slither().humans.find(h => h.human === 1); return [w.px[0], w.py[0]]; }", tol: 35 },
   holeio: { name: 'City Swallow', own: 'd', other: 'd', start: 'wait', mine: "() => { const p = ludusDebug.holeMe(); return [p.x, p.y]; }", host: "() => { const p = ludusDebug.holeMe(2); return [p.x, p.y]; }", seen: "() => { const p = ludusDebug.holeMe(1); return [p.x, p.y]; }", tol: 30 },
 };
 async function lagGame(browser, id) {
@@ -297,7 +320,7 @@ S.layout = async browser => {
   for (const [sn, size] of Object.entries(sizes)) for (const dark of [false, true]) {
     const tag = sn + (dark ? '_dark' : '_light'), br = await broker.start();
     const A = await newPage(browser, br, { name: 'Alexandria', size, dark }), B = await newPage(browser, br, { name: 'Bartholome', size, dark });
-    check(tag + ' chip row fits (All, Arcade, Puzzle, Duel, 2 Player, Online) with no clipping', await A.$eval('#filters', e => e.scrollWidth <= e.clientWidth + 1 && [...e.children].every(c => c.getBoundingClientRect().right <= e.getBoundingClientRect().right + 1)));
+    check(tag + ' chip row fits (All, Arcade, Puzzle, Duel, Same laptop, Online) with no clipping', await A.$eval('#filters', e => e.scrollWidth <= e.clientWidth + 1 && [...e.children].every(c => c.getBoundingClientRect().right <= e.getBoundingClientRect().right + 1)));
     await onlineTab(A); await shot(A, 'online_page_' + tag);
     check(tag + ' Online page: no overlap', (await overlap(A)).length === 0, await overlap(A));
     const c = await flexCreate(A); await flexJoin(B, c); await pick(A, ['Paddle Duel', 'Air Hockey', 'Four in a Row'], 3); await wait(500);

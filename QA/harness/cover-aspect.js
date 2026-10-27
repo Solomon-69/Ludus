@@ -25,7 +25,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     const cc = async label => { await wait(450); const r = await measure(); check(`${scale * 100}% ${sz} ${label}: ${r.cards} covers true to shape`, r.cards > 0 && r.bad.length === 0, r); return r; };
     if (!has && scale === 1 && sz === 'compact') console.log('(build without ludusCoverCheck: measuring directly)');
     await cc('All');
-    for (const f of ['Arcade', 'Puzzle', 'Duel', '2 Player']) { await p.click(`#filters .chip:text-is("${f}")`); await cc(f); }
+    for (const f of ["Arcade", "Puzzle", "Duel", "Same laptop"]) { await p.click(`#filters .chip:text-is("${f}")`); await cc(f); }
     await p.click('#filters .chip:text-is("All")');
     await p.fill('#search', 'Map Hu'); await cc('search Map Hu');
     check(`${scale * 100}% ${sz} search Map Hu: Map Hunt first`, await p.evaluate(() => document.querySelector('#grid .card').dataset.id) === 'geoguess');

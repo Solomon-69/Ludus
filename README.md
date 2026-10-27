@@ -7,7 +7,7 @@
 
 <h1>Ludus</h1>
 
-<p><b>38 little games in your menu bar. Take a little break.</b></p>
+<p><b>44 little games in your menu bar. Take a little break.</b></p>
 
 <p>
   <a href="https://github.com/Solomon-69/Ludus/releases/latest"><img alt="Version 1.7.0" src="https://img.shields.io/badge/version-1.7.0-d97757?style=flat-square"></a>
@@ -53,7 +53,7 @@ It is free, source-available, works fully offline by default and collects nothin
 
 ## Features
 
-Ludus puts 38 small, polished games one click away. Here is what is inside.
+Ludus puts 44 small, polished games one click away. Here is what is inside.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/showcase/ludus-2-dark.png">
@@ -78,7 +78,7 @@ Every board game has a <b>vs Bot / vs Friend</b> switch at the top. Pick Friend 
 
 ### Play online with a room code
 
-Thirteen games have an <b>Online</b> button next to vs Bot / vs Friend: the board games Four in a Row, Dots and Boxes, Ultimate Tic-Tac-Toe, Hex, Wall Race, Rock Paper Scissors, Dead Centre and Last Wire, the action games Paddle Duel and Air Hockey, and Tag, Land Claim and City Swallow, which take <b>2 to 4 players</b> (they are in the <b>3-4 Player</b> tab; the host can press <b>Start now</b> once the room has enough players, or the game starts by itself when every seat is taken). Most games are for two players.
+Fifteen games have an <b>Online</b> button next to vs Bot / vs Friend: the board games Chess, Four in a Row, Dots and Boxes, Ultimate Tic-Tac-Toe, Hex, Wall Race, Rock Paper Scissors, Dead Centre and Last Wire, the action games Paddle Duel and Air Hockey, and Tag, Land Claim, City Swallow and Worm Arena, which take <b>2 to 4 players</b> (start them from the <b>Online</b> tab; the host can press <b>Start now</b> once the room has enough players, or the game starts by itself when every seat is taken). Most games are for two players.
 
 One player taps <b>Create room</b> and gets a 5 character room code. The <b>Copy invite</b> button copies a short message with the code and a `ludus://join/CODE` link. The other player taps <b>Join room</b> and types or pastes the code, or just clicks the link. It works on Mac and Windows. There is no account and no server of ours: the copies of Ludus talk through free public relays, and that only happens when you choose Play online. Rooms are not private: anyone who knows the code can join. See [PRIVACY.md](PRIVACY.md) and [web/ONLINE.md](web/ONLINE.md).
 
@@ -195,13 +195,13 @@ brew install --cask ludus   # not available yet
 
 | Group | Games |
 | --- | --- |
-| **Arcade** (beat your best) | Blocks, Brick Break, Chomp, Hammer Climb, Garden Defence, Flap Through, Rock Blaster, Sky Raiders, Snake, Sky Hop, Stack, City Swallow, Land Claim, Worm Arena, balloon-fusing tower-defence game |
+| **Arcade** (beat your best) | Blocks, Brick Break, Chomp, Hammer Climb, Garden Defence, Flap Through, Rock Blaster, Sky Raiders, Snake, Sky Hop, Stack, City Swallow, Land Claim, Worm Arena, Map Hunt, balloon-fusing tower-defence game |
 | **Puzzle** | 2048, Crate Push, Five Letters, Minefield, Memory, Solitaire, Sweet Match, Sudoku, Flag Quiz, Mosaic Hunt, Clue Spotter, Tongue Twister |
-| **Duel** (you against the computer) | Dots and Boxes, Dead Centre, Four in a Row, Last Wire, Ultimate Tic-Tac-Toe, Sword Duel, Hex, Rock Paper Scissors, Wall Race, Pop Duel, stick-figure brawler |
-| **2 Player** (one keyboard) | Air Hockey, Paddle Duel, Tag, Tank Arena |
-| **3-4 Player** (online, Tag also on one keyboard) | Tag, Land Claim, City Swallow |
+| **Duel** (you against the computer) | Chess, Dots and Boxes, Dead Centre, Four in a Row, Last Wire, Ultimate Tic-Tac-Toe, Sword Duel, Hex, Rock Paper Scissors, Wall Race, Pop Duel, stick-figure brawler |
+| **Same laptop** (two people, one keyboard) | Air Hockey, Paddle Duel, Tag, Tank Arena, plus the arcade games with a vs Friend mode |
+| **Online, 2-4 players** | Tag, Land Claim, City Swallow, Worm Arena |
 
-Four in a Row, Dots and Boxes, Ultimate Tic-Tac-Toe, Hex, Rock Paper Scissors and Dead Centre also have a **vs Friend** mode, so they show up in the 2 Player tab too.
+Chess, Four in a Row, Dots and Boxes, Ultimate Tic-Tac-Toe, Hex and Dead Centre also have a **vs Friend** mode: pick it at the top of the game.
 
 Each game lives in its own file in [`web/games/`](web/games).
 
@@ -233,9 +233,10 @@ Open Settings with the gear in the top corner of the panel.
 
 ## Privacy
 
-Nothing leaves your Mac. Ludus has no accounts, no analytics, no ads and makes no network
-connections unless you press Play online (then only game moves and a random room code go through
-a public relay). Scores, saved games and settings are stored locally. The game pages run in a
+Nothing leaves your Mac. Ludus has no accounts, no analytics and no ads. It only goes online when you
+press Play online (then only game moves and a random room code go through a public relay), play Map Hunt
+or Mosaic Hunt (photos and map tiles), or turn on Privacy blur (the camera picture is checked on your
+computer and never saved or sent). Scores, saved games and settings are stored locally. The game pages run in a
 sandboxed web view that can only load files from inside the app. See [PRIVACY.md](PRIVACY.md).
 
 ## Requirements

@@ -3,6 +3,25 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.0 (2026-10-27)
+
+- New game: **Chess**. Play the computer (four levels, it thinks in the background so the board never stutters), a friend
+  on the same screen, or a friend online.
+- **Mosaic Hunt** rebuilt: real mosaic spots with live close-up photos (credited, never stored in the app), guess on a map
+  and score like Map Hunt, with a small fixed map and a card that follows light or dark mode. Offline it falls back to drawn pictures and bundled map tiles.
+- **Privacy blur** (More settings): blurs the game when someone else looks at your screen or you look away. Uses the camera,
+  checked on your computer only; nothing is saved or sent. The Mac and Windows apps ask for camera permission first.
+- **Worm Arena online** for 2 to 4 players plus bots: everyone steers their own worm, last worm standing wins.
+- **Original names** (More settings): show each game under the classic name it is based on. Off by default.
+- The 2 Player tab is now called **Same laptop** and only lists games two people play on one computer; Duel lists games
+  against the computer. The game you played last waits at the top of its tab as "Continue", and every tab opens at the top.
+- The Online connection light is a solid dot from the start: green when online, red when offline.
+- Map Hunt: more country names (Poland, Slovakia, Hungary, Serbia...), borders and towns show sooner when zooming in,
+  double-click the street to step there, and trackpad pinch zooms the street view.
+- Fixes: Five Letters only accepts real words; Hex has a hexagon pulse; Rock Paper Scissors new cover and fist fade;
+  Worm Arena has no trail or dots behind worms; Tank Arena fires with Space; search returns to the game's tab; games always
+  open vs Bot; the More settings card opens in place; centred title and footer.
+
 ## 1.11.1 (2026-10-23)
 
 - Mosaic Hunt now uses only our own material: eight original pixel creatures (Moth, Newt, Pip, Bloop, Gull, Fox, Crab, Owl)

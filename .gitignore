@@ -23,3 +23,7 @@ QA/AGENT-BRIEF.md
 QA/PROGRESS.md
 reference/
 .preview.html
+
+# Local tool caches
+.base-ast/
+node_modules

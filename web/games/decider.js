@@ -129,16 +129,37 @@
     ctx.restore();
   }
 
+  // Draws a hand onto a scratch canvas first, then stamps it with one alpha. Faded icons stay clean:
+  // overlapping finger strokes no longer show through each other, and no alpha leaks into later drawing.
+  let handLayer = null;
+  function drawHandLayer(ctx, kind, x, y, r, col, ink, alpha, flip) {
+    const t = ctx.getTransform(), sc = Math.max(1, Math.hypot(t.a, t.b));
+    const px = Math.ceil(r * 2.3 * sc);
+    if (!handLayer) handLayer = document.createElement('canvas');
+    if (handLayer.width < px || handLayer.height < px) { handLayer.width = handLayer.height = px; }
+    const lc = handLayer.getContext('2d');
+    lc.setTransform(1, 0, 0, 1, 0, 0); lc.globalAlpha = 1; lc.clearRect(0, 0, handLayer.width, handLayer.height);
+    lc.setTransform(sc, 0, 0, sc, px / 2, px / 2);
+    drawHand(lc, kind, 0, 0, r, col, ink, !!flip);
+    ctx.save(); ctx.globalAlpha = alpha;
+    ctx.drawImage(handLayer, 0, 0, px, px, x - px / 2 / sc, y - px / 2 / sc, px / sc, px / sc);
+    ctx.restore();
+  }
+
   Ludus.register({
     id: 'decider', name: 'Rock Paper Scissors', aka: 'The Decider', tag: 'Duel', tint: PINK, online: { min: 2, max: 2 },
     onlineHint: 'Pick with <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd>, <kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> or a click. Picks are secret until both players have locked in. First to 3',
     hint: 'Pick with <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd>, <kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> or a click. Rock beats scissors, scissors beat paper, paper beats rock. First to 3. To play a friend, use Online.',
     _rules: { makeBrain, outcome, BEATS, COUNTER }, _hand: drawHand,
     art(ctx, w, h) {
-      const r = Math.min(w, h) * 0.34;
-      drawHand(ctx, 'rock', w * 0.3, h * 0.52, r, 'rgba(255,255,255,0.95)', '#7a1d43', false);
-      drawHand(ctx, 'scissors', w * 0.7, h * 0.52, r, 'rgba(255,255,255,0.75)', '#7a1d43', true);
-      Ludus.draw.text(ctx, 'VS', w / 2, h * 0.52, r * 0.42, 'rgba(255,255,255,0.85)', 800);
+      // Three soft discs, one per move, the middle one raised. Solid glyphs only, so nothing overlaps translucently.
+      const r = Math.min(w / 8.4, h / 2.75), gap = r * 2.55, cy = h * 0.53, fit = { rock: 0.66, paper: 0.78, scissors: 0.8 };
+      ['rock', 'paper', 'scissors'].forEach((m, i) => {
+        const x = w / 2 + (i - 1) * gap, y = cy - (i === 1 ? r * 0.18 : 0), rr = r * (i === 1 ? 1.08 : 1);
+        ctx.fillStyle = i === 1 ? 'rgba(255,255,255,0.26)' : 'rgba(255,255,255,0.16)';
+        ctx.beginPath(); ctx.arc(x, y, rr, 0, Math.PI * 2); ctx.fill();
+        drawHandLayer(ctx, m, x + (m === 'rock' ? -rr * 0.06 : 0), y, rr * fit[m], '#fffaf2', '#7a1d43', 1);
+      });
     },
     create(stage, api) {
       const D = Ludus.draw;
@@ -371,7 +392,9 @@
           D.roundRect(ctx, -b.w / 2, -b.h / 2, b.w, b.h, 14); ctx.fill();
           ctx.strokeStyle = hov ? col.accent : col.line; ctx.lineWidth = hov ? 2 : 1; ctx.stroke();
           const ic = chosen ? '#fff8f2' : col.ink;
-          drawHand(ctx, b.m, 0, -b.h * 0.12, b.h * 0.3, ic, chosen ? col.accent : col.surface2, false);
+          const fade = ctx.globalAlpha; ctx.globalAlpha = 1;
+          drawHandLayer(ctx, b.m, 0, -b.h * 0.12, b.h * 0.3, ic, chosen ? col.accent : col.surface2, fade);
+          ctx.globalAlpha = fade;
           D.text(ctx, (friend && !on ? 'ASD'[i] + ' ' + 'JKL'[i] : i + 1) + '  ' + LABEL[b.m], 0, b.h * 0.32, 11, chosen ? '#fff8f2' : col.ink2, 650);
           ctx.restore();
         });

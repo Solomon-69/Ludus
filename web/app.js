@@ -8,13 +8,18 @@
   const FILTERS = ['All', 'Arcade', 'Puzzle', 'Duel', '2 Player', 'Online'];   // 2, 3 and 4 player online play all live under Online
   const ONLINE = 'Online';                 // the tab that opens the Online page instead of a list of games
   const TWO = '2 Player';
+  const LABEL = { [TWO]: 'Same laptop' };   // the 2 Player tab: two people sharing this one computer
   const PARTY = '3-4 Player';              // games that 3 or 4 people can play together (online, some also on one keyboard)
   const party = g => !!(g.online && g.online.max >= 3);
   // ---------- custom game names (Settings > Rename games) ----------
   // Off: every name is the original. On: a name the player typed (kept in S.names, also while switched off) replaces it.
   const NAME_MAX = 24;
   const customName = g => (S.renameGames && S.names && typeof S.names[g.id] === 'string' && S.names[g.id].trim()) || '';
-  const dispName = g => customName(g) || g.name;
+  // "Original names" (Settings > More): a built-in preset that shows each game under the classic name it is based on.
+  // It only changes what is shown, never ids or saves; a name typed in Rename games still wins. Off by default.
+  const ORIGINAL_NAMES = {};
+  const presetName = g => (S.originalNames && ORIGINAL_NAMES[g.id]) || '';
+  const dispName = g => customName(g) || presetName(g) || g.name;
   L.displayName = dispName;
   const REVEAL_MS = 1200;   // how long the final board stays on screen before the result bar slides up
   const SAVE_EVERY_MS = 4000;
@@ -57,6 +62,7 @@
       el.classList.toggle('is-behind', v !== next && order[v] < order[next]);
     });
     view = next;
+    privacySync();   // the camera runs only while a game is open
   }
 
   // ---------- wide or tall ----------
@@ -79,14 +85,15 @@
   // ---------- home ----------
   // Search box: matches a game's name, its group and its older Ludus name, ignoring case and accents.
   let query = '';
+  let searchReturn = null;   // the tab of a game opened from search results (see start / goHome)
   const norm = t => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
-  const matches = g => { const q = norm(query); return !q || q.split(' ').every(w => norm([g.name, customName(g), g.tag, g.aka, g.id].join(' ')).includes(w)); };
+  const matches = g => { const q = norm(query); return !q || q.split(' ').every(w => norm([g.name, customName(g), presetName(g), g.tag, g.aka, g.id].join(' ')).includes(w)); };
   function visibleGames() {
     if (norm(query)) {   // best match first: the name starting with what you typed, then a word of the name, then anything else
-      const q = norm(query), rank = g => { const n = norm(customName(g) || g.name); return n.startsWith(q) ? 3 : (' ' + n).includes(' ' + q) ? 2 : n.includes(q) ? 1 : 0; };
+      const q = norm(query), rank = g => { const n = norm(dispName(g)); return n.startsWith(q) ? 3 : (' ' + n).includes(' ' + q) ? 2 : n.includes(q) ? 1 : 0; };
       return L.games.filter(g => !S.hidden.includes(g.id) && matches(g)).map((g, i) => [g, rank(g), i]).sort((a, b) => b[1] - a[1] || a[2] - b[2]).map(x => x[0]);
     }
-    return L.games.filter(g => !S.hidden.includes(g.id) && (S.filter === 'All' || g.tag === S.filter || (S.filter === TWO && g.versus) || (S.filter === PARTY && party(g))));
+    return L.games.filter(g => !S.hidden.includes(g.id) && (S.filter === 'All' || g.tag === S.filter || (S.filter === TWO && g.versus && g.tag !== 'Duel') || (S.filter === PARTY && party(g))));
   }
   // The connection light: a 7px dot on the Online tab (and a hollow ring beside the title while offline).
   const netWord = () => (L.conn.shown ? 'Online' : 'Offline');
@@ -107,8 +114,9 @@
       const b = document.createElement('button');
       b.className = 'chip' + (S.filter === name ? ' is-on' : '');
       b.setAttribute('role', 'tab');
-      if (name === ONLINE) { const lab = el('span', 'chip-lab', name); lab.appendChild(netDot()); b.appendChild(lab); } else b.textContent = name;
-      b.onclick = () => { S.filter = name; L.save(); L.sfx('click'); renderFilters(); renderCards(); };
+      if (name === ONLINE) { const lab = el('span', 'chip-lab', name); lab.appendChild(netDot()); b.appendChild(lab); } else b.textContent = LABEL[name] || name;
+      if (LABEL[name]) b.title = 'Two players on this computer';
+      b.onclick = () => { S.filter = name; L.save(); L.sfx('click'); renderFilters(); renderCards(); const gr = $('grid'); if (gr) gr.scrollTop = 0; };
       f.appendChild(b);
     });
   }
@@ -185,7 +193,8 @@
     const list = visibleGames();
     const searching = !!norm(query);
     if (S.filter === ONLINE && !searching) { renderOnlinePage(grid); return; }
-    const lastGame = !searching && S.filter === 'All' && L.games.find(g => g.id === S.last && !S.hidden.includes(g.id));
+    // The game you played last leads every tab it belongs to as "Continue", so it can be picked up again.
+    const lastGame = !searching && list.find(g => g.id === S.last);
     const rest = list.filter(g => g !== lastGame);
     // In "All", the games for two people on one keyboard get their own section at the end.
     const all = S.filter === 'All' && !searching;
@@ -224,7 +233,7 @@
   function fillName(el, g, done) {
     el.textContent = ''; el.title = '';
     root.classList.toggle('renaming', !!S.renameGames);
-    if (!S.renameGames) { el.textContent = g.name; return; }
+    if (!S.renameGames) { el.textContent = dispName(g); return; }
     const n = document.createElement('span');
     n.className = 'rename-name'; n.textContent = dispName(g); n.setAttribute('role', 'button'); n.tabIndex = 0;
     n.title = customName(g) ? g.name + ' \u00b7 click to rename' : 'Click to rename';
@@ -313,8 +322,10 @@
     $('scoreNow').textContent = '0';
     $('scoreBest').textContent = fmt(S.best[id] || 0);
     if (!S.vs) S.vs = {};
-    // Opened from the 2 Player tab: a board game starts with a friend.
-    if (g.versus && S.filter === TWO && S.vs[id] !== 'friend') { S.vs[id] = 'friend'; L.save(); }
+    // A game with the vs Bot / vs Friend switch always opens against the bot (an online room is untouched).
+    if (g.versus && !keepRoom && S.vs[id] !== 'bot') { S.vs[id] = 'bot'; L.save(); }
+    // Opened from search results: Back lands on the game's own tab, not the results.
+    searchReturn = norm(query) ? g.tag : null;
     $('scoreBest').parentElement.hidden = g.tag === TWO;   // no high score between two people
     renderVsToggle(g);
     $('hint').innerHTML = S.hints ? (g.hint || '') : '';
@@ -674,7 +685,20 @@
     $('pauseSheet').hidden = true;
     current.run.resume(); current.instance && current.instance.resume && current.instance.resume();
   }
-  function goHome() { hideCrash(); leaveOnline(); persist(); stop(); hideOver(); $('pauseSheet').hidden = true; show('home'); renderCards(); L.native('playing', { id: null }); L.native('wide', { on: false }); }
+  function leaveSearch() {
+    const tab = searchReturn; searchReturn = null;
+    if (!tab) return;
+    search.value = ''; query = ''; $('filters').classList.remove('is-dim');
+    if (FILTERS.includes(tab) && S.filter !== tab) { S.filter = tab; L.save(); }
+    renderFilters();
+  }
+  function goHome() {
+    hideCrash(); leaveOnline(); persist(); stop(); hideOver(); $('pauseSheet').hidden = true;
+    const fromSearch = !!searchReturn; leaveSearch();
+    show('home'); renderCards();
+    if (fromSearch) { const gr = $('grid'); if (gr) gr.scrollTop = 0; }
+    L.native('playing', { id: null }); L.native('wide', { on: false });
+  }
 
   $('backBtn').onclick = goHome;
   $('leaveBtn').onclick = goHome;
@@ -825,6 +849,42 @@
     const offB = L.conn.on(() => { if (!r.isConnected) { offA(); offB(); return; } draw(); });
     return r;
   }
+  // ---------- privacy blur (privacy.js): the camera watches for onlookers while a game is open ----------
+  const MORE_CLOSE_MS = 460;   // the More card's closing animation (style.css .more-box)
+  function setPrivacyBlur(on, reason) {
+    root.classList.toggle('privacy-blur', !!on);
+    const t = $('privacyWhy'); if (t && on) t.textContent = reason === 'watcher' ? 'Hidden while someone else is looking' : 'Look at the screen to carry on';
+  }
+  function privacyFail(msg) {
+    S.privacyBlur = false; L.save(); setPrivacyBlur(false);
+    const sub = document.querySelector('#privacyRow .row-sub'), swb = document.querySelector('#privacyRow .switch');
+    if (swb) swb.setAttribute('aria-checked', 'false');
+    if (sub) { sub.textContent = msg + '. ' + PRIVACY_NOTE; sub.classList.add('bad'); }
+    toast(msg);
+  }
+  function privacySync() {
+    const P = window.LudusPrivacy; if (!P) return;
+    const want = !!S.privacyBlur && view === 'game' && !document.hidden;
+    if (want && !P.running()) P.start(setPrivacyBlur).then(ok => { if (ok && !(S.privacyBlur && view === 'game')) P.stop(); }).catch(e => privacyFail(e.message));
+    else if (!want && P.running()) P.stop();
+    if (!want) setPrivacyBlur(false);
+  }
+  document.addEventListener('visibilitychange', privacySync);
+  const PRIVACY_NOTE = 'The camera is checked on this computer only: nothing is saved or sent, and it is on only during a game';
+  function privacyRow() {
+    const ok = !!(window.LudusPrivacy && window.LudusPrivacy.supported());
+    const r = row('Privacy blur', ok ? 'Blurs the game if someone else looks or you look away. ' + PRIVACY_NOTE : 'Needs a camera, which this window cannot use',
+      sw(!!S.privacyBlur && ok, v => {
+        S.privacyBlur = v; L.save();
+        const sub = r.querySelector('.row-sub'); sub.classList.remove('bad'); sub.textContent = 'Blurs the game if someone else looks or you look away. ' + PRIVACY_NOTE;
+        // Ask for the camera now, while the player is here to answer, then let it go until a game opens.
+        if (v) window.LudusPrivacy.start(setPrivacyBlur).then(() => privacySync()).catch(e => privacyFail(e.message));
+        else privacySync();
+      }, 'Privacy blur'));
+    r.id = 'privacyRow';
+    if (!ok) { const b = r.querySelector('.switch'); b.disabled = true; b.setAttribute('aria-disabled', 'true'); }
+    return r;
+  }
   let settingsFrom = 'home';   // the screen the gear was pressed on: Back returns there (a game stays paused behind it)
   function renderSettings() {
     const body = $('settingsBody'); body.innerHTML = '';
@@ -879,11 +939,29 @@
       moreRows.push(row('Invisible icon', invisibleHelp, sw(!!window.__LUDUS_INVISIBLE__, v => { window.__LUDUS_INVISIBLE__ = v; L.native('invisible', { on: v }); }, 'Invisible icon')));
     }
     moreRows.push(row('Rename games', 'Click a game’s name to give it your own', sw(!!S.renameGames, v => { S.renameGames = v; L.save(); }, 'Rename games')));
-    const moreBtn = el('button', 'group-label more-toggle', '<span>More</span><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-down"/></svg>');
-    moreBtn.type = 'button'; moreBtn.id = 'moreToggle'; moreBtn.setAttribute('aria-expanded', 'false');
-    const moreBox = el('div', 'group more-box'); moreBox.hidden = true; moreRows.forEach(x => moreBox.appendChild(x));
-    moreBtn.onclick = () => { const open = moreBox.hidden; moreBox.hidden = !open; moreBtn.setAttribute('aria-expanded', String(open)); L.sfx('click'); };
-    body.append(moreBtn, moreBox);
+    moreRows.push(row('Original names', 'Show each game under the classic name it is based on',
+      sw(!!S.originalNames, v => { S.originalNames = v; L.save(); renderCards(); }, 'Original names')));
+    moreRows.push(privacyRow());
+    // The More card: a settings row that says what is inside, and springs open in place.
+    const moreCard = el('div', 'group more-card');
+    const preview = moreRows.map(r => { const t = r.querySelector('.row-title'); return t ? t.textContent : ''; }).filter(Boolean).join(', ');
+    const moreBtn = el('button', 'row more-head', '<span class="more-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#i-sliders"/></svg></span>'
+      + '<span class="row-text"><span class="row-title">More settings</span><span class="row-sub"></span></span>'
+      + '<span class="more-chev" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#i-down"/></svg></span>');
+    moreBtn.querySelector('.row-sub').textContent = preview.charAt(0) + preview.slice(1).toLowerCase();
+    moreBtn.type = 'button'; moreBtn.id = 'moreToggle'; moreBtn.setAttribute('aria-expanded', 'false'); moreBtn.setAttribute('aria-controls', 'moreBox');
+    const moreBox = el('div', 'more-box'); moreBox.id = 'moreBox'; moreBox.hidden = true;
+    const moreInner = el('div', 'more-inner'); moreRows.forEach(x => moreInner.appendChild(x)); moreBox.appendChild(moreInner);
+    let moreTimer = 0;
+    moreBtn.onclick = () => {
+      const open = !moreCard.classList.contains('is-open');
+      clearTimeout(moreTimer);
+      moreBtn.setAttribute('aria-expanded', String(open)); L.sfx('click');
+      if (open) { moreBox.hidden = false; void moreBox.offsetHeight; moreCard.classList.add('is-open'); }
+      else { moreCard.classList.remove('is-open'); moreTimer = setTimeout(() => { if (!moreCard.classList.contains('is-open')) moreBox.hidden = true; }, MORE_CLOSE_MS); }
+    };
+    moreCard.append(moreBtn, moreBox);
+    body.appendChild(moreCard);
     if (native) {
       const q = el('button', 'small-btn', 'Quit'); q.onclick = () => L.native('quit');
       const g = el('div', 'group quit-group'); g.appendChild(row('Quit Ludus', null, q)); body.appendChild(g);
