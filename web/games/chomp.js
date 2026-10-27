@@ -352,14 +352,13 @@
           ghosts.forEach(g => { if (phase !== 'dying' || phaseT < 0.3) drawGhost(g, col, L); });
           drawPac(col, L);
         } else {
-          ghosts.forEach(g => drawGhost(g, col, L));
+          // Caught: the whole scene dims and only the ghost that caught you (and you) stay bright, like a spotlight.
+          const k = api.reduceMotion ? 1 : Math.min(1, phaseT / 0.3);
+          ghosts.forEach(g => { if (g !== catcher) drawGhost(g, col, L); });
           drawPac(col, L);
-          if (catcher) {
-            const k = api.reduceMotion ? 1 : Math.min(1, phaseT / 0.3);
-            const mx = L.ox + ((catcher.x + pac.x) / 2 + 0.5) * s, my = L.oy + ((catcher.y + pac.y) / 2 + 0.5) * s;
-            ctx.strokeStyle = col.bad; ctx.lineWidth = Math.max(2, s * 0.14);
-            ctx.beginPath(); ctx.arc(mx, my, s * (0.7 + 0.5 * D.ease.outCubic(k)), 0, Math.PI * 2); ctx.stroke();
-          }
+          ctx.fillStyle = col.dark ? 'rgba(0,0,0,' + (0.45 * k) + ')' : 'rgba(30,20,10,' + (0.4 * k) + ')'; ctx.fillRect(0, 0, view.w, view.h);
+          if (catcher) drawGhost(catcher, col, L);
+          drawPac(col, L);
         }
         particles = particles.filter(p => (p.age += dt) < p.life);
         particles.forEach(p => {
