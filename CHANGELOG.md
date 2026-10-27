@@ -3,6 +3,11 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.11 (2026-10-27)
+
+- Settings: opening More settings scrolls down with it so the new options are in view.
+- Small grey text is darker and easier to read in light and dark, in the app and on the Ludus page.
+
 ## 1.12.10 (2026-10-27)
 
 - Online: if the free MQTT relays are blocked or down on your network, Ludus now falls back to ntfy.sh (an ordinary HTTPS service), so Create room works on any network. Both players connect outward, so players on different networks meet fine.

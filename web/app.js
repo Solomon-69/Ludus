@@ -941,7 +941,22 @@
       const open = !moreCard.classList.contains('is-open');
       clearTimeout(moreTimer);
       moreBtn.setAttribute('aria-expanded', String(open)); L.sfx('click');
-      if (open) { moreBox.hidden = false; void moreBox.offsetHeight; moreCard.classList.add('is-open'); }
+      if (open) {
+        moreBox.hidden = false; void moreBox.offsetHeight; moreCard.classList.add('is-open');
+        // as the card grows, scroll down with it so the new options are in view (not left below the fold)
+        const t0 = performance.now();
+        const follow = now => {
+          if (!moreCard.classList.contains('is-open') || !moreCard.isConnected) return;
+          let sc = moreCard.parentElement;   // the nearest scrolling ancestor
+          while (sc && sc.scrollHeight <= sc.clientHeight + 1) sc = sc.parentElement;
+          if (sc) {
+            const over = moreCard.getBoundingClientRect().bottom - sc.getBoundingClientRect().bottom + 16;
+            if (over > 0) sc.scrollTop += Math.ceil(over * (S.reduceMotion ? 1 : 0.35));
+          }
+          if (now - t0 < MORE_CLOSE_MS + 80) requestAnimationFrame(follow);
+        };
+        requestAnimationFrame(follow);
+      }
       else { moreCard.classList.remove('is-open'); moreTimer = setTimeout(() => { if (!moreCard.classList.contains('is-open')) moreBox.hidden = true; }, MORE_CLOSE_MS); }
     };
     moreCard.append(moreBtn, moreBox);
