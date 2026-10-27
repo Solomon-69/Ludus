@@ -33,9 +33,22 @@ function Ui-Wait($root, [string]$like, [string]$type = '', [int]$timeoutSec = 30
   while ((Get-Date) -lt $end) { $e = Ui-All $root $like $type | Select-Object -First 1; if ($e) { return $e }; Start-Sleep -Milliseconds 250 }
   return $null
 }
+# Press like a click: buttons (Invoke), switches (Toggle), disclosure buttons with aria-expanded (ExpandCollapse).
 function Ui-Press($el) {
-  try { $el.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke(); return $true }
-  catch { try { $el.GetCurrentPattern([System.Windows.Automation.LegacyIAccessiblePattern]::Pattern).DoDefaultAction(); return $true } catch { return $false } }
+  $pats = $el.GetSupportedPatterns()
+  foreach ($pt in $pats) {
+    try {
+      switch ($pt.ProgrammaticName) {
+        'InvokePatternIdentifiers.Pattern' { $el.GetCurrentPattern($pt).Invoke(); return $true }
+        'TogglePatternIdentifiers.Pattern' { $el.GetCurrentPattern($pt).Toggle(); return $true }
+        'ExpandCollapsePatternIdentifiers.Pattern' {
+          $ec = $el.GetCurrentPattern($pt)
+          if ($ec.Current.ExpandCollapseState -eq [System.Windows.Automation.ExpandCollapseState]::Collapsed) { $ec.Expand() } else { $ec.Collapse() }
+          return $true }
+      }
+    } catch { }
+  }
+  try { $el.GetCurrentPattern([System.Windows.Automation.LegacyIAccessiblePattern]::Pattern).DoDefaultAction(); return $true } catch { return $false }
 }
 function Ui-Dump($root, [string]$path) {
   $lines = foreach ($e in $root.FindAll($TS::Descendants, [System.Windows.Automation.Condition]::TrueCondition)) {

@@ -55,7 +55,7 @@ $p = Start-Process $Exe -ArgumentList '--test-open', "--selftest=$json2" -PassTh
 $win = Ui-Window $p.Id 30
 $gear = Ui-Wait $win 'Settings' 'Button' 30; if ($gear) { [void](Ui-Press $gear) }
 $swt = $null
-for ($try = 0; $try -lt 3 -and -not $swt; $try++) {
+for ($try = 0; $try -lt 2 -and -not $swt; $try++) {
   $more = Ui-Wait $win 'More settings*' 'Button' 15
   if ($more) {
     try { $more.GetCurrentPattern([System.Windows.Automation.ScrollItemPattern]::Pattern).ScrollIntoView() } catch { }
@@ -63,7 +63,7 @@ for ($try = 0; $try -lt 3 -and -not $swt; $try++) {
     [void](Ui-Press $more)
   }
   Start-Sleep -Milliseconds 1200
-  $swt = Ui-Wait $win 'Original names' 'Button' 5
+  $swt = Ui-Wait $win 'Original names' '' 5
 }
 if (-not $swt) { Ui-Dump $win (Join-Path $Out 'uia-settings.txt') }
 Check ($null -ne $swt) 'names: Original names switch found'
