@@ -146,7 +146,6 @@
     const mk = el('button', 'btn primary', 'Create room'); mk.type = 'button'; mk.id = 'opCreate';
     mk.onclick = () => { L.sfx('click'); createFlexRoom(); };
     mid.appendChild(mk);
-    join.appendChild(el('span', 'field-label', 'Or join a room'));
     const code = el('input', 'code-input'); code.type = 'text'; code.maxLength = 300; code.placeholder = 'K7M2Q'; code.id = 'opCode';
     code.autocomplete = 'off'; code.spellcheck = false; code.autocapitalize = 'characters'; code.setAttribute('aria-label', 'Room code, invite or link');
     const msg = el('div', 'lobby-error', ''); msg.setAttribute('role', 'alert');
@@ -162,7 +161,7 @@
       [mk, jb, code].forEach(x => { x.disabled = true; });
       page.querySelectorAll('.party-card button').forEach(x => { x.disabled = true; });
     }
-    page.appendChild(join); page.appendChild(note);
+    page.appendChild(el('div', 'op-or', 'or join a room')); page.appendChild(join); page.appendChild(note);
     grid.appendChild(page);
   }
   // The last room you were in: an orange "Last party · <game>" tag on top, then the players as small name chips (a

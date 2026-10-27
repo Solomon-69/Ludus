@@ -3,6 +3,10 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.8 (2026-10-27)
+
+- Online page: thinner cards and bars, and the "or join a room" line is back between hosting and joining.
+
 ## 1.12.7 (2026-10-27)
 
 - Chess clock: one Timed switch (15 minutes for each player) that glides between Off and Timed; the two clocks sit on opposite sides of the board.

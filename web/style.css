@@ -666,3 +666,11 @@ svg { display: block; }
 .online-page .op-card #opCreate { min-height: 50px; }
 .online-page .op-card .join-row input.code-input, .online-page .op-card .join-row .btn { height: 50px; }
 .online-page > .lobby-note { margin: 0; }
+
+/* thinner bars and cards, with the "or join a room" line back between hosting and joining */
+.op-card { gap: 10px; padding: 10px 12px; border-radius: 14px; }
+.online-page .op-card input { height: 40px; }
+.online-page .op-card #opCreate { min-height: 44px; height: 44px; }
+.online-page .op-card .join-row input.code-input, .online-page .op-card .join-row .btn { height: 44px; font-size: 20px; }
+.online-page .op-card .join-row .btn { font-size: 14px; }
+.online-page .op-or { margin: -2px 0; }
