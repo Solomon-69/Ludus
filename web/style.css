@@ -250,7 +250,10 @@ svg { display: block; }
 /* Settings */
 .settings-body { flex: 1; overflow-y: auto; padding: 4px 14px 18px; scrollbar-width: none; }
 .settings-body::-webkit-scrollbar { display: none; }
-.group-label { font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-3); margin: 14px 4px 6px; }
+.group-label { font-size: 11px; line-height: 13px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-3); margin: 5px 4px 4px; }
+.group-label:first-child { margin-top: 14px; }
+/* every gap between setting cards is the same 22px: a label gap is 5 + 13 + 4 */
+.group + .group-label { margin-top: 5px; }
 .group { background: var(--surface); border-radius: var(--r-lg); box-shadow: var(--shadow); overflow: hidden; }
 .row { display: flex; align-items: center; gap: 10px; min-height: 46px; padding: 8px 12px; }
 .row + .row { border-top: 1px solid var(--line); }
@@ -581,7 +584,7 @@ svg { display: block; }
 .sv { display: flex; align-items: center; gap: 12px; }
 .sv .vol { width: 104px; }
 /* More settings: a card that says what is inside and springs open in place (app.js renderSettings). */
-.more-card { margin-top: 14px; }
+.more-card { margin-top: 22px; }
 .more-head { width: 100%; text-align: left; cursor: pointer; transition: background 0.15s; }
 .more-head:hover { background: color-mix(in srgb, var(--ink) 3%, transparent); }
 .more-head:active .more-ico { transform: scale(0.92); }
@@ -615,7 +618,7 @@ svg { display: block; }
   transition: opacity 0.25s var(--ease-out), transform 0.4s var(--spring); }
 .privacy-veil svg { width: 26px; height: 26px; }
 .privacy-blur .privacy-veil { opacity: 1; transform: none; }
-.quit-group { margin-top: 14px; }
+.quit-group { margin-top: 22px; }
 .upd-ctl { display: flex; align-items: center; gap: 6px; flex: none; }
 .row-sub.good { color: var(--net-on); font-weight: 600; }
 .row-sub.bad { color: var(--bad); }
