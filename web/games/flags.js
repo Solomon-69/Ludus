@@ -609,9 +609,13 @@
       flag(w * 0.36, h * 0.54, -0.14, () => {            // France
         ['#002654', '#ffffff', '#ce1126'].forEach((c, i) => { ctx.fillStyle = c; ctx.fillRect(-fw / 2 + i * fw / 3 - 0.5, -fh / 2 - 1, fw / 3 + 1, fh + 2); });
       });
-      flag(w * 0.64, h * 0.46, 0.12, () => {             // Japan: a red disc on white, a little left of centre like the real flag's proportions allow
-        ctx.fillStyle = '#ffffff'; ctx.fillRect(-fw / 2 - 1, -fh / 2 - 1, fw + 2, fh + 2);
-        ctx.fillStyle = '#bc002d'; ctx.beginPath(); ctx.arc(0, 0, fh * 0.3, 0, Math.PI * 2); ctx.fill();
+      flag(w * 0.64, h * 0.46, 0.12, () => {             // Jamaica: gold saltire, green top and bottom, black sides (no white, so it never blends into France)
+        const L = -fw / 2 - 1, T = -fh / 2 - 1, R = fw / 2 + 1, B = fh / 2 + 1;
+        const tri = (c, pts) => { ctx.fillStyle = c; ctx.beginPath(); pts.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.closePath(); ctx.fill(); };
+        tri('#009b3a', [[L, T], [R, T], [0, 0]]); tri('#009b3a', [[L, B], [R, B], [0, 0]]);
+        tri('#000000', [[L, T], [L, B], [0, 0]]); tri('#000000', [[R, T], [R, B], [0, 0]]);
+        ctx.strokeStyle = '#fed100'; ctx.lineWidth = fh * 0.17; ctx.lineCap = 'butt';
+        ctx.beginPath(); ctx.moveTo(L, T); ctx.lineTo(R, B); ctx.moveTo(R, T); ctx.lineTo(L, B); ctx.stroke();
       });
     },
     create(stage, api) {
