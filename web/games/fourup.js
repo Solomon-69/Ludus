@@ -186,7 +186,11 @@
           const t0 = performance.now();
           const c = L.choose(board, api.level, C);
           const spent = performance.now() - t0;
-          api.timeout(() => { thinking = false; place(c, C); }, Math.max(60, api.rand(380, 640) - spent));
+          api.timeout(() => {
+            thinking = false;
+            // If the chosen column is somehow unusable, take any open one so the game never waits forever
+            if (!place(c, C) && phase === 'play' && turn === C) { const lg = L.legal(board); if (lg.length) place(lg[Math.floor(Math.random() * lg.length)], C); }
+          }, Math.max(60, api.rand(380, 640) - spent));
         }, 120);
       }
 
@@ -400,6 +404,10 @@
         return true;
       });
       api.loop(dt => render(dt));
+      if (window.ludusDebug) window.ludusDebug.botTest = {   // test hook: a quick state read and a random player move
+        state: () => ({ turn: turn === P ? 'me' : 'bot', phase, n: Array.from(board).filter(Boolean).length, wins: wins.p + '-' + wins.c }),
+        play: () => { if (phase !== 'play' || turn !== P || thinking) return false; const lg = L.legal(board); playerDrop(lg[Math.floor(Math.random() * lg.length)]); return true; }
+      };
       return {
         save() {
           if (api.ended || !board) return null;

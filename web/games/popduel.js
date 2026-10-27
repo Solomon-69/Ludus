@@ -386,6 +386,9 @@
   function aiThink(B, level) {
     if (B.dead) return;
     const margin = [140, 20, 0][level];
+    // Stuck on one plan step for 30 seconds (a spot it cannot build on, an upgrade that never opens)? Skip it.
+    if (B.aiLastI !== B.aiI) { B.aiLastI = B.aiI; B.aiLastT = B.t; }
+    else if (B.aiI < AIPLAN.length && B.t - B.aiLastT > 30) { B.aiI++; B.aiLastT = B.t; }
     const item = AIPLAN[B.aiI];
     if (item) {
       if (item[0] === 'up') {

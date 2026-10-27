@@ -20,8 +20,13 @@
   // block the MQTT relays, and it is only tried after them (it throttles fast traffic, which suits menus and turn-based games).
   const KEEP_ALIVE = 30;            // seconds; the relay drops a quiet client after about 1.5x this
   const CONNECT_TIMEOUT = 4000;     // ms to wait for one relay before trying the next
+  const PINNED_CONNECT_TIMEOUT = 10000;   // ms for the one relay a room code belongs to (a slow network still gets there)
   const HEARTBEAT = 4000;           // ms between "I am still here" messages
-  const PEER_TIMEOUT = 16000;       // ms of silence before a player (or the host) counts as gone
+  const PEER_TIMEOUT = 45000;       // ms of silence before a player (or the host) counts as gone
+  const NTFY_HEARTBEAT = 15000, NTFY_TIMEOUT = 60000;   // the same on the ntfy.sh fallback, which throttles busy senders
+  const SEAT_HOLD = 120000;         // ms a player who dropped out keeps their seat (and score) for when they come back
+  const CLAIM_LISTEN = 1100;        // ms a new room listens for somebody already hosting its code
+  const RECLAIM_LISTEN = 4500;      // the same for a code that was used before (longer than one heartbeat, so an older host is heard too)
   const MAX_PACKET = 4096;          // bytes of one game message, in and out
   const HISTORY = 300;              // sent game messages kept so a lost one can be sent again
   const QUEUE_LIMIT = 100;          // messages held while the connection is down
@@ -62,6 +67,7 @@
     return a;
   }
   const hex = b => Array.from(b, x => x.toString(16).padStart(2, '0')).join('');
+  const bytes = t => enc.encode(t).length;   // message limits count bytes (an accented name takes more than one)
   NET.newCode = () => Array.from(randBytes(5), x => ALPHABET[x % ALPHABET.length]).join('');
   // Each relay is a separate world, so everybody in a room must use the same one. The room code decides which:
   // the host makes a code that belongs to the relay it is connected to, and joiners try that relay first.
@@ -147,7 +153,7 @@
     me.urls = o.urls; me.clientId = o.clientId; me.state = 'connecting';
     me.subs = new Map(); me.outbox = []; me.listeners = []; me.attempt = 0; me.pid = 1;
     me.closed = false; me.ws = null; me.everOnline = false; me.url = '';
-    me.idx = o.start || 0; me.curIdx = me.idx % me.urls.length; me.pinned = false;
+    me.idx = o.start || 0; me.curIdx = me.idx % me.urls.length; me.pinned = !!o.pinned;   // pinned: a room code's own relay, never another one
     me.connect();
   }
   Mqtt.prototype.pin = function () { this.pinned = true; this.idx = this.curIdx; };
@@ -168,7 +174,7 @@
     try { ws = new (NET.WebSocket || window.WebSocket)(url, 'mqtt'); } catch (e) { me._lost(false); return; }
     ws.binaryType = 'arraybuffer';
     me.ws = ws;
-    const timer = setTimeout(() => { if (!acked) { try { ws.close(); } catch (e) {} } }, CONNECT_TIMEOUT);
+    const timer = setTimeout(() => { if (!acked) { try { ws.close(); } catch (e) {} } }, me.pinned ? PINNED_CONNECT_TIMEOUT : CONNECT_TIMEOUT);
     ws.onopen = () => { try { ws.send(P.connect(me.clientId)); } catch (e) {} };
     ws.onmessage = ev => {
       if (me.ws !== ws) return;
@@ -222,7 +228,7 @@
     me.attempt++;
     // Never reached a relay after trying them all twice: say offline. Otherwise a drop is "offline" until it recovers.
     if (wasOnline || me.everOnline || me.attempt >= me.urls.length * 2) me._set('offline'); else me._set('connecting');
-    const delay = me.attempt < me.urls.length ? 250 : Math.min(6000, 1000 * Math.pow(2, me.attempt - me.urls.length));
+    const delay = me.pinned ? Math.min(5000, 500 * me.attempt) : me.attempt < me.urls.length ? 250 : Math.min(6000, 1000 * Math.pow(2, me.attempt - me.urls.length));
     clearTimeout(me.retryTimer);
     me.retryTimer = setTimeout(() => me.connect(), delay);
   };
@@ -241,7 +247,7 @@
     else if (this.state === 'online') this._raw(P.unsubscribe(this.pid++ & 0xFFFF || 1, topic));
   };
   Mqtt.prototype.publish = function (topic, text, volatile) {
-    if (this.isNtfy && this.state === 'online') { this._ntfyPost(topic, text); return true; }
+    if (this.isNtfy && this.state === 'online') return this._ntfyPost(topic, text, volatile);
     const p = P.publish(topic, text);
     if (!this.isNtfy && this.state === 'online' && this._raw(p)) return true;
     if (volatile) return false;                 // live game state: an old copy is worthless, never queue it
@@ -250,7 +256,7 @@
   };
   Mqtt.prototype.close = function () {
     this.closed = true;
-    clearInterval(this.pingTimer); clearTimeout(this.retryTimer);
+    clearInterval(this.pingTimer); clearTimeout(this.retryTimer); clearInterval(this.watchdog); clearTimeout(this.flushTimer);
     const ws = this.ws; this.ws = null;
     this._ntfyShutAll();
     if (ws && this.isNtfy) { try { ws.close(); } catch (e) {} }
@@ -259,13 +265,15 @@
     this.listeners = [];
   };
   // ---- the ntfy.sh relay: one WebSocket per room topic to listen, one HTTPS POST per message to send
+  const NTFY_SILENT = 70000;        // ms without even a keepalive before an ntfy socket is replaced
+  const NTFY_FAST_GAP = 220;        // ms between live game copies on ntfy (about 4 a second)
   const ntfyName = topic => 'lds-' + String(topic).replace(/[^A-Za-z0-9_-]/g, '-').slice(0, 58);
   Mqtt.prototype._connectNtfy = function () {
     const me = this;
     let ws, acked = false;
     try { ws = new (NET.WebSocket || window.WebSocket)('wss://ntfy.sh/lds-c-' + hex(randBytes(6)) + '/ws'); } catch (e) { me._lost(false); return; }
     me.ws = ws;
-    const timer = setTimeout(() => { if (!acked) { try { ws.close(); } catch (e) {} } }, CONNECT_TIMEOUT);
+    const timer = setTimeout(() => { if (!acked) { try { ws.close(); } catch (e) {} } }, me.pinned ? PINNED_CONNECT_TIMEOUT : CONNECT_TIMEOUT);
     ws.onmessage = ev => {
       if (me.ws !== ws) return;
       me.lastRx = Date.now();
@@ -273,12 +281,18 @@
       if (m && m.event === 'open' && !acked) {
         acked = true; me.attempt = 0; me.everOnline = true; me.curIdx = me.idx % me.urls.length; me.lastRx = Date.now();
         me.subs.forEach((fn, t) => me._ntfyOpen(t));
-        const q = me.outbox; me.outbox = [];
-        q.forEach(e => me._ntfyPost(e.topic, e.text));
+        me._ntfyFlush();
         me._set('online');
+        // watchdog: ntfy sends a keepalive about every 45 s; a socket that has gone quiet for longer is dead (sleep, network change)
+        clearInterval(me.watchdog);
+        me.watchdog = setInterval(() => {
+          const now = Date.now();
+          if (me.ws === ws && now - me.lastRx > NTFY_SILENT) { try { ws.close(); } catch (e) {} return; }
+          if (me.nsock) me.nsock.forEach((s, t) => { if (now - (s.lastRx || 0) > NTFY_SILENT) { me.nsock.delete(t); try { s.close(); } catch (e) {} if (!me.closed && me.subs.has(t)) me._ntfyOpen(t); } });
+        }, 10000);
       }
     };
-    ws.onclose = () => { clearTimeout(timer); if (me.ws !== ws) return; me.ws = null; me._ntfyShutAll(); me._lost(acked); };
+    ws.onclose = () => { clearTimeout(timer); clearInterval(me.watchdog); if (me.ws !== ws) return; me.ws = null; me._ntfyShutAll(); me._lost(acked); };
     ws.onerror = () => { try { ws.close(); } catch (e) {} };
   };
   Mqtt.prototype._ntfyOpen = function (topic) {
@@ -286,8 +300,9 @@
     me.nsock = me.nsock || new Map();
     if (me.nsock.has(topic)) return;
     let ws; try { ws = new (NET.WebSocket || window.WebSocket)('wss://ntfy.sh/' + ntfyName(topic) + '/ws?since=8s'); } catch (e) { return; }
-    me.nsock.set(topic, ws);
+    me.nsock.set(topic, ws); ws.lastRx = Date.now();
     ws.onmessage = ev => {
+      ws.lastRx = Date.now();
       let m; try { m = JSON.parse(ev.data); } catch (e) { return; }
       if (!m || m.event !== 'message' || typeof m.message !== 'string') return;
       const fn = me.subs.get(topic);
@@ -307,8 +322,33 @@
     const all = [...this.nsock.values()]; this.nsock.clear();
     all.forEach(ws => { try { ws.close(); } catch (e) {} });
   };
-  Mqtt.prototype._ntfyPost = function (topic, text) {
-    try { fetch('https://ntfy.sh/' + ntfyName(topic), { method: 'POST', body: text }).catch(() => {}); } catch (e) { /* offline: the room's own resend covers it */ }
+  /* Sending on ntfy: one HTTPS POST per message. ntfy limits busy senders (HTTP 429), so live game state is capped at a few copies
+     a second, and after a 429 or a failed POST everything waits (backing off up to 30 s); numbered messages wait in the outbox,
+     live state is dropped. */
+  Mqtt.prototype._ntfyPost = function (topic, text, volatile) {
+    const me = this, now = Date.now();
+    if (volatile && (now < (me.nBack || 0) || now - (me.nLastFast || 0) < NTFY_FAST_GAP)) return false;
+    if (now < (me.nBack || 0)) { me.outbox.push({ topic, text }); if (me.outbox.length > QUEUE_LIMIT) me.outbox.shift(); return false; }
+    if (volatile) me.nLastFast = now;
+    const fail = () => {
+      me.nFails = Math.min(6, (me.nFails || 0) + 1); me.nBack = Date.now() + Math.min(30000, 1000 * Math.pow(2, me.nFails - 1));
+      if (!volatile) { me.outbox.unshift({ topic, text }); if (me.outbox.length > QUEUE_LIMIT) me.outbox.pop(); }
+      clearTimeout(me.flushTimer); me.flushTimer = setTimeout(() => me._ntfyFlush(), me.nBack - Date.now() + 20);
+    };
+    try {
+      fetch('https://ntfy.sh/' + ntfyName(topic), { method: 'POST', body: text }).then(r => {
+        if (r && (r.status === 429 || r.status >= 500)) fail(); else me.nFails = 0;
+      }, fail);
+    } catch (e) { fail(); return false; }
+    return true;
+  };
+  Mqtt.prototype._ntfyFlush = function () {
+    if (this.closed || !this.isNtfy || this.state === 'offline' && !this.ws) return;
+    const q = this.outbox; this.outbox = [];
+    for (let i = 0; i < q.length; i++) {
+      if (Date.now() < (this.nBack || 0)) { this.outbox = q.slice(i).concat(this.outbox); return; }
+      this._ntfyPost(q[i].topic, q[i].text);
+    }
   };
   NET.Mqtt = Mqtt;
 
@@ -337,6 +377,10 @@
     me.role = role; me.gameId = String(opts.gameId || ''); me.min = opts.min | 0 || 2; me.max = opts.max | 0 || 2;
     me.cid = hex(randBytes(6));
     me.baseName = NET.cleanName(opts.name, '');
+    me.uid = typeof opts.uid === 'string' && /^[0-9a-f]{8,16}$/.test(opts.uid) ? opts.uid : '';   // this player's lasting id: the same seat comes back after a drop
+    me.uids = {};               // host: cid -> lasting id
+    me.held = [];               // host: seats kept for players who dropped out { u, seat, cid, name, until }
+    me.rejoin = !!opts.rejoin;  // guest: coming back to a party (asks a little longer before saying the room is gone)
     me.code = ''; me.seat = role === 'host' ? 0 : -1; me.hostCid = role === 'host' ? me.cid : '';
     me.roster = new Map();      // seat -> { seat, name, cid }
     me.seen = {};               // cid -> last time we heard from them
@@ -361,14 +405,18 @@
     const urls = NET.brokers();
     me.wantCode = role === 'host' && opts.code ? NET.extractCode(opts.code) : '';   // a host coming back to the same room code (Rejoin)
     me.wantTries = 0;
-    me.client = new Mqtt({ urls, clientId: 'ludus_' + hex(randBytes(8)), start: role === 'guest' ? NET.codeBroker(opts.code, urls.length) : me.wantCode ? NET.codeBroker(me.wantCode, urls.length) : 0 });
+    // a guest (and a host coming back to its own code) stays on the relay the code belongs to: the room is only there
+    const pinned = role === 'guest' || !!me.wantCode;
+    me.client = new Mqtt({ urls, clientId: 'ludus_' + hex(randBytes(8)), pinned, start: role === 'guest' ? NET.codeBroker(opts.code, urls.length) : me.wantCode ? NET.codeBroker(me.wantCode, urls.length) : 0 });
     me.client.onState(s => me._conn(s));
-    me.lastHost = Date.now();
-    me.tick = setInterval(() => me._tick(), HEARTBEAT);
-    me.guard = setTimeout(() => { if (!me.ready && !me.over && me.conn !== 'online') me._fail('offline'); }, 14000);
+    me.lastHost = Date.now(); me.lastHb = 0;
+    me.tick = setInterval(() => me._tick(), 1000);
+    me.guard = setTimeout(() => { if (!me.ready && !me.over && me.conn !== 'online') me._fail('offline'); }, pinned ? 32000 : 14000);
     me.candidate = role === 'host' ? '' : opts.code;
     me._begin();
   }
+  Session.prototype._hbEvery = function () { return this.client.isNtfy ? NTFY_HEARTBEAT : HEARTBEAT; };
+  Session.prototype._peerTimeout = function () { return this.client.isNtfy ? NTFY_TIMEOUT : PEER_TIMEOUT; };
   Session.prototype.on = function (ev, fn) {
     (this.ev[ev] = this.ev[ev] || []).push(fn);
     return () => { this.ev[ev] = (this.ev[ev] || []).filter(f => f !== fn); };
@@ -408,37 +456,48 @@
     const me = this;
     if (me.role === 'host') {
       const n = me.client.urls.length;
-      if (me.wantCode && me.wantTries < 4 && NET.codeBroker(me.wantCode, n) === me.client.curIdx % n) { me.wantTries++; me.candidate = me.wantCode; }
+      if (me.wantCode && me.wantTries < 2 && NET.codeBroker(me.wantCode, n) === me.client.curIdx % n) { me.wantTries++; me.candidate = me.wantCode; }
       else me.candidate = NET.codeFor(me.client.curIdx, n);
     }
     const topic = topicOf(me.candidate);
     me.client.subscribe(topic, txt => me._recv(txt));
     if (me.role === 'host') {
-      // Listen for a moment: if somebody is already hosting this code, pick another.
+      // Listen for a moment and ask "is anybody hosting this code?" (hq): if somebody is, pick another. A code used before
+      // listens longer than one heartbeat, so even an older Ludus (which does not answer hq) is heard.
       me.collision = false;
+      me._pub({ t: 'hq' });
+      const askAgain = setTimeout(() => { if (!me.over && !me.ready) me._pub({ t: 'hq' }); }, 600);
       me.claimWait = setTimeout(() => {
+        clearTimeout(askAgain);
         if (me.over) return;
         if (me.collision) {
           me.client.unsubscribe(topic);
           // our own code may still look taken for a moment (the old room just closed): try it again a few times before giving up on it
-          if (me.wantCode && me.candidate === me.wantCode && me.wantTries < 4) { me.claimWait = setTimeout(() => { if (!me.over) me._subscribeCandidate(); }, 2000); return; }
+          if (me.wantCode && me.candidate === me.wantCode && me.wantTries < 2) { me.claimWait = setTimeout(() => { if (!me.over) me._subscribeCandidate(); }, 2000); return; }
           me.candidate = NET.newCode(); me._subscribeCandidate(); return;
         }
-        me.code = me.candidate; me.ready = true; me.client.pin();
+        me.code = me.candidate; me.ready = true; me.client.pin(); me.claimedAt = Date.now();
         me.roster.set(0, { seat: 0, name: me._nameFor(0), cid: me.cid });
         me._emit('ready', { code: me.code });
         me._emit('roster', me.rosterList());
-      }, 1100);
-    } else {
-      me.code = me.candidate; me.tries = 0;
-      const ask = () => {
-        if (me.over || me.ready || me.conn !== 'online') return;
-        if (++me.tries > 6) { me._fail('no-room'); return; }
-        me._pub({ t: 'join', n: me.baseName, g: me.gameId, pv: PV, hx: 1 });
-      };
-      me.joinTimer = setInterval(ask, 1000);
-      ask();
-    }
+      }, me.candidate === me.wantCode ? RECLAIM_LISTEN : CLAIM_LISTEN);
+    } else me._askJoin();
+  };
+  // guest: ask the host of the code to let us in, once a second until it answers (a party rejoin waits longer for a slow host)
+  Session.prototype._askJoin = function () {
+    const me = this;
+    me.code = me.candidate; me.tries = 0;
+    const limit = me.rejoin ? 12 : 8;
+    const ask = () => {
+      if (me.over || me.ready || me.conn !== 'online') return;
+      if (++me.tries > limit) { me._fail('no-room'); return; }
+      const j = { t: 'join', n: me.baseName, g: me.gameId, pv: PV, hx: 1 };
+      if (me.uid) j.u = me.uid;
+      me._pub(j);
+    };
+    clearInterval(me.joinTimer);
+    me.joinTimer = setInterval(ask, 1000);
+    ask();
   };
   Session.prototype._nameFor = function (seat) { return this.baseName || 'Player ' + (seat + 1); };
   Session.prototype.rosterList = function () { return Array.from(this.roster.values()).sort((a, b) => a.seat - b.seat); };
@@ -446,6 +505,7 @@
   Session.prototype._hbObj = function () {
     const o = { t: 'hb', q: this.sq, p: this._rosterWire(), mx: this.max, mn: this.min, g: this.gameId, gen: this.gen, sd: this.seed, pv: PV, hx: 1 };
     if (this.he) o.he = this.he;
+    if (this.claimedAt) o.ca = this.claimedAt;
     if (this.flex) { o.tn = { g: this.plan.g, n: this.plan.n }; o.sg = 1; if (this.legacy) o.lg = 1; }   // sg: this host answers suggestions
     if (this.ser) o.sr = this._srWire();
     return o;
@@ -457,31 +517,36 @@
     obj.v = 1; obj.c = this.cid;
     let text;
     try { text = JSON.stringify(obj); } catch (e) { return false; }
-    if (text.length > MAX_PACKET) return false;
+    if (bytes(text) > MAX_PACKET) return false;
     return this.client.publish(topicOf(this.code || this.candidate), text);
   };
 
   // A heartbeat from everyone; the host's also carries the roster and the game state, so a lost message heals itself.
   Session.prototype._tick = function () {
     if (this.over || this.conn !== 'online') return;
-    const now = Date.now();
+    const now = Date.now(), due = now - this.lastHb >= this._hbEvery() - 50, gone = this._peerTimeout();
+    this.held = this.held.filter(h => h.until > now);
     if (this.role === 'host') {
       if (!this.ready) return;
       this.roster.forEach((p, seat) => {
-        if (seat !== 0 && now - (this.seen[p.cid] || 0) > PEER_TIMEOUT) this._removeSeat(seat, 'timeout');
+        if (seat !== 0 && now - (this.seen[p.cid] || 0) > gone) this._removeSeat(seat, 'timeout');
       });
-      this._pub(this._hbObj());
+      if (due) { this.lastHb = now; this._pub(this._hbObj()); }
     } else {
-      if (this.ready) this._pub({ t: 'hb', q: this.sq, pv: PV, hx: 1 });
+      // h: the host this player is in the room of (a host that also seated us by mistake lets go)
+      if (this.ready && due) { this.lastHb = now; const o = { t: 'hb', q: this.sq, pv: PV, hx: 1, h: this.hostCid }; if (this.he) o.he = this.he; this._pub(o); }
       // we just handed the room over: say it again until the new host's heartbeat shows it took over
-      if (this.hxMsg && this.hxTries++ < 4) this._pub(Object.assign({}, this.hxMsg));
-      if (this.ready && now - this.lastHost > PEER_TIMEOUT) this._close('host-lost');
+      if (this.hxMsg && due && this.hxTries++ < 4) this._pub(Object.assign({}, this.hxMsg));
+      if (this.ready && now - this.lastHost > gone) this._close('host-lost');
     }
   };
   Session.prototype._removeSeat = function (seat, why) {
     const p = this.roster.get(seat);
     if (!p) return;
     this.roster.delete(seat);
+    // dropped out (not left on purpose): keep the seat and score for a while, for when they come back
+    if (this.role === 'host' && why === 'timeout' && this.uids[p.cid]) this.held = this.held.filter(h => h.u !== this.uids[p.cid]).concat([{ u: this.uids[p.cid], seat, cid: p.cid, name: p.name, until: Date.now() + SEAT_HOLD }]);
+    delete this.uids[p.cid];
     delete this.rxq[p.cid];
     delete this.peerPv[p.cid]; delete this.peerHx[p.cid];
     this.order = this.order.filter(c => c !== p.cid);
@@ -496,7 +561,7 @@
   };
 
   Session.prototype._recv = function (txt) {
-    if (this.over || typeof txt !== 'string' || txt.length > MAX_PACKET + 600) return;
+    if (this.over || typeof txt !== 'string' || txt.length > MAX_PACKET + 600 || bytes(txt) > MAX_PACKET + 600) return;
     let m;
     try { m = JSON.parse(txt); } catch (e) { return; }
     if (!m || typeof m !== 'object' || Array.isArray(m) || m.v !== 1 || typeof m.c !== 'string' || m.c.length > 16 || m.c === this.cid) return;
@@ -504,6 +569,7 @@
     if (m.c === this.hostCid) this.lastHost = Date.now();
     switch (m.t) {
       case 'join': return this.role === 'host' ? this._onJoin(m) : undefined;
+      case 'hq': if (this.role === 'host' && this.ready && Date.now() - (this.hqAt || 0) > 500) { this.hqAt = Date.now(); this._pub(this._hbObj()); } return;
       case 'welcome': return this._onWelcome(m);
       case 'rej': if (m.to === this.cid && !this.ready) { this._fail(m.why === 'full' || m.why === 'started' || m.why === 'game' || m.why === 'update' ? m.why : 'no-room'); } return;
       case 'hb': return this._onHb(m);
@@ -543,7 +609,10 @@
       if (!(this.flex && pv < 2 && g && existing0 < 0 && !this.started && this.roster.size === 1 && !this.legacy)) { if (pv < 2) this._emit('oldpeer', { why: 'game' }); return reply({ why: 'game' }); }
       this.plan = { g: [m.g], n: 1 }; this.gameId = m.g; this._emit('plan', this.plan);
     }
-    const existing = existing0;
+    // the same player on a new connection (the app restarted, or the old connection timed out): same seat, same score
+    const u = typeof m.u === 'string' && /^[0-9a-f]{8,16}$/.test(m.u) ? m.u : '';
+    let existing = existing0;
+    if (existing < 0 && u) existing = this._reseat(m.c, u, m.n, pv, m.hx === 1);
     if (existing < 0) {
       if (this.started) { if (pv < 2) this._emit('oldpeer', { why: 'started' }); return reply({ why: 'started' }); }
       if (pv < 2 && this.flex && !this.legacy) {
@@ -557,16 +626,42 @@
       this.peerPv[m.c] = pv;
       if (m.hx === 1) this.peerHx[m.c] = 1;
       if (!this.order.includes(m.c)) this.order.push(m.c);
-      let seat = 1; while (this.roster.has(seat)) seat++;
+      // a seat kept for somebody who dropped out is only given away when nothing else is free
+      const taken = s => this.roster.has(s) || this.held.some(h => h.seat === s);
+      let seat = 1; while (seat < this.max && taken(seat)) seat++;
+      if (seat >= this.max) { seat = 1; while (this.roster.has(seat)) seat++; }
       this.roster.set(seat, { seat, name: NET.cleanName(m.n, 'Player ' + (seat + 1)), cid: m.c });
+      if (u) this.uids[m.c] = u;
       this._emit('roster', this.rosterList());
     }
     const seat = this._seatOf(m.c);
     const w = { t: 'welcome', to: m.c, s: seat, p: this._rosterWire(), mx: this.max, mn: this.min, g: this.gameId, pv: PV };
+    if (this.started) w.gn = this.gen;   // a round is being played: wait in the room for the next one
     if (this.flex) { w.tn = { g: this.plan.g, n: this.plan.n }; if (this.legacy) w.lg = 1; }
     if (this.he) w.he = this.he;
     this._pub(w);
     this._pub(this._hbObj());
+  };
+  // host: a player with this lasting id is in the room on another connection, or dropped out a moment ago: give them that seat again.
+  // Returns the seat, or -1.
+  Session.prototype._reseat = function (cid, u, name, pv, hx) {
+    let old = null;
+    for (const p of this.roster.values()) if (p.seat > 0 && this.uids[p.cid] === u) old = p;
+    let seat = -1, oldCid = '';
+    if (old) { seat = old.seat; oldCid = old.cid; this.roster.delete(seat); delete this.uids[oldCid]; delete this.rxq[oldCid]; delete this.peerPv[oldCid]; delete this.peerHx[oldCid]; }
+    else {
+      const h = this.held.find(x => x.u === u);
+      if (!h || this.roster.size >= this.max) return -1;
+      this.held = this.held.filter(x => x !== h);
+      seat = h.seat > 0 && !this.roster.has(h.seat) && h.seat < this.max ? h.seat : (() => { let s = 1; while (this.roster.has(s)) s++; return s; })();
+      oldCid = h.cid;
+    }
+    this.roster.set(seat, { seat, name: NET.cleanName(name, 'Player ' + (seat + 1)), cid });
+    this.uids[cid] = u; this.peerPv[cid] = pv; if (hx) this.peerHx[cid] = 1;
+    this.order = this.order.map(c => c === oldCid ? cid : c); if (!this.order.includes(cid)) this.order.push(cid);
+    if (this.ser) this.ser.sc.forEach(e => { if (e[0] === oldCid) e[0] = cid; });
+    this._emit('roster', this.rosterList());
+    return seat;
   };
   // Host: begin the game (or a rematch / the next round). Needs at least `min` players.
   Session.prototype.start = function () {
@@ -805,6 +900,8 @@
     this.seat = m.s; this.hostCid = m.c; this.lastHost = Date.now(); this.ready = true; this.client.pin();
     if (Number.isInteger(m.he) && m.he > 0) this.he = m.he;
     if (!this.gameId && typeof m.g === 'string' && TYPE_RE.test(m.g)) this.gameId = m.g;
+    // the room is in the middle of a round: wait in the room for the next one (never drop into a game half played)
+    if (Number.isInteger(m.gn) && m.gn > this.gen) { this.gen = m.gn; this.waitRound = true; }
     this.max = Math.max(2, Math.min(MAX_SEATS, m.mx | 0)); this.min = Math.max(2, Math.min(this.max, m.mn | 0)); this.gmin = this.min; this.gmax = this.max;
     this._setRoster(list);
     this._emit('ready', { code: this.code });
@@ -818,6 +915,9 @@
     const seat = this._seatOf(m.c);
     // someone else is hosting the code we wanted: pick another
     if (this.role === 'host' && !this.ready && Array.isArray(m.p)) { this.collision = true; return; }
+    if (this.role === 'host' && this.ready && Array.isArray(m.p) && seat < 0) { this._otherHost(m); return; }
+    // a player of ours says it is in somebody else's room (two hosts answered its join): let it go
+    if (this.role === 'host' && seat > 0 && typeof m.h === 'string' && m.h && m.h !== this.cid && (Number.isInteger(m.he) ? m.he : 0) >= this.he) { this._removeSeat(seat, 'moved'); return; }
     if (typeof m.q === 'number' && seat >= 0) this._maybeNack(m.c, m.q);
     if (this.role === 'host' && seat > 0 && m.hx === 1) this.peerHx[m.c] = 1;
     // a player of this room is hosting with a newer host epoch: it took over (we missed the hand-over message itself)
@@ -841,6 +941,21 @@
     if (m.sr) this._applySr(m.sr); else if (this.ser && this.ser.st === 'final') this._toLobbyLocal();
     if (m.gen > this.gen && Number.isInteger(m.gen) && Number.isInteger(m.sd)) this._startFrom(m.gen, m.sd, m.g);
   };
+  // host: somebody else hosts this same code (two players claimed it at the same moment). A host still alone gives way to the
+  // other room (bigger, or claimed first) and joins it as a guest, so a party never splits in two.
+  Session.prototype._otherHost = function (m) {
+    const list = cleanRoster(m.p);
+    if (!list || !list.some(p => p.seat === 0 && p.cid === m.c) || list.some(p => p.cid === this.cid)) return;
+    if (this.roster.size > 1 || this.started || this.ser) return;
+    const theirs = list.length, at = Number.isInteger(m.ca) ? m.ca : 0, mine = this.claimedAt || 0;
+    const better = theirs > 1 || (at && mine ? at < mine || (at === mine && m.c < this.cid) : m.c < this.cid);
+    if (!better) { this._pub(this._hbObj()); return; }
+    this.role = 'guest'; this.seat = -1; this.hostCid = ''; this.ready = false; this.flex = false; this.claimedAt = 0;
+    this.roster = new Map(); this.order = []; this.peerPv = {}; this.peerHx = {}; this.uids = {}; this.held = []; this.sugs = [];
+    this.candidate = this.code;
+    this._emit('yield', { code: this.code });
+    this._askJoin();
+  };
   Session.prototype._onStart = function (m) {
     if (this.role === 'host' || m.c !== this.hostCid || !Number.isInteger(m.gen) || !Number.isInteger(m.sd)) return;
     const list = cleanRoster(m.p);
@@ -851,6 +966,7 @@
   };
   Session.prototype._startFrom = function (gen, seed, game) {
     if (gen <= this.gen) return;
+    this.waitRound = false;
     this.mySug = null; this.sugs = [];
     if (typeof game === 'string' && TYPE_RE.test(game)) this.gameId = game;
     this.started = true; this.gen = gen; this.seed = seed >>> 0;
@@ -984,7 +1100,7 @@
     m.v = 1; m.c = this.cid;
     let text;
     try { text = JSON.stringify(m); } catch (e) { this.sq--; return false; }
-    if (text.length > MAX_PACKET) { this.sq--; return false; }
+    if (bytes(text) > MAX_PACKET) { this.sq--; return false; }
     this.history.push({ q: m.q, text }); if (this.history.length > HISTORY) this.history.shift();
     this.client.publish(topicOf(this.code), text);
     return true;
@@ -997,7 +1113,7 @@
     if (to !== undefined) m.to = to;
     let text;
     try { text = JSON.stringify(m); } catch (e) { return false; }
-    if (text.length > MAX_PACKET) return false;
+    if (bytes(text) > MAX_PACKET) return false;
     return this.client.publish(topicOf(this.code), text, true);
   };
   Session.prototype._onFast = function (m) {

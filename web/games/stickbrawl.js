@@ -99,7 +99,7 @@
       function mk(side) { const x = STAGES[st].s[side === 'r' ? 0 : 1]; return { side, x, y: spawnY(x), vx: 0, vy: 0, face: side === 'r' ? 1 : -1, hp: 100, alive: true, gr: true, on: null, jumps: 2, cd: 0, atkT: 0, hurt: 0, aim: 0, ph: 0, w: null }; }
       const other = p => (p.side === 'r' ? P.y : P.r);
       const NAME = s => (s === 'r' ? (friend ? 'P1' : 'You') : friend ? 'P2' : 'Bot');
-      function resetRound() { items = []; bullets = []; dolls = []; P = { r: mk('r'), y: mk('y') }; dropT = 1.2; firstWep = true; ai.t = 0; ai.act = null; ai.graph = null; }
+      function resetRound() { items = []; bullets = []; dolls = []; P = { r: mk('r'), y: mk('y') }; dropT = 1.2; firstWep = true; ai.t = 0; ai.act = null; ai.graph = null; ai.stuckT = 0; ai.back = 0; }
 
       function burst(x, y, c, n) {
         if (reduce) n = Math.min(n, 8);
@@ -269,7 +269,7 @@
       }
 
       /* ---------- the bot (plays Player 2) ---------- */
-      const ai = { t: 0, jumpT: 0, graph: null, gStage: -1, act: null };
+      const ai = { t: 0, jumpT: 0, graph: null, gStage: -1, act: null, stuckT: 0, lx: 0, ly: 0, back: 0, backDir: 1 };
       const AI_REACT = [0.45, 0.25, 0.12][api.level] ?? 0.25;   // extra pause between bot attacks, by difficulty
       function aiSim(me, dir, jump, dbl, steps) {
         const c = Object.assign({}, me, { w: null, hurt: 0 }); const dt = 1 / 60; let used = false;
@@ -349,10 +349,20 @@
             if (!fixed && !o._up) dir = c;
           }
         }
+        // Stuck? (pushing into a wall or a ledge edge for about a second) -> hop and back off for a moment
+        if (ai.back > 0) { ai.back -= dt; dir = ai.backDir; }
+        else if (dir !== 0 && me.gr) {
+          if (Math.abs(me.x - ai.lx) + Math.abs(me.y - ai.ly) > 8) { ai.stuckT = 0; ai.lx = me.x; ai.ly = me.y; }
+          else if ((ai.stuckT += dt) > 0.9) { ai.stuckT = 0; ai.back = 0.45; ai.backDir = -dir; o._up = true; o.up = true; }
+        } else ai.stuckT = 0;
         o.left = dir < 0; o.right = dir > 0;
         if (t.alive && ai.t <= 0) {
           const facing = Math.sign(t.x - me.x) === me.face;
-          if (!me.w || Dw.melee) { if (facing && dist < Dw.reach + PW * 2 + 4 && Math.abs(dyT) < PH * 0.8) { o._atk = true; o.atk = true; ai.t = AI_REACT + Math.random() * 0.2; } }
+          if (!me.w || Dw.melee) {
+            if (facing && dist < Dw.reach + PW * 2 + 4 && Math.abs(dyT) < PH * 0.8) { o._atk = true; o.atk = true; ai.t = AI_REACT + Math.random() * 0.2; }
+            // Standing right next to the foe but facing away: step toward it so the bot turns round (it used to wait here forever)
+            else if (!facing && dist < Dw.reach + PW * 3 && Math.abs(dyT) < PH) { o.left = t.x < me.x; o.right = t.x > me.x; }
+          }
           else if (Dw.bomb) { if (dist < 320 && dist > 90) { if (!facing) { o.left = t.x < me.x; o.right = t.x > me.x; } else { o._thr = true; ai.t = 0.5; } } }
           else {
             const vy = (t.y - PH / 2) - (me.y - PH / 2); if (vy < -60) o.up = true; else if (vy > 60 && !me.gr) o.down = true;
@@ -532,6 +542,10 @@
       } catch (e) { rounds = { r: 0, y: 0 }; st = 0; }
       resetRound();
 
+      if (window.ludusDebug) window.ludusDebug.botTest = {   // test hook: positions of both fighters, and a teleport for the bot
+        state: () => ({ phase, sig: [rounds.r, rounds.y, P.r.x, P.r.y, P.y.x, P.y.y, P.r.hp, P.y.hp, P.y.alive ? 1 : 0, P.r.alive ? 1 : 0], bot: [P.y.x, P.y.y] }),
+        begin: () => begin(), tp: (x, y) => { P.y.x = x; P.y.y = y; P.y.vx = 0; P.y.vy = 0; }
+      };
       return {
         save() {
           if (api.ended || phase === 'matchover') return null;

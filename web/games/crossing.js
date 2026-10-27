@@ -227,6 +227,8 @@
           if (doneThinking && clock - job.t0 >= job.delay) {
             let cell = job.search.best();
             if (api.level === 0 && Math.random() < 0.2) { const e = []; board.forEach((v, i) => { if (!v) e.push(i); }); cell = api.pick(e); }
+            // A bad pick (taken or no cell) falls back to any empty cell so the bot never stalls
+            if (!(cell >= 0) || board[cell]) { const e = []; board.forEach((v, i) => { if (!v) e.push(i); }); cell = e.length ? api.pick(e) : cell; }
             job = null; place(cell, CPU);
           }
         } else if (clock - job.t0 >= job.delay) { const j = job; job = null; j.done(); }
@@ -414,6 +416,10 @@
         for (let i = parts.length - 1; i >= 0; i--) { const p = parts[i]; p.life -= dt; p.vy += 400 * dt; p.x += p.vx * dt; p.y += p.vy * dt; if (p.life <= 0) parts.splice(i, 1); }
         render();
       });
+      if (window.ludusDebug) window.ludusDebug.botTest = {   // test hook: a quick state read and a random player move
+        state: () => ({ turn: turn === YOU ? 'me' : 'bot', phase: winner ? 'end' : 'play', n: Array.from(board).filter(Boolean).length + (swapped ? 100 : 0) + matches * 1000, busy: !!job }),
+        play: () => { if (winner || turn !== YOU || job) return false; const e = []; board.forEach((v, i) => { if (!v) e.push(i); }); if (!e.length) return false; tryPlay(e[Math.floor(Math.random() * e.length)]); return true; }
+      };
       return {
         save() {
           if (api.ended) return null;

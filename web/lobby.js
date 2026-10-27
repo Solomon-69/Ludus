@@ -207,20 +207,9 @@
     else if (!draft.dirty) syncDraft();
     const touch = fn => { draft.dirty = true; fn(); render(); };
     box.classList.add('guest-plan');
-    box.appendChild(el('div', 'field-label', 'Games: the host’s pick has an orange outline'));
-    const chips = el('div', 'pick-chips game-grid');
-    L.games.filter(g => g.online && g.online.max >= n && g.online.min <= session.max).forEach(g => {
-      const host_on = plan.g.includes(g.id), mine = draft.g.includes(g.id);
-      const c = chip('', host_on, () => touch(() => {
-        if (draft.m === 's') draft.g = [g.id];
-        else if (mine) { if (draft.g.length > 1) draft.g = draft.g.filter(x => x !== g.id); } else draft.g = draft.g.concat(g.id);
-      }));
-      c.classList.add('gcard'); c.classList.toggle('is-sug', mine); c.dataset.id = g.id; c.setAttribute('aria-label', gname(g.id) + (host_on ? ', host’s pick' : '') + (mine ? ', in your suggestion' : ''));
-      c.appendChild(cover(g)); c.appendChild(el('span', 'gcard-name', gname(g.id)));
-      chips.appendChild(c);
-    });
-    box.appendChild(chips);
-    box.appendChild(el('div', 'field-label', 'Your suggestion'));
+    // The same picker the host has: your idea is the orange selection (it starts as the host's pick); a small "Host" tag marks
+    // what the host has chosen right now. Pick single or tournament, the games and the rounds, then send it.
+    box.appendChild(el('div', 'field-label', 'Suggest a game or a tournament'));
     const tabs = el('div', 'mode-tabs'); tabs.setAttribute('role', 'tablist');
     [['s', 'Single game'], ['t', 'Tournament']].forEach(([m, t]) => {
       const tb = el('button', 'mode-tab' + (draft.m === m ? ' is-on' : ''), t); tb.type = 'button'; tb.setAttribute('role', 'tab'); tb.setAttribute('aria-selected', String(draft.m === m)); tb.dataset.mode = m;
@@ -228,6 +217,19 @@
       tabs.appendChild(tb);
     });
     box.appendChild(tabs);
+    box.appendChild(el('div', 'field-label', draft.m === 't' ? 'Games (pick 2 or more)' : 'Game'));
+    const chips = el('div', 'pick-chips game-grid');
+    L.games.filter(g => g.online && g.online.max >= n && g.online.min <= session.max).forEach(g => {
+      const host_on = plan.g.includes(g.id), mine = draft.g.includes(g.id);
+      const c = chip('', mine, () => touch(() => {
+        if (draft.m === 's') draft.g = [g.id];
+        else if (mine) { if (draft.g.length > 1) draft.g = draft.g.filter(x => x !== g.id); } else draft.g = draft.g.concat(g.id);
+      }));
+      c.classList.add('gcard'); c.classList.toggle('is-host', host_on); c.dataset.id = g.id; c.setAttribute('aria-label', gname(g.id) + (host_on ? ', host’s pick' : '') + (mine ? ', in your suggestion' : ''));
+      c.appendChild(cover(g)); c.appendChild(el('span', 'gcard-name', gname(g.id)));
+      chips.appendChild(c);
+    });
+    box.appendChild(chips);
     box.appendChild(el('div', 'field-label', 'Rounds'));
     const rr = el('div', 'pick-chips rounds-pick');
     [1, 3, 5].forEach(v => rr.appendChild(chip(String(v), draft.n === v, () => touch(() => { draft.n = v; }))));
@@ -255,7 +257,7 @@
     else if (st === 'no') status.textContent = session.mySug.why === 'busy' ? 'Declined: the host is playing right now.' : 'Declined by the host.';
     else if (st === 'late') status.textContent = 'No answer yet. You can send it again.';
     else if (draft.m === 't' && draft.g.length < 2) status.textContent = 'Pick at least 2 games for a tournament.';
-    else status.textContent = 'Tap covers and rules, then send your idea. The host chooses.';
+    else status.textContent = same ? 'This is the host’s pick. Change it to suggest something else.' : 'The host gets your idea and chooses.';
     box.appendChild(status);
     return box;
   }
@@ -264,7 +266,7 @@
     const list = session.suggestions();
     if (!list.length) return null;
     const sg = list[0], card_ = el('div', 'sug-card'); card_.setAttribute('role', 'group'); card_.setAttribute('aria-label', 'Suggestion from ' + sg.name);
-    card_.appendChild(el('div', 'sug-head', sg.name + ' suggests'));
+    const hd = el('div', 'sug-head'); const nm = document.createElement('b'); nm.textContent = sg.name; hd.append(nm, ' suggests'); card_.appendChild(hd);
     describe(sg.p).forEach(t => card_.appendChild(el('div', 'sug-line', t)));
     const row = el('div', 'sug-actions');
     row.appendChild(btn('Accept', 'primary small sug-accept', () => {
@@ -370,7 +372,7 @@
       row.appendChild(cb); row.appendChild(connChip(session.conn));
       card.appendChild(row);
       const n = session.count(), mx = session.max;
-      live.textContent = host ? (n >= session.min ? 'Ready to start. ' + n + '/' + mx + ' players' : n < 2 ? 'Waiting for a friend to join' : 'Waiting for players ' + n + '/' + mx) : 'Waiting for the host to start. ' + n + '/' + mx + ' players';
+      live.textContent = host ? (n >= session.min ? 'Ready to start. ' + n + '/' + mx + ' players' : n < 2 ? 'Waiting for a friend to join' : 'Waiting for players ' + n + '/' + mx) : session.waitRound ? 'A round is being played. You join the next one.' : 'Waiting for the host to start. ' + n + '/' + mx + ' players';
       card.appendChild(live);
       card.appendChild(avatars(n, mx));
       if (host && n > 1 && session.promoteBlock() === 'old') card.appendChild(el('p', 'lobby-note leader-note', 'Make leader needs everyone on the newest Ludus.'));
@@ -417,6 +419,7 @@
     session = s;
     offs.push(s.on('conn', () => { if (screen === 'room' || screen === 'creating' || screen === 'joining') render(); }));
     offs.push(s.on('ready', () => { screen = 'room'; L.sfx('tap'); render(); }));
+    offs.push(s.on('yield', () => { screen = 'joining'; render(); }));   // somebody else already hosts this code: we join their room
     offs.push(s.on('roster', () => {
       if (screen === 'room') {
         render();
@@ -438,17 +441,18 @@
       ops.onStart(keep, e);
     }));
   }
-  function createRoom(code) {
+  const uidOf = () => (typeof L.state.onlineId === 'string' ? L.state.onlineId : '');
+  function createRoom(code, uid) {
     screen = 'creating'; render();
     if (game) hookSession(L.net.createRoom({ gameId: game.id, min: game.online.min, max: game.online.max, name: nameValue() }));
     else {   // from the Online page: a room for up to 4 whose games the host picks in the lobby
       const first = L.games.find(g => g.id === L.state.last && g.online && g.online.min <= 2) || L.games.find(g => g.online && g.online.min <= 2 && g.online.max >= 2);
-      hookSession(L.net.createRoom({ gameId: first ? first.id : '', min: 2, max: 4, name: nameValue(), code: typeof code === 'string' ? code : '' }));
+      hookSession(L.net.createRoom({ gameId: first ? first.id : '', min: 2, max: 4, name: nameValue(), uid: uid || uidOf(), code: typeof code === 'string' ? code : '' }));
     }
   }
   function joinRoom(code) {
     screen = 'joining'; render();
-    hookSession(L.net.joinRoom(code, { gameId: game.id, name: nameValue() }));
+    hookSession(L.net.joinRoom(code, { gameId: game.id, name: nameValue(), uid: uidOf() }));
     session.code = code;
     render();
   }
@@ -482,7 +486,7 @@
     refresh(s) { if (sheet && !sheet.hidden && session === s && (screen === 'board' || screen === 'final')) render(); },
     hide,
     // A room made from the Online page: no game yet, the host picks games in the lobby.
-    openRoom(o, code) { ensure(); discard(); game = null; ops = o; error = ''; sheet.hidden = false; createRoom(code); return session; },
+    openRoom(o, code, uid) { ensure(); discard(); game = null; ops = o; error = ''; sheet.hidden = false; createRoom(code, uid); return session; },
     // Scoreboard between rounds ('board') or the final standings ('final') for a session that is playing a tournament.
     series(s, kind, o) { ensure(); unhook(); session = s; ops = o || ops; screen = kind; sheet.hidden = false; render(); },
     // Back to the waiting room (after a tournament, "Back to lobby").

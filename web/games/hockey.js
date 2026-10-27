@@ -53,7 +53,7 @@
   Ludus.register({
     id: 'hockey', name: 'Air Hockey', aka: 'Air Puck', tag: '2 Player', wide: true, tint: '#e05d8b', versus: true, defaultVs: 'friend',
     online: { min: 2, max: 2 },
-    onlineHint: '<b>Online</b> <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or the arrow keys move your mallet · the host guards the orange goal',
+    onlineHint: '<b>Online</b> you guard the goal on your side (left, or bottom when turned) · mouse, trackpad, <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or arrows',
     hint: '<b>vs Bot</b> <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> move · <b>vs Friend</b> P1 (left) <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> · P2 (right) <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd>',
     _rules: { strike },
     art(ctx, w, h) {
@@ -89,10 +89,32 @@
       // Untransformed stage size (the panel's slide-in scale would skew getBoundingClientRect).
       const dims = () => [stage.clientWidth || view.w, stage.clientHeight || view.h];
       let H = lengthFor(...dims());
-      const flat = () => view.w > view.h;
+      // Side-on (wide) unless the player turned it with the Rotate button (remembered); never chosen by the panel's shape.
+      const flat = () => !(Ludus.state && Ludus.state.orient && Ludus.state.orient.hockey === false);
+      // Online, the guest sees the rink turned round, so everyone has their own goal on their side: left when wide, bottom when tall.
+      const flip = () => guest;
       // Keys in rink space. On the side-on rink, screen right is towards P2's goal (rink up),
-      // screen up is rink left, so WASD and the arrows still move each mallet the way they point.
-      const dirs = p => flat() ? { up: p.right, down: p.left, left: p.up, right: p.down } : p;
+      // screen up is rink left, so WASD and the arrows still move each mallet the way they point (turned round for the guest).
+      const dirs = p => flat() ? (flip() ? { up: p.left, down: p.right, left: p.down, right: p.up } : { up: p.right, down: p.left, left: p.up, right: p.down })
+        : flip() ? { up: p.down, down: p.up, left: p.right, right: p.left } : p;
+      // Mouse / trackpad: the mallet follows the pointer inside its own half. A key press hands control back to the keys.
+      let aim = null, lay = null;
+      const mineId = on ? (on.seat === 0 ? 'p1' : 'p2') : 'p1';
+      const anyKey = p => p.up || p.down || p.left || p.right;
+      function pointerAim(e) {
+        if (!lay) return;
+        const r = view.canvas.getBoundingClientRect(), kx = view.w / (r.width || view.w), ky = view.h / (r.height || view.h);
+        const sx = ((e.clientX - r.left) * kx - lay.ox) / lay.s, sy = ((e.clientY - r.top) * ky - lay.oy) / lay.s;
+        let x = sx, y = sy;
+        if (lay.side) { x = sy; y = H - sx; } else { x = sx; y = sy; }
+        if (lay.flip) { x = W - x; y = H - y; }
+        if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+        aim = { x: Math.max(0, Math.min(W, x)), y: Math.max(0, Math.min(H, y)) };
+      }
+      api.on(view.canvas, 'pointermove', e => { if (e.pointerType !== 'touch' || e.buttons) pointerAim(e); });
+      api.on(view.canvas, 'pointerdown', e => pointerAim(e));
+      const myAim = () => { if (aim && anyKey(pads[mineId])) aim = null; return aim; };
+      if (window.ludusDebug) window.ludusDebug.hockeyAim = (x, y) => { aim = x === null ? null : { x, y }; };   // test hook: rink coordinates
       const MAX_P = [520, 600, 690][api.level];
       let score, mallets, puck, phase, phaseT, clock = 0, parts = [], trail = [], lastGoal = null, overCalled = false, hitFx = { p1: -9, p2: -9 };
 
@@ -106,11 +128,23 @@
       // Bot (P2, the top / right mallet): sees the puck only every so often with a little aiming error,
       // defends its goal line, and hits the puck towards P1's goal when it gets the chance.
       const REACT = [0.2, 0.13, 0.08][api.level], ERR = [34, 20, 10][api.level], DEF_Y = 66;
-      let ai = { tx: W / 2, ty: DEF_Y, timer: 0, ex: 0 };
+      let ai = { tx: W / 2, ty: DEF_Y, timer: 0, ex: 0, stuck: 0, back: 0 };
       const axisDir = (pos, v, t) => { const d = t - pos; return Math.abs(d) < 4 || (v * d > 0 && Math.abs(v) / 9 >= Math.abs(d)) ? 0 : d > 0 ? 1 : -1; };
       function botAxes(dt) {
         const m = mallets.p2;
         ai.timer -= dt;
+        // Unstick: the puck slow by a wall or in a corner with the bot on top of it for over 0.6 s (it was pinning it there and the
+        // game stalled). The bot backs off towards the middle of its half, then comes in again and strikes it out at an angle.
+        const slow = Math.hypot(puck.vx, puck.vy) < 80, byWall = puck.x < PR + 34 || puck.x > W - PR - 34 || puck.y < PR + 34;
+        const close = Math.hypot(puck.x - m.x, puck.y - m.y) < MR + PR + 24;
+        if (phase === 'play' && slow && byWall && close && puck.y < H / 2) ai.stuck += dt; else ai.stuck = Math.max(0, ai.stuck - dt * 2);
+        if (ai.stuck > 0.6) { ai.stuck = 0; ai.back = 0.45; }
+        if (ai.back > 0) {
+          ai.back -= dt;
+          ai.tx = W / 2 + (puck.x < W / 2 ? 40 : -40); ai.ty = Math.min(H / 2 - MR - 10, puck.y + 70);
+          if (ai.back <= 0) ai.timer = 0;   // then attack straight away
+          return [axisDir(m.x, m.vx, ai.tx), axisDir(m.y, m.vy, ai.ty)];
+        }
         if (ai.timer <= 0) {
           ai.timer = REACT; ai.ex = api.rand(-ERR, ERR);
           const px = puck.x + ai.ex * 0.4, py = puck.y, speed = Math.hypot(puck.vx, puck.vy);
@@ -134,13 +168,23 @@
         const m = mallets[id], p = net && id === 'p2' ? net : dirs(pads[id]), live = phase === 'play' || phase === 'ready';
         let ax = live ? (p.right ? 1 : 0) - (p.left ? 1 : 0) : 0, ay = live ? (p.down ? 1 : 0) - (p.up ? 1 : 0) : 0;
         if (id === 'p2' && !api.friend) { [ax, ay] = live ? botAxes(dt) : [0, 0]; }
-        stepMallet(id, m, ax, ay, dt);
+        const target = !live ? null : net && id === 'p2' ? net.aim : id === mineId && !(id === 'p2' && !api.friend && !on) ? myAim() : null;
+        stepMallet(id, m, ax, ay, dt, ax || ay ? null : target);
       }
-      function stepMallet(id, m, ax, ay, dt) {
-        if (ax && ay) { ax *= Math.SQRT1_2; ay *= Math.SQRT1_2; }
+      function stepMallet(id, m, ax, ay, dt, target) {
+        if (target) {
+          // follow the pointer: head for it at up to full speed, easing in as it gets close (no overshoot, no jitter)
+          const dvx = Math.max(-MAX_M, Math.min(MAX_M, (target.x - m.x) * 16)), dvy = Math.max(-MAX_M, Math.min(MAX_M, (target.y - m.y) * 16));
+          const ex = dvx - m.vx, ey = dvy - m.vy, el = Math.hypot(ex, ey), lim = ACC * 2.2 * dt;
+          if (el > lim) { m.vx += ex / el * lim; m.vy += ey / el * lim; } else { m.vx = dvx; m.vy = dvy; }
+          ax = ay = 0;
+        } else if (ax && ay) { ax *= Math.SQRT1_2; ay *= Math.SQRT1_2; }
         const damp = Math.exp(-9 * dt);
-        if (ax) m.vx += ax * ACC * dt * (m.vx * ax < 0 ? 1.7 : 1); else m.vx *= damp;
-        if (ay) m.vy += ay * ACC * dt * (m.vy * ay < 0 ? 1.7 : 1); else m.vy *= damp;
+        if (target) { /* velocity set above */ }
+        else {
+          if (ax) m.vx += ax * ACC * dt * (m.vx * ax < 0 ? 1.7 : 1); else m.vx *= damp;
+          if (ay) m.vy += ay * ACC * dt * (m.vy * ay < 0 ? 1.7 : 1); else m.vy *= damp;
+        }
         const sp = Math.hypot(m.vx, m.vy); if (sp > MAX_M) { m.vx *= MAX_M / sp; m.vy *= MAX_M / sp; }
         m.x += m.vx * dt; m.y += m.vy * dt;
         const y0 = id === 'p1' ? H / 2 + 6 : MR, y1 = id === 'p1' ? H - MR : H / 2 - 6;
@@ -189,6 +233,22 @@
         }
       }
 
+      // A puck almost still against a wall gets a small push towards the middle (after 1 s); if nothing has moved it for 3 s
+      // (a mallet parked on it, both players waiting), the puck is faced off again on the side it was stuck on.
+      let still = 0, wallStill = 0;
+      function unstall(dt) {
+        const sp = Math.hypot(puck.vx, puck.vy);
+        still = sp < 25 ? still + dt : 0;
+        const byWall = puck.x < PR + 6 || puck.x > W - PR - 6 || (!inMouth(puck.x) && (puck.y < PR + 6 || puck.y > H - PR - 6));
+        wallStill = byWall && sp < 25 ? wallStill + dt : 0;
+        if (wallStill > 1) {
+          wallStill = 0;
+          const dx = W / 2 - puck.x, dy = H / 2 - puck.y, d = Math.hypot(dx, dy) || 1;
+          puck.vx += dx / d * 70; puck.vy += dy / d * 70;
+        }
+        if (still > 3) { still = 0; faceoff(puck.y < H / 2 ? 'p2' : 'p1'); }
+      }
+      if (window.ludusDebug) window.ludusDebug.hockeySet = (x, y, vx, vy) => { puck.x = x; puck.y = y; puck.vx = vx || 0; puck.vy = vy || 0; phase = 'play'; };
       function goal(who) {
         score[who]++; lastGoal = { who, x: Math.max(W / 2 - GOAL / 2, Math.min(W / 2 + GOAL / 2, puck.x)), y: who === 'p1' ? 0 : H, t: clock };
         api.score(Math.max(score.p1, score.p2));
@@ -222,6 +282,7 @@
           } else { unpin('p1'); unpin('p2'); }
         }
         if (phase === 'play') { trail.unshift({ x: puck.x, y: puck.y }); if (trail.length > 7) trail.pop(); }
+        if (phase === 'play') unstall(dt);
         if (phase === 'ready') { phaseT -= dt; if (phaseT <= 0) phase = 'play'; }
         else if (phase === 'goal') { phaseT -= dt; if (phaseT <= 0) faceoff(lastGoal.who === 'p1' ? 'p2' : 'p1'); }
         else if (phase === 'over') {
@@ -250,20 +311,21 @@
         const { w, h } = view;
         ctx.clearRect(0, 0, w, h);
         const side = flat();
-        D.duelHeader(ctx, 10, 8, w - 20, {
-          left: on ? { who: 'p1', label: nameOf('p1'), score: score.p1 } : api.friend ? { who: 'p1', label: side ? 'P1 left' : 'P1 bottom', score: score.p1 } : { who: 'you', label: 'You', score: score.p1 },
-          right: on ? { who: 'p2', label: nameOf('p2'), score: score.p2 } : api.friend ? { who: 'p2', label: side ? 'P2 right' : 'P2 top', score: score.p2 } : { who: 'bot', label: 'Bot', score: score.p2 },
-          turn: null, status: phase === 'goal' ? 'Goal' : ''
-        }, col);
+        const hl = on ? { who: 'p1', label: nameOf('p1'), score: score.p1 } : api.friend ? { who: 'p1', label: side ? 'P1 left' : 'P1 bottom', score: score.p1 } : { who: 'you', label: 'You', score: score.p1 };
+        const hr = on ? { who: 'p2', label: nameOf('p2'), score: score.p2 } : api.friend ? { who: 'p2', label: side ? 'P2 right' : 'P2 top', score: score.p2 } : { who: 'bot', label: 'Bot', score: score.p2 };
+        // the guest's own name on the left, on the same side as their goal
+        D.duelHeader(ctx, 10, 8, w - 20, { left: flip() ? hr : hl, right: flip() ? hl : hr, turn: null, status: phase === 'goal' ? 'Goal' : '' }, col);
         // RW x RH = the rink as it appears on screen
         const RW = side ? H : W, RH = side ? W : H;
         const top = 56, avail = h - top - 8, s = Math.min((w - 16) / (RW + 16), avail / (RH + 16));
         const ox = (w - RW * s) / 2, oy = top + 8 * s + Math.max(0, (avail - (RH + 16) * s) / 2) * 0.3;
+        lay = { ox, oy, s, side, flip: flip() };
         ctx.save(); ctx.translate(ox, oy); ctx.scale(s, s);
         ctx.fillStyle = col.dark ? '#3a332b' : '#e4d6c2'; D.roundRect(ctx, -8, -8, RW + 16, RH + 16, 26); ctx.fill();
         ctx.save();
         // side-on: rink (x, y) is drawn at screen (H - y, x), a quarter turn
         if (side) ctx.transform(0, 1, -1, 0, H, 0);
+        if (lay.flip) ctx.transform(-1, 0, 0, -1, W, H);   // the guest's view: turned round, own goal on their side
         // ice
         ctx.fillStyle = col.dark ? '#23211f' : '#fbf8f3'; D.roundRect(ctx, 0, 0, W, H, 20); ctx.fill();
         ctx.save(); D.roundRect(ctx, 0, 0, W, H, 20); ctx.clip();
@@ -349,7 +411,7 @@
         if (on || nh === H || restored || api.touched || score.p1 || score.p2 || phase !== 'ready') return;
         H = nh; reset();
       }
-      if (window.ludusDebug) window.ludusDebug.hockey = () => ({ W, H, flat: flat(), phase, score: { ...score }, puck: { ...puck }, m1: { ...mallets.p1 }, m2: { ...mallets.p2 } });
+      if (window.ludusDebug) window.ludusDebug.hockey = () => ({ W, H, flat: flat(), flip: flip(), lay, phase, score: { ...score }, puck: { ...puck }, m1: { ...mallets.p1 }, m2: { ...mallets.p2 } });
       // ---------- online: the host plays the match, the guest sends its mallet keys and draws the host's copy ----------
       let link = null, ended = false;
       function finishOnline() {
@@ -359,13 +421,17 @@
       }
       const num = v => typeof v === 'number' && isFinite(v);
       if (on) {
-        if (on.isHost) net = { up: false, down: false, left: false, right: false };
+        if (on.isHost) net = { up: false, down: false, left: false, right: false, aim: null };
         const R1 = v => Math.round(v * 10) / 10;
         link = Ludus.rt(api, {
           hz: 30,
-          snapshot: () => ({ H, s: [score.p1, score.p2], m: [R1(mallets.p1.x), R1(mallets.p1.y), R1(mallets.p2.x), R1(mallets.p2.y)], p: [R1(puck.x), R1(puck.y)], ph: phase, g: lastGoal ? lastGoal.who : '' }),
-          input: () => { const d = dirs(pads.p2); return { u: d.up ? 1 : 0, d: d.down ? 1 : 0, l: d.left ? 1 : 0, r: d.right ? 1 : 0 }; },
-          onInput: (seat, d) => { if (seat === 1) { net.up = d.u === 1; net.down = d.d === 1; net.left = d.l === 1; net.right = d.r === 1; } },
+          snapshot: () => ({ H, s: [score.p1, score.p2], m: [R1(mallets.p1.x), R1(mallets.p1.y), R1(mallets.p2.x), R1(mallets.p2.y)], p: [R1(puck.x), R1(puck.y)], v: [Math.round(puck.vx), Math.round(puck.vy)], ph: phase, g: lastGoal ? lastGoal.who : '' }),
+          input: () => { const d = dirs(pads.p2), a = myAim(), o = { u: d.up ? 1 : 0, d: d.down ? 1 : 0, l: d.left ? 1 : 0, r: d.right ? 1 : 0 }; if (a) { o.x = Math.round(a.x); o.y = Math.round(a.y); } return o; },
+          onInput: (seat, d) => {
+            if (seat !== 1) return;
+            net.up = d.u === 1; net.down = d.d === 1; net.left = d.l === 1; net.right = d.r === 1;
+            net.aim = num(d.x) && num(d.y) && d.x >= 0 && d.x <= W && d.y >= 0 && d.y <= MAX_H ? { x: d.x, y: d.y } : null;
+          },
           onState: d => {
             if (num(d.H) && d.H >= PH && d.H <= MAX_H) H = d.H;
             if (Array.isArray(d.s) && d.s.length === 2 && d.s.every(Number.isInteger)) {
@@ -382,22 +448,69 @@
       // the guest moves its own mallet from its own keys at once; the host's copy only nudges it back into line
       const me = guest && link ? link.predictor({ pick: s => Array.isArray(s.m) && s.m.length === 4 ? [s.m[2], s.m[3]] : null, snap: 90, init: [mallets.p2.x, mallets.p2.y] }) : null;
       const mine = { x: 0, y: 0, vx: 0, vy: 0 };
+      /* The guest's puck. The host's copies are ~0.1 s old when drawn, which made the puck look late against the guest's own
+         mallet (drawn "now"). A host that sends the puck's speed (v) lets the guest run the puck itself: it is carried forward
+         to the host's present moment (walls and friction), bounces off the guest's own mallet straight away, and is eased
+         back onto the host's copy (a big difference, a goal or a face-off snaps). Older hosts: the old in-between drawing. */
+      const lp = { x: W / 2, y: H / 2, vx: 0, vy: 0, ok: false, hitAt: -9 };
+      function puckStep(q, h) {
+        const f = Math.exp(-0.32 * h);
+        q.vx *= f; q.vy *= f; q.x += q.vx * h; q.y += q.vy * h;
+        if (q.x < PR) { q.x = PR; q.vx = Math.abs(q.vx) * 0.9; }
+        if (q.x > W - PR) { q.x = W - PR; q.vx = -Math.abs(q.vx) * 0.9; }
+        if (!inMouth(q.x)) {
+          if (q.y < PR) { q.y = PR; q.vy = Math.abs(q.vy) * 0.9; }
+          if (q.y > H - PR) { q.y = H - PR; q.vy = -Math.abs(q.vy) * 0.9; }
+        }
+      }
+      function hostPuckNow(st) {   // the host's puck carried forward to the host's present moment
+        const q = { x: st.p[0], y: st.p[1], vx: st.v[0], vy: st.v[1] };
+        let left = link.lead() / 1000;
+        while (left > 0) { const h = Math.min(1 / 120, left); puckStep(q, h); left -= h; }
+        return q;
+      }
+      function guestPuck(dt, st) {
+        const target = hostPuckNow(st);
+        if (!lp.ok || phase !== 'play') { Object.assign(lp, target); lp.ok = true; return; }
+        let left = dt;
+        while (left > 0) {
+          const h = Math.min(1 / 240, left); left -= h; puckStep(lp, h);
+          const m = mallets.p2, dx = lp.x - m.x, dy = lp.y - m.y, dd = Math.hypot(dx, dy);
+          if (dd < MR + PR && dd > 0) {
+            const v = strike(lp, { x: m.x, y: m.y, vx: mine.vx, vy: mine.vy }, 0.9);
+            lp.vx = v.vx; lp.vy = v.vy; lp.x = m.x + dx / dd * (MR + PR); lp.y = m.y + dy / dd * (MR + PR);
+            const sp = Math.hypot(lp.vx, lp.vy); if (sp > MAX_P) { lp.vx *= MAX_P / sp; lp.vy *= MAX_P / sp; }
+            if (clock - lp.hitAt > 0.08) api.sfx('tap');
+            lp.hitAt = clock;
+          }
+        }
+        // just hit it here: the host has not seen that yet, so trust the local puck for one round trip
+        const grace = Math.min(0.4, (link.rtt() || 120) / 1000 + 0.06);
+        const ex = target.x - lp.x, ey = target.y - lp.y;
+        if (Math.hypot(ex, ey) > 70) { Object.assign(lp, target); return; }
+        if (clock - lp.hitAt < grace) return;
+        const k = 1 - Math.exp(-dt * 9);
+        lp.x += ex * k; lp.y += ey * k; lp.vx += (target.vx - lp.vx) * k; lp.vy += (target.vy - lp.vy) * k;
+      }
       function guestFrame(dt) {
         clock += dt;
-        const sm = link.sample();
-        if (sm && Array.isArray(sm.a.m) && Array.isArray(sm.b.m) && Array.isArray(sm.a.p) && Array.isArray(sm.b.p) && sm.a.m.concat(sm.b.m, sm.a.p, sm.b.p).every(num) && sm.b.m.length === 4) {
-          const { a, b, t } = sm, M = Ludus.rt.mix;
-          mallets.p1.x = M(a.m[0], b.m[0], t); mallets.p1.y = M(a.m[1], b.m[1], t);
-          puck.x = M(a.p[0], b.p[0], t, 80); puck.y = M(a.p[1], b.p[1], t, 80);
-        }
         {
-          const live = phase === 'play' || phase === 'ready', d = dirs(pads.p2);
+          const live = phase === 'play' || phase === 'ready', d = dirs(pads.p2), a = live && !anyKey(d) ? myAim() : null;
+          const px = mine.x, py = mine.y;
           me.frame(dt, v => {
             mine.x = v[0]; mine.y = v[1];
-            stepMallet('p2', mine, live ? (d.right ? 1 : 0) - (d.left ? 1 : 0) : 0, live ? (d.down ? 1 : 0) - (d.up ? 1 : 0) : 0, dt);
+            stepMallet('p2', mine, live ? (d.right ? 1 : 0) - (d.left ? 1 : 0) : 0, live ? (d.down ? 1 : 0) - (d.up ? 1 : 0) : 0, dt, a);
             v[0] = mine.x; v[1] = mine.y;
           });
           mallets.p2.x = me.v[0]; mallets.p2.y = me.v[1];
+          if (dt > 0) { mine.vx = (me.v[0] - px) / dt; mine.vy = (me.v[1] - py) / dt; }
+        }
+        const sm = link.sample(), st = link.latest();
+        if (sm && Array.isArray(sm.a.m) && Array.isArray(sm.b.m) && Array.isArray(sm.a.p) && Array.isArray(sm.b.p) && sm.a.m.concat(sm.b.m, sm.a.p, sm.b.p).every(num) && sm.b.m.length === 4) {
+          const { a, b, t } = sm, M = Ludus.rt.mix;
+          mallets.p1.x = M(a.m[0], b.m[0], t); mallets.p1.y = M(a.m[1], b.m[1], t);
+          if (st && Array.isArray(st.v) && st.v.length === 2 && st.v.every(num) && Array.isArray(st.p) && st.p.every(num)) { guestPuck(dt, st); puck.x = lp.x; puck.y = lp.y; }
+          else { puck.x = M(a.p[0], b.p[0], t, 80); puck.y = M(a.p[1], b.p[1], t, 80); }
         }
         if (phase === 'play') { trail.unshift({ x: puck.x, y: puck.y }); if (trail.length > 7) trail.pop(); } else trail = [];
         parts.forEach(q => { q.x += q.vx * dt; q.y += q.vy * dt; q.vx *= 0.95; q.vy *= 0.95; q.life -= dt; });

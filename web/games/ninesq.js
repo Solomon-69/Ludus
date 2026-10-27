@@ -253,7 +253,13 @@
         const t0 = performance.now();
         api.timeout(() => {
           const mv = L.choose(s, api.level, Math.random, api.level === 2 ? 260 + Math.random() * 120 : 0);
-          api.timeout(() => { thinking = false; if (phase === 'play') doMove(mv); }, Math.max(40, api.rand(420, 680) - (performance.now() - t0)));
+          api.timeout(() => {
+            thinking = false;
+            if (phase !== 'play') return;
+            // A bad pick (nothing legal at that square) falls back to any legal square so the bot never stalls
+            const ms = L.moves(s);
+            doMove(ms.includes(mv) || !ms.length ? mv : ms[Math.floor(Math.random() * ms.length)]);
+          }, Math.max(40, api.rand(420, 680) - (performance.now() - t0)));
         }, 140);
       }
 
@@ -466,6 +472,10 @@
         return true;
       });
       api.loop(dt => render(dt));
+      if (window.ludusDebug) window.ludusDebug.botTest = {   // test hook: a quick state read and a random player move
+        state: () => ({ turn: s.turn === P ? 'me' : 'bot', phase, n: Array.from(s.cells).filter(Boolean).length }),
+        play: () => { if (phase !== 'play' || s.turn !== P || thinking) return false; const ms = L.moves(s); if (!ms.length) return false; playerMove(ms[Math.floor(Math.random() * ms.length)]); return true; }
+      };
       return {
         save() {
           if (api.ended) return null;

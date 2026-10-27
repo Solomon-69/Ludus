@@ -1084,6 +1084,7 @@
       // A restored game counts as in progress; a fresh one only once a player has pressed something.
       const restored = !!(api.saved && restore(api.saved));
       if (window.ludusDebug) window.ludusDebug.tagMe = id => { const p = players.find(q => q.id === (id || myId)); return p ? { x: p.x, y: p.y } : null; };
+      if (window.ludusDebug) window.ludusDebug.tagTp = (id, x, y) => { const p = players.find(q => q.id === id); if (p) { p.x = x; p.y = y; p.vx = 0; p.vy = 0; } };   // test hook: drop a player somewhere
       if (window.ludusDebug) window.ludusDebug.tag = () => ({ friend, bot: friend ? null : { path: ai.path.map(e => e.kind), info: ai.info, nodes: (navs[mapIdx] || { nodes: [] }).nodes.length, edges: (navs[mapIdx] || { nodes: [] }).nodes.reduce((a, n) => a + n.edges.length, 0) }, phase, focus, sel, mapIdx, map: map.name, it, wins, timer, tagCool, round, mt,
         items: items.map(i => ({ x: i.x, y: i.y, type: i.type })), menu: phase === 'menu' ? menuLayout().tiles.map(t => [t.x, t.y, t.w, t.h, t.map]) : null,
         ps: players.map(p => ({ x: p.x, y: p.y, w: p.w, vx: p.vx, vy: p.vy, ground: p.ground, surf: p.surf, onM: p.onM, frozen: p.frozen, hold: p.hold, dead: p.dead,

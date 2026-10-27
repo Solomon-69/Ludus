@@ -280,6 +280,10 @@
         }
         render();
       });
+      if (window.ludusDebug) window.ludusDebug.botTest = {   // test hook: a quick state read and a needle stop on the player's turn
+        state: () => ({ turn: turn === 'you' ? 'me' : 'bot', phase: phase === 'done' ? 'end' : 'play', n: pts.you * 10 + pts.cpu + roundNo * 100 + matches * 1000 + (shot.cpu >= 0 ? 1 : 0) + (shot.you >= 0 ? 2 : 0) + (phase === 'run' ? 0.5 : 0) }),
+        play: () => { if (phase === 'run' && turn === 'you') { stopAt('you'); return true; } return false; }
+      };
       return {
         save() {
           if (api.ended || phase === 'done') return api.ended ? null : { v: 1, dead: true };

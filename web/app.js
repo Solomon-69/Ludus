@@ -76,8 +76,9 @@
 
   // ---------- wide or tall ----------
   // The .io games work in either shape; the button next to Pause flips the panel and remembers the choice.
-  const ORIENT = new Set(['slither', 'holeio', 'paperio']);
-  function wideFor(g) { return ORIENT.has(g.id) ? !!(S.orient && S.orient[g.id]) : !!g.wide; }
+  // Air Hockey too (1.12.17): wide (side-on rink) by default, tall when turned; the choice is remembered per game.
+  const ORIENT = new Set(['slither', 'holeio', 'paperio', 'hockey']), ORIENT_WIDE = new Set(['hockey']);
+  function wideFor(g) { return ORIENT.has(g.id) ? (S.orient && typeof S.orient[g.id] === 'boolean' ? S.orient[g.id] : ORIENT_WIDE.has(g.id) && !!g.wide) : !!g.wide; }
   function renderOrient(g) {
     const b = $('orientBtn'); b.hidden = !ORIENT.has(g.id);
     const icon = () => { b.classList.toggle('is-wide', wideFor(g)); $('orientUse').setAttribute('href', wideFor(g) ? '#i-rotate-back' : '#i-rotate'); };
@@ -188,7 +189,10 @@
     // The blocks (heading, name, last party, Create room, joining) share the page's full height with equal gaps
     // between them, so there is no empty band at the bottom; the panel itself keeps the same size as every other tab.
     const page = el('div', 'online-page'), head = el('div', 'op-group op-head'), start = el('div', 'op-card'), join = el('div', 'op-card');
-    page.appendChild(head); const mid = { appendChild: e => start.appendChild(e) };
+    // two columns on a wide panel (intro and last party | create and join); one column otherwise (the columns are display: contents)
+    const colA = el('div', 'op-col'), colB = el('div', 'op-col');
+    page.appendChild(colA); page.appendChild(colB);
+    colA.appendChild(head); const mid = { appendChild: e => start.appendChild(e) };
     head.appendChild(el('div', 'op-title', 'Play online'));
     const steps = el('ol', 'op-steps');   // three short steps instead of a long sentence; each wraps to two lines when narrow
     ['Create or join', 'Share the code', 'Host picks games'].forEach((t, i) => { const li = el('li'); li.appendChild(el('span', 'op-dot', String(i + 1))); li.appendChild(el('span', '', t)); steps.appendChild(li); });
@@ -199,12 +203,16 @@
     const nm = el('input'); nm.type = 'text'; nm.maxLength = 10; nm.placeholder = 'Player'; nm.value = L.net.cleanName(S.onlineName, ''); nm.autocomplete = 'off'; nm.spellcheck = false; nm.setAttribute('aria-label', 'Your name');
     nm.addEventListener('input', () => { S.onlineName = L.net.cleanName(nm.value, ''); L.save(); });
     f.appendChild(nm); mid.appendChild(f);
-    if (S.party && S.party.code) page.appendChild(partyCard(S.party));
-    page.appendChild(start);
+    if (S.party && S.party.code) {
+      const pc = partyCard(S.party); colA.appendChild(pc);
+      if (!opHadParty && opRendered && !S.reduceMotion) pc.classList.add('op-enter');   // a party just appeared (back from a room): it opens in
+    }
+    opHadParty = !!(S.party && S.party.code); opRendered = true;
+    colB.appendChild(start);
     const mk = el('button', 'btn primary', 'Create room'); mk.type = 'button'; mk.id = 'opCreate';
     mk.onclick = () => { L.sfx('click'); createFlexRoom(); };
     mid.appendChild(mk);
-    const code = el('input', 'code-input'); code.type = 'text'; code.maxLength = 300; code.placeholder = (S.party && S.party.code && L.net.validCode(S.party.code)) ? S.party.code : 'CODE'; code.id = 'opCode';
+    const code = el('input', 'code-input'); code.type = 'text'; code.maxLength = 300; code.placeholder = ''; code.id = 'opCode';
     code.autocomplete = 'off'; code.spellcheck = false; code.autocapitalize = 'characters'; code.setAttribute('aria-label', 'Room code, invite or link');
     const msg = el('div', 'lobby-error', ''); msg.setAttribute('role', 'alert');
     const go = () => { const c = L.net.extractCode(code.value) || L.net.cleanCode(code.value); if (!L.net.validCode(c)) { msg.textContent = 'Room codes are 5 letters or digits.'; code.focus(); return; } msg.textContent = 'Joining room ' + c + '...'; L.sfx('click'); joinFromInvite(c, true); };
@@ -212,16 +220,15 @@
     code.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); go(); } });
     const jb = el('button', 'btn primary', 'Join'); jb.type = 'button'; jb.id = 'opJoin'; jb.onclick = go;
     // Five tiles show the code as it is typed (a dash while empty); the real input sits invisibly on top, so paste, the keyboard and
-    // screen readers all keep working. With a recent party, its code shows faintly in the empty tiles.
-    const hint = (S.party && S.party.code && L.net.validCode(S.party.code)) ? S.party.code : '';
+    // screen readers all keep working. Empty tiles stay empty (no code from an earlier party).
     const wrap = el('div', 'code-wrap'), tiles = el('div', 'code-tiles'); tiles.setAttribute('aria-hidden', 'true');
     const cells = [0, 1, 2, 3, 4].map(() => { const c = el('span', 'code-tile'); tiles.appendChild(c); return c; });
     const paint = () => {
       const v = code.value, focus = document.activeElement === code;
       cells.forEach((c, i) => {
         const ch = v[i] || '', was = c.textContent;
-        c.textContent = ch || (v ? '' : hint[i] || '');
-        c.classList.toggle('filled', !!ch); c.classList.toggle('hint', !ch && !v && !!hint);
+        c.textContent = ch;
+        c.classList.toggle('filled', !!ch);
         c.classList.toggle('now', focus && i === Math.min(v.length, 4));
         if (ch && ch !== was && !S.reduceMotion) { c.classList.remove('pop'); void c.offsetWidth; c.classList.add('pop'); }
       });
@@ -237,11 +244,12 @@
       [mk, jb, code].forEach(x => { x.disabled = true; });
       page.querySelectorAll('.party-card button').forEach(x => { x.disabled = true; });
     }
-    page.appendChild(el('div', 'op-or', 'or join a room')); page.appendChild(join); page.appendChild(note);
+    colB.appendChild(el('div', 'op-or', 'or join a room')); colB.appendChild(join); colB.appendChild(note);
     grid.appendChild(page);
   }
   // The last room you were in: an orange "Last party · <game>" tag on top, then the players as small name chips (a
   // crown on the host's) with Forget and Rejoin on the right.
+  let opHadParty = false, opRendered = false;   // the Online page last showed a Last party card (for its open / fold animation)
   function partyCard(p) {
     const card = el('div', 'party-card');
     const games = (p.games || []).map(id => { const g = L.games.find(x => x.id === id); return g ? dispName(g) : id; });
@@ -260,7 +268,16 @@
       ppl.appendChild(c);
     });
     const acts = el('div', 'party-acts');
-    const fg = el('button', 'btn small ghost', 'Forget'); fg.type = 'button'; fg.id = 'opForget'; fg.onclick = () => { L.sfx('click'); S.party = null; L.save(); renderCards(); };
+    const fg = el('button', 'btn small ghost', 'Forget'); fg.type = 'button'; fg.id = 'opForget';
+    // Forget: the card folds away (height and fade, spring), then the page settles; instant with reduced motion
+    fg.onclick = () => {
+      L.sfx('click'); S.party = null; opHadParty = false; L.save();
+      if (S.reduceMotion) { renderCards(); return; }
+      card.style.height = card.offsetHeight + 'px'; card.classList.add('op-leave');
+      void card.offsetHeight; card.style.height = '0px';
+      let done = false; const fin = () => { if (done) return; done = true; if (S.filter === 'Online' || document.querySelector('.online-page')) renderCards(); };
+      card.addEventListener('transitionend', e => { if (e.propertyName === 'height') fin(); }); setTimeout(fin, 500);
+    };
     const rj = el('button', 'btn small primary', 'Rejoin'); rj.type = 'button'; rj.id = 'opRejoin'; rj.onclick = () => { L.sfx('click'); rejoinParty(); };
     acts.appendChild(fg); acts.appendChild(rj);
     row.appendChild(ppl); row.appendChild(acts); card.appendChild(row);
@@ -542,21 +559,33 @@
   function trackParty(s, role) {
     const save = () => {
       if (!s.ready) return;
-      S.party = { role: s.role || role, code: s.code, name: L.net.cleanName(S.onlineName, ''), names: s.rosterList().map(p => p.name), games: s.plan.g.slice(), n: s.plan.n, at: Date.now() };
+      // mine: this player made the code (only then may Rejoin open it again when nobody hosts it). live: still in the room.
+      const was = S.party && S.party.code === s.code ? S.party : null;
+      S.party = { role: s.role || role, code: s.code, mine: was ? !!was.mine : role === 'host' && !s.yielded, live: true, name: L.net.cleanName(S.onlineName, ''), names: s.rosterList().map(p => p.name), games: s.plan.g.slice(), n: s.plan.n, at: Date.now() };
       L.save();
     };
     ['ready', 'roster', 'plan', 'host'].forEach(ev => s.on(ev, save));
+    s.on('yield', () => { s.yielded = true; });
     // leader hand-over: everybody hears who runs the room now; an open scoreboard card redraws with the right buttons
     s.on('host', ev => { toast(ev.me ? 'You are now the leader' : (ev.name || 'A player') + ' is now the leader'); L.lobby.refresh(s); });
   }
+  // Rejoin always joins the party as a guest, whoever ran it before (a leader may have changed while we were away). Only the
+  // player who made the code opens it again as host, and only when nobody is hosting it any more.
   function rejoinParty() {
-    const p = S.party; if (!p) return;
-    if (p.role === 'host') createFlexRoom(p); else joinFromInvite(p.code);
+    const p = S.party; if (!p || !L.net.validCode(p.code)) return;
+    joinFromInvite(p.code, false, { rejoin: true, fallback: p.mine ? () => createFlexRoom(p) : null });
+  }
+  function onlineId() {
+    if (typeof S.onlineId !== 'string' || !/^[0-9a-f]{12}$/.test(S.onlineId)) {
+      const a = new Uint8Array(6); try { crypto.getRandomValues(a); } catch (e) { for (let i = 0; i < 6; i++) a[i] = Math.floor(Math.random() * 256); }
+      S.onlineId = Array.from(a, x => x.toString(16).padStart(2, '0')).join(''); L.save();
+    }
+    return S.onlineId;
   }
   function createFlexRoom(party) {   // from the Online page: no game yet, the host picks them in the room
     showOnlineShell();
     online = { game: null, session: null, started: false };
-    const s = L.lobby.openRoom(lobbyOps(null), party && party.code);
+    const s = L.lobby.openRoom(lobbyOps(null), party && party.code, onlineId());
     if (!s) return;
     trackParty(s, 'host');
     if (party && party.games && party.games.length) s.on('ready', () => { s.setPlan(party.games.filter(id => L.games.some(g => g.id === id && g.online)), party.n); });
@@ -577,15 +606,15 @@
   // A room invite: the code typed or pasted, or a ludus://join/CODE link opened by the Mac / Windows app. The link does not
   // say which game, so the room tells us. A newer host (tournament rooms) lets the host pick games, so we just show the room;
   // a 1.6 host plays one game, so that game's screen opens with the room already joined.
-  function joinFromInvite(text, quiet) {
+  function joinFromInvite(text, quiet, how) {
     const code = L.net.extractCode(text);
     if (!code) { toast('No room code found'); return false; }
     leaveOnline(); stop(); hideOver(); $('pauseSheet').hidden = true;
-    if (!quiet) toast('Joining room ' + code);
-    const s = L.net.joinRoom(code, { gameId: '', name: L.net.cleanName(S.onlineName, '') });
+    if (!quiet) toast((how && how.rejoin ? 'Rejoining room ' : 'Joining room ') + code);
+    const s = L.net.joinRoom(code, { gameId: '', name: L.net.cleanName(S.onlineName, ''), uid: onlineId(), rejoin: !!(how && how.rejoin) });
     online = { game: null, session: s, started: false };
     trackParty(s, 'guest');
-    s.on('error', e => { online = null; if (e.code === 'update') L.lobby.notice(...L.lobby.why('update'), () => {}); else toast(L.lobby.why(e.code === 'no-room' || e.code === 'full' || e.code === 'started' ? e.code : 'offline')[0]); });
+    s.on('error', e => { online = null; if (e.code === 'no-room' && how && how.fallback) { how.fallback(); return; } if (how && how.rejoin && S.party && S.party.code === code) { S.party.live = false; L.save(); } if (e.code === 'update') L.lobby.notice(...L.lobby.why('update'), () => {}); else toast(L.lobby.why(e.code === 'no-room' || e.code === 'full' || e.code === 'started' ? e.code : 'offline')[0]); });
     s.on('ready', () => {
       if (s.hostPv >= 2) { showOnlineShell(); online = { game: null, session: s, started: false }; L.lobby.attach(null, s, lobbyOps(null)); return; }
       const g = L.games.find(x => x.id === s.gameId && x.online);
@@ -658,6 +687,7 @@
     if (!online) return;
     const s = online.session, g = online.game;
     online = null;
+    if (S.party && s && S.party.code === s.code && S.party.live) { S.party.live = false; L.save(); }   // left on purpose: no automatic rejoin
     L.lobby.close();
     if (s) { try { s.leave(); } catch (e) { /* already closed */ } }
     syncOnlineBar(g);
@@ -1108,7 +1138,8 @@
     if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
     // Ludus always opens on All games, wherever it was left. A game left open is saved and waits
     // in the "Continue" card at the top.
-    if (view !== 'home' && !(online && online.started)) { root.classList.add('instant'); goHome(); }   // an online round that is being played stays; a room being set up does not (its code is remembered for Rejoin)   // safety net; normally done on close (a room stays open)
+    if (inRoom()) { resumeRoomView(); return; }   // in a party: come back to it (the room, or the round being played)
+    if (view !== 'home') { root.classList.add('instant'); goHome(); }   // safety net; normally done on close
     if (S.filter !== 'All') { S.filter = 'All'; L.save(); renderFilters(); renderCards(); }
     const top = () => { const g = $('grid'); if (g) g.scrollTop = 0; };
     top(); replayCards(); top();   // always the very top of All, never wherever it was left
@@ -1120,7 +1151,7 @@
   window.ludusOpenedSettings = () => {
     if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
     root.classList.add('instant');
-    if (view !== 'home' && view !== 'settings' && !(online && online.started)) goHome();
+    if (view !== 'home' && view !== 'settings' && !inRoom()) goHome();
     if (S.filter !== 'All') { S.filter = 'All'; L.save(); renderFilters(); renderCards(); }
     const g = $('grid'); if (g) g.scrollTop = 0;
     window.ludusOpenSettings();
@@ -1130,7 +1161,8 @@
   // Go back to All games while the panel is closing, with transitions off, so the next open shows
   // the finished home screen straight away instead of the game flashing and sliding out.
   window.ludusClosed = () => {
-    if (view !== 'home' && !(online && online.started)) {
+    if (inRoom()) { L.save(true); return; }   // a party stays open while the panel is closed
+    if (view !== 'home') {
       root.classList.add('instant');
       if (view === 'game') goHome(); else { show('home'); renderCards(); }
     }
@@ -1139,6 +1171,18 @@
     L.save(true);
   };
   window.ludusOpenGame = id => start(id);
+  // still in an online room (waiting room, scoreboard or a round)
+  function inRoom() { const s = online && online.session; return !!(s && !s.over && (s.ready || online.started)); }
+  // Reopening Ludus while in a party: a round being played stays as it is; otherwise the room lobby shows again.
+  function resumeRoomView() {
+    const s = online.session;
+    if (online.started) return;
+    if (!s.ready) return;
+    if (view !== 'game') showOnlineShell();
+    if (s.ser && (s.ser.st === 'board' || s.ser.st === 'final')) L.lobby.series(s, s.ser.st, lobbyOps(online.game));
+    else if (!L.lobby.isOpen) L.lobby.resume(s, lobbyOps(online.game));
+  }
+  window.ludusInRoom = inRoom;   // test hook
   // Right-click on the menu bar / tray icon: show Settings (a game underneath is paused, as with the gear). Already there: stay.
   window.ludusOpenSettings = () => {
     if (view === 'settings') { settingsTop(); return 'settings'; }
@@ -1199,6 +1243,9 @@
   renderFilters();
   renderCards();
   maybeIntro();
+  // Ludus restarted while it was in a party: go straight back to the party's room (as a guest; the round in progress is not
+  // reopened, the next one is). Only when it was still in the room, never after Leave or Forget.
+  if (S.party && S.party.live && L.net && L.net.validCode(S.party.code) && Date.now() - (S.party.at || 0) < 12 * 3600e3 && !window.__LUDUS_NO_AUTOREJOIN__) setTimeout(() => { if (view === 'home' && !online) rejoinParty(); }, 0);
   window.__ludusReady = true; L.native('ready');   // tells the app shell the page started (otherwise it shows its own fallback screen)
 
   // ---------- first-run welcome ----------

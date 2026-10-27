@@ -167,15 +167,25 @@
           banner = { t: clock, title: side === 'r' ? YOU + (friend ? ' reached the gate' : ' reached your gate') : BOT + ' reached its gate', sub: 'Rounds ' + rounds.r + ' to ' + rounds.y + '. Next round starts soon' };
         }
       }
-      function resetRound() { zone = 0; row = ''; parts = []; P = { r: mk('r'), y: mk('y') }; ai.hist = []; ai.next = 0; ai.thrustAt = 0; }
+      function resetRound() { zone = 0; row = ''; parts = []; P = { r: mk('r'), y: mk('y') }; ai.hist = []; ai.next = 0; ai.thrustAt = 0; ai.idleAt = now; }
       function go() {
         if (phase === 'matchover') { if (rounds.y >= TOWIN || friend) return; rounds = { r: 0, y: 0 }; }
         if (phase === 'roundover' || phase === 'matchover') { resetRound(); phase = 'count'; countT = 1.1; banner = null; clearInput(); api.sfx('tap'); }
       }
 
       // ---------- the bot (pushes left) ----------
-      const ai = { hist: [], next: 0, thrustAt: 0, moveDir: 0 };
+      const ai = { hist: [], next: 0, thrustAt: 0, moveDir: 0, idleAt: 0 };
+      // If the bot has done nothing at all for about 3 seconds (pinned or dithering), it walks at the foe or thrusts.
       function aiInput() {
+        const o = aiPick(), me = P.y, op = P.r;
+        if (o.left || o.right || o._atk || o._up || o._down || ai.thrustAt) ai.idleAt = now;
+        else if (now - ai.idleAt > 3 && me.alive && op.alive && me.st === 'idle') {
+          ai.idleAt = now - 1.5; ai.next = now;
+          if (Math.abs(me.x - op.x) > REACH + 6) o[me.face < 0 ? 'left' : 'right'] = true; else o._atk = true;
+        }
+        return o;
+      }
+      function aiPick() {
         const me = P.y, op = P.r, o = noInput();
         ai.hist.push({ t: now, st: op.st, tt: op.t, h: op.h, alive: op.alive });
         while (ai.hist.length > 2 && ai.hist[0].t < now - 1) ai.hist.shift();
@@ -437,6 +447,10 @@
         shake = Math.max(0, shake - dt);
         render();
       });
+      if (window.ludusDebug) window.ludusDebug.botTest = {   // test hook: positions of both fighters, and a teleport for the bot
+        state: () => ({ phase, sig: [rounds.r, rounds.y, P.r.x, P.y.x, P.r.h, P.y.h, P.r.alive ? 1 : 0, P.y.alive ? 1 : 0, zone, P.y.st === 'idle' ? 0 : 1, P.y.t], bot: [P.y.x, 0] }),
+        tp: (x) => { P.y.x = x; }
+      };
       return {
         resume() { clearInput(); },
         save() {

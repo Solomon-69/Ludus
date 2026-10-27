@@ -356,6 +356,8 @@
           if (pd < 260 && b.mass > prey.mass * 1.7) ga += ai.side * 0.85;       // wrap around it
           boost = pd < 320 && b.mass > 45 && Math.abs(angDiff(ga, b.ang)) < 0.5;
           gw = 1.3;
+        } else if (ai.kick > 0) {
+          ga = ai.wa; gw = 1.2;   // breaking out of a circle: head straight across for a moment
         } else {
           let f = ai.food;
           if (!f || f.gone || Math.hypot(f.x - hx, f.y - hy) > 520) f = ai.food = findFood(b);
@@ -424,6 +426,12 @@
           else { const c = control(w); w.tgt = c.a; w.boost = c.b; }
         } else {
           w.ai.t -= dt;
+          // Circling in place for about 6 seconds (round one pellet or its own tail)? Let go of the target and cut across the arena.
+          const ai0 = w.ai; ai0.kick = (ai0.kick || 0) - dt; ai0.ot = (ai0.ot || 0) + dt;
+          if (ai0.ot > 6) {
+            if (Math.hypot(w.px[0] - (ai0.ox || 0), w.py[0] - (ai0.oy || 0)) < 170) { ai0.food = null; ai0.kick = 2.5; ai0.wa = Math.atan2(-w.py[0], -w.px[0]) + (Math.random() - 0.5); ai0.t = 0; }
+            ai0.ox = w.px[0]; ai0.oy = w.py[0]; ai0.ot = 0;
+          }
           if (w.ai.t <= 0) { w.ai.t = AI.think * (0.8 + Math.random() * 0.4); think(w); }
           w.boost = w.ai.boostWant;
         }
