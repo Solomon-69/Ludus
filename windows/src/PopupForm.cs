@@ -191,7 +191,7 @@ internal sealed class PopupForm : Form
                 if (!e.IsSuccess) { Store.Log($"Page failed to load: {e.WebErrorStatus}"); BeginInvoke((MethodInvoker)ShowFallback); return; }
                 ArmWatchdog(6000);
                 ApplyZoom();
-                if (Visible) RunScript("window.ludusOpened && ludusOpened()");
+                if (Visible) RunScript(OpenedScript());
                 PageReady?.Invoke();
             };
             core.ProcessFailed += (_, e) =>
@@ -463,6 +463,26 @@ internal sealed class PopupForm : Form
     // ---------- Showing and hiding ----------
 
     /// <summary>Left-click on the tray icon.</summary>
+    private bool settingsNext;   // the next open shows Settings (right-click on the tray icon)
+
+    /// <summary>The page's "panel opened" call; after a right-click it also goes straight to Settings, with no slide.</summary>
+    private string OpenedScript()
+    {
+        var js = "window.ludusOpened && ludusOpened();";
+        if (settingsNext) js += "document.documentElement.classList.add('instant');window.ludusOpenSettings && ludusOpenSettings();";
+        settingsNext = false;
+        return js;
+    }
+
+    /// <summary>Right-click on the tray icon: opens the panel on Settings, or switches an open panel to Settings.</summary>
+    public void OpenSettings(Point at)
+    {
+        if (Visible) { RunScript("window.ludusOpenSettings && ludusOpenSettings()"); return; }
+        // A right-click while open first hides the panel (it loses focus); bring it back on Settings anyway.
+        settingsNext = true;
+        ShowPopup(at);
+    }
+
     public void Toggle(Point at)
     {
         if (Visible) { HidePopup(); return; }
@@ -500,7 +520,7 @@ internal sealed class PopupForm : Form
                 web.Focus();
             }));
         }
-        if (ready) RunScript("window.ludusOpened && ludusOpened()");
+        if (ready) RunScript(OpenedScript());
     }
 
     /// <summary>Opens the join flow for a room code. Only a 5 character letters/digits code ever reaches the page.</summary>

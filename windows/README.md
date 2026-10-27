@@ -16,7 +16,7 @@ repo) inside Microsoft Edge WebView2.
 
 - **Left-click** the controller icon in the tray: open or close the panel.
 - **Click anywhere else**: the panel closes (a running game pauses).
-- **Right-click** the icon: Open, Open at login, Quit.
+- **Right-click** the icon: opens Ludus straight on Settings (Open at login and Quit are there).
 - **Ctrl+Alt+G** anywhere: open or close the panel. **Start menu > Ludus** opens it too (Ludus keeps
   that shortcut pointing at wherever `Ludus.exe` is).
 - **Invisible icon** (Settings): hides the tray icon; Ctrl+Alt+G and the Start menu still open Ludus.
@@ -65,7 +65,7 @@ GitHub Actions builds this on every push (`.github/workflows/ci.yml`) and attach
 | File | Job |
 | --- | --- |
 | `src/Program.cs` | Single instance, WebView2 runtime check, starts the tray app |
-| `src/TrayContext.cs` | Tray icon, right-click menu (light/dark), exit |
+| `src/TrayContext.cs` | Tray icon (left-click opens, right-click opens Settings), exit |
 | `src/PopupForm.cs` | The panel: placement above the tray (taskbar side and DPI aware), rounded corners, WebView2 and the page bridge |
 | `src/Store.cs` | `state.json`, `window.json`, the Run key, the log |
 | `src/Theme.cs` | Windows light/dark (`AppsUseLightTheme`) and live changes |

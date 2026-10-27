@@ -480,7 +480,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
             // button itself is never pressed and the spot stays empty before, during and after a click.
             let catcher = ClickCatcher(frame: button.bounds)
             catcher.autoresizingMask = [.width, .height]
-            catcher.onClick = { [weak self] in self?.statusClicked() }
+            catcher.onClick = { [weak self] in self?.handleStatusClick(settings: false) }
+            catcher.onSettingsClick = { [weak self] in self?.handleStatusClick(settings: true) }
             button.addSubview(catcher)
         }
     }
@@ -532,7 +533,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
     // MARK: - Popover
 
     @objc private func statusClicked() {
-        if popover.isShown { closePopover() } else { openPopover() }
+        let event = NSApp.currentEvent
+        handleStatusClick(settings: StatusClick.isSettingsClick(type: event?.type, modifiers: event?.modifierFlags ?? []))
+    }
+
+    private func handleStatusClick(settings: Bool) {
+        switch StatusClick.action(panelShown: popover.isShown, settingsClick: settings) {
+        case .open: openPopover()
+        case .close: closePopover()
+        case .openSettings: openPopover(settings: true)
+        case .showSettings: webView.evaluateJavaScript("window.ludusOpenSettings && ludusOpenSettings()")
+        }
     }
 
     /// The view the panel's arrow points at: the menu bar button, or while invisible a clear window over
@@ -583,7 +594,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
         return NSRect(x: x, y: screen.frame.maxY - bar, width: bar, height: bar)
     }
 
-    private func openPopover() {
+    private func openPopover(settings: Bool = false) {
         guard let button = popoverAnchor() else { return }
         PanelGroup.announceOpen()   // close our other menu bar apps' panels
         bounceIcon()
@@ -610,7 +621,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
             }
         }
         webView.callAsyncJavaScript(
-            "window.ludusOpened && ludusOpened(); await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));",
+            "window.ludusOpened && ludusOpened();"
+            // right-click: straight to Settings, with no slide (ludusOpened turns transitions back on next frame)
+            + (settings ? " document.documentElement.classList.add('instant'); window.ludusOpenSettings && ludusOpenSettings();" : "")
+            + " await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));",
             arguments: [:], in: nil, in: .page) { _ in reveal() }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: reveal)   // never stay hidden
         MenuBarStrip.startEsc(window: { [weak self] in self?.popover.contentViewController?.view.window }, close: { [weak self] in self?.closePopover() })
@@ -834,11 +848,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
 /// pressing the button underneath, so no highlight pill is ever drawn.
 final class ClickCatcher: NSView {
     var onClick: (() -> Void)?
+    var onSettingsClick: (() -> Void)?   // right click or Control-click: open on Settings
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
     override func mouseDown(with event: NSEvent) {}
-    override func mouseUp(with event: NSEvent) { onClick?() }
+    override func mouseUp(with event: NSEvent) {
+        if StatusClick.isSettingsClick(type: event.type, modifiers: event.modifierFlags) { onSettingsClick?() } else { onClick?() }
+    }
     override func rightMouseDown(with event: NSEvent) {}
-    override func rightMouseUp(with event: NSEvent) { onClick?() }
+    override func rightMouseUp(with event: NSEvent) { onSettingsClick?() }
 }
 
 @main

@@ -1012,6 +1012,14 @@
     L.save(true);
   };
   window.ludusOpenGame = id => start(id);
+  // Right-click on the menu bar / tray icon: show Settings (a game underneath is paused, as with the gear). Already there: stay.
+  window.ludusOpenSettings = () => {
+    if (view === 'settings') return 'settings';
+    settingsFrom = view === 'game' ? 'game' : 'home';
+    if (view === 'game') pause();
+    renderSettings(); show('settings');
+    return 'settings';
+  };
   // The app has resized the panel for a game (wide or normal): start it once the page has the new size.
   window.ludusResized = () => {
     const p = pendingLaunch; if (!p) return;
