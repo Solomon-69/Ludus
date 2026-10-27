@@ -3,6 +3,10 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.9 (2026-10-27)
+
+- Online page: the join box shows the code of your most recent party instead of made-up letters.
+
 ## 1.12.8 (2026-10-27)
 
 - Online page: thinner cards and bars, and the "or join a room" line is back between hosting and joining.

@@ -146,7 +146,7 @@
     const mk = el('button', 'btn primary', 'Create room'); mk.type = 'button'; mk.id = 'opCreate';
     mk.onclick = () => { L.sfx('click'); createFlexRoom(); };
     mid.appendChild(mk);
-    const code = el('input', 'code-input'); code.type = 'text'; code.maxLength = 300; code.placeholder = 'K7M2Q'; code.id = 'opCode';
+    const code = el('input', 'code-input'); code.type = 'text'; code.maxLength = 300; code.placeholder = (S.party && S.party.code && L.net.validCode(S.party.code)) ? S.party.code : 'CODE'; code.id = 'opCode';
     code.autocomplete = 'off'; code.spellcheck = false; code.autocapitalize = 'characters'; code.setAttribute('aria-label', 'Room code, invite or link');
     const msg = el('div', 'lobby-error', ''); msg.setAttribute('role', 'alert');
     const go = () => { const c = L.net.extractCode(code.value) || L.net.cleanCode(code.value); if (!L.net.validCode(c)) { msg.textContent = 'Room codes are 5 letters or digits.'; code.focus(); return; } msg.textContent = 'Joining room ' + c + '...'; L.sfx('click'); joinFromInvite(c, true); };
