@@ -117,7 +117,7 @@
     if (mine !== gen || !stream) return false;   // stopped while loading
     video = document.createElement('video');
     video.muted = true; video.playsInline = true; video.srcObject = stream;
-    try { await video.play(); } catch (e) { /* autoplay of a muted stream normally succeeds */ }
+    try { await video.play(); } catch (e) { stop(); throw new Error('The camera picture could not start'); }
     if (mine !== gen) return false;
     blurred = false; badSince = goodSince = 0; lastReason = '';
     clearInterval(timer); timer = setInterval(tick, TICK_MS);

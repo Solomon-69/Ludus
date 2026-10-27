@@ -367,7 +367,8 @@
             if (tok !== photoTok) return;
             img.src = u; img.alt = `Photo of mosaic ${id}`; photo.classList.remove('wait'); photo.classList.add('ok');
             pcredit.innerHTML = ''; pcredit.append('Photo: ');
-            const a = el('span', '', PHOTO_SITE);   // plain credit: the app's web view opens no outside pages pcredit.appendChild(a);
+            const a = el('span', '', PHOTO_SITE);   // plain credit: the app's web view opens no outside pages
+            pcredit.appendChild(a);
           };
           probe.onerror = tryNext;
           probe.src = u;

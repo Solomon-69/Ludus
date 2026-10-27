@@ -147,7 +147,7 @@
         W.push(w); return w;
       }
       function place(w, x, y, ang, mass) {
-        w.mass = mass; const z = sizeFor(mass); w.r = z.r; w.sp = z.sp; w.n = z.n; w.ang = w.tgt = ang; w.v = BASE_V; w.boost = false; w.alive = true; w.drop = 0; w.killer = '';
+        w.mass = mass; const z = sizeFor(mass); w.r = z.r; w.sp = z.sp; w.n = z.n; w.ang = w.tgt = ang; w.v = BASE_V; w.boost = false; w.killerIdx = -2; w.alive = true; w.drop = 0; w.killer = '';
         for (let i = 0; i < w.n; i++) { w.px[i] = x - Math.cos(ang) * w.sp * i; w.py[i] = y - Math.sin(ang) * w.sp * i; }
         updateBB(w);
       }
@@ -462,7 +462,7 @@
           for (const w of W) {
             if (!w.alive || w.prot > 0) continue;
             const h = hitTest(w);
-            if (h !== -1) kill(w, h === -2 ? 'the wall' : W[h].name);
+            if (h !== -1) { w.killerIdx = h === -2 ? -1 : h; kill(w, h === -2 ? 'the wall' : W[h].name); }
           }
           for (const w of W) if (!w.alive && !w.human && w.respawn > 0) {
             w.respawn -= dt;
@@ -694,8 +694,8 @@
         let bottomRow = mr * 2 + edge;
         if (solo) {
           const g = btnGeom(), act = ptr.down || ptr.btn || anyKey(KEYMAP[0].boost);
-          ctx.beginPath(); ctx.arc(g.x, g.y, g.r, 0, TAU); ctx.fillStyle = act ? me.c.base : soft; ctx.fill();
-          ctx.lineWidth = 1.5; ctx.strokeStyle = act ? me.c.dark : col.line; ctx.stroke();
+          ctx.beginPath(); ctx.arc(g.x, g.y, g.r, 0, TAU); ctx.fillStyle = act && me ? me.c.base : soft; ctx.fill();
+          ctx.lineWidth = 1.5; ctx.strokeStyle = act && me ? me.c.dark : col.line; ctx.stroke();
           ctx.save(); ctx.translate(g.x, g.y); ctx.strokeStyle = act ? '#fffaf3' : ink; ctx.lineWidth = 2.6 * u; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
           for (const dy of [-5.5, 2.5]) { ctx.beginPath(); ctx.moveTo(-6.5 * u, (dy + 4) * u); ctx.lineTo(0, (dy - 2) * u); ctx.lineTo(6.5 * u, (dy + 4) * u); ctx.stroke(); }
           ctx.restore();
@@ -755,7 +755,7 @@
           if (!was && alive) { place(w, q[0], q[1], q[2], w.mass); if (isMine(w) && pred) pred.set([q[0], q[1]]); }
           else if (was && !alive) {
             w.alive = false; w.deadLen = Math.round(before); burst(w);
-            const by = W[q[5]]; w.killer = q[5] === -1 ? 'the wall' : by ? by.name : '';
+            const by = Number.isInteger(q[5]) && q[5] >= 0 ? W[q[5]] : null; w.killer = q[5] === -1 ? 'the wall' : by ? by.name : '';
             if (w.human) { let rk = 1; for (const o of W) if (o !== w && o.alive && o.mass > w.mass) rk++; w.rank = rk; }
             if (isMine(w)) { api.sfx('lose'); shake = api.reduceMotion ? 0 : 0.7; } else if (w.human) api.sfx('hit');
           }
@@ -798,7 +798,7 @@
             const r1 = v => Math.round(v * 10) / 10;
             return { ph: phase, wl: W.map(w => [w.name, w.hex, w.human]),
               w: W.map(w => [Math.round(w.px[0]), Math.round(w.py[0]), Math.round(w.ang * 100) / 100, r1(w.mass),
-                (w.alive ? 1 : 0) | (w.boost ? 2 : 0) | (w.prot > 0 ? 4 : 0), w.killer === 'the wall' ? -1 : W.findIndex(o => o.name === w.killer)]) };
+                (w.alive ? 1 : 0) | (w.boost ? 2 : 0) | (w.prot > 0 ? 4 : 0), w.alive ? -2 : Number.isInteger(w.killerIdx) ? w.killerIdx : -2]) };
           },
           input: () => { const me = myWorm(); if (!me) return { a: 0, b: 0 }; const c = control(me); return { a: Math.round(c.a * 1000) / 1000, b: c.b ? 1 : 0 }; },
           onInput: (seat, d) => { if (num(d.a) && Math.abs(d.a) < 1e4) remote[seat + 1] = { a: d.a, b: d.b === 1 }; },

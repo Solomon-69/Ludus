@@ -272,7 +272,7 @@ everything, quit Ludus and run `defaults delete com.solomon.Ludus`.
 <details>
 <summary><b>Does Ludus use the internet?</b></summary>
 
-Not unless you ask it to. Every game works the same with Wi-Fi off. The only time Ludus goes online is when you choose <b>Play online</b> for one of the online games.
+Not unless you ask it to. Every game works the same with Wi-Fi off. Ludus only goes online when you choose <b>Play online</b>, play Map Hunt or Mosaic Hunt (photos and maps), or turn on Privacy blur (a one-time face finder download; the camera picture never leaves your computer).
 </details>
 
 <details>

@@ -867,8 +867,8 @@
     const want = !!S.privacyBlur && view === 'game' && !document.hidden;
     P.onFail = privacyFail;
     if (want && !P.running()) P.start(setPrivacyBlur).then(ok => {
-      if (ok && !(S.privacyBlur && view === 'game')) P.stop();
-      else if (!ok && S.privacyBlur && view === 'game' && !P.running()) privacySync();   // an older start was cancelled: start again
+      if (ok && !(S.privacyBlur && view === 'game' && !document.hidden)) P.stop();
+      else if (!ok && S.privacyBlur && view === 'game' && !document.hidden && !P.running()) privacySync();   // an older start was cancelled: start again
     }).catch(e => privacyFail(e.message));
     else if (!want && P.running()) P.stop();
     if (!want) setPrivacyBlur(false);
