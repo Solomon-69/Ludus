@@ -194,7 +194,10 @@
         api.timeout(() => {
           thinking = false;
           if (phase !== 'play' || turn !== C) return;
-          doMove(L.choose(st.edges, api.level), C);
+          let e = L.choose(st.edges, api.level);
+          // A bad pick (edge already drawn) falls back to any free edge so the bot never stalls
+          if (e === undefined || e < 0 || st.edges[e]) { const fr = L.free(st.edges); if (fr.length) e = fr[Math.floor(Math.random() * fr.length)]; }
+          doMove(e, C);
         }, delay);
       }
 
@@ -365,6 +368,10 @@
         return true;
       });
       api.loop(dt => render(dt));
+      if (window.ludusDebug) window.ludusDebug.botTest = {   // test hook: a quick state read and a random player move
+        state: () => ({ turn: turn === P ? 'me' : 'bot', phase, n: Array.from(st.edges).filter(Boolean).length }),
+        play: () => { if (phase !== 'play' || turn !== P || thinking) return false; const fr = L.free(st.edges); if (!fr.length) return false; playerMove(fr[Math.floor(Math.random() * fr.length)]); return true; }
+      };
       return {
         save() {
           if (api.ended) return null;

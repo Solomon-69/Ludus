@@ -496,7 +496,7 @@
     const id = nextReq++;
     pending.set(id, cb);
     try { w.postMessage({ id, moves, level, ms }); } catch (e) { pending.delete(id); cb(null); return; }
-    setTimeout(() => { if (pending.has(id)) { pending.delete(id); cb(null); } }, ms + 5000);
+    setTimeout(() => { if (pending.has(id)) { pending.delete(id); cb(null); } }, ms + 2500);
   }
 
   // ---------- pieces: soft chunky shapes, no outlines, two tones (a lighter face over a darker rim) ----------
@@ -744,8 +744,9 @@
         const id = ++reqId, t0 = performance.now(), lv = level;
         const done = u => {
           if (id !== reqId || api.ended || phase !== 'play') return;
-          const m = u ? core.fromUci(pos, u) : 0;
-          if (!m) { thinking = false; return; }
+          let m = u ? core.fromUci(pos, u) : 0;
+          // No usable move from the engine? Play any legal one, so the bot never waits forever.
+          if (!m) { const lm = core.legalMoves(pos); if (!lm.length) { thinking = false; return; } m = lm[Math.floor(Math.random() * lm.length)]; }
           const wait = Math.max(0, (lv === 0 ? 520 : 380) - (performance.now() - t0));
           api.timeout(() => { if (id !== reqId || phase !== 'play') return; thinking = false; commit(m, true, false); }, wait);
         };
@@ -1189,6 +1190,7 @@
       });
       if (window.ludusDebug) {
         window.ludusDebug.chess = () => ({ fen: core.fen(pos), plies: plies.slice(), sans: sans.slice(), side: pos.side, my: myColor, phase, level, thinking, ended: api.ended, worker: !!worker, workerBroken, tc, tcOk, rem: [rem[1], rem[-1]], mode: on ? 'online' : friendLocal ? 'friend' : 'bot' });
+        window.ludusDebug.chessAny = () => { const lm = core.legalMoves(pos); return lm.length ? core.uci(lm[Math.floor(Math.random() * lm.length)]) : ''; };   // test hook: any legal move
         window.ludusDebug.chessRem = (wms, bms) => { rem[1] = wms; rem[-1] = bms; };
         window.ludusDebug.chessMove = u => { const m = core.fromUci(pos, u); if (!m || !mayAct()) return false; commit(m, true, true); return true; };
         window.ludusDebug.chessGeo = sq => { layout(); const p = sqXY(sq); const r = view.canvas.getBoundingClientRect(); return { x: r.left + p.x + geo.s / 2, y: r.top + p.y + geo.s / 2, s: geo.s }; };

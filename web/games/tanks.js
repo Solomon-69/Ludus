@@ -156,7 +156,7 @@
       const nameOf = id => friend ? (id === 'p1' ? 'P1' : 'P2') : (id === 'p1' ? 'You' : 'Bot');
       const LV = api.level;
       const LOCK = [0.6, 0.4, 0.18][LV], GAP = [0.9, 0.6, 0.35][LV], SEE = [0.65, 0.35, 0.1][LV];   // aim lock time, extra reload, chance a shell is not noticed
-      const bot = { think: 0, aim: null, lock: 0, wait: 0, dodge: null, stuck: 0, lastX: 0, lastY: 0, back: 0, backDir: 1, noticed: new WeakSet() };
+      const bot = { think: 0, aim: null, lock: 0, wait: 0, dodge: null, stuck: 0, lastX: 0, lastY: 0, back: 0, backDir: 1, aimT: 0, skipAim: 0, noticed: new WeakSet() };
       const angDiff = (a, b) => { let d = (b - a) % (Math.PI * 2); if (d > Math.PI) d -= Math.PI * 2; if (d < -Math.PI) d += Math.PI * 2; return d; };
       // Follow a shell's path (with bounces) from (x, y) heading (vx, vy); 'enemy' / 'self' / null for who it reaches first.
       function trace(x, y, vx, vy, from, foe, maxLen, maxBounce) {
@@ -254,6 +254,11 @@
           });
           bot.aim = best ? best.a : null;
         }
+        // Lined up for 1.8 seconds without firing (aim keeps flipping)? Give up the aim and hunt for a moment.
+        bot.skipAim = Math.max(0, bot.skipAim - dt);
+        if (bot.skipAim > 0) bot.aim = null;
+        bot.aimT = bot.aim !== null ? bot.aimT + dt : 0;
+        if (bot.aimT > 1.8) { bot.aimT = 0; bot.skipAim = 1.2; bot.aim = null; }
         bot.aiming = bot.aim !== null;
         if (bot.aim !== null) {
           const d = angDiff(b.a, bot.aim);
@@ -261,7 +266,7 @@
           const r = trace(b.x + Math.cos(b.a) * (TR + 5), b.y + Math.sin(b.a) * (TR + 5), Math.cos(b.a), Math.sin(b.a), b, h, 420, LV === 0 ? 0 : LV === 1 ? 1 : 2);
           if (r && r.who === 'foe') {
             bot.lock += dt;
-            if (bot.lock >= LOCK && bot.wait <= 0 && b.cool <= 0) { p.hit.act = true; bot.wait = GAP; }
+            if (bot.lock >= LOCK && bot.wait <= 0 && b.cool <= 0) { p.hit.act = true; bot.wait = GAP; bot.aimT = 0; }
           } else bot.lock = Math.max(0, bot.lock - dt * 2);
           return;
         }
@@ -468,6 +473,10 @@
         layout(g); startMatch();
       }
       if (window.ludusDebug) window.ludusDebug.tanks = () => ({ MC, MRW, phase, wins: { ...wins }, round, result, shells: shells.length, tanks: tanks.map(t => ({ x: t.x, y: t.y, a: t.a, dead: t.dead })), rects: rects.map(r => [r.x, r.y, r.w, r.h]) });
+      if (window.ludusDebug) window.ludusDebug.botTest = {   // test hook: positions of both tanks, and a teleport for the bot
+        state: () => ({ phase, sig: [wins.p1, wins.p2, round, tanks[0].x, tanks[0].y, tanks[1].x, tanks[1].y, tanks[1].a, tanks[0].dead ? 1 : 0, tanks[1].dead ? 1 : 0, shells.length], bot: [tanks[1].x, tanks[1].y] }),
+        tp: (x, y) => { tanks[1].x = x; tanks[1].y = y; }
+      };
       api.loop(dt => { update(dt); render(); });
       return { save, pause() { pads.clear(); }, resume() { pads.clear(); } };
     }

@@ -318,6 +318,7 @@
         if (on || nw === W || restored || api.touched || score.p1 || score.p2 || phase !== 'serve') return;
         layout(nw); reset();
       }
+      if (window.ludusDebug) window.ludusDebug.pongSet = o => { Object.assign(ball, o); };   // test hook: move/aim the ball
       if (window.ludusDebug) window.ludusDebug.pong = () => ({ W, H, phase, score: { ...score }, ball: { ...ball }, p1: paddles.p1.y, p2: paddles.p2.y, rally });
       // ---------- online: the host plays the match, the guest sends its paddle keys and draws the host's copy ----------
       let net = null, link = null, ended = false;

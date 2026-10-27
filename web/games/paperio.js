@@ -355,6 +355,9 @@
       }
       function aiThink(p) {
         const a = p.ai;
+        // Barely moved in 3 seconds (circling a waypoint it cannot reach, or pinned)? Forget the plan, go home and plan afresh.
+        if (a.sT === undefined || Math.hypot(p.x - a.sx, p.y - a.sy) > 3) { a.sx = p.x; a.sy = p.y; a.sT = clock; }
+        else if (clock - a.sT > 3) { a.sT = clock; a.wps = []; a.home = null; a.bias = -(a.bias || 1); a.mode = p.trail.length ? 'return' : 'plan'; }
         const home = owner[ci(p)] === p.id;
         let dEn = 1e9, dTr = 1e9;
         for (const e of players) {

@@ -160,11 +160,12 @@
       const nameOf = who => (on && on.names[who === 'a' ? 0 : 1]) || (who === 'a' ? 'Player 1' : 'Player 2');
       const doLocal = a => { if (on) on.send('act', a); act(turn, a); };
       let clock = 0, matches = 0, starter = 'a';
+      const botSeen = [];   // the bot's last squares, to spot dithering
       let st, turn, winner, thinking, last, anim, wallT, hover = null, flip = false, flipKey = '', banner = null, parts = [];
       api.score(0);
 
       function newGame(quiet) {
-        st = blank(); turn = starter; winner = ''; thinking = false; last = null; hover = null;
+        st = blank(); botSeen.length = 0; turn = starter; winner = ''; thinking = false; last = null; hover = null;
         anim = { a: { from: st.p.a.slice(), t: -9 }, b: { from: st.p.b.slice(), t: -9 } };
         wallT = {};
         if (turn === 'b' && !quiet && !friend) cpuTurn();
@@ -181,8 +182,16 @@
         thinking = true;
         api.timeout(() => {
           if (winner) return;
-          const a = chooseAction(st, api.level, Math.random);
-          thinking = false; act('b', a);
+          let a = chooseAction(st, api.level, Math.random);
+          // No usable action, or it keeps stepping back to a square it was just on (dithering)? Take the shortest-path step.
+          const bad = !a || (a.type === 'move' && !a.to);
+          const key = a && a.type === 'move' && a.to ? a.to.join(',') : '';
+          if (bad || (key && botSeen.filter(k => k === key).length >= 3)) {
+            const mv = bestMove(st, 'b', Math.random);
+            if (mv.to) a = mv; else if (bad) { const lm = legalMoves(st, 'b'); if (lm.length) a = { type: 'move', to: lm[0] }; }
+          }
+          if (a && a.type === 'move' && a.to) { botSeen.push(a.to.join(',')); if (botSeen.length > 10) botSeen.shift(); }
+          thinking = false; if (a) act('b', a);
         }, api.rand(450, 700));
       }
       function finish() {
@@ -389,6 +398,10 @@
         for (let i = parts.length - 1; i >= 0; i--) { const p = parts[i]; p.life -= dt; p.vy += 500 * dt; p.x += p.vx * dt; p.y += p.vy * dt; if (p.life <= 0) parts.splice(i, 1); }
         render();
       });
+      if (window.ludusDebug) window.ludusDebug.botTest = {   // test hook: a quick state read and a shortest-path player move
+        state: () => ({ turn: turn === 'a' ? 'me' : 'bot', phase: winner ? 'end' : 'play', n: st.p.b.join(',') + '|' + st.p.a.join(',') + '|' + st.left.b + matches }),
+        play: () => { if (winner || turn !== 'a' || thinking) return false; const mv = bestMove(st, 'a', Math.random); if (!mv.to) return false; doLocal(mv); return true; }
+      };
       return {
         save() {
           if (api.ended) return null;

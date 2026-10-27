@@ -11,7 +11,7 @@ if (!fs.existsSync(OLD)) { fs.mkdirSync(path.join(__dirname, '.old'), { recursiv
 const wait = ms => new Promise(r => setTimeout(r, ms));
 const results = [];
 const check = (name, ok, info) => { results.push(!!ok); console.log((ok ? 'PASS ' : 'FAIL ') + name + (!ok && info !== undefined ? '  ' + JSON.stringify(info).slice(0, 400) : '')); };
-const launch = () => chromium.launch({ executablePath: CHROME, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+const launch = () => chromium.launch({ executablePath: CHROME, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--disable-renderer-backgrounding', '--disable-background-timer-throttling', '--disable-backgrounding-occluded-windows'] });
 async function newPage(browser, br, o = {}) {
   const ctx = await browser.newContext({ viewport: o.size || { width: 400, height: 600 }, colorScheme: o.dark ? 'dark' : 'light', deviceScaleFactor: 1 });
   const page = await ctx.newPage(); page.errors = [];

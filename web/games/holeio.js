@@ -485,7 +485,7 @@
         const a = h.ai; a.t -= dt;
         if (a.tgt && (a.tgt.fall || (a.tgt.rr !== undefined && !a.tgt.alive))) a.t = Math.min(a.t, 0);
         if (a.t > 0) return;
-        a.t = rnd(0.25, 0.5);
+        a.t = rnd(0.25, 0.5); a.banT = (a.banT || 0) - 0.4;
         const keen = [0.6, 0.85, 1][LV];
         // 1. run from bigger holes
         let threat = null, td = 1e9;
@@ -507,7 +507,7 @@
         let best = null, bs = 0;
         const R = 200 + h.rr * 2.4, x0 = gi(h.x - R), x1 = gi(h.x + R), y0 = gi(h.y - R), y1 = gi(h.y + R);
         const consider = o => {
-          if (o.need > h.rr * 0.98 || o.fall) return;
+          if (o.need > h.rr * 0.98 || o.fall || (o === a.ban && a.banT > 0)) return;
           const d = Math.hypot(o.x - h.x, o.y - h.y);
           if (d > R) return;
           const s = (o.val + 1.5) / (d + 40);
@@ -542,6 +542,12 @@
           if (a.tgt) { tx = a.tgt.x + (a.tgt.vx || 0) * 0.25; ty = a.tgt.y + (a.tgt.vy || 0) * 0.25; }
           const ex = tx - h.x, ey = ty - h.y, m = Math.hypot(ex, ey);
           if (m > 3) { dx = ex / m; dy = ey / m; mag = 1; }
+          // Pushing against a building it cannot swallow yet (barely moved in 0.8 s)? Drop that target and wander elsewhere for a bit.
+          a.sT = (a.sT || 0) + dt;
+          if (a.sT > 0.8) {
+            if (mag && Math.hypot(h.x - (a.sx || 0), h.y - (a.sy || 0)) < 10) { a.ban = a.tgt; a.banT = 4; a.tgt = null; a.mode = 'wander'; a.wx = rnd(150, WORLD - 150); a.wy = rnd(150, WORLD - 150); a.t = 1.5; }
+            a.sx = h.x; a.sy = h.y; a.sT = 0;
+          }
           if (a.mode === 'wander') mag = 0.7;
         }
         const sp = (116 + h.rr * 0.75) * (h.human ? 1 : h.ai.spd);

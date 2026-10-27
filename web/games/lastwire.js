@@ -181,7 +181,16 @@
         api.timeout(() => {
           thinking = false; cpuAim = -1;
           if (phase !== 'play' || turn !== C) return;
-          if (move.type === 'scan') doScan(move.i, C); else doCut(move.i, C);
+          // An unusable pick (wire already cut, no scans left) would leave the bot waiting forever: cut a wire it still suspects instead.
+          let mv = move;
+          if ((cut & (1 << mv.i)) || (mv.type === 'scan' && scans.c <= 0)) {
+            const ok = []; for (let i = 0; i < N; i++) if (!(cut & (1 << i)) && (cand & (1 << i))) ok.push(i);
+            const any = []; for (let i = 0; i < N; i++) if (!(cut & (1 << i))) any.push(i);
+            const pool = ok.length ? ok : any;
+            if (!pool.length) return;
+            mv = { type: 'cut', i: pool[Math.floor(Math.random() * pool.length)] };
+          }
+          if (mv.type === 'scan') doScan(mv.i, C); else doCut(mv.i, C);
         }, t);
       }
 
@@ -390,6 +399,10 @@
         return true;
       });
       api.loop(dt => render(dt));
+      if (window.ludusDebug) window.ludusDebug.botTest = {   // test hook: a quick state read and a random player move
+        state: () => ({ turn: turn === P ? 'me' : 'bot', phase, n: bits(cut) + scans.p + scans.c + (wins.p + wins.c) * 20 }),
+        play: () => { if (phase !== 'play' || turn !== P || thinking) return false; const o = []; for (let i = 0; i < N; i++) if (!(cut & (1 << i))) o.push(i); if (!o.length) return false; scanMode = false; act(o[Math.floor(Math.random() * o.length)]); return true; }
+      };
       return {
         save() {
           if (api.ended) return null;
