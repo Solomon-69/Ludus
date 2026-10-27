@@ -6,6 +6,8 @@ All notable changes to Ludus. Versions follow the app's version number (`Info.pl
 ## 1.12.3 (2026-10-27)
 
 - Privacy blur removed: it could pick an iPhone camera instead of the Mac's, and it wasn't reliable enough.
+- Chess has a softer look: rounded pieces, a calm board and a game clock.
+- Clearer covers: Solitaire card edges, Flag Quiz now shows France and Jamaica, no corner sparks.
 
 ## 1.12.2 (2026-10-27)
 
