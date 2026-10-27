@@ -3,26 +3,33 @@
 # Windows UI Automation (the accessibility tree, no mouse), watches the "Downloading... N%" line, then checks the
 # app closed, swapped its files and came back as the newest release, all within a time limit.
 # Runs in Windows PowerShell 5.1 (UI Automation). Writes a log to $Out.
-param([string]$From, [string]$To, [string]$Out = 'update-test', [int]$Limit = 240)
+# -FromDir: start from a local build (e.g. this commit built with an older version number) instead of a published release.
+param([string]$From, [string]$To, [string]$Out = 'update-test', [int]$Limit = 240, [string]$FromDir = '')
 $ErrorActionPreference = 'Stop'
 . "$PSScriptRoot/uia.ps1"
 New-Item -ItemType Directory -Force $Out | Out-Null
 $Out = (Resolve-Path $Out).Path
-$log = Join-Path $Out "update-$From-to-$To.txt"
+$log = Join-Path $Out ("update-" + $(if ($FromDir) { "local" } else { $From }) + "-to-$To.txt")
 $fails = 0
 $t0 = Get-Date
 function Say($m) { $s = "[{0,6:N1}s] {1}" -f ((Get-Date) - $t0).TotalSeconds, $m; Write-Host $s; Add-Content $log $s }
 function Check($ok, $m) { if ($ok) { Say "PASS $m" } else { Say "FAIL $m"; $script:fails++ } }
 Set-Content $log ''
 
+Get-Process Ludus -ErrorAction SilentlyContinue | Stop-Process -Force; Start-Sleep -Seconds 1   # one Ludus at a time
 $repo = 'https://github.com/Solomon-69/Ludus/releases/download'
 $root = Join-Path $env:RUNNER_TEMP 'ludus-old'
 if (Test-Path $root) { Remove-Item -Recurse -Force $root }
 New-Item -ItemType Directory -Force $root | Out-Null
-Say "installing Ludus $From"
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-(New-Object Net.WebClient).DownloadFile("$repo/v$From/Ludus-windows.zip", (Join-Path $root 'old.zip'))
-Expand-Archive (Join-Path $root 'old.zip') -DestinationPath $root
+if ($FromDir) {
+  Say "installing the local build in $FromDir"
+  Copy-Item -Recurse (Resolve-Path $FromDir).Path (Join-Path $root 'Ludus')
+} else {
+  Say "installing Ludus $From"
+  [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+  (New-Object Net.WebClient).DownloadFile("$repo/v$From/Ludus-windows.zip", (Join-Path $root 'old.zip'))
+  Expand-Archive (Join-Path $root 'old.zip') -DestinationPath $root
+}
 $exe = (Get-ChildItem $root -Recurse -Filter Ludus.exe | Select-Object -First 1).FullName
 $ver = { (Get-Item $exe).VersionInfo.FileVersion }
 Say "installed $exe, version $(& $ver)"

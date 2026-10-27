@@ -23,7 +23,9 @@ internal static class Store
     {
         try
         {
+            // %APPDATA%\Ludus first, then next to Ludus.exe (where people tend to drop it)
             var path = Path.Combine(Folder, "original-names.json");
+            if (!File.Exists(path)) path = Path.Combine(AppContext.BaseDirectory, "original-names.json");
             var info = new FileInfo(path);
             if (!info.Exists || info.Length > 20000) return "null";
             var map = JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText(path));

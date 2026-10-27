@@ -9,8 +9,9 @@
    World units, y grows upward. Fixed 240 Hz position-based solver, so it feels the same at any frame rate. */
 (function () {
   const D = Ludus.draw;
-  const G = -1450, PR = 16, HR = 6, HL = 80, HMIN = 18, STEP = 1 / 240, VIEW = 360;
-  const SPRING = 26, HSPD = 720, VMAX = 1000, FLING = 580, BOUNCE = 0.18, STICK = 1.5, STICKV = 380, SUP = 0.25;
+  const G = -1250, PR = 16, HR = 6, HL = 80, HMIN = 18, STEP = 1 / 240, VIEW = 360;
+  // the head follows the mouse closely (fast spring, high speed cap: 1300/240 = 5.4 units a step, under the head radius, so it never tunnels)
+  const SPRING = 40, HSPD = 1300, VMAX = 1000, FLING = 640, BOUNCE = 0.18, STICK = 1.5, STICKV = 380, SUP = 0.25;
   // Materials: head slip (share of sideways drag that slides), pot friction.
   const MAT = {
     rock: { slip: 0, mu: 0.9 }, orange: { slip: 0, mu: 0.8 }, wall: { slip: 1, mu: 0.3 }, wood: { slip: 0.03, mu: 0.8 },
@@ -41,91 +42,100 @@
     return [k, x0 + c, y0, x1 - c, y0, x1, y0 + c, x1, y1 - c, x1 - c, y1, x0 + c, y1, x0, y1 - c, x0, y0 + c];
   }
   function build(di) {
-    const P = DIFFS[di], st = P.step, ln = P.len, out = [], route = [], marks = [], deco = { snow: [], joints: [] };
+    // An original mountain in the spirit of the famous pot-and-hammer climb: the start pit under a dead tree, the pipes,
+    // orange rocks and a bucket, the chimney, the furniture, the long slide, the mountain, the ice, and a summit in space.
+    const P = DIFFS[di], st = P.step, gp = P.gap, ln = P.len, sl = P.slope, out = [], route = [], marks = [], deco = { snow: [], joints: [] };
     const mark = (x, y, name) => marks.push({ x, y, name });
     const R = (...pts) => { for (let i = 0; i < pts.length; i += 2) route.push([pts[i], pts[i + 1]]); };
-    // 1. the tree (a dead end you can climb for fun) and the first small rock
-    out.push(['wood', -350, 0, -312, 0, -316, 300, -326, 540, -338, 540, -346, 300],
-      ['wood', -320, 214, -196, 270, -192, 284, -320, 232], ['wood', -340, 330, -474, 396, -478, 382, -342, 312],
-      ['wood', -328, 432, -224, 476, -220, 490, -330, 450], blob('rock', 60, -4, 44, 36, 3, 12));
-    mark(-80, 16, 'The tree'); R(-80, 16, 60, 48);
-    // 2. the first climb over boulders, up to the chimney floor
-    const bx = 160, Hf = 360 * st, cx = bx + 640, g = 92 * P.gap, rwx = cx + 70 + g, Ht = Hf + 600 * ln;
-    out.push(blob('rock', bx + 80, -10, 100, 120 * st, 1), blob('rock', bx + 270, 50 * st, 110, 160 * st, 2),
-      blob('rock', bx + 480, 150 * st, 125, 190 * st, 4, 16), ['rock', bx + 400, 0, rwx, 0, rwx, Hf, bx + 610, Hf]);
-    if (P.holds >= 3) out.push(blob('nub', bx + 180, 100 * st, 18, 12, 40, 8), blob('nub', bx + 380, 220 * st, 18, 12, 41, 8));
-    mark(bx + 80, 110 * st + 16, 'The boulders');
-    R(bx + 80, 110 * st + 16, bx + 270, 210 * st + 16, bx + 480, 340 * st + 16, bx + 620, Hf + 16);
-    // 3. the chimney: a narrow crack between a pillar and the mountain wall
-    out.push(['rock', cx, Hf + 140, cx + 70, Hf + 140, cx + 70, Ht - 40, cx, Ht - 40]);
+    const nub = (x, y, i) => out.push(blob('nub', x, y, 16, 11, 70 + i, 8));
+    // 1. the start pit: a dead tree on the left rim (climb it for fun), a boulder and a shelf on the right
+    const H1 = 150 * st;
+    out.push(['rock', XMIN, 0, -250, 0, -232, 40, -240, 90, XMIN, 90],
+      ['wood', -350, 86, -312, 86, -316, 380, -326, 630, -338, 630, -346, 380],
+      ['wood', -320, 304, -196, 360, -192, 374, -320, 322], ['wood', -340, 420, -474, 486, -478, 472, -342, 402],
+      ['wood', -328, 522, -224, 566, -220, 580, -330, 540],
+      blob('rock', 92, 0, 66, 92 * st, 3, 12));
+    if (P.holds >= 3) nub(40, 34, 0);
+    mark(-80, 16, 'The pit'); R(-80, 16, 92, 92 * st + 16, 260, H1 + 16);
+    // 2. the pipes: four metal pipes, each a step above the last and overlapping it, over a rock shelf
+    const p0 = 520, pr = 96 * st, pl = 210 * ln, nP = 4;
+    let pa = p0, pTop = H1;
+    for (let i = 0; i < nP; i++) {
+      pTop = H1 + (i + 1) * pr;
+      out.push(slab('metal', pa, pTop - 26, pa + pl, pTop, 10), slab('metal', pa + pl - 34, H1 - 4, pa + pl - 16, pTop - 24, 3));
+      deco.joints.push([pa + pl - 25, pTop - 13], [pa + pl - 25, H1 + 14]);
+      R(pa + pl * 0.5, pTop + 16);
+      if (i < nP - 1) pa += pl - 24 * gp;
+    }
+    const pEnd = pa + pl;
+    out.push(['rock', 120, 0, pEnd + 10, 0, pEnd + 10, H1, 150, H1, 132, H1 - 44]);
+    mark(p0 - 30, H1 + 16, 'Pipes');
+    // 3. orange rocks and the bucket: three orange steps with round lips, a bucket to climb in and out of
+    const O = pEnd - 10, h0 = pTop - 30, hs = 100 * st, h2 = h0 + 2 * hs;
+    out.push(['orange', O, 0, O + 520, 0, O + 520, h2, O + 340, h2, O + 340, h0 + hs, O + 180, h0 + hs, O + 180, h0, O, h0],
+      blob('orange', O + 182, h0 + hs - 8, 30, 20, 31, 10), blob('orange', O + 342, h2 - 8, 30, 20, 32, 10),
+      blob('orange', O + 70, h0 + 4, 40, 18, 33, 10));
+    const bx0 = O + 380, bx1 = O + 492, bh = 78;
+    out.push(['metal', bx0, h2, bx1, h2, bx1 + 6, h2 + bh, bx1 - 6, h2 + bh, bx1 - 12, h2 + 12, bx0 + 12, h2 + 12, bx0 + 6, h2 + bh, bx0 - 6, h2 + bh]);
+    deco.bucket = [(bx0 + bx1) / 2, h2 + bh];
+    if (P.holds >= 2) nub(O + 260, h0 + hs + 40, 1);
+    mark(O + 40, h0 + 16, 'Orange rocks'); R(O + 90, h0 + 40, O + 260, h0 + hs + 16, O + 400, h2 + 30, (bx0 + bx1) / 2, h2 + bh + 16, O + 510, h2 + 16);
+    // 4. the chimney: a narrow crack between a pillar and the wall, then furniture on the mesa
+    const C = O + 520, g = 92 * gp, rwx = C + 70 + g, Ht = h2 + 560 * ln;
+    out.push(['rock', C - 10, 0, rwx + 2, 0, rwx + 2, h2, C - 10, h2], ['rock', C, h2 + 140, C + 70, h2 + 140, C + 70, Ht - 40, C, Ht - 40]);
     const nC = P.holds + 1;
-    for (let i = 0; i < nC; i++) {
-      const y = Hf + 200 + (i + 0.5) * (Ht - Hf - 260) / nC;
-      out.push(blob('nub', i % 2 ? cx + 70 : rwx, y, 16, 12, 5 + i, 8));
+    for (let i = 0; i < nC; i++) out.push(blob('nub', i % 2 ? C + 70 : rwx, h2 + 200 + (i + 0.5) * (Ht - h2 - 260) / nC, 16, 12, 5 + i, 8));
+    mark(C + 20, h2 + 16, 'The chimney'); R(C + 70 + g / 2, h2 + 16, C + 70 + g / 2, Ht + 24);
+    const F1 = rwx + 560, Hs = Ht + 250 * st;
+    out.push(['rock', rwx, 0, F1, 0, F1, Ht, rwx, Ht],
+      // a stool, a table with a lamp, a tall bookcase against the next rock wall
+      slab('wood', rwx + 120, Ht + 60 * st, rwx + 196, Ht + 74 * st, 4), slab('wood', rwx + 128, Ht - 4, rwx + 138, Ht + 62 * st, 2), slab('wood', rwx + 178, Ht - 4, rwx + 188, Ht + 62 * st, 2),
+      slab('wood', rwx + 250, Ht + 140 * st, rwx + 410, Ht + 158 * st, 5), slab('wood', rwx + 258, Ht - 4, rwx + 270, Ht + 142 * st, 2), slab('wood', rwx + 390, Ht - 4, rwx + 402, Ht + 142 * st, 2),
+      slab('wood', F1 - 100, Ht - 4, F1 + 4, Hs, 6));
+    deco.lamp = [rwx + 330, Ht + 158 * st + 30];
+    out.push(slab('metal', rwx + 326, Ht + 156 * st, rwx + 334, Ht + 186 * st, 2));
+    if (P.holds >= 3) nub(F1 - 120, Ht + 210 * st, 2);
+    mark(rwx + 40, Ht + 16, 'Furniture'); R(rwx + 60, Ht + 16, rwx + 158, Ht + 74 * st + 16, rwx + 290, Ht + 158 * st + 16, F1 - 50, Hs + 16);
+    // 5. the slide: a long slick slope down into a valley (slip and it carries you a long way back)
+    const Ls = 560 * ln, Ds = Ls * 0.45 * sl, s0 = F1 + 110, sx1 = s0 + Ls, Hl = Hs - Ds, Hv = Hl - 60;
+    out.push(['rock', F1, 0, sx1, 0, sx1, Hl - 20, s0, Hs - 10, s0 - 10, Hs, F1, Hs],
+      ['slide', s0 - 14, Hs + 4, sx1 + 10, Hl + 4, sx1 + 10, Hl - 24, s0 - 14, Hs - 24]);
+    deco.slide = [s0, Hs + 2, sx1, Hl + 2];
+    mark(F1 + 40, Hs + 16, 'The slide'); R(s0 + Ls / 2, Hs - Ds / 2 + 20, sx1 + 40, Hv + 16);
+    // 6. the mountain: a valley floor, then a long staircase of rock with snow on the upper steps
+    const m0 = sx1 + 160 * gp, nM = Math.round(7 * ln), tr = 118, rise = 100 * st;
+    const stair = ['rock', m0, Hv - 4];
+    let yS = Hv;
+    for (let j = 0; j < nM; j++) {
+      yS += rise * (j % 2 ? 1.06 : 0.94);
+      const y = yS, x = m0 + j * tr;
+      stair.push(x, y, x + tr, y);
+      if (j >= nM - 3) deco.snow.push([x, x + tr, y]);
+      R(x + tr / 2, y + 16);
+      if (P.holds >= 2 && j % 3 === 1) out.push(blob('nub', x + 4, y - rise * 0.5, 13, 9, 80 + j, 8));
     }
-    mark(cx + 20, Hf + 16, 'The chimney'); R(cx + 70 + g / 2, Hf + 16, cx + 70 + g / 2, Ht + 24, rwx + 60, Ht + 20);
-    // 4. the slide down to the edge of the orange-hell pit
-    const Ls = 520 * ln, Ds = Ls * 0.42 * P.slope, sx1 = rwx + 160 + Ls, Hl = Ht - Ds;
-    out.push(['rock', rwx, 0, sx1, 0, sx1, Hl - 20, rwx + 160, Ht - 10, rwx + 150, Ht, rwx, Ht],
-      ['slide', rwx + 140, Ht + 4, sx1 + 10, Hl + 4, sx1 + 10, Hl - 24, rwx + 140, Ht - 24],
-      blob('nub', sx1 + 2, Hl + 8, 9, P.holds ? 14 : 10, 21, 8));
-    deco.slide = [rwx + 150, Ht + 2, sx1, Hl + 2];
-    mark(rwx + 60, Ht + 20, 'The slide'); R(sx1 - 24, Hl + 24);
-    // 5. orange hell: hook the hanging boulder across the pit, then climb the orange wall. Fall, and it is all the way down.
-    const Gp = 170 * P.gap, ox = sx1 + Gp, To = Ht + 120 * st;
-    out.push(blob('orange', ox - 30, Hl + 20, 70, 52, 8), ['orange', ox + 40, 0, ox + 260, 0, ox + 260, To, ox + 40, To]);
-    for (let y = 70, i = 0; y < To - 30; y += 118 * st, i++) out.push(blob('orange', ox + (i % 2 ? 10 : 50), y, 72, 58, 30 + i));
-    mark(ox - 30, Hl + 88, 'Orange hell'); R(ox - 30, Hl + 90, ox + 30, To - 40, ox + 120, To + 16);
-    // 6. furniture and pipes on the mesa: table, cabinet, bucket, a pipe to hook and a lamp post
-    const f0 = ox + 330, i0 = f0 + 820, Ti = To + 500 * st;
-    out.push(['rock', ox + 250, 0, i0, 0, i0, To, ox + 250, To],
-      slab('wood', f0 + 70, To + 64 * st, f0 + 192, To + 80 * st, 4), slab('wood', f0 + 74, To - 4, f0 + 84, To + 66 * st, 2),
-      slab('wood', f0 + 178, To - 4, f0 + 188, To + 66 * st, 2), slab('wood', f0 + 270, To - 4, f0 + 390, To + 180 * st, 6),
-      ['metal', f0 + 490, To, f0 + 570, To, f0 + 574, To + 62, f0 + 566, To + 62, f0 + 560, To + 10, f0 + 500, To + 10, f0 + 494, To + 62, f0 + 486, To + 62],
-      slab('metal', f0 + 430, To + 270 * st, f0 + 672, To + 294 * st, 10), slab('metal', f0 + 648, To - 4, f0 + 672, To + 290 * st, 3),
-      slab('metal', f0 + 732, To - 4, f0 + 750, To + 412 * st, 2), slab('metal', f0 + 702, To + 410 * st, f0 + 782, To + 434 * st, 8));
-    if (P.holds >= 3) out.push(blob('nub', f0 + 600, To + 160 * st, 14, 10, 42, 8));
-    deco.joints.push([f0 + 660, To + 282 * st], [f0 + 660, To + 20], [f0 + 430, To + 282 * st], [f0 + 741, To + 20]);
-    deco.lamp = [f0 + 742, To + 402 * st]; deco.bucket = [f0 + 530, To + 62];
-    mark(f0, To + 16, 'Furniture'); mark(f0 + 560, To + 294 * st + 16, 'Pipes');
-    R(f0, To + 16, f0 + 130, To + 96 * st, f0 + 330, To + 196 * st, f0 + 560, To + 310 * st, f0 + 742, To + 450 * st);
-    // 7. ice mountain: one long icy slope with a few rough stones
-    const Li = 560 * ln, Ri = Li * 0.62 * P.slope, i1 = i0 + 80 + Li, Tp = Ti + 8 + Ri;
-    out.push(['rock', i0, 0, i1 + 140, 0, i1 + 140, Tp, i1, Tp, i0 + 80, Ti, i0, Ti],
-      ['ice', i0, Ti, i0 + 80, Ti + 8, i1, Tp, i1 + 10, Tp - 30, i0 + 80, Ti - 22, i0, Ti - 20]);
+    const mE = m0 + nM * tr, yT = stair[stair.length - 1];
+    stair.push(mE, Hv - 4);
+    out.push(['rock', sx1 - 10, 0, mE + 10, 0, mE + 10, Hv, sx1 - 10, Hv], stair);
+    mark(m0 - 60, Hv + 16, 'The mountain');
+    // 7. the ice: one long icy slope with a few rough stones
+    const Li = 560 * ln, Ri = Li * 0.6 * sl, i1 = mE + 80 + Li, Tp = yT + 8 + Ri;
+    out.push(['rock', mE, 0, i1 + 140, 0, i1 + 140, Tp, i1, Tp, mE + 80, yT, mE, yT],
+      ['ice', mE, yT, mE + 80, yT + 8, i1, Tp, i1 + 10, Tp - 30, mE + 80, yT - 22, mE, yT - 20]);
     const nI = P.holds + 2;
-    for (let j = 0; j < nI; j++) { const t = (j + 0.7) / (nI + 0.4); out.push(blob('nub', i0 + 80 + t * Li, Ti + 12 + t * Ri, 22, 14, 11 + j, 10)); }
-    deco.ice = [i0 + 80, Ti + 8, i1, Tp];
-    mark(i0 + 60, Ti + 24, 'Ice mountain'); R(i0 + 80, Ti + 24, i1, Tp + 16, i1 + 120, Tp + 16);
-    // 8. the ridge: humps and steep little valleys, up and down (more of them on harder mountains)
-    const nR = 2 + DIFFS.indexOf(P), base = Tp - 200 * st, r0 = i1 + 140, rEnd = r0 + 280 + (nR - 1) * 260 * ln;
-    out.push(['rock', r0, 0, rEnd, 0, rEnd, base, r0, base]);
-    for (let j = 0; j < nR; j++) {
-      const hx = r0 + 140 + j * 260 * ln, ry = (230 + 50 * (j % 2)) * st;
-      out.push(blob('rock', hx, base, 112, ry, 50 + j, 16));
-      if (P.holds >= 2) out.push(blob('nub', hx - 118, base + ry * 0.45, 14, 10, 60 + j, 8));
-      R(hx, base + ry + 16);
-    }
-    mark(r0 + 140, base + 246 * st, 'The ridge');
-    // 9. a saddle, then the tall tower to the summit
-    const sd = base + 30, sx = rEnd + 60, tx = sx + 80, n = Math.round(6 * ln), hb = 112 * st;
-    let a = 0, b = 0, yT = sd;
-    for (let i = 0; i < n; i++) {
-      a = tx + i * 24 + (i % 2 ? -100 : 0); b = a + (i % 2 ? 190 : 210); yT = sd + (i + 1) * hb;
-      out.push(slab('rock', a, sd + i * hb - 6, b, yT, 14)); deco.snow.push([a, b, yT]);
-      R((i % 2 ? a + 40 : b - 40), yT + 16);
-    }
-    out.push(['rock', a, yT - 6, b, yT - 6, b - 6, yT + 40, b - 40, yT + 70, a + 40, yT + 72, a + 6, yT + 40]);
-    const XMAX = b + 600;
-    out.push(['rock', rEnd, 0, XMAX, 0, XMAX, sd, rEnd, sd]);
-    route.splice(route.length - n, 0, [sx, sd + 16]);
-    mark(sx, sd + 16, 'The tower'); mark((a + b) / 2, yT + 88, 'Summit'); R((a + b) / 2, yT + 88);
-    deco.flag = [(a + b) / 2, yT + 71];
+    for (let j = 0; j < nI; j++) { const t = (j + 0.7) / (nI + 0.4); out.push(blob('nub', mE + 80 + t * Li, yT + 12 + t * Ri, 22, 14, 11 + j, 10)); }
+    deco.ice = [mE + 80, yT + 8, i1, Tp];
+    mark(mE + 40, yT + 24, 'Ice'); R(mE + 80, yT + 24, i1, Tp + 16);
+    // 8. the summit: a last flat top under the stars. Stand on it and you lift off into space.
+    const sumX0 = i1 + 60, sumX1 = i1 + 300, XMAX = i1 + 900;
+    out.push(['rock', i1 + 100, 0, XMAX, 0, XMAX, Tp, i1 + 100, Tp]);
+    deco.flag = [(sumX0 + sumX1) / 2, Tp];
+    mark((sumX0 + sumX1) / 2, Tp + 16, 'Space'); R((sumX0 + sumX1) / 2, Tp + 16);
     // the ground under it all, and the world's edges
-    out.push(['rock', XMIN, -300, XMAX, -300, XMAX, 0, 700, 3, 420, 0, 100, -2, -200, 4, -520, 10, XMIN, 40],
+    out.push(['rock', XMIN, -300, XMAX, -300, XMAX, 0, XMIN, 0],
       ['wall', XMIN - 400, -300, XMIN, -300, XMIN, 9000, XMIN - 400, 9000],
-      ['wall', XMAX, -300, XMAX + 400, -300, XMAX + 400, 9000, XMAX, 9000]);
-    return { P, shapes: out, route, marks, deco, XMAX, YTOP: yT + 2000, summit: { y: yT + 75, x0: a, x1: b } };
+      ['wall', XMAX, -300, XMAX + 400, -300, XMAX + 400, 99999, XMAX, 99999]);
+    return { P, shapes: out, route, marks, deco, XMAX, YTOP: Tp + 2000, summit: { y: Tp + 5, x0: sumX0, x1: sumX1 } };
   }
 
   function makeWorld(di) {
@@ -291,8 +301,8 @@
     };
   }
   const ORDER = ['wall', 'rock', 'orange', 'slide', 'wood', 'metal', 'ice', 'nub'];
-  const LEAVES = [[-330, 560, 70], [-400, 500, 52], [-250, 510, 50], [-470, 410, 40], [-215, 300, 38], [-210, 480, 36]];
-  const GRASS = [[-620, 22], [-520, 12], [-460, 9], [-170, 4], [-20, 1], [120, 0]];
+  const LEAVES = [[-330, 650, 70], [-400, 590, 52], [-250, 600, 50], [-470, 500, 40], [-215, 390, 38], [-210, 570, 36]];
+  const GRASS = [[-620, 90], [-520, 90], [-420, 90], [-170, 0], [-20, 0], [200, 0]];
 
   Ludus.register({
     id: 'climb', name: 'Hammer Climb', tag: 'Arcade', tint: '#7d6a58', resetOnQuit: true,
@@ -330,7 +340,7 @@
     create(stage, api) {
       const view = api.canvas(() => {});
       const { ctx, canvas } = view;
-      canvas.style.cursor = 'crosshair';
+      canvas.style.cursor = 'crosshair'; canvas.style.touchAction = 'none';   // a touch screen or pen drives the hammer too, never scrolls
       let world, s, maxH, maxP, time, state = 'menu', cam = { x: 0, y: 0 }, winLift = 0, acc = 0, aim, mouse = null, keysDown = {}, clock = 0, winAt = 0;
       let fallFrom = 0, fallNote = null, lastTap = 0, wasHc = false, falls = 0, reached = 1, sectionNote = null, back = null;
       let sensI = SENS.indexOf(+Ludus.state.climbSens); if (sensI < 0) sensI = 2;
@@ -345,7 +355,7 @@
         back = world.route.map(([x, y]) => [x, y - 40]).concat([[world.route[world.route.length - 1][0], 0], [world.route[0][0], 0]]);
       }
       function restore(o) {
-        if (!o || o.v2 !== 2 || !fin(o.di) || !DIFFS[o.di] || !pt(o.p) || !pt(o.v) || !pt(o.o) || !pt(o.h)) return false;
+        if (!o || o.v2 !== 3 || !fin(o.di) || !DIFFS[o.di] || !pt(o.p) || !pt(o.v) || !pt(o.o) || !pt(o.h)) return false;
         setWorld(o.di);
         if (o.p.x < XMIN || o.p.x > world.XMAX || o.p.y < -100 || o.p.y > world.YTOP || Math.hypot(o.o.x, o.o.y) > HL + 1) return false;
         s = { p: { x: o.p.x, y: o.p.y }, v: { x: o.v.x, y: o.v.y }, o: { x: o.o.x, y: o.o.y }, h: { x: o.h.x, y: o.h.y }, hc: !!o.hc,
@@ -461,13 +471,16 @@
         ctx.closePath();
       }
       function sky(col, w, h, k) {
-        const t = Math.max(0, Math.min(1, cam.y / 3400)), d = col.dark;
+        const t = Math.max(0, Math.min(1, cam.y / (world.summit.y + 40))), d = col.dark;
         const g = ctx.createLinearGradient(0, 0, 0, h);
         if (d) { g.addColorStop(0, `hsl(${222 + t * 20} ${28 + t * 10}% ${13 - t * 5}%)`); g.addColorStop(1, `hsl(${28 - t * 20} 16% ${12 - t * 3}%)`); }
-        else { g.addColorStop(0, `hsl(${36 + t * 170} ${48 - t * 8}% ${93 - t * 10}%)`); g.addColorStop(1, `hsl(${34 + t * 150} 40% ${91 - t * 4}%)`); }
+        else {
+          const sp = Math.max(0, t - 0.8) * 5;   // 0..1 over the last stretch: the sky deepens into space
+          g.addColorStop(0, `hsl(${36 + t * 190} ${48 - t * 8 - sp * 10}% ${93 - t * 10 - sp * 68}%)`); g.addColorStop(1, `hsl(${34 + t * 170} ${40 - sp * 12}% ${91 - t * 4 - sp * 58}%)`);
+        }
         ctx.fillStyle = g; D.roundRect(ctx, 0, 0, w, h, 14); ctx.fill();
         // stars high up (and always a few at night)
-        const sa = d ? 0.25 + t * 0.6 : Math.max(0, t - 0.55) * 1.6;
+        const sa = d ? 0.25 + Math.max(0, t - 0.6) * 1.8 : Math.max(0, t - 0.8) * 5;   // space at the summit
         if (sa > 0.01) {
           ctx.fillStyle = d ? '#fff6e6' : '#ffffff';
           for (let i = 0; i < 60; i++) {
@@ -497,7 +510,7 @@
       function render() {
         const col = api.colors(), pal = palette(col.dark), d = col.dark;
         const { w, h } = view, k = scale();
-        if (state === 'won') winLift += (200 - winLift) * (api.reduceMotion ? 1 : 0.03);
+        if (state === 'won') winLift += (700 - winLift) * (api.reduceMotion ? 1 : 0.02);   // lift off into space
         if (state === 'menu') { cam.x = 260 + Math.sin(clock * 0.15) * 120; cam.y = 200; }
         else { cam.x = s.p.x; cam.y = s.p.y + winLift; }
         ctx.clearRect(0, 0, w, h);
@@ -676,7 +689,7 @@
         save() {
           if (state !== 'play' || time < 1) return null;
           const c = q => ({ x: q.x, y: q.y });
-          return { v2: 2, di: world.di, p: c(s.p), v: c(s.v), o: c(s.o), h: c(s.h), hc: s.hc, hn: c(s.hn), ground: s.ground, maxH, maxP, time, falls, aim: { a: aim.a, l: aim.l } };
+          return { v2: 3, di: world.di, p: c(s.p), v: c(s.v), o: c(s.o), h: c(s.h), hc: s.hc, hn: c(s.hn), ground: s.ground, maxH, maxP, time, falls, aim: { a: aim.a, l: aim.l } };
         },
         resume() { acc = 0; }
       };

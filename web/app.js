@@ -17,13 +17,16 @@
   const customName = g => (S.renameGames && S.names && typeof S.names[g.id] === 'string' && S.names[g.id].trim()) || '';
   // "Original names" (Settings > More): shows your own list of names, read from original-names.json in the Ludus app folder
   // (the app hands it over as window.__LUDUS_ORIGINAL_NAMES__). Nothing is built in or shipped. Only changes what is shown.
-  const ORIGINAL_NAMES = (() => {
-    const out = {}, src = window.__LUDUS_ORIGINAL_NAMES__;
-    if (src && typeof src === 'object') for (const k of Object.keys(src)) if (typeof src[k] === 'string' && src[k].trim()) out[k] = src[k].trim().slice(0, 40);
+  // The list can also be pasted in Settings (kept in Ludus's own saved state), so it works without finding the app folder.
+  const cleanList = src => {
+    const out = {};
+    if (src && typeof src === 'object') for (const k of Object.keys(src)) if (typeof src[k] === 'string' && src[k].trim()) out[String(k).slice(0, 40)] = src[k].trim().slice(0, 40);
     return out;
-  })();
-  const hasPreset = Object.keys(ORIGINAL_NAMES).length > 0;
-  const presetName = g => (hasPreset && S.originalNames && ORIGINAL_NAMES[g.id]) || '';
+  };
+  const FILE_NAMES = cleanList(window.__LUDUS_ORIGINAL_NAMES__);
+  const origList = () => Object.assign({}, FILE_NAMES, cleanList(S.originalList));
+  const hasList = () => Object.keys(origList()).length > 0;
+  const presetName = g => { if (!S.originalNames) return ''; const m = origList(); return m[g.id] || m[g.name] || ''; };
   const dispName = g => customName(g) || presetName(g) || g.name;
   L.displayName = dispName;
   const REVEAL_MS = 1200;   // how long the final board stays on screen before the result bar slides up
@@ -334,6 +337,44 @@
     n.addEventListener('pointerdown', e => e.stopPropagation());
     n.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') open(e); });
     el.appendChild(n);
+  }
+  // Paste your own list: one "Game = Original name" per line (or the same JSON as original-names.json).
+  function parseNamesList(text) {
+    const t = String(text || '').trim(); if (!t) return {};
+    try { const j = JSON.parse(t); if (j && typeof j === 'object' && !Array.isArray(j)) return cleanList(j); } catch (e) { /* not JSON: lines */ }
+    const out = {};
+    t.split(/\r?\n/).forEach(line => {
+      const m = line.match(/^\s*(.+?)\s*(?:=|:|\t|->)\s*(.+?)\s*$/); if (!m) return;
+      const key = m[1].toLowerCase(), g = L.games.find(x => x.id === m[1] || x.name.toLowerCase() === key || (customName(x) || '').toLowerCase() === key);
+      if (g) out[g.id] = m[2].slice(0, 40);
+    });
+    return out;
+  }
+  function openNamesList(done) {
+    if (!renameSheet) {
+      renameSheet = document.createElement('div'); renameSheet.className = 'sheet rename-sheet'; renameSheet.setAttribute('role', 'dialog'); renameSheet.setAttribute('aria-modal', 'true');
+      document.body.appendChild(renameSheet);
+    }
+    const sh = renameSheet; sh.innerHTML = ''; sh.hidden = false; sh.setAttribute('aria-label', 'Original names');
+    const card = el('div', 'lobby-card rename-card');
+    card.append(el('div', 'sheet-title', 'Original names'), el('p', 'lobby-sub', 'One game per line, like “Sky Raiders = your name”. Only changes what is shown.'));
+    const ta = document.createElement('textarea'); ta.className = 'names-list'; ta.rows = 6; ta.spellcheck = false; ta.setAttribute('aria-label', 'Your list of names');
+    const cur = cleanList(S.originalList); ta.value = Object.keys(cur).map(id => { const g = L.games.find(x => x.id === id); return (g ? g.name : id) + ' = ' + cur[id]; }).join('\n');
+    const note = el('div', 'rename-count', ''); card.append(ta, note);
+    const close = () => { sh.hidden = true; sh.innerHTML = ''; document.removeEventListener('keydown', esc, true); if (done) done(); };
+    const save = el('button', 'btn primary', 'Save'); save.type = 'button';
+    save.onclick = () => {
+      const list = parseNamesList(ta.value), n = Object.keys(list).length;
+      if (ta.value.trim() && !n) { note.textContent = 'No game names found. Use “Game = name”.'; return; }
+      S.originalList = list; S.originalNames = n > 0 || Object.keys(FILE_NAMES).length > 0; L.save(); L.sfx('click'); close();
+    };
+    const cancel = el('button', 'btn ghost', 'Cancel'); cancel.type = 'button'; cancel.onclick = close;
+    card.append(save, cancel);
+    function esc(e) { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); } }
+    document.addEventListener('keydown', esc, true);
+    sh.onclick = e => { if (e.target === sh) close(); };
+    sh.appendChild(card);
+    setTimeout(() => { try { ta.focus({ preventScroll: true }); } catch (e) {} }, 30);
   }
   let renameSheet = null;
   function openRename(g, done) {
@@ -1000,9 +1041,15 @@
       moreRows.push(row('Invisible icon', invisibleHelp, sw(!!window.__LUDUS_INVISIBLE__, v => { window.__LUDUS_INVISIBLE__ = v; L.native('invisible', { on: v }); }, 'Invisible icon')));
     }
     moreRows.push(row('Rename games', 'Click a game’s name to give it your own', sw(!!S.renameGames, v => { S.renameGames = v; L.save(); }, 'Rename games')));
-    const origSw = sw(hasPreset && !!S.originalNames, v => { S.originalNames = v; L.save(); renderCards(); }, 'Original names');
-    if (!hasPreset) { origSw.onclick = null; origSw.setAttribute('aria-disabled', 'true'); origSw.style.opacity = '.5'; }   // no file: quietly does nothing
-    moreRows.push(row('Original names', 'Show your own list of original game names', origSw));
+    const origSw = sw(hasList() && !!S.originalNames, v => {
+      if (v && !hasList()) { origSw.setAttribute('aria-checked', 'false'); openNamesList(() => { origSw.setAttribute('aria-checked', String(!!S.originalNames)); renderCards(); }); return; }
+      S.originalNames = v; L.save(); renderCards();
+    }, 'Original names');
+    const origCtl = el('div', 'upd-ctl');
+    const editB = el('button', 'small-btn', hasList() ? 'Edit list' : 'Add list'); editB.type = 'button';
+    editB.onclick = () => { L.sfx('click'); openNamesList(() => { editB.textContent = hasList() ? 'Edit list' : 'Add list'; origSw.setAttribute('aria-checked', String(hasList() && !!S.originalNames)); renderCards(); }); };
+    origCtl.append(editB, origSw);
+    moreRows.push(row('Original names', 'Show your own list of original game names', origCtl));
     // The More card: a settings row that says what is inside, and springs open in place.
     const moreCard = el('div', 'group more-card');
     const preview = moreRows.map(r => { const t = r.querySelector('.row-title'); return t ? t.textContent : ''; }).filter(Boolean).join(', ');

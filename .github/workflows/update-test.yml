@@ -22,6 +22,7 @@ jobs:
     outputs:
       from: ${{ steps.v.outputs.from }}
       to: ${{ steps.v.outputs.to }}
+      old_broken: ${{ steps.v.outputs.old_broken }}
     steps:
       - id: v
         env:
@@ -35,6 +36,8 @@ jobs:
           to=${IN_TO:-$(echo "$tags" | sed -n 1p)}
           from=${IN_FROM:-$(echo "$tags" | sed -n 2p)}
           echo "from=$from" >> "$GITHUB_OUTPUT"; echo "to=$to" >> "$GITHUB_OUTPUT"
+          # 1.12.16 and older: the Windows update button never started the download (fixed after it)
+          broken=$(printf '%s\n1.12.16\n' "$from" | sort -V | head -1); [ "$broken" = "$from" ] && echo "old_broken=true" >> "$GITHUB_OUTPUT" || echo "old_broken=false" >> "$GITHUB_OUTPUT"
           echo "update test: $from -> $to"
 
   windows:
@@ -43,11 +46,11 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      - name: Older Ludus updates itself in-app
-        shell: pwsh
+      # Windows Ludus 1.12.16 and older cannot update in-app (their update button never started the download):
+      # people on those versions download once from the website. From the next version on, this must pass.
+      - name: Previous release updates itself in-app to the newest
+        shell: powershell
+        continue-on-error: ${{ needs.versions.outputs.old_broken == 'true' }}
         run: ./windows/ci/update-real.ps1 -From '${{ needs.versions.outputs.from }}' -To '${{ needs.versions.outputs.to }}' -Out update-test -Limit 240
       - name: Newest Ludus self-test (check, download, verify, unpack)
         shell: pwsh
