@@ -485,6 +485,13 @@ svg { display: block; }
 .seat-badge { font: 700 8.5px/1 var(--font-round); letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); padding: 2px 6px; border-radius: 999px; }
 .seats.many .seat-name { font-size: 12px; }
 .seat-tag { flex: none; font-size: 10px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-3); }
+.seat-acts { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
+.seat-act { appearance: none; font: 600 10.5px/1 var(--font-round); color: var(--accent); background: transparent; border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); padding: 4px 8px; border-radius: 999px; cursor: pointer; transition: background-color 0.15s ease, transform 0.1s ease; }
+.seat-act:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.seat-act:active:not(:disabled) { transform: scale(0.97); }
+.seat-act:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.seat-act.is-yes { background: var(--accent); border-color: var(--accent); color: #fff; }
+.seat-act:disabled { color: var(--ink-3); border-color: var(--line); cursor: default; opacity: 0.8; }
 .seats.many { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .seats.many .seat { padding: 6px 8px; gap: 7px; }
 .seats.many .seat-tag { font-size: 9px; }

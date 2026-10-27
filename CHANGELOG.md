@@ -3,6 +3,12 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.13 (2026-10-27)
+
+- Online: the host can make another player the leader. In the room, tap Make leader under a player's name and confirm. That player gets the host controls (picking games, starting, answering suggestions) and everyone sees who the new leader is. The room keeps its code, players, games and scores, so the old host can leave and everyone else plays on.
+- Online: if the host leaves without choosing, the player who has been in the room longest becomes the leader instead of the room closing. This works in the waiting room and between tournament rounds; leaving in the middle of a round still ends the room.
+- If someone in the room has an older Ludus, Make leader is greyed out (everyone needs this version) and a leaving host closes the room as before.
+
 ## 1.12.12 (2026-10-27)
 
 - Online: the join code is shown as five tiles that fill from left to right (a dash while empty); a recent party's code shows faintly. Paste still works with a code or an invite message.

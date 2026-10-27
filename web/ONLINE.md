@@ -30,6 +30,26 @@ suggestions wait behind it ("+1 more waiting"), one per player (a newer one repl
 heartbeat; guests only offer the feature then, and older Ludus ignores both new kinds. A host that is already in a game declines
 with `why: 'busy'`. Test: `node online.js suggest` (host + two joiners, light and dark).
 
+## Leader hand-over (1.12.13)
+
+In the room the host sees **Make leader** under every other player's name; it asks for an inline **Confirm** / **Cancel**. The
+chosen player becomes the host (seat 0; the two swap seats) and gets every host control (picking games and rounds, Start, answering
+suggestions, Make leader). Everyone sees a toast ("Bo is now the leader"). The room keeps its code, players, plan and scoreboard,
+so the old host can press **Leave** and the room carries on. A host who presses Leave *without* choosing hands the room to the
+player who has been in it longest. Wire: `hx` (old host to everyone, `{ to, he, p, x, lv? }`: the new host's id, the new **host
+epoch** `he`, the new roster, the host's state: plan, series and game-win tally, round number, seats, join order) and an optional
+`nh` / `he` on the leaving host's `bye`, so a player who missed the `hx` still follows. The new host's heartbeats carry `he`; a
+player who missed both adopts a room member that hosts with a higher `he`. The old host repeats `hx` (at most 4 times, one per
+heartbeat) until the new host's heartbeat shows it took over.
+* Every player says `hx: 1` in its join and heartbeats. The host offers Make leader (and hands over on Leave) only when **every**
+  player in the room says so; with an older Ludus present the buttons are greyed out ("Needs everyone on the newest Ludus") and a
+  host who leaves closes the room as before, because the older player would not follow.
+* Not while a round is being played: a host who leaves mid-round still closes the room (real-time games run on the host's
+  screen). Between tournament rounds (scoreboard) and at the final standings it works; the new host's scoreboard gets Start now.
+* A host that disappears without leaving (crash, lost connection) still closes the room after 16 s: there is no safe way for the
+  others to agree on a new host while the old one might come back.
+* Test: `node promote.js` (three pages, light and dark; plus a 1.12.12 and a 1.6.0 guest).
+
 ## Old versions (1.6.0 / 1.6.1)
 
 Wire version `v` stays 1 and the topic stays `ludus/v1/<CODE>/m`. Protocol 2 only adds optional fields: `pv` (join, welcome,
@@ -144,8 +164,8 @@ about 0.1 s late; if the host leaves the room closes.
   `q` game message number, `r` round. Game messages are numbered per sender; a gap is noticed (also from the
   4 s heartbeat) and the missing messages are requested and sent again. Duplicates are ignored.
 * Presence: everyone sends a heartbeat every 4 s; silence for 16 s means gone. The host's heartbeat carries the
-  roster and the current round so a missed message heals itself. If the host leaves the room closes (no host
-  migration). A connection that drops reconnects by itself (state `connecting` / `online` / `offline`).
+  roster and the current round so a missed message heals itself. If the host leaves, the room is handed to
+  another player when everybody can follow (see "Leader hand-over"), otherwise it closes. A connection that drops reconnects by itself (state `connecting` / `online` / `offline`).
 * Room codes are 5 characters from `ABCDEFGHJKMNPQRSTUVWXYZ23456789` (no `I L O 0 1`).
 
 ## Prediction and smoothing (real-time games)

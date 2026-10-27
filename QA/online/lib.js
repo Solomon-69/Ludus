@@ -22,7 +22,7 @@ async function newPage(browser, br, o = {}) {
     window.__LUDUS_BROKERS__ = port ? ['ws://127.0.0.1:' + port] : ['ws://127.0.0.1:9'];
     try { if (!localStorage.getItem('ludus.v1')) localStorage.setItem('ludus.v1', JSON.stringify({ reduceMotion: true, introDone: true, onlineName: name || '', theme: dark ? 'dark' : 'light' })); } catch (e) {}
   }, [br && br.port, o.name || '', !!o.dark]);
-  await page.goto('file://' + path.join(o.old ? OLD : WEB, 'index.html'));
+  await page.goto('file://' + path.join(o.dir || (o.old ? OLD : WEB), 'index.html'));
   await page.waitForTimeout(300);
   return page;
 }

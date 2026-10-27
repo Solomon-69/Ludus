@@ -315,7 +315,8 @@
   // ---------- rooms ----------
   /* Messages are JSON objects on one topic per room: ludus/v1/<CODE>/m
        v:1 (version)  c: sender's random id   t: kind   q: game message number   r: round (rematch count)
-     kinds: join, welcome, rej, roster (inside hb), hb, bye, start, nack, rematch, sg / sgr (a guest's suggestion and the host's answer; older Ludus ignores both), g (a game message: k = its type, d = its data)
+     kinds: join, welcome, rej, roster (inside hb), hb, bye, start, nack, rematch, sg / sgr (a guest's suggestion and the host's answer; older Ludus ignores both),
+            hx (the host hands the room to another player: see "leader hand-over" below; older Ludus ignores it), g (a game message: k = its type, d = its data)
   */
   const topicOf = code => 'ludus/v1/' + code + '/m';
   function cleanRoster(list) {
@@ -353,6 +354,9 @@
     me.rmin = me.min; me.rmax = me.max;   // the room's own seat limits (a game for one older player shrinks them)
     me.gmin = me.min; me.gmax = me.max;   // seats the running game wants (the room may be bigger)
     me.over = false;            // closed or left
+    me.he = 0;                  // host epoch: goes up by one each time the room gets a new host (leader hand-over)
+    me.peerHx = {};             // host: cid -> 1 when that player's Ludus understands a hand-over
+    me.order = [];              // host: player ids in the order they joined (the longest-present player takes over when the host leaves)
     me.ready = false;           // host: code claimed; guest: accepted into the room
     const urls = NET.brokers();
     me.wantCode = role === 'host' && opts.code ? NET.extractCode(opts.code) : '';   // a host coming back to the same room code (Rejoin)
@@ -430,7 +434,7 @@
       const ask = () => {
         if (me.over || me.ready || me.conn !== 'online') return;
         if (++me.tries > 6) { me._fail('no-room'); return; }
-        me._pub({ t: 'join', n: me.baseName, g: me.gameId, pv: PV });
+        me._pub({ t: 'join', n: me.baseName, g: me.gameId, pv: PV, hx: 1 });
       };
       me.joinTimer = setInterval(ask, 1000);
       ask();
@@ -440,7 +444,8 @@
   Session.prototype.rosterList = function () { return Array.from(this.roster.values()).sort((a, b) => a.seat - b.seat); };
   Session.prototype.count = function () { return this.roster.size; };
   Session.prototype._hbObj = function () {
-    const o = { t: 'hb', q: this.sq, p: this._rosterWire(), mx: this.max, mn: this.min, g: this.gameId, gen: this.gen, sd: this.seed, pv: PV };
+    const o = { t: 'hb', q: this.sq, p: this._rosterWire(), mx: this.max, mn: this.min, g: this.gameId, gen: this.gen, sd: this.seed, pv: PV, hx: 1 };
+    if (this.he) o.he = this.he;
     if (this.flex) { o.tn = { g: this.plan.g, n: this.plan.n }; o.sg = 1; if (this.legacy) o.lg = 1; }   // sg: this host answers suggestions
     if (this.ser) o.sr = this._srWire();
     return o;
@@ -467,7 +472,9 @@
       });
       this._pub(this._hbObj());
     } else {
-      if (this.ready) this._pub({ t: 'hb', q: this.sq, pv: PV });
+      if (this.ready) this._pub({ t: 'hb', q: this.sq, pv: PV, hx: 1 });
+      // we just handed the room over: say it again until the new host's heartbeat shows it took over
+      if (this.hxMsg && this.hxTries++ < 4) this._pub(Object.assign({}, this.hxMsg));
       if (this.ready && now - this.lastHost > PEER_TIMEOUT) this._close('host-lost');
     }
   };
@@ -476,7 +483,8 @@
     if (!p) return;
     this.roster.delete(seat);
     delete this.rxq[p.cid];
-    delete this.peerPv[p.cid];
+    delete this.peerPv[p.cid]; delete this.peerHx[p.cid];
+    this.order = this.order.filter(c => c !== p.cid);
     if (this.role === 'host') {
       if (this.legacy && !Object.keys(this.peerPv).some(c => this.peerPv[c] < 2)) { this.legacy = false; this.min = this.rmin; this.max = this.rmax; this._emit('legacy', { on: false }); this._emit('plan', this.plan); }
       this._pub(this._hbObj());
@@ -505,6 +513,7 @@
       case 'rematch': if (this.role === 'host') this._emit('rematch', { name: this._senderName(m.c) }); return;
       case 'sg': return this.role === 'host' ? this._onSuggest(m) : undefined;
       case 'sgr': return this._onSuggestReply(m);
+      case 'hx': return this._onHandover(m);
       case 'tr': return this._onResult(m);
       case 'sb': return this._onBoard(m);
       case 'lob': return m.c === this.hostCid ? this._toLobbyLocal() : undefined;
@@ -546,6 +555,8 @@
       } else if (pv < 2 && this.flex) this.legacy = true;
       if (this.roster.size >= this.max) return reply({ why: 'full' });
       this.peerPv[m.c] = pv;
+      if (m.hx === 1) this.peerHx[m.c] = 1;
+      if (!this.order.includes(m.c)) this.order.push(m.c);
       let seat = 1; while (this.roster.has(seat)) seat++;
       this.roster.set(seat, { seat, name: NET.cleanName(m.n, 'Player ' + (seat + 1)), cid: m.c });
       this._emit('roster', this.rosterList());
@@ -553,6 +564,7 @@
     const seat = this._seatOf(m.c);
     const w = { t: 'welcome', to: m.c, s: seat, p: this._rosterWire(), mx: this.max, mn: this.min, g: this.gameId, pv: PV };
     if (this.flex) { w.tn = { g: this.plan.g, n: this.plan.n }; if (this.legacy) w.lg = 1; }
+    if (this.he) w.he = this.he;
     this._pub(w);
     this._pub(this._hbObj());
   };
@@ -791,6 +803,7 @@
     if (m.tn) this._setPlan(m.tn);
     this.oldPeer = m.lg === 1;
     this.seat = m.s; this.hostCid = m.c; this.lastHost = Date.now(); this.ready = true; this.client.pin();
+    if (Number.isInteger(m.he) && m.he > 0) this.he = m.he;
     if (!this.gameId && typeof m.g === 'string' && TYPE_RE.test(m.g)) this.gameId = m.g;
     this.max = Math.max(2, Math.min(MAX_SEATS, m.mx | 0)); this.min = Math.max(2, Math.min(this.max, m.mn | 0)); this.gmin = this.min; this.gmax = this.max;
     this._setRoster(list);
@@ -806,19 +819,21 @@
     // someone else is hosting the code we wanted: pick another
     if (this.role === 'host' && !this.ready && Array.isArray(m.p)) { this.collision = true; return; }
     if (typeof m.q === 'number' && seat >= 0) this._maybeNack(m.c, m.q);
+    if (this.role === 'host' && seat > 0 && m.hx === 1) this.peerHx[m.c] = 1;
+    // a player of this room is hosting with a newer host epoch: it took over (we missed the hand-over message itself)
+    if (this.role !== 'host' && this.ready && m.c !== this.hostCid && seat >= 0 && Number.isInteger(m.he) && m.he > this.he) {
+      const nl = cleanRoster(m.p);
+      if (nl && nl.some(p => p.seat === 0 && p.cid === m.c) && nl.some(p => p.cid === this.cid)) this._adopt(m.c, m.he, nl);
+    }
     if (this.role === 'host' || !this.ready || m.c !== this.hostCid) return;
     const list = cleanRoster(m.p);
     if (!list) return;
+    this.hxMsg = null;   // the host we handed the room to is running it
+    if (Number.isInteger(m.he) && m.he > this.he) this.he = m.he;
     const before = Array.from(this.roster.values()).map(p => p.cid).join();
     const gone = Array.from(this.roster.values()).filter(p => !list.some(q => q.cid === p.cid));
     if (!list.some(p => p.cid === this.cid)) { this._close('removed'); return; }
-    if (before !== list.map(p => p.cid).join() || list.length !== this.roster.size) {
-      this.roster = new Map(list.map(p => [p.seat, p]));
-      const meE = list.find(p => p.cid === this.cid); if (meE) this.seat = meE.seat;
-      list.forEach(p => { if (!this.seen[p.cid]) this.seen[p.cid] = Date.now(); });
-      this._emit('roster', this.rosterList());
-      gone.forEach(p => { delete this.rxq[p.cid]; if (this.started && this.active) this.active._left(p.seat, p.name, false); this._emit('left', { seat: p.seat, name: p.name, why: 'gone' }); });
-    }
+    if (before !== list.map(p => p.cid).join() || list.length !== this.roster.size) this._applyRoster(list, gone);
     this.hostPv = Number.isInteger(m.pv) ? m.pv : 1; this.legacy = this.hostPv < 2;
     if (m.tn) this._setPlan(m.tn);
     if ((m.sg === 1) !== !!this.hostSg) { this.hostSg = m.sg === 1; this._emit('plan', this.plan); }
@@ -842,9 +857,123 @@
     this._emit('start', { gen, seed: this.seed, game: this.gameId });
   };
   Session.prototype._onBye = function (m) {
-    if (m.c === this.hostCid && this.role !== 'host') { this._close('host-left'); return; }
+    if (m.c === this.hostCid && this.role !== 'host') {
+      // the host left but named the player who takes over (we may have missed the hand-over itself)
+      if (typeof m.nh === 'string' && Number.isInteger(m.he) && m.he > this.he && this._seatOf(m.nh) > 0) {
+        const heir = this._seatOf(m.nh);
+        const nl = this.rosterList().filter(p => p.cid !== m.c).map(p => Object.assign({}, p, { seat: p.seat === heir ? 0 : p.seat }));
+        if (m.nh === this.cid) this._becomeHost(nl, m.he, null); else this._adopt(m.nh, m.he, nl);
+        return;
+      }
+      this._close('host-left'); return;
+    }
     const seat = this._seatOf(m.c);
     if (seat > 0 && this.role === 'host') this._removeSeat(seat, 'left');
+  };
+
+  // ----- leader hand-over (1.12.13) -----
+  /* The host can make another player the host ("leader"); a host who leaves between rounds hands the room to the player who has
+     been in it longest. The room keeps its code, plan, scoreboard and players. Seat 0 is always the host, so the new host and
+     the old host swap seats (a leaving host's seat is simply dropped).
+       hx  old host -> everyone: { to: new host id, he: new host epoch, p: the new roster, x: the host's state, lv: 1 if leaving }
+       bye from a leaving host also says { nh: new host id, he } so a player who missed the hx still follows.
+     The new host's heartbeats carry he; a player who missed everything adopts a member of the room that hosts with a higher he.
+     Every player says hx: 1 in join and heartbeats; the host only offers a hand-over when every player in the room says so, so
+     an older Ludus (which would not follow and would close the room) is never left behind. Not during a round being played. */
+  Session.prototype._inRound = function () { return this.started && !(this.ser && this.ser.st !== 'play'); };
+  // host: why a hand-over cannot happen right now ('' = it can)
+  Session.prototype.promoteBlock = function () {
+    if (this.role !== 'host' || !this.ready || this.over) return 'host';
+    if (this.conn !== 'online') return 'offline';
+    if (this.legacy || this.rosterList().some(p => p.seat > 0 && !this.peerHx[p.cid])) return 'old';
+    if (this._inRound()) return 'playing';
+    return '';
+  };
+  Session.prototype._hostState = function () {
+    const x = { fx: this.flex ? 1 : 0, g: this.gameId, tn: { g: this.plan.g.slice(), n: this.plan.n }, gen: this.gen, sd: this.seed, st: this.started ? 1 : 0,
+      mx: this.max, mn: this.min, rx: [this.rmin, this.rmax], gm: [this.gmin, this.gmax], jo: this.order.slice(0, MAX_SEATS) };
+    if (this.ser) { x.sr = this._srWire(); if (this.ser.gw) x.gw = Object.assign({}, this.ser.gw); }
+    return x;
+  };
+  // host: make the player with this id the host. leaving: called from leave(), the old host is not in the new room.
+  Session.prototype.promote = function (cid, leaving) {
+    if (this.promoteBlock()) return false;
+    const t = this.rosterList().find(p => p.cid === cid);
+    if (!t || t.seat === 0) return false;
+    const list = this.rosterList().filter(p => !(leaving && p.cid === this.cid))
+      .map(p => [p.cid === cid ? 0 : p.cid === this.cid ? t.seat : p.seat, p.name, p.cid]).sort((a, b) => a[0] - b[0]);
+    const msg = { t: 'hx', to: cid, he: this.he + 1, p: list, x: this._hostState() };
+    if (leaving) msg.lv = 1;
+    if (!this._pub(msg)) return false;
+    if (leaving) return true;
+    this._demote(msg);
+    return true;
+  };
+  Session.prototype._demote = function (msg) {
+    if (this.ser) { clearTimeout(this.ser.t1); clearTimeout(this.ser.t2); const s = this.ser; this.ser = { st: s.st, gs: s.gs.slice(), gi: s.gi, ri: s.ri, n: s.n, sc: s.sc.map(e => e.slice()), why: s.why || '' }; }
+    this.role = 'guest'; this.flex = false; this.legacy = false; this.hostPv = PV; this.hostSg = msg.x.fx === 1;
+    this.sugs = []; this.mySug = null; this.peerPv = {}; this.peerHx = {}; this.order = [];
+    this.hxMsg = Object.assign({}, msg); this.hxTries = 0;
+    this._adopt(msg.to, msg.he, cleanRoster(msg.p));
+  };
+  // everybody but the new host: follow the new host
+  Session.prototype._adopt = function (cid, he, list) {
+    if (!list) return;
+    this.hostCid = cid; this.he = he; this.lastHost = Date.now();
+    const gone = this.rosterList().filter(p => !list.some(q => q.cid === p.cid));
+    this._applyRoster(list, gone);
+    const h = list.find(p => p.cid === cid);
+    this._emit('host', { cid, name: h ? h.name : '', me: false });
+  };
+  Session.prototype._applyRoster = function (list, gone) {
+    this.roster = new Map(list.map(p => [p.seat, p]));
+    const meE = list.find(p => p.cid === this.cid); if (meE) this.seat = meE.seat;
+    list.forEach(p => { if (!this.seen[p.cid]) this.seen[p.cid] = Date.now(); });
+    this._emit('roster', this.rosterList());
+    (gone || []).forEach(p => { delete this.rxq[p.cid]; if (this.started && this.active) this.active._left(p.seat, p.name, false); this._emit('left', { seat: p.seat, name: p.name, why: 'gone' }); });
+  };
+  Session.prototype._onHandover = function (m) {
+    if (this.role === 'host' || !this.ready || m.c !== this.hostCid || typeof m.to !== 'string' || m.to.length > 16 || !Number.isInteger(m.he) || m.he <= this.he) return;
+    const list = cleanRoster(m.p);
+    if (!list || !list.some(p => p.seat === 0 && p.cid === m.to) || !list.some(p => p.cid === this.cid) || this._seatOf(m.to) < 0) return;
+    if (m.to === this.cid) this._becomeHost(list, m.he, m.x && typeof m.x === 'object' && !Array.isArray(m.x) ? m.x : null);
+    else this._adopt(m.to, m.he, list);
+  };
+  // this player is the new host: take over the room from what the old host sent (x) and what every player already knows
+  Session.prototype._becomeHost = function (list, he, x) {
+    const now = Date.now(), gone = this.rosterList().filter(p => !list.some(q => q.cid === p.cid));
+    x = x || {};
+    const int2 = a => Array.isArray(a) && a.length === 2 && a.every(n => Number.isInteger(n) && n >= 2 && n <= MAX_SEATS) && a[0] <= a[1];
+    this.role = 'host'; this.seat = 0; this.hostCid = this.cid; this.he = he; this.ready = true;
+    this.flex = x.fx === 1 || x.fx === 0 ? x.fx === 1 : !!this.hostSg;
+    if (x.tn) this._setPlan(x.tn);
+    if (typeof x.g === 'string' && TYPE_RE.test(x.g)) this.gameId = x.g;
+    if (Number.isInteger(x.gen) && x.gen >= this.gen) { this.gen = x.gen; if (Number.isInteger(x.sd)) this.seed = x.sd >>> 0; }
+    if (x.st === 0 || x.st === 1) this.started = x.st === 1;
+    if (Number.isInteger(x.mx) && x.mx >= 2 && x.mx <= MAX_SEATS) this.max = x.mx;
+    if (Number.isInteger(x.mn) && x.mn >= 2 && x.mn <= this.max) this.min = x.mn;
+    if (int2(x.rx)) { this.rmin = x.rx[0]; this.rmax = x.rx[1]; } else { this.rmin = this.min; this.rmax = this.max; }
+    if (int2(x.gm)) { this.gmin = x.gm[0]; this.gmax = x.gm[1]; }
+    if (x.sr) { const keep = this.role; this.role = 'guest'; this._applySr(x.sr); this.role = keep; }
+    if (this.ser) {
+      this.ser = Object.assign({}, this.ser, { rep: {}, gw: {} });
+      if (x.gw && typeof x.gw === 'object') Object.keys(x.gw).slice(0, MAX_SEATS).forEach(c => { if (Number.isInteger(x.gw[c]) && x.gw[c] >= 0 && x.gw[c] < 100) this.ser.gw[c] = x.gw[c]; });
+      if (this.ser.st === 'final') this.started = false;
+    }
+    this.legacy = false; this.oldPeer = false; this.sugs = []; this.mySug = null; clearTimeout(this.sugTimer); clearInterval(this.joinTimer); this.hxMsg = null;
+    this.roster = new Map(list.map(p => [p.seat, p]));
+    this.peerPv = {}; this.peerHx = {};
+    list.forEach(p => { this.seen[p.cid] = now; if (p.cid !== this.cid) { this.peerPv[p.cid] = PV; this.peerHx[p.cid] = 1; } });
+    const jo = Array.isArray(x.jo) ? x.jo.filter(c => typeof c === 'string' && list.some(p => p.cid === c && c !== this.cid)) : [];
+    this.order = jo.concat(list.filter(p => p.cid !== this.cid && !jo.includes(p.cid)).sort((a, b) => a.seat - b.seat).map(p => p.cid));
+    this._pub(this._hbObj());
+    setTimeout(() => { if (!this.over && this.role === 'host') this._pub(this._hbObj()); }, 500);   // once more, in case the first copy is lost
+    gone.forEach(p => { delete this.rxq[p.cid]; this._emit('left', { seat: p.seat, name: p.name, why: 'gone' }); });
+    if (this.ser && this.ser.st === 'board') { clearTimeout(this.ser.t2); this.ser.t2 = setTimeout(() => this.advance(), SERIES_PAUSE); }
+    else if (this.ser && this.ser.st === 'play') this._afterLeave();
+    this._emit('plan', this.plan);
+    const meE = list.find(p => p.cid === this.cid);
+    this._emit('host', { cid: this.cid, name: meE ? meE.name : this._nameFor(0), me: true });
   };
 
   // ----- game messages -----
@@ -906,7 +1035,10 @@
 
   Session.prototype.leave = function () {
     if (this.over) return;
-    this._pub({ t: 'bye' });
+    // a host leaving between rounds hands the room to the longest-present player, when everybody's Ludus can follow that
+    let heir = null;
+    if (this.role === 'host' && !this.promoteBlock()) { const c = this.order.find(x => this._seatOf(x) > 0) || (this.rosterList().find(p => p.seat > 0) || {}).cid; if (c && this.promote(c, true)) heir = c; }
+    this._pub(heir ? { t: 'bye', nh: heir, he: this.he + 1 } : { t: 'bye' });
     this.over = true; this._stop();
     if (this.active) this.active._left(null, null, true);
     this.ev = {};

@@ -447,10 +447,12 @@
   function trackParty(s, role) {
     const save = () => {
       if (!s.ready) return;
-      S.party = { role, code: s.code, name: L.net.cleanName(S.onlineName, ''), names: s.rosterList().map(p => p.name), games: s.plan.g.slice(), n: s.plan.n, at: Date.now() };
+      S.party = { role: s.role || role, code: s.code, name: L.net.cleanName(S.onlineName, ''), names: s.rosterList().map(p => p.name), games: s.plan.g.slice(), n: s.plan.n, at: Date.now() };
       L.save();
     };
-    ['ready', 'roster', 'plan'].forEach(ev => s.on(ev, save));
+    ['ready', 'roster', 'plan', 'host'].forEach(ev => s.on(ev, save));
+    // leader hand-over: everybody hears who runs the room now; an open scoreboard card redraws with the right buttons
+    s.on('host', ev => { toast(ev.me ? 'You are now the leader' : (ev.name || 'A player') + ' is now the leader'); L.lobby.refresh(s); });
   }
   function rejoinParty() {
     const p = S.party; if (!p) return;
@@ -518,7 +520,7 @@
       s.on('rematch', ev => toast((ev.name || 'Your opponent') + ' wants a rematch'));
       s.on('conn', () => { if (mine()) syncOnlineBar(online.game); });
       s.on('left', ev => {
-        if (!mine() || s.ser) return;   // a tournament: the host decides whether it goes on
+        if (!mine() || s.ser || !online.started) return;   // a tournament: the host decides whether it goes on; in the waiting room nothing ends
         if (s.count() < s.gmin) endOnline((ev.name || 'Your opponent') + ' left', 'The game cannot go on without them, so you are going back to the menu.');
       });
       s.on('closed', ev => {

@@ -53,10 +53,35 @@
       const label = p ? p.name + (i === mine ? ' (you)' : '') : 'Waiting';
       const tx = el('div', 'seat-text'); tx.appendChild(el('div', 'seat-name', label));
       if (p && i === 0) tx.appendChild(el('div', 'seat-badge', 'Host'));   // under the name, so the name always has the whole width
+      else if (p && session.role === 'host' && i !== mine) tx.appendChild(leaderActs(p));
       s.appendChild(tx);
       row.appendChild(s);
     }
     return row;
+  }
+  // host: "Make leader" under each other player's name, confirmed in place (no pop-up)
+  let confirmLeader = { s: null, cid: '' }, focusConfirm = false;
+  const LEADER_WHY = { old: 'Needs everyone on the newest Ludus', offline: 'Needs a connection', playing: 'Not while a round is being played' };
+  function leaderActs(p) {
+    const box = el('div', 'seat-acts'), why = session.promoteBlock(), asking = confirmLeader.s === session && confirmLeader.cid === p.cid && !why;
+    const act = (label, cls, fn) => { const b = el('button', 'seat-act' + (cls ? ' ' + cls : ''), label); b.type = 'button'; b.onclick = () => { L.sfx('click'); fn(); }; return b; };
+    if (asking) {
+      const yes = act('Confirm', 'is-yes', () => {
+        confirmLeader = { s: null, cid: '' };
+        if (!session.promote(p.cid)) ops && ops.toast && ops.toast('Could not change the leader');
+        render();
+      });
+      yes.setAttribute('aria-label', 'Confirm: make ' + p.name + ' the leader');
+      box.appendChild(yes);
+      box.appendChild(act('Cancel', '', () => { confirmLeader = { s: null, cid: '' }; render(); }));
+      if (focusConfirm) { focusConfirm = false; setTimeout(() => { try { yes.focus({ preventScroll: true }); } catch (e) {} }, 0); }
+    } else {
+      const b = act('Make leader', '', () => { confirmLeader = { s: session, cid: p.cid }; focusConfirm = true; render(); });
+      b.setAttribute('aria-label', 'Make ' + p.name + ' the leader');
+      if (why) { b.disabled = true; b.title = LEADER_WHY[why] || ''; }
+      box.appendChild(b);
+    }
+    return box;
   }
   function codeBoxes(code) {
     const row = el('div', 'code-row');
@@ -348,6 +373,7 @@
       live.textContent = host ? (n >= session.min ? 'Ready to start. ' + n + '/' + mx + ' players' : n < 2 ? 'Waiting for a friend to join' : 'Waiting for players ' + n + '/' + mx) : 'Waiting for the host to start. ' + n + '/' + mx + ' players';
       card.appendChild(live);
       card.appendChild(avatars(n, mx));
+      if (host && n > 1 && session.promoteBlock() === 'old') card.appendChild(el('p', 'lobby-note leader-note', 'Make leader needs everyone on the newest Ludus.'));
       if (host) { const sc = suggestionCard(); if (sc) card.appendChild(sc); }
       if (session.flex || session.plan.g.length) card.appendChild(planBlock(host));
       if (host) {
@@ -399,6 +425,7 @@
       }
     }));
     offs.push(s.on('plan', () => { if (screen === 'room') render(); }));
+    offs.push(s.on('host', () => { confirmLeader = { s: null, cid: '' }; if (screen === 'room') { render(); L.sfx('tap'); } }));
     offs.push(s.on('sugstate', () => { if (screen === 'room') { render(); L.sfx('tap'); } }));
     offs.push(s.on('suggest', () => { if (screen === 'room') { render(); L.sfx('tap'); } }));
     offs.push(s.on('oldpeer', () => { ops && ops.toast && ops.toast('Your friend needs to update Ludus for tournaments'); }));
@@ -451,6 +478,8 @@
     // Show the room screen for a session that is already in the room (joined from a ludus:// link).
     attach(g, s, o) { ensure(); discard(); game = g; ops = o; hookSession(s); screen = 'room'; error = ''; sheet.hidden = false; render(); },
     close() { discard(); if (sheet) sheet.hidden = true; },
+    // redraw for this session (the room got a new leader while a scoreboard card is up)
+    refresh(s) { if (sheet && !sheet.hidden && session === s && (screen === 'board' || screen === 'final')) render(); },
     hide,
     // A room made from the Online page: no game yet, the host picks games in the lobby.
     openRoom(o, code) { ensure(); discard(); game = null; ops = o; error = ''; sheet.hidden = false; createRoom(code); return session; },
