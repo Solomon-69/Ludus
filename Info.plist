@@ -23,6 +23,7 @@
 		</dict>
 	</array>
 	<key>NSAppTransportSecurity</key><dict><key>NSAllowsLocalNetworking</key><true/></dict>
+	<key>NSCameraUsageDescription</key><string>Ludus uses the camera only for Privacy blur, on this Mac. Nothing is recorded or sent.</string>
 	<key>LSUIElement</key><true/>
 	<key>NSHumanReadableCopyright</key><string>Ludus, made by Solomon, 2026.</string>
 </dict>

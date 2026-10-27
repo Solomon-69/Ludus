@@ -83,10 +83,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
         content.addUserScript(WKUserScript(source: bootScript(), injectionTime: .atDocumentStart, forMainFrameOnly: true))
         config.userContentController = content
         config.preferences.setValue(true, forKey: "allowFileAccessFromFileURLs")
+        // WebKit hides navigator.mediaDevices on file:// pages unless this is on (Privacy blur needs the camera).
+        config.preferences.setValue(true, forKey: "mediaDevicesEnabled")
         webView = WKWebView(frame: NSRect(origin: .zero, size: currentSize()), configuration: config)
         webView.setValue(false, forKey: "drawsBackground")
         webView.allowsMagnification = false
         webView.navigationDelegate = self
+        webView.uiDelegate = self   // camera permission for Privacy blur (Camera.swift)
         if let dir = Bundle.main.resourceURL?.appendingPathComponent("web"),
            FileManager.default.fileExists(atPath: dir.appendingPathComponent("index.html").path) {
             webView.loadFileURL(dir.appendingPathComponent("index.html"), allowingReadAccessTo: dir)

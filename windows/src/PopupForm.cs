@@ -176,6 +176,15 @@ internal sealed class PopupForm : Form
                 if (!e.Uri.StartsWith(Origin, StringComparison.OrdinalIgnoreCase)) e.Cancel = true;
             };
             core.NewWindowRequested += (_, e) => e.Handled = true;
+            // Privacy blur needs the camera; only our own page may have it, and nothing else (no mic, location, ...).
+            core.PermissionRequested += (_, e) =>
+            {
+                var own = Uri.TryCreate(e.Uri, UriKind.Absolute, out var u) && u.Scheme == Uri.UriSchemeHttps
+                          && string.Equals(u.Host, Host, StringComparison.OrdinalIgnoreCase);
+                e.State = own && e.PermissionKind == CoreWebView2PermissionKind.Camera
+                    ? CoreWebView2PermissionState.Allow : CoreWebView2PermissionState.Deny;
+                e.Handled = true;
+            };
             core.NavigationCompleted += (_, e) =>
             {
                 ready = e.IsSuccess;
