@@ -99,25 +99,29 @@
       const u = Math.min(h / 78, w / 236);
       const g = ctx.createLinearGradient(0, 0, w, h); g.addColorStop(0, '#36707a'); g.addColorStop(1, '#24525a');
       ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+      // One clean outline per bubble (rounded box and tail drawn as a single shape) with one soft shadow.
       const bubble = (x, y, bw, bh, fill, tailLeft) => {
-        ctx.fillStyle = 'rgba(0,0,0,0.18)'; Ludus.draw.roundRect(ctx, x + 1.5 * u, y + 2.5 * u, bw, bh, 9 * u); ctx.fill();
-        ctx.fillStyle = fill; Ludus.draw.roundRect(ctx, x, y, bw, bh, 9 * u); ctx.fill();
-        ctx.beginPath(); const tx = tailLeft ? x + 14 * u : x + bw - 14 * u;
-        ctx.moveTo(tx - 5 * u, y + bh - 1); ctx.lineTo(tx + (tailLeft ? -4 : 4) * u, y + bh + 9 * u); ctx.lineTo(tx + 6 * u, y + bh - 1); ctx.closePath(); ctx.fill();
+        const r = 10 * u, tw = 11 * u, th = 8 * u, tx = tailLeft ? x + r + 3 * u : x + bw - r - 3 * u - tw, yb = y + bh;
+        ctx.beginPath();
+        ctx.moveTo(x + r, y); ctx.lineTo(x + bw - r, y); ctx.arcTo(x + bw, y, x + bw, y + r, r);
+        ctx.lineTo(x + bw, yb - r); ctx.arcTo(x + bw, yb, x + bw - r, yb, r);
+        if (tailLeft) { ctx.lineTo(tx + tw, yb); ctx.lineTo(tx + 1.5 * u, yb + th); ctx.lineTo(tx, yb); } else { ctx.lineTo(tx + tw, yb); ctx.lineTo(tx + tw - 1.5 * u, yb + th); ctx.lineTo(tx, yb); }
+        ctx.lineTo(x + r, yb); ctx.arcTo(x, yb, x, yb - r, r);
+        ctx.lineTo(x, y + r); ctx.arcTo(x, y, x + r, y, r); ctx.closePath();
+        ctx.save(); ctx.shadowColor = 'rgba(0,0,0,0.22)'; ctx.shadowBlur = 7 * u; ctx.shadowOffsetY = 2.5 * u; ctx.fillStyle = fill; ctx.fill(); ctx.restore();
       };
       // Both bubbles are sized from their own words and centred together, so nothing is cut off at any card shape.
-      const fs = 16 * u, padX = 12 * u, bh = 30 * u, gap = 14 * u;
+      const fs = 16 * u, padX = 13 * u, bh = 32 * u, gap = 10 * u;
       const f1 = `700 ${fs}px -apple-system, "Segoe UI", system-ui, sans-serif`, f2 = `700 ${fs}px "Hiragino Sans", "Yu Gothic", "Noto Sans CJK JP", system-ui, sans-serif`;
       ctx.font = f1; const t1 = ctx.measureText('Hola').width; ctx.font = f2; const t2 = ctx.measureText('こんにちは').width;
       let b1 = t1 + padX * 2, b2 = t2 + padX * 2, total = b1 + gap + b2, k = Math.min(1, (w * 0.9) / total);
-      const gh = bh + 20 * u;                       // staggered pair: second bubble sits lower
+      const gh = bh + 8 * u + 14 * u;                       // staggered pair: second bubble sits lower
       ctx.save(); ctx.translate(w / 2, h / 2 - 2 * u); ctx.scale(k, k); ctx.translate(-total / 2, -gh / 2);
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       bubble(0, 0, b1, bh, '#fffdf8', true);
       ctx.fillStyle = '#2f5d62'; ctx.font = f1; ctx.fillText('Hola', b1 / 2, bh / 2 + 0.5 * u);
       bubble(b1 + gap, 14 * u, b2, bh, '#f2c94c', false);
       ctx.fillStyle = '#3a2f12'; ctx.font = f2; ctx.fillText('こんにちは', b1 + gap + b2 / 2, 14 * u + bh / 2 + 0.5 * u);
-      ctx.fillStyle = 'rgba(255,255,255,0.9)'; ctx.font = `800 ${20 * u}px ui-rounded, -apple-system, system-ui, sans-serif`; ctx.fillText('?', b1 + gap / 2, bh + 6 * u);
       ctx.restore();
     },
     create(stage, api) {
