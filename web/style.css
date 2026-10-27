@@ -609,15 +609,6 @@ svg { display: block; }
 .more-card.is-open .more-inner > .row:nth-child(4) { transition-delay: 0.12s; }
 .row-sub.bad { color: var(--bad); }
 
-/* Privacy blur: the game softens out of reach when someone else looks or the player looks away. */
-#game .stage, #game .hint, #game .game-title { transition: filter 0.35s var(--ease-out); }
-.privacy-blur #game .stage, .privacy-blur #game .hint { filter: blur(22px) saturate(0.7); }
-.privacy-blur #game .game-title { filter: blur(6px); }
-.privacy-veil { position: absolute; inset: 0; z-index: 7; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
-  color: var(--ink-2); font-weight: 600; font-size: 12px; pointer-events: none; opacity: 0; transform: scale(0.96);
-  transition: opacity 0.25s var(--ease-out), transform 0.4s var(--spring); }
-.privacy-veil svg { width: 26px; height: 26px; }
-.privacy-blur .privacy-veil { opacity: 1; transform: none; }
 .quit-group { margin-top: 22px; }
 .upd-ctl { display: flex; align-items: center; gap: 6px; flex: none; }
 .row-sub.good { color: var(--net-on); font-weight: 600; }
@@ -645,7 +636,6 @@ svg { display: block; }
 .intro-page.tight .intro-item { padding: 8px 12px; }
 .intro-item b, .intro-item small { white-space: normal; overflow: visible; text-overflow: clip; }
 :root.reduce .more-inner > .row { transition-delay: 0s; }
-.privacy-blur .stage-wrap:has(> .sheet:not([hidden])) .privacy-veil { opacity: 0; }   /* a menu on top says enough */
 
 /* Suggestions: a guest proposes, the host accepts or declines. Theme colours only, so light and dark both follow. */
 .pick-chips .chip.gcard.is-sug { outline: 2px dashed var(--ink-2); outline-offset: 2px; }

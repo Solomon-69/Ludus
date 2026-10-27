@@ -83,13 +83,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
         content.addUserScript(WKUserScript(source: bootScript(), injectionTime: .atDocumentStart, forMainFrameOnly: true))
         config.userContentController = content
         config.preferences.setValue(true, forKey: "allowFileAccessFromFileURLs")
-        // WebKit hides navigator.mediaDevices on file:// pages unless this is on (Privacy blur needs the camera).
-        config.preferences.setValue(true, forKey: "mediaDevicesEnabled")
         webView = WKWebView(frame: NSRect(origin: .zero, size: currentSize()), configuration: config)
         webView.setValue(false, forKey: "drawsBackground")
         webView.allowsMagnification = false
         webView.navigationDelegate = self
-        webView.uiDelegate = self   // camera permission for Privacy blur (Camera.swift)
         if let dir = Bundle.main.resourceURL?.appendingPathComponent("web"),
            FileManager.default.fileExists(atPath: dir.appendingPathComponent("index.html").path) {
             webView.loadFileURL(dir.appendingPathComponent("index.html"), allowingReadAccessTo: dir)
@@ -765,14 +762,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
                 + "anchor=\(NSStringFromRect(anchorWindow?.frame ?? .zero)) panel=\(NSStringFromRect(popover.contentViewController?.view.window?.frame ?? .zero))\n"
             appendLog(line)
         case "probe":
-            // Mosaic Hunt photo and camera support, as this real web view sees them.
-            webView.evaluateJavaScript("(()=>{const i=document.querySelector('.ih-photo img');return JSON.stringify({img:i?{src:i.currentSrc,ok:i.complete&&i.naturalWidth>0}:null,cam:!!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia),privacy:!!(window.LudusPrivacy&&LudusPrivacy.supported())})})()") { [weak self] result, _ in
+            // Mosaic Hunt photo, as this real web view sees it.
+            webView.evaluateJavaScript("(()=>{const i=document.querySelector('.ih-photo img');return JSON.stringify({img:i?{src:i.currentSrc,ok:i.complete&&i.naturalWidth>0}:null})})()") { [weak self] result, _ in
                 self?.appendLog("\(Date()) probe \(result as? String ?? "nil")\n")
-            }
-        case "camera":
-            // Ask for the camera like Privacy blur does; logs granted / refused, or nothing while the system prompt is up.
-            webView.evaluateJavaScript("navigator.mediaDevices.getUserMedia({video:true}).then(s=>{s.getTracks().forEach(t=>t.stop());window.__camTest='granted'},e=>{window.__camTest='refused '+e.name});window.__camTest='asking';'asking'") { [weak self] result, _ in
-                self?.appendLog("\(Date()) camera \(result as? String ?? "nil")\n")
             }
         case "mute":
             // Silent test runs: mutes this web view's sound only (not the Mac's volume, not the saved Sound setting).
@@ -783,40 +775,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
             }
             webView.evaluateJavaScript("window.__ludusTestMuted=true") { _, _ in }
             appendLog("\(Date()) mute \(webView.responds(to: sel))\n")
-        case "privacy:start":
-            // Starts Privacy blur exactly as the switch does; "privacy" reads back how it is doing (no pictures, only counts).
-            webView.evaluateJavaScript("window.__privStart='starting';LudusPrivacy.start((b,r)=>{window.__privLast=b+' '+r}).then(ok=>{window.__privStart='ok '+ok},e=>{window.__privStart='fail '+e.message});'starting'") { [weak self] result, _ in
-                self?.appendLog("\(Date()) privacy:start \(result as? String ?? "nil")\n")
-            }
-        case "privacy:selftest":
-            // Face finder check with the window closed and no camera: draws made-up pictures (empty, one face from a
-            // public MediaPipe sample portrait at two sizes, one face plus a small one behind) and logs the faces found.
-            webView.callAsyncJavaScript("""
-              const im = new Image(); im.crossOrigin = 'anonymous'; im.src = 'https://storage.googleapis.com/mediapipe-assets/portrait.jpg';
-              await new Promise((ok, no) => { im.onload = ok; im.onerror = no; });
-              const c = document.createElement('canvas'); c.width = 640; c.height = 480; const x = c.getContext('2d');
-              const scenes = { none: [], one: [[180, 40, 352, 440]], small: [[240, 220, 208, 260]], watcher: [[240, 40, 352, 440], [20, 60, 160, 200]] };
-              const out = [];
-              for (const [name, list] of Object.entries(scenes)) {
-                x.fillStyle = '#777'; x.fillRect(0, 0, 640, 480); list.forEach(r => x.drawImage(im, ...r));
-                const t = performance.now(); const f = await LudusPrivacy._test.facesIn(c);
-                out.push(name + '=' + f.length + (f.length ? '(' + f.map(q => q.w.toFixed(2) + (q.facing ? 'F' : 'a')).join(' ') + ')' : '') + ' ' + Math.round(performance.now() - t) + 'ms');
-              }
-              return out.join(' ') + ' engine=' + LudusPrivacy.engine();
-              """, arguments: [:], in: nil, in: .page) { [weak self] result in
-                switch result {
-                case .success(let v): self?.appendLog("\(Date()) privacy:selftest \(v)\n")
-                case .failure(let e): self?.appendLog("\(Date()) privacy:selftest failed \(e)\n")
-                }
-            }
-        case "privacy:stop":
-            webView.evaluateJavaScript("LudusPrivacy.stop();'stopped'") { [weak self] result, _ in self?.appendLog("\(Date()) privacy:stop \(result as? String ?? "nil")\n") }
-        case "privacy":
-            webView.evaluateJavaScript("JSON.stringify(Object.assign({start:String(window.__privStart),last:String(window.__privLast),running:LudusPrivacy.running(),veil:document.documentElement.classList.contains('privacy-blur')},LudusPrivacy._test.status()))") { [weak self] result, error in
-                self?.appendLog("\(Date()) privacy \(result as? String ?? "nil \(String(describing: error))")\n")
-            }
-        case "camstate":
-            webView.evaluateJavaScript("String(window.__camTest)") { [weak self] result, _ in self?.appendLog("\(Date()) camstate \(result as? String ?? "nil")\n") }
         case "state":
             webView.evaluateJavaScript("window.ludusState && ludusState()") { [weak self] result, _ in
                 self?.appendLog("\(Date()) \(result as? String ?? "nil")\n")

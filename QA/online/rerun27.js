@@ -1,12 +1,12 @@
 // 27 Oct re-check (no relay needed): More settings + Original names, Same laptop tab, Continue per tab, tabs open at top,
-// vs Bot default, Air Hockey upright and wide, connection light, Privacy blur with a fake camera, Mosaic Hunt layouts, photo
+// vs Bot default, Air Hockey upright and wide, connection light, Mosaic Hunt layouts, photo
 // and offline fallback.  node rerun27.js
 const { chromium } = require('playwright-core');
 const L = require('./lib.js'), path = require('path');
 const { wait, check, shot } = L;
 const CHROME_ARGS = ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream', '--allow-file-access-from-files'];   // the Mac app allows file reads too (App.swift allowFileAccessFromFileURLs)
 async function page(browser, size, opts = {}) {
-  const ctx = await browser.newContext({ viewport: size || { width: 400, height: 600 }, deviceScaleFactor: 1, permissions: ['camera'], offline: !!opts.offline });
+  const ctx = await browser.newContext({ viewport: size || { width: 400, height: 600 }, deviceScaleFactor: 1, offline: !!opts.offline });
   const p = await ctx.newPage(); p.errors = [];
   p.on('pageerror', e => p.errors.push(String(e.stack || e)));
   p.on('console', m => { if (m.type() === 'error' && !/net::|Failed to load resource|ERR_INTERNET|ERR_NAME|TensorFlow Lite/.test(m.text())) p.errors.push(m.text()); });
@@ -70,19 +70,6 @@ const cards = p => p.$$eval('#grid .card', els => els.map(e => e.dataset.id));
     check('connection light turns solid red offline', d2 && /rgb\(209, 73, 91\)/.test(d2[0]) && d2[1] === '1', d2);
     await A.context().setOffline(false); await A.evaluate(() => dispatchEvent(new Event('online'))); await wait(300);
     await shot(A, 'rerun27-home');
-    // ---- Privacy blur (fake camera)
-    await A.click('#openSettings'); await wait(400); await A.click('#moreToggle'); await wait(400);
-    await A.evaluate(() => document.querySelector('#privacyRow .switch').click());
-    await shot(A, 'rerun27-privacy');
-    const idle = async ms => { for (let i = 0; i < ms / 300; i++) { if (!(await A.evaluate(() => window.LudusPrivacy.running()))) return true; await wait(300); } return false; };
-    check('Privacy blur: switch on asks for the camera, then lets it go outside a game', await idle(20000));
-    await A.click('#settingsBack'); await wait(300); await A.evaluate(() => window.ludusOpenGame('snake'));
-    let run = false; for (let i = 0; i < 60 && !run; i++) { await wait(300); run = await A.evaluate(() => !!(window.LudusPrivacy.running() && window.LudusPrivacy.engine())); }
-    const pv = await A.evaluate(() => ({ on: Ludus.state.privacyBlur, engine: window.LudusPrivacy.engine && window.LudusPrivacy.engine(), sub: (document.querySelector('#privacyRow .row-sub') || {}).textContent }));
-    check('Privacy blur watches the (fake) camera during a game', run && pv.on === true, pv);
-    await A.click('#backBtn'); await wait(500);
-    check('Privacy blur lets the camera go back on the home screen', await idle(6000));
-    await A.evaluate(() => { Ludus.state.privacyBlur = false; });
     check('no page errors (shell)', A.errors.length === 0, A.errors);
     await A.context().close();
     // ---- Air Hockey upright and wide

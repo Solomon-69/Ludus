@@ -3,6 +3,10 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.3 (2026-10-27)
+
+- Privacy blur removed: it could pick an iPhone camera instead of the Mac's, and it wasn't reliable enough.
+
 ## 1.12.2 (2026-10-27)
 
 - Right-click the menu bar icon to open Settings. (Windows: right-click the tray icon; Open at login and Quit are in Settings.)

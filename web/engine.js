@@ -25,7 +25,9 @@
     let s = null;
     try { if (window.__LUDUS_STATE__) s = window.__LUDUS_STATE__; } catch (e) {}
     if (!s) { try { s = JSON.parse(localStorage.getItem(STORE_KEY) || 'null'); } catch (e) {} }
-    return Object.assign({}, defaults, s || {});
+    const st = Object.assign({}, defaults, s || {});
+    delete st.privacyBlur;   // Privacy blur was removed in 1.12.3: an old saved switch is ignored
+    return st;
   }
   const state = loadState();
   let saveTimer = null;
