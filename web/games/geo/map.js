@@ -118,8 +118,8 @@
   function zoomUI(el, m) {
     if (!document.getElementById('geo-zoom-css')) {
       const st = document.createElement('style'); st.id = 'geo-zoom-css';
-      st.textContent = '.geo-zoom{position:absolute;left:8px;bottom:8px;z-index:640;display:flex;flex-direction:column;border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.25)}' +
-        '.geo-zoom button{width:28px;height:28px;padding:0;border:0;display:grid;place-items:center;background:rgba(16,16,18,.74);color:#fff;font:600 17px/1 system-ui,sans-serif;cursor:pointer;transition:background .15s}' +
+      st.textContent = '.geo-zoom{position:absolute;left:8px;bottom:8px;z-index:640;width:28px;display:flex;flex-direction:column;border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.25)}' +
+        '.geo-zoom.tiny{display:none}.geo-zoom button{flex:none;width:28px;height:28px;padding:0;border:0;display:grid;place-items:center;background:rgba(16,16,18,.74);color:#fff;font:600 17px/1 system-ui,sans-serif;cursor:pointer;transition:background .15s}' +
         '.geo-zoom button+button{border-top:1px solid rgba(255,255,255,.18)}.geo-zoom button:hover{background:rgba(16,16,18,.92)}.geo-zoom button:active{background:rgba(16,16,18,1)}';
       document.head.appendChild(st);
     }
@@ -132,6 +132,9 @@
       box.appendChild(b);
     });
     el.appendChild(box);
+    // a collapsed mini map is too small for buttons: they come back as soon as it opens up
+    const fit = () => box.classList.toggle('tiny', el.clientWidth < 120 || el.clientHeight < 110);
+    fit(); try { new ResizeObserver(fit).observe(el); } catch (e) { /* old engines: always shown */ }
     let z0 = 0;
     el.addEventListener('gesturestart', e => { e.preventDefault(); z0 = m.getZoom(); });
     el.addEventListener('gesturechange', e => { e.preventDefault(); if (e.scale > 0) m.setZoom(Math.max(1, Math.min(18, z0 + Math.log2(e.scale)))); });
