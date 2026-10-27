@@ -654,3 +654,28 @@ svg { display: block; }
 .sug-more { font-size: 11px; color: var(--ink-3); font-weight: 600; }
 @keyframes sug-in { from { transform: scale(0.96); opacity: 0; } to { transform: none; opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .sug-card { animation: none; } }
+
+/* Raised buttons: solid face, darker solid bottom edge, face sinks when pressed (buttons only) */
+:root { --btn-edge-amt: 20%; --edge: 3px; }
+.btn, .small-btn, .icon-btn, .chip.is-on, .mode-tab.is-on, .seg-thumb {
+  --face: var(--surface-2);
+  --btn-edge: color-mix(in srgb, var(--face) calc(100% - var(--btn-edge-amt)), #000);
+}
+.btn:not(.ghost), .small-btn, .icon-btn, .chip.is-on, .mode-tab.is-on, .seg-thumb {
+  box-shadow: 0 var(--edge) 0 var(--btn-edge), 0 calc(var(--edge) + 3px) 8px -3px rgba(0,0,0,0.16);
+  transition: transform 0.18s var(--spring), box-shadow 0.18s var(--spring), background 0.15s, color 0.15s;
+}
+.icon-btn { --face: var(--surface); }
+.btn.primary, .chip.is-on, .mode-tab.is-on { --face: var(--ink); }
+.small-btn.warm { --face: #E8833A; }
+.seg-thumb { --face: var(--surface); --edge: 2px; bottom: 4px; transition: transform 0.4s var(--spring), width 0.4s var(--spring), box-shadow 0.18s; }
+.seg button { padding: 4px 10px 6px; }
+.btn:not(.ghost):not(:disabled):active, .small-btn:not(:disabled):active, .icon-btn:active, .chip.is-on:active, .mode-tab.is-on:active {
+  transform: translateY(calc(var(--edge) - 1px));
+  box-shadow: 0 1px 0 var(--btn-edge), 0 2px 4px -2px rgba(0,0,0,0.12);
+}
+.btn:hover, .icon-btn:hover { transform: none; }
+.btn:not(.ghost):hover, .icon-btn:hover { filter: brightness(1.03); }
+.btn.ghost:active { transform: scale(0.97); }
+:root.reduce .btn, :root.reduce .small-btn, :root.reduce .icon-btn, :root.reduce .chip, :root.reduce .mode-tab { transition: none !important; }
+@media (prefers-reduced-motion: reduce) { .btn, .small-btn, .icon-btn, .chip, .mode-tab { transition: none !important; } }
