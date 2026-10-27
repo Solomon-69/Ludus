@@ -63,7 +63,7 @@ for ($try = 0; $try -lt 2 -and -not $swt; $try++) {
     [void](Ui-Press $more)
   }
   Start-Sleep -Milliseconds 1200
-  $swt = Ui-Wait $win 'Original names' '' 5
+  $swt = Ui-Wait $win 'Original names' 'Button' 5
 }
 if (-not $swt) { Ui-Dump $win (Join-Path $Out 'uia-settings.txt') }
 Check ($null -ne $swt) 'names: Original names switch found'
