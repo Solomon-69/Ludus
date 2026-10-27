@@ -114,17 +114,67 @@
   }
   { const bn = document.querySelector('.brand-name'); const r = el('i', 'net-ring'); r.setAttribute('role', 'img'); bn.appendChild(r); }
   L.conn.on(paintNet);
-  function renderFilters() {
-    const f = $('filters'); f.innerHTML = '';
-    FILTERS.forEach(name => {
-      const b = document.createElement('button');
-      b.className = 'chip' + (S.filter === name ? ' is-on' : '');
-      b.setAttribute('role', 'tab');
-      if (name === ONLINE) { const lab = el('span', 'chip-lab', name); lab.appendChild(netDot()); b.appendChild(lab); } else b.textContent = LABEL[name] || name;
-      if (LABEL[name]) b.title = 'Two players on this computer';
-      b.onclick = () => { S.filter = name; L.save(); L.sfx('click'); renderFilters(); renderCards(); const gr = $('grid'); if (gr) gr.scrollTop = 0; };
-      f.appendChild(b);
-    });
+  // The category tabs share one pill that slides from the old tab to the new one and takes the new tab's width, like a
+  // segmented toggle. The tabs are built once and only their "on" state changes, so the pill has somewhere to slide from
+  // (and keyboard focus stays on the tab). First placement, panel resizes and size changes place it without a slide.
+  let pill = null, pillAt = null;
+  function placePill(animate) {
+    const f = $('filters'), on = f.querySelector('.chip.is-on');
+    if (!pill || !on) { if (pill) pill.style.opacity = '0'; return; }
+    const x = on.offsetLeft, y = on.offsetTop, w = on.offsetWidth, h = on.offsetHeight;
+    const moved = !pillAt || pillAt.x !== x || pillAt.w !== w || pillAt.y !== y || pillAt.h !== h;
+    if (!moved && pill.style.opacity === '1') return;
+    const slide = animate && pillAt && f.offsetParent !== null;
+    if (!slide) pill.classList.add('no-slide');
+    pill.style.transform = `translate(${x}px, ${y}px)`; pill.style.width = w + 'px'; pill.style.height = h + 'px'; pill.style.opacity = '1';
+    pillAt = { x, y, w, h };
+    if (!slide) { void pill.offsetWidth; pill.classList.remove('no-slide'); }
+  }
+  function keepTabInView(on, animate) {
+    const f = $('filters'); if (!on || f.scrollWidth <= f.clientWidth + 1) return;
+    const pad = 14, l = on.offsetLeft - pad, r = on.offsetLeft + on.offsetWidth + pad - f.clientWidth;
+    const to = f.scrollLeft > l ? l : f.scrollLeft < r ? r : null;
+    if (to === null) return;
+    const calm = !animate || root.classList.contains('reduce') || root.classList.contains('instant') || (matchMedia('(prefers-reduced-motion: reduce)').matches && !root.classList.contains('motion-ok'));
+    f.scrollTo({ left: Math.max(0, to), behavior: calm ? 'auto' : 'smooth' });
+  }
+  function pickFilter(name, focus) {
+    S.filter = name; L.save(); L.sfx('click'); renderFilters(true); renderCards();
+    const gr = $('grid'); if (gr) gr.scrollTop = 0;
+    if (focus) { const b = [...$('filters').querySelectorAll('.chip')][FILTERS.indexOf(name)]; if (b) b.focus({ preventScroll: true }); }
+  }
+  function renderFilters(animate) {
+    const f = $('filters');
+    let chips = [...f.querySelectorAll('.chip')];
+    if (chips.length !== FILTERS.length) {
+      f.innerHTML = ''; pillAt = null;
+      pill = el('i', 'tab-pill'); pill.setAttribute('aria-hidden', 'true'); f.appendChild(pill); f.classList.add('has-pill');
+      FILTERS.forEach(name => {
+        const b = document.createElement('button');
+        b.className = 'chip';
+        b.setAttribute('role', 'tab');
+        if (name === ONLINE) { const lab = el('span', 'chip-lab', name); lab.appendChild(netDot()); b.appendChild(lab); } else b.textContent = LABEL[name] || name;
+        if (LABEL[name]) b.title = 'Two players on this computer';
+        b.onclick = () => { if (S.filter === name) return; pickFilter(name); };
+        f.appendChild(b);
+      });
+      f.addEventListener('keydown', e => {
+        if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' && e.key !== 'Home' && e.key !== 'End') return;
+        e.preventDefault();
+        const i = Math.max(0, FILTERS.indexOf(S.filter)), n = FILTERS.length;
+        const j = e.key === 'Home' ? 0 : e.key === 'End' ? n - 1 : (i + (e.key === 'ArrowRight' ? 1 : -1) + n) % n;
+        if (FILTERS[j] !== S.filter) pickFilter(FILTERS[j], true);
+      });
+      // Panel resize, the Large/Normal size setting, fonts arriving: put the pill back under its tab straight away.
+      if (window.ResizeObserver) { const ro = new ResizeObserver(() => { placePill(false); keepTabInView(f.querySelector('.chip.is-on'), false); }); ro.observe(f); f.querySelectorAll('.chip').forEach(c => ro.observe(c)); }
+      chips = [...f.querySelectorAll('.chip')];
+    }
+    chips.forEach((b, i) => { const on = FILTERS[i] === S.filter; b.classList.toggle('is-on', on); b.setAttribute('aria-selected', on ? 'true' : 'false'); });
+    const on = f.querySelector('.chip.is-on');
+    placePill(!!animate);
+    keepTabInView(on, !!animate);
+    // Hidden on first paint (home not shown yet): place it as soon as there is a layout.
+    if (!pillAt) requestAnimationFrame(() => placePill(false));
   }
   // ---------- the Online page: make a room or join one ----------
   function renderOnlinePage(grid) {

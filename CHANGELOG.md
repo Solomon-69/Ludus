@@ -3,6 +3,13 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.16 (2026-10-27)
+
+- The category tabs on the home screen (All, Arcade, Puzzle, Duel, Same laptop, Online) now work like one toggle:
+  the dark pill (light in dark mode) slides smoothly from the old tab to the new one and stretches to the new tab's width.
+  It stays exactly under the chosen tab when the tab row scrolls, when the panel or size setting changes, and after a
+  search is cleared. Left and right arrow keys move between tabs. With Reduce Motion on, the pill moves without sliding.
+
 ## 1.12.15 (2026-10-27)
 
 - The Online page is the same height as the other tabs; its sections spread out with equal gaps instead of the panel shrinking.
