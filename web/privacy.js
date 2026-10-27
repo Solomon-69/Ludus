@@ -61,9 +61,11 @@
       pinned(MP_MODEL, 'blaze_face_short_range.tflite')
     ]);
     const files = { wasmLoaderPath: blobUrl(js, 'text/javascript'), wasmBinaryPath: blobUrl(wasm, 'application/wasm') };
-    detector = await mp.FaceDetector.createFromOptions(files, {
-      baseOptions: { modelAssetBuffer: new Uint8Array(model), delegate: 'CPU' }, runningMode: 'VIDEO', minDetectionConfidence: 0.55
-    });
+    try {
+      detector = await mp.FaceDetector.createFromOptions(files, {
+        baseOptions: { modelAssetBuffer: new Uint8Array(model), delegate: 'CPU' }, runningMode: 'VIDEO', minDetectionConfidence: 0.55
+      });
+    } finally { URL.revokeObjectURL(files.wasmLoaderPath); URL.revokeObjectURL(files.wasmBinaryPath); }
     kind = 'mediapipe';
     return detector;
   }

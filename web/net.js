@@ -499,6 +499,7 @@
   // Host: begin the game (or a rematch / the next round). Needs at least `min` players.
   Session.prototype.start = function () {
     if (this.role !== 'host' || this.over) return false;
+    this.sugs = [];
     if (this.isSeries()) {
       if (this.ser && this.ser.st === 'board') return this.advance();
       if (this.ser && this.ser.st === 'play') return false;
@@ -601,7 +602,9 @@
     if (k < 0) return null;
     const sg = this.sugs.splice(k, 1)[0];
     let ok = false;
-    if (accept && this.role === 'host') ok = this.setPlan(sg.p.g, sg.p.n);
+    const n = Math.max(2, this.roster.size);   // a crafted suggestion must still fit this room, like the picker enforces
+    const fits = sg.p.g.every(id => { const g = gameOf(id); return g && g.online.max >= n && g.online.min <= this.max; });
+    if (accept && this.role === 'host' && fits) ok = this.setPlan(sg.p.g, sg.p.n);
     this._pub({ t: 'sgr', i: sg.i, to: sg.cid, ok });
     this._emit('suggest', this.sugs);
     return { ok, p: sg.p, name: sg.name };
@@ -620,7 +623,7 @@
     if (!before || before.st !== next.st) { if (next.st === 'board') this._emit('board', next); else if (next.st === 'final') this._emit('final', next); }
     else if (next.st === 'board' && JSON.stringify(before.sc) !== JSON.stringify(next.sc)) this._emit('board', next);
   };
-  Session.prototype._toLobbyLocal = function () { if (!this.ser && !this.started) return; this.ser = null; this.started = false; this._emit('lobby', {}); };
+  Session.prototype._toLobbyLocal = function () { this.mySug = null; if (!this.ser && !this.started) return; this.ser = null; this.started = false; this._emit('lobby', {}); };
   Session.prototype._closeGaps = function () {
     const list = this.rosterList();
     if (list.every((p, i) => p.seat === i)) return;
@@ -773,6 +776,7 @@
   };
   Session.prototype._startFrom = function (gen, seed, game) {
     if (gen <= this.gen) return;
+    this.mySug = null; this.sugs = [];
     if (typeof game === 'string' && TYPE_RE.test(game)) this.gameId = game;
     this.started = true; this.gen = gen; this.seed = seed >>> 0;
     this._emit('start', { gen, seed: this.seed, game: this.gameId });

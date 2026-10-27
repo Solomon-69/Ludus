@@ -281,7 +281,7 @@ const S = {
       const t = await lobbyText(N);
       check('old guest naming another game: room drops to Paddle Duel only', (await N.$$('#lobbyCard .pick-chips')).length === 0 && /Paddle Duel only/.test(t), t);
       await N.click('#lobbyCard button.primary'); await Promise.all([started(O), started(N)]);
-      check('...Paddle Duel runs on both', /Paddle Duel/.test(await N.$eval('#gameName', e => e.textContent)) && /Paddle Duel/.test(await O.$eval('#gameName', e => e.textContent)));
+      check('...Paddle Duel runs on both', /Paddle Duel/.test(await N.$eval('#gameName', e => e.textContent)) && /Paddle Duel|Pong/.test(await O.$eval('#gameName', e => e.textContent)))   // Ludus 1.6.0 still calls it Pong;
       await probe(N, O, 'Online-section host + old guest'); br.close(); }
     // 4) an old guest cannot join a running tournament; the host is told to say "update"
     { const br = await broker.start(); const [A, B] = [await newPage(browser, br, { name: 'Ann' }), await newPage(browser, br, { name: 'Bo' })];
@@ -421,6 +421,7 @@ S.layout = async browser => {
     await shot(C, 'overbar_host_' + tag); await shot(D, 'overbar_guest_' + tag);
     check(tag + ' result bar (Rematch / Ask for rematch): no overlap', (await overlap(C)).length === 0 && (await overlap(D)).length === 0, [await overlap(C), await overlap(D)]);
     br.close(); br2.close();
+    await Promise.all([A, B, C, D].map(p => p.context().close().catch(() => {})));   // free the memory before the next size (8 GB Mac)
   }
 };
 
