@@ -163,7 +163,7 @@
       const v = code.value, focus = document.activeElement === code;
       cells.forEach((c, i) => {
         const ch = v[i] || '', was = c.textContent;
-        c.textContent = ch || (v ? '' : hint[i] || '') || '\u2013';
+        c.textContent = ch || (v ? '' : hint[i] || '');
         c.classList.toggle('filled', !!ch); c.classList.toggle('hint', !ch && !v && !!hint);
         c.classList.toggle('now', focus && i === Math.min(v.length, 4));
         if (ch && ch !== was && !S.reduceMotion) { c.classList.remove('pop'); void c.offsetWidth; c.classList.add('pop'); }

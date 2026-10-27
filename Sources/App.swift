@@ -351,13 +351,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
         // The page keeps its current layout (centred, top pinned) and fades out while the panel's outline
         // grows or shrinks smoothly; it re-lays out once, unseen, and fades back in at the new size. (A
         // web page can't redraw fast enough to follow a resizing panel frame by frame without tearing.)
-        let page = start
+        // Height-only changes (the Online page fitting its content) keep the page visible: its content is
+        // pinned to the top, so the page is laid out once at the taller height and the edge slides over it.
+        let heightOnly = start.width == target.width
+        let page = heightOnly ? NSSize(width: start.width, height: max(start.height, target.height)) : start
         webView.autoresizingMask = []   // placed by hand each frame
         if let container = popover.contentViewController?.view { placePage(page, in: container) }
-        NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0.14
-            ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            webView.animator().alphaValue = 0
+        if !heightOnly {
+            NSAnimationContext.runAnimationGroup { ctx in
+                ctx.duration = 0.14
+                ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                webView.animator().alphaValue = 0
+            }
         }
         popover.animates = false
         guard let window = popover.contentViewController?.view.window else { setPanelSize(target); finishResize(); return }

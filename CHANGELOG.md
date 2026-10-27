@@ -3,6 +3,11 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.14 (2026-10-27)
+
+- Switching between the Online tab and the other tabs no longer blanks the panel for a moment: the page stays visible while the bottom edge slides.
+- The join code boxes stay empty until you type, with no dashes.
+
 ## 1.12.13 (2026-10-27)
 
 - Online: the host can make another player the leader. In the room, tap Make leader under a player's name and confirm. That player gets the host controls (picking games, starting, answering suggestions) and everyone sees who the new leader is. The room keeps its code, players, games and scores, so the old host can leave and everyone else plays on.
