@@ -578,16 +578,18 @@
     onlineHint: 'Your pieces are at the bottom. Drag or click to move',
     _core: core,
     art(ctx, w, h) {
-      // checkmate: the white queen stands over the fallen black king
-      const cell = h * 0.24, oy = h - cell * 1.9, cols = Math.round(w * 0.64 / cell), big = h * 0.9;
+      // checkmate: the white queen stands over the fallen black king, side by side at every card shape
+      const big = Math.min(h * 0.78, w * 0.36), cell = big * 0.28, gap = big * 0.95;
+      const qx = w / 2 - gap * 0.45, kx = qx + gap, oy = h * 0.5 + big * 0.12;
+      const cols = Math.ceil((gap + big * 1.3) / cell) | 1, bx = w / 2 - cols * cell / 2;
       ctx.save();
       for (let r = 0; r < 3; r++) for (let c = 0; c < cols; c++) {
         ctx.fillStyle = (r + c) % 2 ? 'rgba(0,0,0,0.16)' : 'rgba(255,255,255,0.2)';
-        ctx.fillRect(w * 0.18 + c * cell, oy + r * cell, cell, cell);
+        ctx.fillRect(bx + c * cell, oy + r * cell, cell, cell);
       }
-      drawPieceVec(ctx, 5, true, w * 0.42, oy - big * 0.02, big * 0.86);
-      ctx.translate(w * 0.63, oy + cell * 0.35); ctx.rotate(Math.PI / 2.3);
-      drawPieceVec(ctx, 6, false, 0, 0, big * 0.78);
+      drawPieceVec(ctx, 5, true, qx, oy - big * 0.08, big);
+      ctx.translate(kx, oy + big * 0.12); ctx.rotate(Math.PI / 2.3);
+      drawPieceVec(ctx, 6, false, 0, 0, big * 0.9);
       ctx.restore();
     },
     create(stage, api) {
