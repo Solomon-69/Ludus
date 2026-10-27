@@ -36,7 +36,7 @@
       paint: { 'line-color': '#141414', 'line-width': 3, 'line-opacity': 0.9, 'line-dasharray': [0.01, 2.4] } });
     const map = new ml.Map({
       container: el, style, center: [o.lon, o.lat], zoom: o.zoom - 1, minZoom: 0, maxZoom: 17, maxPitch: 0,
-      attributionControl: false, dragRotate: false, pitchWithRotate: false, doubleClickZoom: false, keyboard: false,
+      attributionControl: false, dragRotate: false, pitchWithRotate: false, doubleClickZoom: true, boxZoom: false, keyboard: false,
       fadeDuration: 120, renderWorldCopies: true
     });
     map.touchZoomRotate.disableRotation();
@@ -62,6 +62,8 @@
       project(lat, lon) { const p = map.project([lon, lat]); return { x: p.x, y: p.y }; },
       size() { return { x: el.clientWidth, y: el.clientHeight }; },
       panBy(dx, dy, ms) { map.panBy([dx, dy], { duration: ms || 0, essential: true }); },
+      zoomBy(d) { map.easeTo({ zoom: map.getZoom() + d, duration: 220, essential: true }); },
+      setZoom(z) { map.jumpTo({ zoom: z - 1 }); },
       onClick(fn) { map.on('click', e => { const ll = e.lngLat; fn({ lat: ll.lat, lon: wrapLon(ll.lng) }); }); },
       marker(lat, lon, html, mo) { const m = new ml.Marker({ element: markerEl(html, mo), anchor: 'center' }).setLngLat([lon, lat]).addTo(map); return { remove() { m.remove(); } }; },
       line() { const l = { c: [[0, 0], [0, 0]] }; lines.push(l); return {
@@ -75,7 +77,7 @@
   // ---------------- Leaflet, flat colour (no graphics card) ----------------
   function createFlat(el, credit, o) {
     const map = L.map(el, { zoomControl: false, attributionControl: false, worldCopyJump: true, minZoom: 1, zoomSnap: 0.25, zoomDelta: 0.5,
-      doubleClickZoom: false, preferCanvas: true, fadeAnimation: false }).setView([o.lat, o.lon], Math.max(1, o.zoom), { animate: false });
+      doubleClickZoom: true, boxZoom: false, preferCanvas: true, fadeAnimation: false }).setView([o.lat, o.lon], Math.max(1, o.zoom), { animate: false });
     map.getPane('tilePane').classList.add('geo-nomap');
     credit.innerHTML = '<i>No map</i>'; credit.title = NOMAP;
     return {
@@ -87,6 +89,8 @@
       project(lat, lon) { const p = map.latLngToContainerPoint([lat, lon]); return { x: p.x, y: p.y }; },
       size() { const s = map.getSize(); return { x: s.x, y: s.y }; },
       panBy(dx, dy, ms) { map.panBy([dx, dy], ms ? { animate: true, duration: ms / 1000, easeLinearity: 0.4 } : { animate: false }); },
+      zoomBy(d) { map.setZoom(map.getZoom() + d); },
+      setZoom(z) { map.setZoom(z, { animate: false }); },
       onClick(fn) { map.on('click', e => { const w = e.latlng.wrap(); fn({ lat: w.lat, lon: w.lng }); }); },
       marker(lat, lon, html, mo) {
         const m = L.marker([lat, lon], { icon: L.divIcon({ className: '', html: markerEl(html, mo).outerHTML, iconSize: [mo.size, mo.size], iconAnchor: [mo.size / 2, mo.size / 2] }), interactive: false, zIndexOffset: mo.z || 0 }).addTo(map);
@@ -103,8 +107,38 @@
   // o = { lat, lon, zoom }. Never throws: if MapLibre cannot start, the flat map takes over.
   function create(el, credit, o) {
     // o.flat: the plain map (bundled picture tiles draw reliably on it with no internet, e.g. Mosaic Hunt offline)
-    if (!o.flat && canGL()) { try { return createGL(el, credit, o); } catch (e) { el.innerHTML = ''; } }
-    return createFlat(el, credit, o);
+    let m = null;
+    if (!o.flat && canGL()) { try { m = createGL(el, credit, o); } catch (e) { el.innerHTML = ''; } }
+    if (!m) m = createFlat(el, credit, o);
+    zoomUI(el, m);
+    return m;
+  }
+  // Zoom that is obvious: + and - buttons on every map, the mouse wheel, double-click, a trackpad pinch (Chrome/WebView2
+  // send it as ctrl+wheel, which both map libraries read; Safari/WKWebView sends gesture events, handled here).
+  function zoomUI(el, m) {
+    if (!document.getElementById('geo-zoom-css')) {
+      const st = document.createElement('style'); st.id = 'geo-zoom-css';
+      st.textContent = '.geo-zoom{position:absolute;left:8px;bottom:8px;z-index:640;width:28px;display:flex;flex-direction:column;border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.25)}' +
+        '.geo-zoom.tiny{display:none}.geo-zoom button{flex:none;width:28px;height:28px;padding:0;border:0;display:grid;place-items:center;background:rgba(16,16,18,.74);color:#fff;font:600 17px/1 system-ui,sans-serif;cursor:pointer;transition:background .15s}' +
+        '.geo-zoom button+button{border-top:1px solid rgba(255,255,255,.18)}.geo-zoom button:hover{background:rgba(16,16,18,.92)}.geo-zoom button:active{background:rgba(16,16,18,1)}';
+      document.head.appendChild(st);
+    }
+    const box = document.createElement('div'); box.className = 'geo-zoom';
+    [['+', 'Zoom in', 1], ['\u2212', 'Zoom out', -1]].forEach(([t, label, d]) => {
+      const b = document.createElement('button'); b.type = 'button'; b.textContent = t; b.setAttribute('aria-label', label); b.title = label;
+      const stop = e => e.stopPropagation();
+      b.addEventListener('pointerdown', stop); b.addEventListener('dblclick', stop); b.addEventListener('mousedown', stop);
+      b.addEventListener('click', e => { e.stopPropagation(); e.preventDefault(); m.zoomBy(d); });
+      box.appendChild(b);
+    });
+    el.appendChild(box);
+    // a collapsed mini map is too small for buttons: they come back as soon as it opens up
+    const fit = () => box.classList.toggle('tiny', el.clientWidth < 120 || el.clientHeight < 110);
+    fit(); try { new ResizeObserver(fit).observe(el); } catch (e) { /* old engines: always shown */ }
+    let z0 = 0;
+    el.addEventListener('gesturestart', e => { e.preventDefault(); z0 = m.getZoom(); });
+    el.addEventListener('gesturechange', e => { e.preventDefault(); if (e.scale > 0) m.setZoom(Math.max(1, Math.min(18, z0 + Math.log2(e.scale)))); });
+    el.addEventListener('gestureend', e => e.preventDefault());
   }
   window.__GEO_MAP__ = { create, canGL };
 })();

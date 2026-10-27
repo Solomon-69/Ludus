@@ -12,7 +12,7 @@ permissions:
 jobs:
   test:
     runs-on: windows-latest
-    timeout-minutes: 25
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
 
@@ -37,6 +37,28 @@ jobs:
       - name: Run and check
         shell: pwsh
         run: ./windows/ci/test.ps1 -Exe out/Ludus/Ludus.exe -Shots shots
+
+      - name: Friend-reported features (Hammer Climb starts, Original names)
+        shell: powershell
+        run: ./windows/ci/features.ps1 -Exe out/Ludus/Ludus.exe -Out shots/features
+
+      - name: Update self-test against the real newest release (check, download, verify, unzip)
+        shell: pwsh
+        run: |
+          $res = Join-Path (Resolve-Path shots) 'update-selftest.json'
+          Start-Process out/Ludus/Ludus.exe -ArgumentList "--selftest-update=$res" -Wait
+          Get-Content $res
+          $r = Get-Content $res -Raw | ConvertFrom-Json
+          if (-not $r.ok -or $r.maxPct -le 0 -or $r.seconds -gt 120) { throw "update self-test failed: $($r.error)" }
+
+      - name: In-app update end to end (this build, numbered 1.0.0, updates itself to the newest release)
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          dotnet publish windows/Ludus.csproj -c Release -p:Version=1.0.0 -o out/old
+          $to = (gh release view --repo $env:GITHUB_REPOSITORY --json tagName -q .tagName).TrimStart('v')
+          ./windows/ci/update-real.ps1 -FromDir out/old -To $to -Out shots/update -Limit 240
 
       - name: Keep the app logs
         if: always()

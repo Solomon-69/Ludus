@@ -1,4 +1,6 @@
-/* Spark Hop: the spark bounces by itself. Steer it from platform to platform and climb as high as you can. Moving and crumbly platforms show up the higher you go. */
+/* Spark Hop: the spark bounces by itself. Steer it from platform to platform and climb as high as you can. Moving and crumbly platforms show up the higher you go.
+   Two modes (the switch at the top, before the first jump and after a fall): Classic, and Monsters: little monsters float
+   between the platforms (land on top to bop them, touch one any other way and you fall) and puffy clouds that hold you once. */
 (function () {
   const D = Ludus.draw;
   const WW = 360;                         // world width; height follows the stage shape
@@ -27,7 +29,9 @@
       const view = api.canvas(() => render());   // also draws the board while a resumed game waits on "Welcome back"
       const { ctx, canvas } = view;
       let WH = 520;
-      let p, plats, camY, topGen, height, clock, state, deadAt, squash, spin, pops, lastChainY, best;
+      let p, plats, camY, topGen, height, clock, state, deadAt, squash, spin, pops, lastChainY, best, mons = [];
+      let mode = Ludus.state.hopMode === 'monsters' ? 'monsters' : 'classic';
+      const MR = 14;   // monster radius
       const held = { l: false, r: false, pl: false, pr: false };
 
       const worldH = () => Math.max(360, Math.round(WW * view.h / Math.max(1, view.w)));
@@ -37,7 +41,7 @@
         let type = 'still';
         const r = Math.random();
         if (chain) { if (r < cfg.spring) type = 'spring'; else if (r < cfg.spring + cfg.move * (0.4 + k)) type = 'move'; }
-        else type = 'break';
+        else type = mode === 'monsters' && Math.random() < 0.55 ? 'cloud' : 'break';
         // chain platforms stay within reach sideways of the one below
         const lo = PW / 2 + 6, hi = WW - PW / 2 - 6;
         let x = chain ? lastX + (Math.random() * 2 - 1) * cfg.dx : lo + Math.random() * (hi - lo);
@@ -53,13 +57,20 @@
           lastChainY -= lo + Math.random() * (hi - lo);
           addPlat(lastChainY, true);
           // crumbly decoys in between, higher up they get more common
-          if (Math.random() < cfg.brk * (0.5 + Math.min(1, climb / 40))) addPlat(lastChainY + 30 + Math.random() * 30, false);
+          if (Math.random() < cfg.brk * (0.5 + Math.min(1, climb / 40)) * (mode === 'monsters' ? 1.4 : 1)) addPlat(lastChainY + 30 + Math.random() * 30, false);
+          // monsters: from 60 m up, never on the way to the next platform
+          if (mode === 'monsters' && climb > 6 && Math.random() < [0.1, 0.14, 0.18][api.level] * (0.6 + Math.min(1, climb / 50))) {
+            let mx = lastX + (lastX < WW / 2 ? 1 : -1) * (110 + Math.random() * 60);
+            mx = Math.max(MR + 8, Math.min(WW - MR - 8, mx));
+            if (Math.abs(mx - lastX) > 90) mons.push({ x: mx, y: lastChainY + 36 + Math.random() * 20, ox: mx, ph: Math.random() * 6, kind: Math.floor(Math.random() * 3), dead: -1 });
+          }
         }
+        mons = mons.filter(m => m.y < camY + WH + 60);
         plats = plats.filter(q => q.y < camY + WH + 60);
       }
       function reset() {
         WH = worldH(); clock = 0; state = 'play'; deadAt = -1; squash = 0; spin = 0; pops = []; height = 0; best = 0;
-        plats = []; camY = -WH + 40;          // world y grows downward; the start floor sits at y = 0
+        plats = []; mons = []; camY = -WH + 40;          // world y grows downward; the start floor sits at y = 0
         p = { x: WW / 2, y: -PH - R, vx: 0, vy: BOUNCE };
         plats.push({ x: WW / 2, y: 0, type: 'still', vx: 0, broken: -1, born: 0, wide: true });
         lastChainY = 0; lastX = WW / 2; generate(); api.score(0);
@@ -70,6 +81,7 @@
           if (q.broken < 0) { q.broken = clock; api.sfx('drop'); }
           return false;                     // crumbly platforms never bounce you
         }
+        if (q.type === 'cloud') { p.vy = BOUNCE; p.y = q.y - R; squash = 1; q.broken = clock; api.sfx('jump'); return true; }   // holds you once, then puffs away
         p.vy = q.type === 'spring' ? SPRING : BOUNCE;
         p.y = q.y - R; squash = 1;
         if (q.type === 'spring') { q.sprung = clock; api.sfx('power'); spin += 6; } else api.sfx('jump');
@@ -96,7 +108,7 @@
         spin += dt * (1.5 + Math.abs(p.vx) / 120);
         if (p.vy > 0) {
           for (const q of plats) {
-            if (q.broken >= 0 && q.type === 'break') continue;
+            if (q.broken >= 0 && (q.type === 'break' || q.type === 'cloud')) continue;
             const half = q.wide ? WW : PW / 2 + R * 0.6;
             if (prevY + R <= q.y + 2 && p.y + R >= q.y && Math.abs(p.x - q.x) < half) { if (land(q)) break; }
           }
@@ -109,6 +121,17 @@
           if (Math.floor(height / 100) > Math.floor(best / 100) && height >= 100) { api.sfx('score'); pops.push({ t: clock, text: `${Math.floor(height / 100) * 100} m` }); }
           best = height; api.score(height);
         }
+        // monsters drift side to side; bop one from above, any other touch knocks you down
+        for (const m of mons) {
+          if (m.dead >= 0) { m.y += (clock - m.dead) * 600 * dt; continue; }
+          m.x = m.ox + Math.sin(clock * 1.3 + m.ph) * 26;
+          const dx = p.x - m.x, dy = p.y - (m.y + Math.sin(clock * 3 + m.ph) * 3);
+          if (dx * dx + dy * dy < (R + MR - 3) * (R + MR - 3)) {
+            if (p.vy > 0 && dy < -MR * 0.35) { m.dead = clock; p.vy = BOUNCE * 1.05; squash = 1; spin += 4; api.sfx('score'); pops.push({ t: clock, text: 'Bop!' }); }
+            else { state = 'over'; deadAt = clock; p.vy = 120; api.sfx('lose');
+              api.timeout(() => api.over({ score: height, title: 'Caught by a monster', won: false, message: `Climbed ${height} m` }), 900); return; }
+          }
+        }
         generate();
         if (p.y - R > camY + WH + 20) {
           state = 'over'; deadAt = clock; api.sfx('lose');
@@ -120,11 +143,24 @@
         const k = e.key;
         if (k === 'ArrowLeft' || k === 'a' || k === 'A') held.l = true;
         else if (k === 'ArrowRight' || k === 'd' || k === 'D') held.r = true;
+        else if ((k === 'm' || k === 'M') && switchOn()) setMode(mode === 'classic' ? 'monsters' : 'classic');
       });
       api.keysUp(e => {
         const k = e.key;
         if (k === 'ArrowLeft' || k === 'a' || k === 'A') held.l = false;
         if (k === 'ArrowRight' || k === 'd' || k === 'D') held.r = false;
+      });
+      // the Classic / Monsters switch: shown at the start of a climb and after a fall
+      const switchOn = () => state === 'over' || height < 15;
+      const switchBox = () => ({ x: WW / 2 - 85, y: 6, w: 170, h: 28 });
+      function setMode(m) {
+        if (m === mode) return;
+        mode = m; Ludus.state.hopMode = m; Ludus.save(); api.sfx('click'); reset();
+      }
+      api.on(canvas, 'pointerdown', e => {
+        if (!switchOn()) return;
+        const r = canvas.getBoundingClientRect(), k = WW / r.width, x = (e.clientX - r.left) * k, y = (e.clientY - r.top) * k, b = switchBox();
+        if (x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h) { e.stopImmediatePropagation(); setMode(x < b.x + b.w / 2 ? 'classic' : 'monsters'); }
       });
       const pointerSide = e => { const r = canvas.getBoundingClientRect(); const left = e.clientX - r.left < r.width / 2; held.pl = left; held.pr = !left; };
       api.on(canvas, 'pointerdown', e => { try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* synthetic or finished pointer */ } pointerSide(e); });
@@ -164,6 +200,12 @@
           if (q.type === 'move') fill = col.dark ? '#6f93b5' : '#5b8fc4';
           if (q.type === 'break') fill = col.dark ? '#a08766' : '#c9a77a';
           if (q.wide) fill = col.dark ? '#5c5247' : '#d8cab5';
+          if (q.type === 'cloud') {   // a puffy cloud instead of a slab
+            ctx.fillStyle = col.dark ? 'rgba(235,240,250,0.82)' : '#ffffff';
+            ctx.strokeStyle = col.dark ? 'rgba(255,255,255,0.25)' : 'rgba(120,140,170,0.35)'; ctx.lineWidth = 1.2;
+            ctx.beginPath(); ctx.ellipse(-14, 1, 16, 8, 0, 0, Math.PI * 2); ctx.ellipse(4, -3, 18, 10, 0, 0, Math.PI * 2); ctx.ellipse(20, 1, 13, 7, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+            ctx.restore(); return;
+          }
           ctx.fillStyle = col.dark ? 'rgba(0,0,0,0.3)' : 'rgba(60,40,20,0.12)';
           D.roundRect(ctx, -w / 2, -PH / 2 + 3, w, PH, PH / 2); ctx.fill();
           ctx.fillStyle = fill; D.roundRect(ctx, -w / 2, -PH / 2, w, PH, PH / 2); ctx.fill();
@@ -178,6 +220,24 @@
             ctx.beginPath(); for (let i = 0; i <= 4; i++) ctx[i ? 'lineTo' : 'moveTo'](6 + (i % 2 ? 4 : -4), -PH / 2 - i * (2 + up / 4)); ctx.stroke();
             ctx.fillStyle = col.accent; D.roundRect(ctx, -3, -PH / 2 - 11 - up, 18, 4, 2); ctx.fill();
           }
+          ctx.restore();
+        });
+        // monsters
+        const MC = col.dark ? ['#b58be0', '#6fc0a8', '#e0858f'] : ['#8a5cc8', '#2f9a7c', '#d4566a'];
+        mons.forEach(m => {
+          if (m.y < camY - 30 || m.y > camY + WH + 30) return;
+          const bob = Math.sin(clock * 3 + m.ph) * 3, a = m.dead >= 0 ? Math.max(0, 1 - (clock - m.dead) * 2) : 1;
+          ctx.save(); ctx.globalAlpha = a; ctx.translate(m.x, m.y + bob); if (m.dead >= 0) ctx.scale(1, 0.6);
+          ctx.fillStyle = MC[m.kind];
+          ctx.beginPath(); ctx.arc(0, 0, MR, Math.PI, 0); ctx.lineTo(MR, MR * 0.7);
+          for (let i = 0; i < 4; i++) ctx.lineTo(MR - (i + 0.5) * MR / 2, MR * (i % 2 ? 0.7 : 0.35));
+          ctx.lineTo(-MR, MR * 0.7); ctx.closePath(); ctx.fill();
+          // horns / ears
+          ctx.beginPath(); ctx.moveTo(-MR * 0.7, -MR * 0.55); ctx.lineTo(-MR * 0.95, -MR * 1.15); ctx.lineTo(-MR * 0.3, -MR * 0.85); ctx.fill();
+          ctx.beginPath(); ctx.moveTo(MR * 0.7, -MR * 0.55); ctx.lineTo(MR * 0.95, -MR * 1.15); ctx.lineTo(MR * 0.3, -MR * 0.85); ctx.fill();
+          ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(-5, -2, 4.2, 0, Math.PI * 2); ctx.arc(5, -2, 4.2, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = '#1d1a17'; const lk = Math.max(-1.5, Math.min(1.5, (p.x - m.x) / 40));
+          ctx.beginPath(); ctx.arc(-5 + lk, -1.5, 2, 0, Math.PI * 2); ctx.arc(5 + lk, -1.5, 2, 0, Math.PI * 2); ctx.fill();
           ctx.restore();
         });
         // the spark
@@ -196,8 +256,15 @@
         ctx.globalAlpha = 1;
         if (state === 'over') {
           ctx.fillStyle = col.dark ? 'rgba(42,38,33,0.9)' : 'rgba(255,252,247,0.92)';
-          D.roundRect(ctx, WW / 2 - 70, 34, 140, 30, 15); ctx.fill();
-          D.text(ctx, `Fell from ${height} m`, WW / 2, 49, 13, col.ink, 700);
+          D.roundRect(ctx, WW / 2 - 70, 40, 140, 30, 15); ctx.fill();
+          D.text(ctx, `Fell from ${height} m`, WW / 2, 55, 13, col.ink, 700);
+        }
+        if (switchOn()) {
+          const b = switchBox(), half = b.w / 2, on = mode === 'monsters' ? 1 : 0;
+          ctx.fillStyle = col.dark ? 'rgba(42,38,33,0.9)' : 'rgba(255,252,247,0.94)'; D.roundRect(ctx, b.x, b.y, b.w, b.h, b.h / 2); ctx.fill();
+          ctx.fillStyle = col.ink; D.roundRect(ctx, b.x + 3 + on * half, b.y + 3, half - 6, b.h - 6, (b.h - 6) / 2); ctx.fill();
+          D.text(ctx, 'Classic', b.x + half / 2, b.y + b.h / 2 + 0.5, 12, on ? col.ink2 : col.surface, 700);
+          D.text(ctx, 'Monsters', b.x + half * 1.5, b.y + b.h / 2 + 0.5, 12, on ? col.surface : col.ink2, 700);
         }
         ctx.restore();
       }
@@ -206,24 +273,26 @@
       const r1 = v => Math.round(v * 10) / 10;
       function restore(sv) {
         if (!sv || sv.v !== 1 || !Array.isArray(sv.plats) || !Array.isArray(sv.p) || sv.p.length !== 4) return false;
-        if (!sv.plats.every(q => Array.isArray(q) && q.length >= 4 && ['still', 'move', 'break', 'spring'].includes(q[2]))) return false;
+        if (!sv.plats.every(q => Array.isArray(q) && q.length >= 4 && ['still', 'move', 'break', 'spring', 'cloud'].includes(q[2]))) return false;
+        if (sv.mode === 'monsters' || sv.mode === 'classic') mode = sv.mode;
         reset();
         if (sv.wh >= 360 && sv.wh <= 2000) WH = sv.wh;
         camY = +sv.camY; height = sv.height | 0; best = height; lastChainY = +sv.lastChainY; lastX = sv.lastX >= 0 && sv.lastX <= WW ? +sv.lastX : WW / 2;
         p = { x: +sv.p[0], y: +sv.p[1], vx: +sv.p[2], vy: +sv.p[3] };
         plats = sv.plats.map(q => ({ x: q[0], y: q[1], type: q[2], vx: q[3], broken: -1, born: -9, wide: !!q[4] }));
+        if (Array.isArray(sv.mons)) mons = sv.mons.filter(m => Array.isArray(m) && m.length === 4 && m.every(isFinite)).map(m => ({ x: m[0], ox: m[0], y: m[1], ph: m[2], kind: m[3] % 3, dead: -1 }));
         if (!isFinite(camY) || !isFinite(p.y)) return false;
         return true;
       }
       if (!(api.saved && restore(api.saved))) reset();
-      this._peek = () => ({ p, plats, camY, WH, state });   // read-only view for automated play tests
+      this._peek = () => ({ p, plats, camY, WH, state, mode, mons });   // read-only view for automated play tests
       api.score(height);
       api.loop(dt => { update(dt); render(); });
       return {
         save() {
           if (state !== 'play') return null;
           return {
-            v: 1, wh: WH, camY: r1(camY), height, lastChainY: r1(lastChainY), lastX: r1(lastX), p: [r1(p.x), r1(p.y), r1(p.vx), r1(p.vy)],
+            v: 1, mode, mons: mons.filter(m => m.dead < 0).map(m => [r1(m.ox), r1(m.y), r1(m.ph), m.kind]), wh: WH, camY: r1(camY), height, lastChainY: r1(lastChainY), lastX: r1(lastX), p: [r1(p.x), r1(p.y), r1(p.vx), r1(p.vy)],
             plats: plats.filter(q => q.broken < 0).map(q => [r1(q.x), r1(q.y), q.type, r1(q.vx), q.wide ? 1 : 0])
           };
         }

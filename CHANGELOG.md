@@ -3,6 +3,36 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.17 (2026-10-28)
+
+- Windows: the in-app update now works. Before, pressing Install left the bar stuck at 0% because the app read the
+  update request after it had already been thrown away, so the download never started. It now starts straight away,
+  shows real progress, retries a second download link if the first stalls, and gives up after 30 seconds without data
+  instead of hanging. If an update ever fails, the update row offers a Website button.
+  People on Windows Ludus 1.12.16 or older still have the old, broken button: they need to download this version
+  once from the website (https://solomon-69.github.io/Ludus/). After that, updates work in the app.
+- Mac: updates use the same safety net (timeouts, a second download link, a Website button). A full check, download
+  and verify of the newest release takes about 2 seconds.
+- New automatic tests on GitHub's Windows and Mac machines: a hidden self-test checks, downloads, verifies and unpacks
+  the newest release, and on Windows an older build updates itself end to end through its own Settings buttons.
+- Hammer Climb: a brand new mountain, in the spirit of the famous pot-and-hammer climb: the start pit under a dead
+  tree, the pipes, orange rocks and a bucket, the chimney, the furniture, the long slide, the mountain, the ice, and
+  a summit where the sky turns to space and you lift off into the stars. The hammer follows the mouse more closely and
+  gravity is a little gentler. Back or Quit starts the climb over; closing the panel or pausing keeps your place.
+  Tested on Windows: clicking a mountain starts the climb and the hammer follows the mouse.
+- Sky Hop: a second mode, Monsters. Little monsters float between the platforms (land on top to bop them, touch one
+  any other way and you fall) and puffy clouds hold you for one bounce. Switch between Classic and Monsters at the top
+  before the first jumps or after a fall (or press M).
+- Original names (Settings > More) now does something everywhere: Add list lets you paste your own names
+  (one "Game = name" per line), and on Windows a list file next to Ludus.exe is found too.
+- Map Hunt and Mosaic Hunt maps: + and - zoom buttons, double-click to zoom, and a trackpad pinch works on Mac too.
+- Mosaic Hunt: the map pins and labels no longer draw on top of the "Hunt complete" card.
+- The game name in the header no longer has a coloured underline; hovering shows a soft grey round pill instead.
+- The home Continue card shows one label (Continue), not two.
+- The sliding tab pill never overshoots its tab, even from All to Online and back.
+- Sky Raiders has a new cover that looks like the game itself (the same raiders, bunkers and cannon), and the little
+  star in the cover's corner is gone.
+
 ## 1.12.16 (2026-10-27)
 
 - The category tabs on the home screen (All, Arcade, Puzzle, Duel, Same laptop, Online) now work like one toggle:

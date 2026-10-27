@@ -1,0 +1,97 @@
+name: Update test
+
+# The real in-app update on a different network (GitHub's machines), after every release:
+#  Windows: install the previous release, let its own updater fetch the newest one, check it comes back updated.
+#  Mac:     the newest app's hidden self-test checks, downloads, verifies and unpacks the newest release.
+on:
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      from: { description: 'older version to start from (blank = the release before the newest)', required: false }
+      to: { description: 'version it should reach (blank = the newest release)', required: false }
+
+permissions:
+  contents: read
+
+jobs:
+  versions:
+    runs-on: ubuntu-latest
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    outputs:
+      from: ${{ steps.v.outputs.from }}
+      to: ${{ steps.v.outputs.to }}
+      old_broken: ${{ steps.v.outputs.old_broken }}
+    steps:
+      - id: v
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          IN_FROM: ${{ github.event.inputs.from }}
+          IN_TO: ${{ github.event.inputs.to }}
+        run: |
+          set -euo pipefail
+          tags=$(gh release list --limit 2 --exclude-drafts --exclude-pre-releases --json tagName -q '.[].tagName' | sed 's/^v//')
+          to=${IN_TO:-$(echo "$tags" | sed -n 1p)}
+          from=${IN_FROM:-$(echo "$tags" | sed -n 2p)}
+          echo "from=$from" >> "$GITHUB_OUTPUT"; echo "to=$to" >> "$GITHUB_OUTPUT"
+          # 1.12.16 and older: the Windows update button never started the download (fixed after it)
+          broken=$(printf '%s\n1.12.16\n' "$from" | sort -V | head -1); [ "$broken" = "$from" ] && echo "old_broken=true" >> "$GITHUB_OUTPUT" || echo "old_broken=false" >> "$GITHUB_OUTPUT"
+          echo "update test: $from -> $to"
+
+  windows:
+    needs: versions
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      # Windows Ludus 1.12.16 and older cannot update in-app (their update button never started the download):
+      # people on those versions download once from the website. From the next version on, this must pass.
+      - name: Previous release updates itself in-app to the newest
+        shell: powershell
+        continue-on-error: ${{ needs.versions.outputs.old_broken == 'true' }}
+        run: ./windows/ci/update-real.ps1 -From '${{ needs.versions.outputs.from }}' -To '${{ needs.versions.outputs.to }}' -Out update-test -Limit 240
+      - name: Newest Ludus self-test (check, download, verify, unpack)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $to = '${{ needs.versions.outputs.to }}'
+          $d = Join-Path $env:RUNNER_TEMP 'ludus-new'
+          Invoke-WebRequest "https://github.com/Solomon-69/Ludus/releases/download/v$to/Ludus-windows.zip" -OutFile "$d.zip"
+          Expand-Archive "$d.zip" -DestinationPath $d
+          $exe = (Get-ChildItem $d -Recurse -Filter Ludus.exe | Select-Object -First 1).FullName
+          $res = Join-Path (Resolve-Path update-test) 'selftest-windows.json'
+          $p = Start-Process $exe -ArgumentList "--selftest-update=$res" -PassThru -Wait
+          Get-Content $res
+          $r = Get-Content $res -Raw | ConvertFrom-Json
+          if (-not $r.ok -or $r.maxPct -le 0) { throw "self-test failed: $($r.error)" }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: update-test-windows
+          path: update-test
+          retention-days: 14
+
+  mac:
+    needs: versions
+    runs-on: macos-latest
+    timeout-minutes: 10
+    steps:
+      - name: Newest Ludus self-test (check, download, verify, unpack)
+        run: |
+          set -euo pipefail
+          to='${{ needs.versions.outputs.to }}'
+          mkdir -p update-test && cd "$RUNNER_TEMP"
+          curl -fsSL -o new.zip "https://github.com/Solomon-69/Ludus/releases/download/v$to/Ludus-mac.zip"
+          ditto -x -k new.zip new
+          res="$GITHUB_WORKSPACE/update-test/selftest-mac.json"
+          ./new/Ludus.app/Contents/MacOS/Ludus --selftest-update="$res"
+          cat "$res"
+          python3 -c "import json,sys; r=json.load(open(sys.argv[1])); sys.exit(0 if r['ok'] and r['maxPct']>0 else 1)" "$res"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: update-test-mac
+          path: update-test
+          retention-days: 14

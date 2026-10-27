@@ -299,6 +299,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
                 self?.webView.evaluateJavaScript("window.ludusShareError && ludusShareError(\(String(reflecting: msg)))")
             }
         case "update": startUpdate(body)
+        case "site": NSWorkspace.shared.open(URL(string: "https://solomon-69.github.io/Ludus/")!)   // the website, a fixed address only
         case "ready": uiReady = true; failTimer?.invalidate()
         case "uifail": DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { if !self.uiReady { self.showFallback() } }   // a startup error: unless the page still came up
         case "intro":
@@ -832,6 +833,11 @@ final class ClickCatcher: NSView {
 enum LudusApp {
     @MainActor
     static func main() {
+        if let a = CommandLine.arguments.first(where: { $0.hasPrefix("--selftest-update=") }) {
+            let result = String(a.dropFirst("--selftest-update=".count))
+            Task.detached { let ok = await Updater.selfTestReal(result: result); exit(ok ? 0 : 1) }
+            RunLoop.main.run()
+        }
         let app = NSApplication.shared
         let delegate = AppDelegate()
         app.delegate = delegate

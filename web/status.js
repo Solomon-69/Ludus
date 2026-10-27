@@ -58,15 +58,22 @@
   };
   U.askInstall = () => { if (U.state === 'available') set('confirm'); };
   U.cancel = () => { if (U.state === 'confirm') set('available'); };
+  // If the app never reports any progress (an older or stuck shell), stop waiting and offer the website instead.
+  let silentTimer = 0;
+  const NO_PROGRESS_MS = 45000;
   U.install = () => {
     if (U.state !== 'confirm') return;
     set('progress', { pct: 0 });
+    clearTimeout(silentTimer);
+    silentTimer = setTimeout(() => { if (U.state === 'progress' && U.pct <= 0) set('error'); }, NO_PROGRESS_MS);
     if (!L.native('update', { zip: U.zip, sums: U.sums, name: U.name, version: U.latest })) { /* no shell (browser): nothing to install */ }
   };
+  U.SITE = 'https://solomon-69.github.io/Ludus/';
+  U.openSite = () => { L.native('site', {}); };
   // The shell reports back: progress 0..100, "verifying", or an error. A finished update restarts the app, so there is no "done".
   window.ludusUpdateState = (kind, v) => {
     if (kind === 'progress') set('progress', { pct: Math.max(0, Math.min(100, +v || 0)) });
-    else if (kind === 'error') set('error');
+    else if (kind === 'error') { clearTimeout(silentTimer); set('error'); }
   };
   conn.on(up => { if (!up && (U.state === 'idle' || U.state === 'cantcheck' || U.state === 'uptodate')) set('offline'); else if (up && U.state === 'offline') set('idle'); });
   L.update = U;
