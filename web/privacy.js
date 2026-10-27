@@ -3,12 +3,33 @@
    A normal screen cannot show different pictures to different people, so this is the closest real thing.
    Every frame is checked here, in memory, and thrown away: nothing is saved or sent anywhere.
    Face finding: the built-in FaceDetector when the web view has one, otherwise MediaPipe's small
-   face detector (library, wasm and model fetched once from the pinned versions below). */
+   face detector (library, wasm and model fetched once from the pinned, fingerprint-checked files below). */
 (function () {
   'use strict';
+  // MediaPipe is loaded from this exact version only, and every file is checked against a fixed SHA-384 fingerprint
+  // before it runs (a changed or swapped file is refused). Apache-2.0, see THIRD_PARTY.md. Too big (about 10 MB) to ship inside the app.
   const MP_VER = '0.10.14';
   const MP_BASE = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@' + MP_VER;
   const MP_MODEL = 'https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite';
+  const MP_SRI = {
+    'vision_bundle.mjs': 'sha384-pv/a53slpd9r+c7gv5R/Yx+690OjBKfh44t0YEEQi74uhGupAjv0NpiHrzlmhiVn',
+    'vision_wasm_internal.js': 'sha384-kqX2jGDkWeDYqzs7HpikHthiB1zh/xFyMJu6Fkp8UUMPwamqZBRwL39vNtSQwS5E',
+    'vision_wasm_internal.wasm': 'sha384-5znl2S0CAaFpqRz3rLzstYkWpBwEMzGDbWzlALJ20VPUX6VLjrVqAUdJEHcmXMdc',
+    'vision_wasm_nosimd_internal.js': 'sha384-BQunnb2RrWwTlqL/gGpV1KOoZnLcsIb8uWDD21uhLVtQuKG0HsmfmhlDSDjnA1iw',
+    'vision_wasm_nosimd_internal.wasm': 'sha384-4TZi4A8vwDwAdUuCp/TZFPzVRWERk0T4QnOxMCMY9qFnzvDnndjdiIHzBZ0xu/oB',
+    'blaze_face_short_range.tflite': 'sha384-DK7LKyczaWlQp0NJO4TTv5wARoWlAWz57/exd62cy3KJJNpayeiX3cT7q3iANQSy'
+  };
+  // fetch a file and return its bytes only if its fingerprint matches
+  async function pinned(url, name) {
+    if (!(window.crypto && crypto.subtle)) throw new Error('no crypto');
+    const res = await fetch(url, { cache: 'force-cache', credentials: 'omit' });
+    if (!res.ok) throw new Error('fetch ' + name);
+    const buf = await res.arrayBuffer();
+    const sum = btoa(String.fromCharCode.apply(null, new Uint8Array(await crypto.subtle.digest('SHA-384', buf))));
+    if ('sha384-' + sum !== MP_SRI[name]) throw new Error('fingerprint mismatch ' + name);
+    return buf;
+  }
+  const blobUrl = (buf, type) => URL.createObjectURL(new Blob([buf], { type }));
   const TICK_MS = 200;           // 5 checks a second: light on an 8 GB Mac
   const MIN_FACE = 0.05;         // faces narrower than 5% of the picture are too far away to read the screen
   const FACING = 0.38;           // nose this far off the eye line (in eye widths) = head turned away
@@ -29,10 +50,19 @@
         kind = 'native'; detector = fd; return detector;
       } catch (e) { /* fall through to MediaPipe */ }
     }
-    const mp = await import(MP_BASE + '/vision_bundle.mjs');
-    const files = await mp.FilesetResolver.forVisionTasks(MP_BASE + '/wasm');
+    const bundle = await pinned(MP_BASE + '/vision_bundle.mjs', 'vision_bundle.mjs');
+    const mp = await import(blobUrl(bundle, 'text/javascript'));
+    // MediaPipe picks the SIMD or plain build for this web view; we fetch that same pair, checked, and hand it over as local blobs
+    const wanted = await mp.FilesetResolver.forVisionTasks(MP_BASE + '/wasm');
+    const variant = /nosimd/.test(String(wanted.wasmLoaderPath)) ? 'vision_wasm_nosimd_internal' : 'vision_wasm_internal';
+    const [js, wasm, model] = await Promise.all([
+      pinned(MP_BASE + '/wasm/' + variant + '.js', variant + '.js'),
+      pinned(MP_BASE + '/wasm/' + variant + '.wasm', variant + '.wasm'),
+      pinned(MP_MODEL, 'blaze_face_short_range.tflite')
+    ]);
+    const files = { wasmLoaderPath: blobUrl(js, 'text/javascript'), wasmBinaryPath: blobUrl(wasm, 'application/wasm') };
     detector = await mp.FaceDetector.createFromOptions(files, {
-      baseOptions: { modelAssetPath: MP_MODEL, delegate: 'CPU' }, runningMode: 'VIDEO', minDetectionConfidence: 0.55
+      baseOptions: { modelAssetBuffer: new Uint8Array(model), delegate: 'CPU' }, runningMode: 'VIDEO', minDetectionConfidence: 0.55
     });
     kind = 'mediapipe';
     return detector;

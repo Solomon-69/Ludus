@@ -13,6 +13,10 @@ Ludus itself is Copyright (c) 2026 Solomon, MIT licence (see LICENSE). The parts
 | Microsoft Edge WebView2 SDK (Windows app only) | Microsoft, BSD-style | NuGet package, see `NOTICE` |
 | .NET 8 / Windows Forms (Windows app only, installed separately) | MIT | see `NOTICE` |
 
+## Downloaded once, not bundled: MediaPipe face detector (Privacy blur)
+
+Privacy blur uses MediaPipe Tasks Vision 0.10.14 (`@mediapipe/tasks-vision`, Apache License 2.0, (c) Google / MediaPipe authors, https://github.com/google-ai-edge/mediapipe) and its small BlazeFace short-range face model (Apache 2.0, https://storage.googleapis.com/mediapipe-models/). They are about 10 MB, so they are not shipped inside the app. When the web view has no built-in face finder, `web/privacy.js` fetches exactly that version once and refuses any file whose SHA-384 fingerprint does not match the fingerprints written in that file. Camera pictures are checked on your computer and never saved or sent.
+
 No fonts, sound files or chess engines are bundled: sounds are generated in the app and the fonts are the system fonts. Nothing from other open-source games is copied; the games are written from scratch.
 
 ## Flags (Flag Quiz)
