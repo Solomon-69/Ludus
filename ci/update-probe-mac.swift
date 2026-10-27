@@ -44,6 +44,15 @@ struct Probe {
             check(secs < 300, "finished within 5 minutes")
             let after = (NSDictionary(contentsOf: bundle.appendingPathComponent("Contents/Info.plist"))?["CFBundleShortVersionString"] as? String) ?? "?"
             check(after == tag, "app bundle now holds Ludus \(tag) (found \(after))")
+            if args.count > 3, args[3] == "current" {
+                // The address the page gave is broken: the updater must fall back to the "latest release" address.
+                let bad = "https://github.com/Solomon-69/Ludus/releases/download/v0.0.0/"
+                do {
+                    try await Updater.install(zip: URL(string: bad + "Ludus-mac.zip")!, sums: URL(string: bad + "SHA256SUMS.txt")!, name: "Ludus-mac.zip",
+                                              bundle: bundle, progress: { _ in }, relaunch: { _ in })
+                    check(true, "fallback address used when the first one fails")
+                } catch { check(false, "fallback address used when the first one fails: \(error)") }
+            }
         } catch { log("FAIL \(error)"); fails += 1 }
         try? lines.joined(separator: "\n").write(to: result, atomically: true, encoding: .utf8)
         exit(fails == 0 ? 0 : 1)

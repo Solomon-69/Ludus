@@ -60,14 +60,18 @@
   U.cancel = () => { if (U.state === 'confirm') set('available'); };
   U.install = () => {
     if (U.state !== 'confirm') return;
-    set('progress', { pct: 0 });
+    set('progress', { pct: 0, mb: 0, why: '' });
     if (!L.native('update', { zip: U.zip, sums: U.sums, name: U.name, version: U.latest })) { /* no shell (browser): nothing to install */ }
   };
-  // The shell reports back: progress 0..100, "verifying", or an error. A finished update restarts the app, so there is no "done".
+  // The shell reports back: progress 0..100, bytes so far (when the size is unknown), or an error ('net' = the
+  // connection, 'check' = the file failed its check). A finished update restarts the app, so there is no "done".
   window.ludusUpdateState = (kind, v) => {
     if (kind === 'progress') set('progress', { pct: Math.max(0, Math.min(100, +v || 0)) });
-    else if (kind === 'error') set('error');
+    else if (kind === 'bytes') set('progress', { pct: 0, mb: Math.max(0, +v || 0) / 1048576 });
+    else if (kind === 'error') set('error', { why: v === 'check' ? 'check' : 'net' });
   };
+  // After a failed update: open the Ludus website (the shell opens one fixed address, nothing from the page).
+  U.website = () => L.native('website', {});
   conn.on(up => { if (!up && (U.state === 'idle' || U.state === 'cantcheck' || U.state === 'uptodate')) set('offline'); else if (up && U.state === 'offline') set('idle'); });
   L.update = U;
 })();

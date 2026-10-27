@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
@@ -309,6 +310,8 @@ internal sealed class PopupForm : Form
 
     // ---------- Update (the page asks, Updater does the work) ----------
 
+    private const string WebsiteUrl = "https://solomon-69.github.io/Ludus/";
+
     private async void StartUpdate(string? zip, string? sums, string? name)
     {
         if (updating || zip == null || sums == null || name == null) return;
@@ -316,15 +319,20 @@ internal sealed class PopupForm : Form
         updating = true;
         try
         {
+            Updater.Log ??= Store.Log;
+            Store.Log($"update: starting {zip}");
+            var inv = System.Globalization.CultureInfo.InvariantCulture;
             var staged = await Updater.DownloadAsync(zipUri, sumsUri, name,
-                new Progress<double>(p => RunScript($"window.ludusUpdateState && ludusUpdateState('progress', {p.ToString(System.Globalization.CultureInfo.InvariantCulture)})")));
+                new Progress<double>(p => RunScript($"window.ludusUpdateState && ludusUpdateState('progress', {p.ToString(inv)})")),
+                new Progress<long>(b => RunScript($"window.ludusUpdateState && ludusUpdateState('bytes', {b.ToString(inv)})")));
             Updater.StartSwap(staged, AppContext.BaseDirectory.TrimEnd('\\', '/'), Environment.ProcessId);
             Quit();   // the helper waits for this process to exit, swaps the files and opens Ludus again
         }
         catch (Exception ex)
         {
             Store.Log($"update failed: {ex.Message}");
-            RunScript("window.ludusUpdateState && ludusUpdateState('error')");
+            var why = ex is InvalidOperationException ? "check" : "net";   // a failed check vs. a connection problem
+            RunScript($"window.ludusUpdateState && ludusUpdateState('error', '{why}')");
         }
         finally { updating = false; }
     }
@@ -399,6 +407,13 @@ internal sealed class PopupForm : Form
                     break;
                 case "uifail":   // a startup error: unless the page still came up, show the fallback screen
                     BeginInvoke((MethodInvoker)(() => ArmWatchdog(1500)));
+                    break;
+                case "website":   // "Download from the website" after a failed update: always this one fixed address
+                    BeginInvoke((MethodInvoker)(() =>
+                    {
+                        try { Process.Start(new ProcessStartInfo(WebsiteUrl) { UseShellExecute = true }); }
+                        catch (Exception ex) { Store.Log($"website: {ex.Message}"); }
+                    }));
                     break;
                 case "update":
                     BeginInvoke((MethodInvoker)(() => StartUpdate(StringProp(msg, "zip"), StringProp(msg, "sums"), StringProp(msg, "name"))));

@@ -928,8 +928,15 @@
       else if (st === 'uptodate') say('✓ Up to date', 'good');
       else if (st === 'available') { say('A new version is ready'); ctl.append(btn('Update to ' + U.latest, 'warm', U.askInstall)); }
       else if (st === 'confirm') { say('Ludus restarts when it is done.'); ctl.append(btn('Not now', '', U.cancel), btn('Install', 'warm', U.install)); }
-      else if (st === 'progress') { say(U.pct >= 100 ? 'Installing…' : 'Downloading… ' + Math.round(U.pct) + '%'); const bar = el('div', 'upd-bar'), fill = el('i'); fill.style.width = U.pct + '%'; bar.appendChild(fill); ctl.appendChild(bar); }
-      else if (st === 'error') { say('Couldn’t update. Try again.', 'bad'); ctl.append(btn('Try again', '', U.check)); }
+      else if (st === 'progress') {
+        const pct = U.pct > 0 && U.pct < 10 ? U.pct.toFixed(1) : Math.round(U.pct);
+        say(U.pct >= 100 ? 'Installing…' : U.mb > 0 ? 'Downloading… ' + U.mb.toFixed(1) + ' MB' : 'Downloading… ' + pct + '%');
+        const bar = el('div', 'upd-bar'), fill = el('i'); fill.style.width = Math.max(U.pct, 2) + '%'; bar.appendChild(fill); ctl.appendChild(bar);
+      }
+      else if (st === 'error') {
+        say(U.why === 'check' ? 'The download didn’t check out. Try again, or get it from the website.' : 'Couldn’t download the update. Check the internet, or get it from the website.', 'bad');
+        ctl.append(btn('Try again', '', U.check), btn('Website', '', U.website));
+      }
       else if (st === 'cantcheck') { say('Couldn’t check'); ctl.append(btn('Check', '', U.check)); }
       else { say('Needs the internet.'); ctl.append(btn('Check', '', U.check, true)); }
     }

@@ -59,7 +59,9 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force logs | Out-Null
           $res = Join-Path $PWD 'logs\update-${{ matrix.updater }}.txt'
-          $p = Start-Process probe\UpdateProbe.exe -ArgumentList "`"$res`" `"$env:INST`" ${{ matrix.updater }}" -PassThru -Wait
+          $p = Start-Process probe\UpdateProbe.exe -ArgumentList "`"$res`" `"$env:INST`" ${{ matrix.updater }}" -PassThru
+          # (not -Wait: that also waits for the Ludus the swap starts again)
+          if (-not $p.WaitForExit(15 * 60 * 1000)) { Write-Host 'probe still running after 15 minutes'; $p.Kill() }
           if (Test-Path $res) { Get-Content $res } else { Write-Host 'no result file' }
           Get-Process Ludus -ErrorAction SilentlyContinue | Stop-Process -Force
           exit $p.ExitCode
@@ -99,7 +101,7 @@ jobs:
       - name: Update the older Ludus with the real updater
         run: |
           mkdir -p logs
-          ./probe "logs/update-${{ matrix.updater }}.txt" old/x/Ludus.app
+          ./probe "logs/update-${{ matrix.updater }}.txt" old/x/Ludus.app ${{ matrix.updater }}
 
       - uses: actions/upload-artifact@v4
         if: always()

@@ -37,38 +37,54 @@ internal static class Updater
         return null;
     }
 
-    private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromMinutes(10) };
+    /// <summary>Where a release file can also be fetched if the address the page gave does not work.</summary>
+    public const string LatestDownload = "https://github.com/Solomon-69/Ludus/releases/latest/download/";
 
-    /// <summary>Downloads and checks the zip, unzips it and returns the folder that holds Ludus.exe. Throws on any problem; nothing installed then.</summary>
-    public static async Task<string> DownloadAsync(Uri zip, Uri sums, string name, IProgress<double> progress)
+    private const int Attempts = 4;                                    // per address; a dropped connection resumes where it stopped
+    private static readonly TimeSpan Stall = TimeSpan.FromSeconds(30); // no bytes for this long = try again
+
+    // One client for the app's life. Connect timeout short, no overall timeout (a big file on a slow line may take a
+    // while); the stall watchdog below catches a download that stops moving. Redirects (github.com -> release-assets)
+    // are followed. GitHub asks every client to send a User-Agent.
+    private static readonly HttpClient Http = MakeClient();
+    private static HttpClient MakeClient()
+    {
+        var h = new SocketsHttpHandler
+        {
+            ConnectTimeout = TimeSpan.FromSeconds(20),
+            AllowAutoRedirect = true, MaxAutomaticRedirections = 10,
+            AutomaticDecompression = System.Net.DecompressionMethods.None,
+            PooledConnectionLifetime = TimeSpan.FromMinutes(5),
+        };
+        var c = new HttpClient(h) { Timeout = Timeout.InfiniteTimeSpan };
+        var v = typeof(Updater).Assembly.GetName().Version;
+        c.DefaultRequestHeaders.UserAgent.ParseAdd($"Ludus/{v?.Major}.{v?.Minor}.{v?.Build} (Windows)");
+        return c;
+    }
+
+    /// <summary>Optional log line for each step (the app writes it to its log file).</summary>
+    public static Action<string>? Log { get; set; }
+
+    /// <summary>Downloads and checks the zip, unzips it and returns the folder that holds Ludus.exe. Throws on any problem; nothing installed then.
+    /// <paramref name="progress"/> gets 0..100 (one decimal) when the size is known; <paramref name="bytes"/> gets the bytes so far when it is not.</summary>
+    public static async Task<string> DownloadAsync(Uri zip, Uri sums, string name, IProgress<double> progress, IProgress<long>? bytes = null, CancellationToken ct = default)
     {
         if (!Allowed(zip) || !Allowed(sums) || name.Contains('/') || name.Contains('\\')) throw new InvalidOperationException("source not allowed");
         var work = Path.Combine(Path.GetTempPath(), "ludus-update-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(work);
         try
         {
-            var sumsText = await Http.GetStringAsync(sums);
+            progress.Report(0);
+            var sumsText = await WithFallback(sums, "SHA256SUMS.txt", u => GetTextAsync(u, ct), ct);
             var want = ExpectedHash(sumsText, name) ?? throw new InvalidOperationException("no checksum");
 
             var file = Path.Combine(work, name);
-            using (var resp = await Http.GetAsync(zip, HttpCompletionOption.ResponseHeadersRead))
-            {
-                resp.EnsureSuccessStatusCode();
-                var total = resp.Content.Headers.ContentLength ?? 0;
-                await using var src = await resp.Content.ReadAsStreamAsync();
-                await using var dst = File.Create(file);
-                var buf = new byte[65536]; long got = 0; double last = -1; int n;
-                while ((n = await src.ReadAsync(buf)) > 0)
-                {
-                    await dst.WriteAsync(buf.AsMemory(0, n));
-                    got += n;
-                    if (total > 0) { var p = Math.Min(99, Math.Round(got * 100.0 / total)); if (p != last) { last = p; progress.Report(p); } }
-                }
-            }
+            await WithFallback(zip, name, u => FetchFileAsync(u, file, progress, bytes, ct), ct);
             string have;
-            await using (var fs = File.OpenRead(file)) have = Convert.ToHexString(await SHA256.HashDataAsync(fs)).ToLowerInvariant();
+            await using (var fs = File.OpenRead(file)) have = Convert.ToHexString(await SHA256.HashDataAsync(fs, ct)).ToLowerInvariant();
             if (have != want) throw new InvalidOperationException("checksum mismatch");
             progress.Report(100);
+            Log?.Invoke("update: downloaded and checked " + name);
 
             var x = Path.Combine(work, "x");
             ZipFile.ExtractToDirectory(file, x);
@@ -84,6 +100,100 @@ internal static class Updater
         }
     }
 
+    /// <summary>Tries the address from the page, then the fixed "latest release" address (real releases only).
+    /// The checksum check still guards whatever arrives.</summary>
+    private static async Task<T> WithFallback<T>(Uri first, string fileName, Func<Uri, Task<T>> get, CancellationToken ct)
+    {
+        try { return await get(first); }
+        catch (Exception ex) when (ex is not InvalidOperationException && !ct.IsCancellationRequested
+                                   && first.Scheme == Uri.UriSchemeHttps && first.AbsolutePath.Contains("/releases/"))
+        {
+            var second = new Uri(LatestDownload + Uri.EscapeDataString(fileName));
+            Log?.Invoke($"update: {first.Host} failed ({ex.Message}), trying {second}");
+            return await get(second);
+        }
+    }
+
+    private static async Task<string> GetTextAsync(Uri u, CancellationToken ct)
+    {
+        for (var i = 1; ; i++)
+        {
+            try
+            {
+                using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                cts.CancelAfter(TimeSpan.FromSeconds(30));
+                return await Http.GetStringAsync(u, cts.Token);
+            }
+            catch (Exception ex) when (i < Attempts && !ct.IsCancellationRequested && Retryable(ex))
+            {
+                Log?.Invoke($"update: {u.Host} try {i} failed ({ex.Message})");
+                await Task.Delay(TimeSpan.FromSeconds(i * 2), ct);
+            }
+        }
+    }
+
+    // A 4xx answer (file not there) is not worth repeating; dropped connections, time-outs and 5xx are.
+    private static bool Retryable(Exception ex) =>
+        ex is HttpRequestException h ? h.StatusCode is null || (int)h.StatusCode >= 500 || h.StatusCode == System.Net.HttpStatusCode.RequestTimeout
+        : ex is IOException or OperationCanceledException;
+
+    /// <summary>Streams <paramref name="u"/> to <paramref name="file"/> in 64 KB pieces, reporting progress as it goes.
+    /// A stall (no bytes for 30 s) or a dropped connection is retried, carrying on from the bytes already saved when the
+    /// server allows it (HTTP Range), otherwise from the start.</summary>
+    private static async Task<bool> FetchFileAsync(Uri u, string file, IProgress<double> progress, IProgress<long>? bytes, CancellationToken ct)
+    {
+        long got = 0, total = 0;
+        double last = -1;
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        File.Delete(file);
+        for (var i = 1; ; i++)
+        {
+            using var stall = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            try
+            {
+                using var req = new HttpRequestMessage(HttpMethod.Get, u);
+                if (got > 0) req.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(got, null);
+                stall.CancelAfter(Stall);
+                using var resp = await Http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, stall.Token);
+                if (!Allowed(resp.RequestMessage?.RequestUri ?? u)) throw new InvalidOperationException("source not allowed");
+                if (got > 0 && resp.StatusCode != System.Net.HttpStatusCode.PartialContent) { got = 0; File.Delete(file); }   // no resume: start again
+                resp.EnsureSuccessStatusCode();
+                var len = resp.Content.Headers.ContentLength ?? 0;
+                if (total == 0 && len > 0) total = got + len;
+                Log?.Invoke($"update: downloading {u.Host} -> {resp.RequestMessage?.RequestUri?.Host} ({(total > 0 ? total / 1048576.0 : -1):0.0} MB, from {got / 1048576.0:0.0} MB, try {i})");
+                await using var src = await resp.Content.ReadAsStreamAsync(stall.Token);
+                await using var dst = new FileStream(file, FileMode.Append, FileAccess.Write, FileShare.None, 65536, true);
+                var buf = new byte[65536]; int n;
+                while (true)
+                {
+                    stall.CancelAfter(Stall);   // re-arm: the watchdog only fires when nothing arrives for 30 s
+                    n = await src.ReadAsync(buf, stall.Token);
+                    if (n <= 0) break;
+                    await dst.WriteAsync(buf.AsMemory(0, n), ct);
+                    got += n;
+                    if (total > 0)
+                    {
+                        var p = Math.Min(99.9, Math.Floor(got * 1000.0 / total) / 10);
+                        if (p != last) { last = p; progress.Report(p); }
+                    }
+                    else bytes?.Report(got);
+                }
+                if (total > 0 && got < total) throw new IOException($"connection closed early ({got} of {total} bytes)");
+                Log?.Invoke($"update: {got / 1048576.0:0.0} MB in {sw.Elapsed.TotalSeconds:0}s");
+                return true;
+            }
+            catch (Exception ex) when (i < Attempts && !ct.IsCancellationRequested && Retryable(ex))
+            {
+                Log?.Invoke($"update: try {i} stopped at {got / 1048576.0:0.0} MB ({(stall.IsCancellationRequested ? "no data for 30 s" : ex.Message)})");
+                await Task.Delay(TimeSpan.FromSeconds(i * 2), ct);
+            }
+            catch (Exception ex) when (stall.IsCancellationRequested && !ct.IsCancellationRequested)
+            {
+                throw new TimeoutException("the download stopped (no data for 30 s)", ex);
+            }
+        }
+    }
+
     /// <summary>Starts the helper that waits for process <paramref name="pid"/> to exit, copies <paramref name="staged"/> over
     /// <paramref name="installDir"/> and starts Ludus.exe again. The caller quits right after.</summary>
     public static void StartSwap(string staged, string installDir, int pid)
@@ -94,7 +204,7 @@ internal static class Updater
             "$ErrorActionPreference='SilentlyContinue'\n" +
             "while (Get-Process -Id $ProcId -ErrorAction SilentlyContinue) { Start-Sleep -Milliseconds 200 }\n" +
             "Start-Sleep -Milliseconds 300\n" +
-            "for ($i=0; $i -lt 10; $i++) { Copy-Item -Path (Join-Path $Staged '*') -Destination $Install -Recurse -Force -ErrorAction Stop; if ($?) { break }; Start-Sleep -Milliseconds 500 }\n" +
+            "for ($i=0; $i -lt 20; $i++) { try { Copy-Item -Path (Join-Path $Staged '*') -Destination $Install -Recurse -Force -ErrorAction Stop; break } catch { Start-Sleep -Milliseconds 500 } }\n" +
             "Start-Process -FilePath (Join-Path $Install 'Ludus.exe')\n" +
             "Remove-Item -Recurse -Force (Split-Path $Staged -Parent) -ErrorAction SilentlyContinue\n" +
             "Remove-Item -Force $PSCommandPath -ErrorAction SilentlyContinue\n");

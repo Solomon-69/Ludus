@@ -163,7 +163,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
                     })
             } catch {
                 appendErrorLog("update failed: \(error)")
-                report("window.ludusUpdateState && ludusUpdateState('error')")
+                let why = (error as? Updater.Failure)?.why ?? ""
+                let kind = why.hasPrefix("checksum") || why.hasPrefix("no checksum") || why.hasPrefix("not a Ludus") ? "check" : "net"
+                report("window.ludusUpdateState && ludusUpdateState('error', '\(kind)')")
             }
             await MainActor.run { self.updating = false }
         }
@@ -299,6 +301,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
                 self?.webView.evaluateJavaScript("window.ludusShareError && ludusShareError(\(String(reflecting: msg)))")
             }
         case "update": startUpdate(body)
+        case "website": NSWorkspace.shared.open(URL(string: "https://solomon-69.github.io/Ludus/")!)   // one fixed address
         case "ready": uiReady = true; failTimer?.invalidate()
         case "uifail": DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { if !self.uiReady { self.showFallback() } }   // a startup error: unless the page still came up
         case "intro":

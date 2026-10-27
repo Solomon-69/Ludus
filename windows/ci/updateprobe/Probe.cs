@@ -10,17 +10,22 @@ internal static class Probe
 {
     private static readonly List<string> Lines = new();
     private static readonly Stopwatch Clock = Stopwatch.StartNew();
-    private static void Log(string s) { var l = $"[{Clock.Elapsed.TotalSeconds,6:0.0}s] {s}"; lock (Lines) Lines.Add(l); Console.WriteLine(l); }
+    private static string? resultFile;
+    private static void Log(string s)
+    {
+        var l = $"[{Clock.Elapsed.TotalSeconds,6:0.0}s] {s}";
+        lock (Lines) { Lines.Add(l); if (resultFile != null) File.AppendAllText(resultFile, l + "\n"); }   // written as it goes
+    }
 
     [STAThread]
     private static int Main(string[] args)
     {
         var result = args[0]; var install = args[1]; var label = args.Length > 2 ? args[2] : "updater";
+        File.WriteAllText(result, ""); resultFile = result;
         int code = 1;
         var form = new Form { ShowInTaskbar = false, Opacity = 0, Width = 1, Height = 1 };
         form.Load += async (_, _) => { try { code = await Run(install, label); } catch (Exception e) { Log("FAIL " + e); } form.Close(); };
         Application.Run(form);
-        File.WriteAllLines(result, Lines);
         return code;
     }
 
@@ -37,6 +42,7 @@ internal static class Probe
         Log($"latest = {tag}, zip = {zip}");
 
         double max = 0; var firstAboveZero = -1.0;
+        SetUpdaterLog();   // only the newer updater has this hook
         var progress = new Progress<double>(p =>
         {
             if (p > max) { max = p; if (firstAboveZero < 0 && p > 0) firstAboveZero = Clock.Elapsed.TotalSeconds; if (p % 10 == 0 || p >= 99) Log($"progress {p}%"); }
@@ -70,6 +76,27 @@ internal static class Probe
         var relaunched = false;
         for (var i = 0; i < 20 && !relaunched; i++) { await Task.Delay(500); relaunched = Process.GetProcessesByName("Ludus").Any(); }
         Check(relaunched, "Ludus was started again after the swap");
+        Get_Ludus_Quit();
+        if (label == "current")
+        {
+            // The address the page gave is broken (a release that does not exist): the updater must fall back to the
+            // fixed "latest release" address and still finish.
+            Log("fallback: starting from a broken address");
+            try
+            {
+                var bad = new Uri("https://github.com/Solomon-69/Ludus/releases/download/v0.0.0/Ludus-windows.zip");
+                var badSums = new Uri("https://github.com/Solomon-69/Ludus/releases/download/v0.0.0/SHA256SUMS.txt");
+                SetUpdaterLog();
+                var st = await Updater.DownloadAsync(bad, badSums, "Ludus-windows.zip", new Progress<double>(_ => { }));
+                Check(File.Exists(Path.Combine(st, "Ludus.exe")), "fallback address used when the first one fails");
+            }
+            catch (Exception e) { Check(false, "fallback address used when the first one fails: " + e.Message); }
+        }
         return fails == 0 ? 0 : 1;
     }
+
+    private static void SetUpdaterLog() =>
+        typeof(Updater).GetProperty("Log")?.SetValue(null, (Action<string>)(m => Log("  " + m)));
+
+    private static void Get_Ludus_Quit() { foreach (var p in Process.GetProcessesByName("Ludus")) try { p.Kill(); } catch { } }
 }
