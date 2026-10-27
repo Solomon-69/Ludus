@@ -606,7 +606,7 @@
 
   const LEVELS = ['Easy', 'Medium', 'Hard', 'Expert'];
   const BOT_MS = [400, 700, 1000, 2200];
-  const TIMES = [0, 3, 5, 10];   // clock choices, minutes per side (0 = not timed)
+  const TIMES = [0, 3, 5, 10, 15];   // clock choices, minutes per side (0 = not timed)
   const BOOK = { '': ['e2e4', 'd2d4', 'c2c4', 'g1f3'], e2e4: ['e7e5', 'c7c5', 'e7e6', 'c7c6'], d2d4: ['d7d5', 'g8f6'], c2c4: ['e7e5', 'g8f6', 'c7c5'], g1f3: ['d7d5', 'g8f6'] };
 
   Ludus.register({
@@ -917,20 +917,20 @@
         drawTimePicker(col);
       }
       // Timed or not: a soft segmented control. Under the level buttons, or standing beside the board when there is room.
-      const TIME_LABELS = ['Off', '3 min', '5 min', '10 min'];
+      const TIME_LABELS = ['Off', '3 min', '5 min', '10 min', '15 min'];
       function drawTimePicker(col) {
         const { bx, bs, by, chipY } = geo, cur = TIMES.indexOf(prefTime());
         let rects;
         if (timeSide) {
-          const sw = 72, sh = 30, x = bx + bs + 14, y0 = by + bs - sh * 4 - 6;
+          const sw = 72, sh = 30, x = bx + bs + 14, y0 = by + bs - sh * TIMES.length - 6;
           D.text(ctx, 'Clock', x + sw / 2, y0 - 14, 11.5, col.ink2, 700);
           rects = TIMES.map((m, i) => ({ x, y: y0 + i * sh, w: sw, h: sh }));
         } else {
-          const tw = Math.min(bs, 300), lab = 46, sw = (tw - lab) / 4, sh = 28, x0 = bx + (bs - tw) / 2 + lab, y = chipY + 42;
+          const tw = Math.min(bs, 340), lab = 46, sw = (tw - lab) / TIMES.length, sh = 28, x0 = bx + (bs - tw) / 2 + lab, y = chipY + 42;
           D.text(ctx, 'Clock', x0 - lab / 2 - 2, y + sh / 2 + 3, 11.5, col.ink2, 700);
           rects = TIMES.map((m, i) => ({ x: x0 + i * sw, y: y + 3, w: sw, h: sh }));
         }
-        const f = rects[0], l = rects[3], pad = 3;
+        const f = rects[0], l = rects[rects.length - 1], pad = 3;
         D.roundRect(ctx, f.x - pad, f.y - pad, l.x + l.w - f.x + pad * 2, l.y + l.h - f.y + pad * 2, 14);
         ctx.fillStyle = col.dark ? col.bg : col.bg2; ctx.fill();
         rects.forEach((r, i) => {
@@ -987,14 +987,21 @@
         const tint = (sq, color, a) => { const { x, y } = sqXY(sq); ctx.globalAlpha = a; ctx.fillStyle = color; ctx.fillRect(x, y, s, s); ctx.globalAlpha = 1; };
         // last move: a soft yellow square (muted gold in dark)
         if (lastMove) { tint(lastMove.from, col.dark ? '#4d4532' : '#fbefc2', 1); tint(lastMove.to, col.dark ? '#62553a' : '#f7e49c', 1); }
-        if (sel >= 0) tint(sel, col.accent, 0.38);
-        // king in check: red glow
+        // picked piece: a soft tint on its square only (while dragging, a small hollow ring marks where it came from instead)
+        const lifted = drag && drag.moved && pos.b[drag.sq];
+        const soft = col.dark ? 'rgba(150,180,210,0.16)' : 'rgba(110,140,175,0.2)';
+        if (sel >= 0 && !lifted) { const { x, y } = sqXY(sel); ctx.fillStyle = soft; ctx.fillRect(x, y, s, s); }
+        // keyboard cursor: a subtle tint, only once the keyboard is being used
+        if (kbd && cursor >= 0 && phase === 'play' && cursor !== sel) { const { x, y } = sqXY(cursor); ctx.fillStyle = col.dark ? 'rgba(217,119,87,0.2)' : 'rgba(217,119,87,0.16)'; ctx.fillRect(x, y, s, s); }
+        // king in check: a soft red square
         if (phase !== 'end' ? core.inCheck(pos) : (banner && banner.text === 'Checkmate')) {
           const k = pos.ksq[pos.side === 1 ? 0 : 1], { x, y } = sqXY(k);
-          const pulse = api.reduceMotion ? 1 : 0.75 + 0.25 * Math.sin(now / 180);
-          const g = ctx.createRadialGradient(x + s / 2, y + s / 2, s * 0.1, x + s / 2, y + s / 2, s * 0.72);
-          g.addColorStop(0, `rgba(226,72,60,${0.85 * pulse})`); g.addColorStop(1, 'rgba(226,72,60,0)');
-          ctx.fillStyle = g; ctx.fillRect(x, y, s, s);
+          ctx.fillStyle = col.dark ? 'rgba(226,72,60,0.34)' : 'rgba(226,72,60,0.24)'; ctx.fillRect(x, y, s, s);
+        }
+        if (lifted) {
+          const { x, y } = sqXY(drag.sq);
+          ctx.strokeStyle = col.dark ? 'rgba(170,195,220,0.5)' : 'rgba(90,120,155,0.45)'; ctx.lineWidth = Math.max(1.5, s * 0.04);
+          ctx.beginPath(); ctx.arc(x + s / 2, y + s / 2, s * 0.13, 0, Math.PI * 2); ctx.stroke();
         }
         // coordinates
         const fs = Math.max(8, Math.min(11, s * 0.2)), coord = col.dark ? 'rgba(200,220,235,0.34)' : 'rgba(60,85,110,0.4)';
@@ -1011,7 +1018,7 @@
           const sq = r * 16 + f, pc = pos.b[sq];
           if (!pc || hidden.has(sq)) continue;
           const { x, y } = sqXY(sq);
-          if (drag && drag.moved && drag.sq === sq) { pieceAt(pc, x, y, s, 0.3); continue; }
+          if (drag && drag.moved && drag.sq === sq) continue;
           if (promo && promo.from === sq) { pieceAt(pc, x, y, s, 0.3); continue; }
           pieceAt(pc, x, y, s);
         }
@@ -1024,10 +1031,10 @@
           for (const m of targetsFrom(sel)) {
             const t = core.mTo(m); if (seen.has(t)) continue; seen.add(t);
             const { x, y } = sqXY(t), capture = pos.b[t] || (core.mFlags(m) & core.F_EP);
-            ctx.fillStyle = col.dark ? 'rgba(190,215,235,0.2)' : 'rgba(45,70,100,0.17)';
+            ctx.fillStyle = col.dark ? 'rgba(170,195,220,0.24)' : 'rgba(70,100,135,0.2)';
             ctx.beginPath();
-            if (capture) { ctx.arc(x + s / 2, y + s / 2, s * 0.47, 0, Math.PI * 2); ctx.arc(x + s / 2, y + s / 2, s * 0.38, 0, Math.PI * 2, true); }
-            else ctx.arc(x + s / 2, y + s / 2, s * (hoverSq === t ? 0.2 : 0.15), 0, Math.PI * 2);
+            if (capture) { ctx.arc(x + s / 2, y + s / 2, s * 0.46, 0, Math.PI * 2); ctx.arc(x + s / 2, y + s / 2, s * 0.39, 0, Math.PI * 2, true); }
+            else ctx.arc(x + s / 2, y + s / 2, s * (hoverSq === t ? 0.12 : 0.1), 0, Math.PI * 2);
             ctx.fill();
           }
         }
@@ -1036,17 +1043,10 @@
           const k = ease(Math.min(1, (now - a.t0) / a.dur)), p0 = sqXY(a.from), p1 = sqXY(a.to);
           pieceAt(a.pc, D.lerp(p0.x, p1.x, k), D.lerp(p0.y, p1.y, k), s, 1, 1 + Math.sin(k * Math.PI) * 0.08);
         });
-        // keyboard cursor
-        if (kbd && cursor >= 0 && phase === 'play') {
-          const { x, y } = sqXY(cursor);
-          ctx.strokeStyle = col.accent; ctx.lineWidth = 3; D.roundRect(ctx, x + 2, y + 2, s - 4, s - 4, 6); ctx.stroke();
-        }
         // dragged piece follows the pointer
         if (drag && drag.moved && pos.b[drag.sq]) {
-          const over = sqAt(drag.x, drag.y);
-          if (over >= 0) { const { x, y } = sqXY(over); ctx.strokeStyle = col.dark ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.85)'; ctx.lineWidth = 3; ctx.strokeRect(x + 1.5, y + 1.5, s - 3, s - 3); }
-          ctx.save(); ctx.shadowColor = 'rgba(0,0,0,0.3)'; ctx.shadowBlur = 12; ctx.shadowOffsetY = 6;
-          pieceAt(pos.b[drag.sq], drag.x - s / 2, drag.y - s * 0.62, s, 1, 1.12);
+          ctx.save(); ctx.shadowColor = 'rgba(0,0,0,0.28)'; ctx.shadowBlur = 14; ctx.shadowOffsetY = 8;
+          pieceAt(pos.b[drag.sq], drag.x - s / 2, drag.y - s * 0.72, s, 1, 1.2);
           ctx.restore();
         }
         // promotion picker
@@ -1057,7 +1057,6 @@
             ctx.fillStyle = col.dark ? '#2b3740' : col.surface;
             D.roundRect(ctx, b.x + 3, b.y + 2, b.s - 6, b.s - 6, 12); ctx.fill();
             const hov = hoverSq === -100 - i;
-            if (hov) { ctx.strokeStyle = col.accent; ctx.lineWidth = 2.5; ctx.stroke(); }
             pieceAt(b.t * pos.side, b.x, b.y, b.s, 1, hov ? 1.06 : 0.94);
           });
         }
@@ -1069,7 +1068,7 @@
           ctx.save(); ctx.translate(cx, cy); ctx.scale(k, k);
           D.roundRect(ctx, -bw / 2, -bh / 2 + 4, bw, bh, 18); ctx.fillStyle = col.dark ? 'rgba(0,0,0,0.4)' : 'rgba(40,55,75,0.16)'; ctx.fill();
           D.roundRect(ctx, -bw / 2, -bh / 2, bw, bh, 18); ctx.fillStyle = col.dark ? 'rgba(37,49,58,0.97)' : 'rgba(255,255,255,0.97)'; ctx.fill();
-          ctx.strokeStyle = col.dark ? 'rgba(255,255,255,0.1)' : 'rgba(40,55,75,0.13)'; ctx.lineWidth = 1.5; ctx.stroke();
+
           D.text(ctx, banner.text, 0, -9, 19, col.ink, 750);
           D.fitText(ctx, banner.sub, 0, 14, bw - 20, 11.5, col.ink2, 600, 9);
           ctx.restore();
