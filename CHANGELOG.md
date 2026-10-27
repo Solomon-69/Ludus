@@ -5,6 +5,10 @@ All notable changes to Ludus. Versions follow the app's version number (`Info.pl
 
 ## 1.12.7 (2026-10-27)
 
+- Chess clock: one Timed switch (15 minutes for each player) that glides between Off and Timed; the two clocks sit on opposite sides of the board.
+- Online page: two clear cards (start a room, join a room) with one 12px rhythm.
+- Mac: the panel and the arrow under the menu bar icon are one continuous glass surface in Auto, Light and Dark.
+- Chess cover: the board runs off the bottom edge with softly rounded top corners.
 - Chomp cover redrawn: open-mouthed chomper, dot trail, power dot and a clear ghost.
 
 ## 1.12.6 (2026-10-27)

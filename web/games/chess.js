@@ -606,7 +606,7 @@
 
   const LEVELS = ['Easy', 'Medium', 'Hard', 'Expert'];
   const BOT_MS = [400, 700, 1000, 2200];
-  const TIMES = [0, 3, 5, 10, 15];   // clock choices, minutes per side (0 = not timed)
+  const TIMES = [0, 15];   // clock choices: not timed, or 15 minutes for each player
   const BOOK = { '': ['e2e4', 'd2d4', 'c2c4', 'g1f3'], e2e4: ['e7e5', 'c7c5', 'e7e6', 'c7c6'], d2d4: ['d7d5', 'g8f6'], c2c4: ['e7e5', 'g8f6', 'c7c5'], g1f3: ['d7d5', 'g8f6'] };
 
   Ludus.register({
@@ -616,15 +616,18 @@
     _core: core,
     art(ctx, w, h) {
       // checkmate: the white queen stands over the fallen black king on a pale board, side by side at every card shape
-      const big = Math.min(h * 0.74, w * 0.34), cell = big * 0.28, gap = big * 0.98;
-      const qx = w / 2 - gap * 0.45, kx = qx + gap, oy = h * 0.52 + big * 0.12;
-      const cols = Math.ceil((gap + big * 1.4) / cell) | 1, bx = w / 2 - cols * cell / 2;
+      const big = Math.min(h * 0.7, w * 0.34), cell = big * 0.28, gap = big * 0.98;
+      const qx = w / 2 - gap * 0.45, kx = qx + gap, oy = h * 0.4 + big * 0.12;
+      const cols = Math.floor(w * 0.86 / cell), bx = (w - cols * cell) / 2, rows = Math.ceil((h - oy) / cell) + 1;
       const shadow = (x, y, rx, ry) => { ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); ctx.fill(); };
       ctx.save();
-      for (let r = 0; r < 3; r++) for (let c = 0; c < cols; c++) {
+      // the board runs off the bottom edge of the card, with softly rounded top corners
+      ctx.beginPath(); ctx.roundRect(bx, oy, cols * cell, rows * cell + 12, [Math.min(8, cell * 0.5), Math.min(8, cell * 0.5), 0, 0]); ctx.save(); ctx.clip();
+      for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
         ctx.fillStyle = (r + c) % 2 ? 'rgba(255,255,255,0.62)' : 'rgba(255,255,255,0.4)';
         ctx.fillRect(bx + c * cell, oy + r * cell, cell, cell);
       }
+      ctx.restore();
       shadow(qx, oy + big * 0.38, big * 0.24, big * 0.05); shadow(kx, oy + big * 0.33, big * 0.36, big * 0.06);
       drawPieceVec(ctx, 5, true, qx, oy - big * 0.08, big);
       ctx.translate(kx, oy + big * 0.1); ctx.rotate(Math.PI / 2.3);
@@ -654,7 +657,7 @@
       // clocks: tc = minutes per side (0 = not timed), rem = time left per side in ms. A clock only runs once the first piece has moved.
       // Online, White's choice is used: it rides on every move message, and Black's moves echo it back (an older Ludus that does
       // not echo it makes the game untimed). Each screen only declares its own flag and tells the other with a 'flag' message.
-      const prefTime = () => (TIMES.includes(S.chessTime) ? S.chessTime : 0);
+      const prefTime = () => (S.chessTime ? 15 : 0);
       let tc = 0, tcOk = !on, flagged = false, clockAt = 0, chipPress = null, timeSide = false;
       const rem = { 1: 0, '-1': 0 };
       function setTc(m) { tc = m; rem[1] = rem[-1] = m * 60000; flagged = false; }
@@ -797,12 +800,11 @@
       // ---------- layout ----------
       function layout() {
         const { w, h } = view;
-        const top = 56, capT = 32, capB = 32, lvlH = on ? 0 : 44, rowT = on ? 0 : 36, pad = 12;
+        const top = 56, capT = 32, capB = 32, lvlH = on ? 0 : 44, rowT = on ? 0 : 52, pad = 12;
         const fit = extra => Math.max(12, Math.floor(Math.min(w - pad * 2, h - top - capT - capB - extra - pad) / 8));
         // the clock picker goes beside the board when there is room there, otherwise in a row under the level buttons
         let s = fit(lvlH + rowT);
-        timeSide = !on && (w - 8 * fit(lvlH)) / 2 >= 104;
-        if (timeSide) s = fit(lvlH);
+        timeSide = false;
         const chipH = lvlH + (timeSide ? 0 : rowT), bs = s * 8, block = capT + capB + bs + chipH;
         const y0 = top + Math.max(0, (h - top - pad - block) / 2), by = Math.round(y0 + capT);
         geo = { s, bs, bx: Math.round((w - bs) / 2), by, capTop: y0 + capT / 2 - 1, capBot: by + bs + capB / 2 + 2, chipY: by + bs + capB + 6, chipH };
@@ -843,8 +845,8 @@
         const val = [0, 1, 3, 3, 5, 9], mat = c => { let v = 0; for (const t in have[c]) v += val[t] * have[c][t]; return v; };
         return { byWhite: lost(-1), byBlack: lost(1), diff: mat(1) - mat(-1) };
       }
-      function capRow(list, color, y, maxX, adv, col) {
-        const s = geo.s * 0.46, x0 = geo.bx + 2, groups = Math.max(0, new Set(list).size - 1), room = maxX - x0 - (adv > 0 ? 30 : 0);
+      function capRow(list, color, y, maxX, adv, col, minX) {
+        const s = geo.s * 0.46, x0 = minX == null ? geo.bx + 2 : minX, groups = Math.max(0, new Set(list).size - 1), room = maxX - x0 - (adv > 0 ? 30 : 0);
         let step = s * 0.62, gapG = s * 0.22;
         const need = (list.length - 1) * step + groups * gapG + s;
         if (list.length && need > room) { const k = Math.max(0.35, (room - s) / Math.max(1, need - s)); step *= k; gapG *= k; }
@@ -854,9 +856,9 @@
       }
       // a side's chess clock: a soft pill at the right end of its row, ringed while it runs, red when time is short
       const fmtClock = ms => { const t = Math.ceil(Math.max(0, ms) / 1000); return Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0'); };
-      function clockPill(col, side, cyRow) {
-        if (!tc) return geo.bx + geo.bs;
-        const ph = 26, pw = 80, x = geo.bx + geo.bs - pw, y = Math.round(cyRow - ph / 2), left = rem[side];
+      function clockPill(col, side, cyRow, atLeft) {
+        if (!tc) return atLeft ? geo.bx + 2 : geo.bx + geo.bs;
+        const ph = 26, pw = 80, x = atLeft ? geo.bx : geo.bx + geo.bs - pw, y = Math.round(cyRow - ph / 2), left = rem[side];
         const running = plies.length > 0 && pos.side === side && phase !== 'end' && !api.ended, low = left < 20000;
         D.roundRect(ctx, x, y + 2, pw, ph, ph / 2); ctx.fillStyle = col.dark ? col.bg : col.bg2; ctx.fill();
         D.roundRect(ctx, x, y, pw, ph, ph / 2); ctx.fillStyle = col.dark ? col.surface2 : col.surface; ctx.fill();
@@ -869,7 +871,7 @@
         ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(a) * r * 0.62, cy + Math.sin(a) * r * 0.62); ctx.stroke();
         ctx.beginPath(); ctx.arc(cx, cy, 1.6, 0, Math.PI * 2); ctx.fillStyle = '#557891'; ctx.fill();
         D.text(ctx, fmtClock(left), x + pw - 12, cy + 0.5, 13.5, low && plies.length ? col.bad : running ? col.ink : col.ink2, 800, 'right');
-        return x;
+        return atLeft ? x + pw : x;
       }
       function tickClocks(dt, now) {
         const real = Math.min(250, now - (clockAt || now)); clockAt = now;
@@ -917,38 +919,35 @@
         drawTimePicker(col);
       }
       // Timed or not: a soft segmented control. Under the level buttons, or standing beside the board when there is room.
-      const TIME_LABELS = ['Off', '3 min', '5 min', '10 min', '15 min'];
+      const TIME_LABELS = ['Off', 'Timed'];
+      let knob = -1;   // 0 = Off, 1 = Timed; glides toward the choice
       function drawTimePicker(col) {
-        const { bx, bs, by, chipY } = geo, cur = TIMES.indexOf(prefTime());
-        let rects;
-        if (timeSide) {
-          const sw = 72, sh = 30, x = bx + bs + 14, y0 = by + bs - sh * TIMES.length - 6;
-          D.text(ctx, 'Clock', x + sw / 2, y0 - 14, 11.5, col.ink2, 700);
-          rects = TIMES.map((m, i) => ({ x, y: y0 + i * sh, w: sw, h: sh }));
-        } else {
-          const tw = Math.min(bs, 340), lab = 46, sw = (tw - lab) / TIMES.length, sh = 28, x0 = bx + (bs - tw) / 2 + lab, y = chipY + 42;
-          D.text(ctx, 'Clock', x0 - lab / 2 - 2, y + sh / 2 + 3, 11.5, col.ink2, 700);
-          rects = TIMES.map((m, i) => ({ x: x0 + i * sw, y: y + 3, w: sw, h: sh }));
-        }
-        const f = rects[0], l = rects[rects.length - 1], pad = 3;
-        D.roundRect(ctx, f.x - pad, f.y - pad, l.x + l.w - f.x + pad * 2, l.y + l.h - f.y + pad * 2, 14);
+        const nowK = performance.now(), dt = Math.min(0.05, (nowK - (drawTimePicker.t || nowK)) / 1000); drawTimePicker.t = nowK;
+        const { bx, bs, chipY } = geo, cur = TIMES.indexOf(prefTime());
+        const tw = Math.min(bs, 340), lab = 46, sw = (tw - lab) / 2, sh = 30, x0 = bx + (bs - tw) / 2 + lab, y = chipY + 42;
+        D.text(ctx, 'Clock', x0 - lab / 2 - 2, y + sh / 2 + 3, 11.5, col.ink2, 700);
+        const rects = [0, 1].map(i => ({ x: x0 + i * sw, y: y + 3, w: sw, h: sh }));
+        if (knob < 0 || api.reduceMotion) knob = cur; else knob += (cur - knob) * Math.min(1, (dt || 0.016) * 14);
+        if (Math.abs(cur - knob) < 0.002) knob = cur;
+        const pad = 3;
+        D.roundRect(ctx, rects[0].x - pad, y, sw * 2 + pad * 2, sh + pad * 2, 14);
         ctx.fillStyle = col.dark ? col.bg : col.bg2; ctx.fill();
-        rects.forEach((r, i) => {
-          const on1 = i === cur;
-          if (on1) {
-            D.roundRect(ctx, r.x, r.y + 1.5, r.w, r.h, 11); ctx.fillStyle = col.dark ? 'rgba(0,0,0,0.35)' : 'rgba(32,28,23,0.1)'; ctx.fill();
-            D.roundRect(ctx, r.x, r.y, r.w, r.h, 11); ctx.fillStyle = col.dark ? col.surface2 : col.surface; ctx.fill();
-          }
-          D.fitText(ctx, TIME_LABELS[i], r.x + r.w / 2, r.y + r.h / 2 + 0.5, r.w - 6, 12, on1 ? col.ink : col.ink3, on1 ? 800 : 700, 9);
-          chips.push({ x: r.x, y: r.y, w: r.w, h: r.h, i, time: true });
+        const kx = rects[0].x + knob * sw, r = rects[0];
+        D.roundRect(ctx, kx, r.y + 1.5, sw, sh, 11); ctx.fillStyle = col.dark ? 'rgba(0,0,0,0.35)' : 'rgba(32,28,23,0.1)'; ctx.fill();
+        D.roundRect(ctx, kx, r.y, sw, sh, 11); ctx.fillStyle = col.dark ? col.surface2 : col.surface; ctx.fill();
+        rects.forEach((q, i) => {
+          const hot = Math.abs(i - knob) < 0.5;
+          D.fitText(ctx, TIME_LABELS[i], q.x + q.w / 2, q.y + q.h / 2 + 0.5, q.w - 6, 13, hot ? col.ink : col.ink3, hot ? 800 : 700, 9);
+          chips.push({ x: q.x, y: q.y, w: q.w, h: q.h, i, time: true });
         });
+        D.text(ctx, cur ? 'Timed: 15 minutes for each player' : 'Switch to Timed for 15 minutes each', bx + bs / 2, y + sh + 20, 11.5, cur ? col.ink2 : col.ink3, 600);
       }
       function pickTime(i) {
         const m = TIMES[i];
         if (m === prefTime()) return;
         S.chessTime = m; Ludus.save(); api.sfx('click');
         if (!plies.length && phase === 'play') setTc(m);
-        else api.toast(m ? 'Next game: ' + m + ' min each' : 'Next game: not timed');
+        else api.toast(m ? 'Next game: timed, 15 min each' : 'Next game: not timed');
       }
       function pickLevel(i) {
         S.chessLevel = i; Ludus.save();
@@ -971,7 +970,7 @@
         // captured pieces next to each player
         tickClocks(dt, now);
         const cap = captured(), mineTook = myColor === 1 ? cap.byWhite : cap.byBlack, theyTook = myColor === 1 ? cap.byBlack : cap.byWhite;
-        capRow(theyTook, myColor, geo.capTop, clockPill(col, -myColor, geo.capTop) - 8, -cap.diff * myColor, col);
+        { const lx = clockPill(col, -myColor, geo.capTop, true); capRow(theyTook, myColor, geo.capTop, geo.bx + bs - 2, -cap.diff * myColor, col, tc ? lx + 8 : null); }
         capRow(mineTook, -myColor, geo.capBot, clockPill(col, myColor, geo.capBot) - 8, cap.diff * myColor, col);
         // frame and squares
         D.roundRect(ctx, bx - 5, by - 5, bs + 10, bs + 13, 13);

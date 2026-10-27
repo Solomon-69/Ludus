@@ -51,8 +51,9 @@
     root.style.setProperty('--accent-soft', S.accent + '26');
     root.classList.toggle('reduce', !!S.reduceMotion);
     L.native('theme', { mode: S.theme });
-    // On Auto the Mac's own panel material shows through; a picked Light or Dark paints its own solid background.
-    root.classList.toggle('transparent', !!window.__LUDUS_NATIVE__ && S.theme === 'system');
+    // In the Mac app the panel's own material shows through in every look (the popover follows Light or Dark too), so the
+    // arrow under the menu bar icon and the panel are one continuous surface.
+    root.classList.toggle('transparent', !!window.__LUDUS_NATIVE__);
     if (view === 'home') drawCards();
   }
   sysDark.addEventListener('change', applyTheme);
@@ -128,8 +129,8 @@
   function renderOnlinePage(grid) {
     // The blocks (heading, name, last party, Create room, joining) share the page's full height with equal gaps
     // between them, so there is no empty band at the bottom; the panel itself keeps the same size as every other tab.
-    const page = el('div', 'online-page'), head = el('div', 'op-group op-head'), join = el('div', 'op-group');
-    page.appendChild(head); const mid = { appendChild: e => page.appendChild(e) };
+    const page = el('div', 'online-page'), head = el('div', 'op-group op-head'), start = el('div', 'op-card'), join = el('div', 'op-card');
+    page.appendChild(head); const mid = { appendChild: e => start.appendChild(e) };
     head.appendChild(el('div', 'op-title', 'Play online'));
     const steps = el('ol', 'op-steps');   // three short steps instead of a long sentence; each wraps to two lines when narrow
     ['Create or join', 'Share the code', 'Host picks games'].forEach((t, i) => { const li = el('li'); li.appendChild(el('span', 'op-dot', String(i + 1))); li.appendChild(el('span', '', t)); steps.appendChild(li); });
@@ -140,11 +141,12 @@
     const nm = el('input'); nm.type = 'text'; nm.maxLength = 10; nm.placeholder = 'Player'; nm.value = L.net.cleanName(S.onlineName, ''); nm.autocomplete = 'off'; nm.spellcheck = false; nm.setAttribute('aria-label', 'Your name');
     nm.addEventListener('input', () => { S.onlineName = L.net.cleanName(nm.value, ''); L.save(); });
     f.appendChild(nm); mid.appendChild(f);
-    if (S.party && S.party.code) mid.appendChild(partyCard(S.party));
+    if (S.party && S.party.code) page.appendChild(partyCard(S.party));
+    page.appendChild(start);
     const mk = el('button', 'btn primary', 'Create room'); mk.type = 'button'; mk.id = 'opCreate';
     mk.onclick = () => { L.sfx('click'); createFlexRoom(); };
     mid.appendChild(mk);
-    join.appendChild(el('div', 'op-or', 'or join a room'));
+    join.appendChild(el('span', 'field-label', 'Or join a room'));
     const code = el('input', 'code-input'); code.type = 'text'; code.maxLength = 300; code.placeholder = 'K7M2Q'; code.id = 'opCode';
     code.autocomplete = 'off'; code.spellcheck = false; code.autocapitalize = 'characters'; code.setAttribute('aria-label', 'Room code, invite or link');
     const msg = el('div', 'lobby-error', ''); msg.setAttribute('role', 'alert');
@@ -154,13 +156,13 @@
     const jb = el('button', 'btn primary', 'Join'); jb.type = 'button'; jb.id = 'opJoin'; jb.onclick = go;
     const jr = el('div', 'join-row'); jr.appendChild(code); jr.appendChild(jb);   // the code and the Join button side by side
     join.appendChild(jr); join.appendChild(msg);
-    join.appendChild(el('p', 'lobby-note', 'Code, invite message or ludus:// link. Needs the internet.'));
+    const note = el('p', 'lobby-note', 'Code, invite message or ludus:// link. Needs the internet.');
     if (!L.conn.shown) {   // offline: the name stays editable, everything that needs the internet is dimmed and does nothing
       page.classList.add('op-offline');
       [mk, jb, code].forEach(x => { x.disabled = true; });
       page.querySelectorAll('.party-card button').forEach(x => { x.disabled = true; });
     }
-    page.appendChild(join);
+    page.appendChild(join); page.appendChild(note);
     grid.appendChild(page);
   }
   // The last room you were in: an orange "Last party · <game>" tag on top, then the players as small name chips (a
