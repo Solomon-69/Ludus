@@ -643,3 +643,19 @@ svg { display: block; }
 .intro-item b, .intro-item small { white-space: normal; overflow: visible; text-overflow: clip; }
 :root.reduce .more-inner > .row { transition-delay: 0s; }
 .privacy-blur .stage-wrap:has(> .sheet:not([hidden])) .privacy-veil { opacity: 0; }   /* a menu on top says enough */
+
+/* Suggestions: a guest proposes, the host accepts or declines. Theme colours only, so light and dark both follow. */
+.pick-chips .chip.gcard.is-sug { outline: 2px dashed var(--ink-2); outline-offset: 2px; }
+.pick-chips .chip.gcard.is-sug .gcard-name::after { content: '  +'; color: var(--ink-2); }
+.guest-plan .suggest-btn { align-self: stretch; }
+.sug-status { font-size: 12px; font-weight: 600; color: var(--ink-2); text-align: center; min-height: 1.3em; }
+.sug-status.ok { color: var(--ok, #4f9d69); }
+.sug-status.no { color: var(--danger, #d1495b); }
+.sug-card { background: var(--box); box-shadow: inset 0 0 0 2px var(--accent); border-radius: 14px; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; text-align: left; color: var(--ink); animation: sug-in 0.28s var(--spring); }
+.sug-head { font: 700 13px/1.2 var(--font-round); color: var(--ink); overflow-wrap: anywhere; }
+.sug-line { font-size: 12px; font-weight: 600; color: var(--ink-2); overflow-wrap: anywhere; }
+.sug-actions { display: flex; gap: 6px; margin-top: 4px; }
+.sug-actions .btn { flex: 1; }
+.sug-more { font-size: 11px; color: var(--ink-3); font-weight: 600; }
+@keyframes sug-in { from { transform: scale(0.96); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .sug-card { animation: none; } }

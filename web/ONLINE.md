@@ -19,6 +19,17 @@ games, rounds in the saved state as `party`) and offers **Rejoin**; only **Forge
   are skipped); with too few the standings so far are shown. If the host leaves, guests keep the standings so far.
 * `api.online.min/max` are the **running game's** seats (the room can hold more).
 
+## Suggestions (1.12)
+
+Players who are not the host see the host's screen in the room: the games the host picked have an orange outline on their cover, and
+the rounds. They can build their own idea (games, Single game / Tournament, 1, 3 or 5 rounds, and for Map Hunt the time and
+movement) and press **Suggest to the host**. The host gets an in-app card ("Bo suggests ...") with **Accept** and **Decline**; more
+suggestions wait behind it ("+1 more waiting"), one per player (a newer one replaces the older). The player sees *Accepted* or
+*Declined*. Accepting applies the plan (`setPlan`) and stores the Map Hunt rules in the host's settings. Wire: `sg` (guest to host,
+`{ i, p: { m: 's'|'t', g, n, geo? } }`) and `sgr` (host to guest, `{ i, to, ok, why? }`). A host that answers says `sg: 1` in every
+heartbeat; guests only offer the feature then, and older Ludus ignores both new kinds. A host that is already in a game declines
+with `why: 'busy'`. Test: `node online.js suggest` (host + two joiners, light and dark).
+
 ## Old versions (1.6.0 / 1.6.1)
 
 Wire version `v` stays 1 and the topic stays `ludus/v1/<CODE>/m`. Protocol 2 only adds optional fields: `pv` (join, welcome,

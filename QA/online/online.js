@@ -9,9 +9,10 @@ const S = {
     const c = await flexCreate(A); await flexJoin(B, c);
     check('host sees both players', (await rows(A)).length >= 2 && /Bo/.test(await lobbyText(A)), await lobbyText(A));
     await pick(A, ['Paddle Duel', 'Air Hockey'], 3); await wait(700);
-    const gt = await lobbyText(B);
-    check('guest sees the picked games and rounds live', /Paddle Duel, Air Hockey|Air Hockey, Paddle Duel/.test(gt) && /3 rounds per game/.test(gt), gt);
-    check('guest has no pickers', (await B.$$('#lobbyCard .pick-chips')).length === 0);
+    const gnames = await B.$$eval('#lobbyCard .gcard.is-on .gcard-name', els => els.map(e => e.textContent.replace(/^\S\s+/, '').trim()).sort());
+    const grounds = await B.$eval('#lobbyCard .rounds-pick .chip.is-on', e => e.textContent);
+    check('guest sees the picked games (orange outline) and rounds live', gnames.join() === 'Air Hockey,Paddle Duel' && grounds === '3', [gnames, grounds]);
+    check('guest cannot change the host\'s pick (only suggest)', (await B.$$('#lobbyCard .suggest-btn')).length === 1 && (await A.$$('#lobbyCard .suggest-btn')).length === 0);
     await A.click('#lobbyCard button.primary');
     const order = ['Paddle Duel', 'Air Hockey'], plan = [[0, 0, 1], [0, 1, 0]];
     let a = 0, b = 0, gwA = 0, gwB = 0;
@@ -35,6 +36,85 @@ const S = {
     await A.click('#lobbyCard button:text-is("Rematch")'); await Promise.all([waitPlaying(A), waitPlaying(B)]);
     check('rematch resets the scores', (await B.evaluate(() => JSON.stringify(ludusOnline().session.ser.sc.map(e => e[2])))) === '[0,0]');
     check('no page errors', errs([A, B]) === 0, [A.errors, B.errors]);
+    br.close();
+  },
+  async suggest(browser) {
+    // A guest suggests games, rounds, single / tournament and Map Hunt rules; the host accepts or declines; the guest sees the result.
+    for (const dark of [false, true]) {
+      const tag = dark ? 'dark' : 'light', br = await broker.start();
+      const A = await newPage(browser, br, { name: 'Ann', dark }), B = await newPage(browser, br, { name: 'Bo', dark }), C = await newPage(browser, br, { name: 'Cy', dark });
+      const c = await flexCreate(A); await flexJoin(B, c); await flexJoin(C, c);
+      await pick(A, ['Tag'], 1); await wait(700);
+      const outlined = async P => P.$$eval('#lobbyCard .gcard.is-on', els => els.map(e => e.dataset.id || e.textContent.replace(/^\S\s+/, '')).sort().join().toLowerCase());
+      const hostSel = await outlined(A);
+      check(tag + ': host pick has the orange outline on both guests', (await outlined(B)) === hostSel && (await outlined(C)) === hostSel && hostSel !== '', [hostSel, await outlined(B), await outlined(C)]);
+      const ring = await B.$eval('#lobbyCard .gcard.is-on', e => getComputedStyle(e).boxShadow);
+      check(tag + ': outline is the orange accent', /217, 119, 87/.test(ring), ring);
+      check(tag + ': host shows no suggestion yet', (await A.$$('.sug-card')).length === 0);
+      const prePlan = await A.evaluate(() => JSON.stringify(Ludus.lobby.session.plan));
+      // guest B: tournament of two games + 5 rounds
+      await B.click('#lobbyCard .mode-tab[data-mode="t"]');
+      for (const id of ['slither', 'geoguess']) { const el = await B.$('#lobbyCard .gcard[data-id="' + id + '"]'); if (!el) throw new Error('no cover ' + id); await el.click(); }
+      await B.locator('#lobbyCard .rounds-pick .chip', { hasText: /^5$/ }).click();
+      await B.locator('#lobbyCard .geo-time .chip', { hasText: '30 s' }).click();
+      await B.locator('#lobbyCard .geo-move .chip', { hasText: 'No move' }).click();
+      await shot(B, 'suggest_guest_' + tag);
+      await B.click('#lobbyCard .suggest-btn');
+      await A.waitForSelector('.sug-card', { timeout: 8000 });
+      const ct = await A.$eval('.sug-card', e => e.innerText);
+      check(tag + ': host sees an in-app card with the idea', /Bo suggests/.test(ct) && /Tournament/.test(ct) && /5 rounds/.test(ct) && /30 s/.test(ct) && /No move/.test(ct), ct);
+      check(tag + ': guest sees "waiting"', /Waiting for the host/.test(await B.$eval('.sug-status', e => e.textContent)));
+      await shot(A, 'suggest_host_' + tag);
+      check(tag + ': the other guest is not shown the card', (await C.$$('.sug-card')).length === 0);
+      // second guest suggests while the first is pending: host gets "+1 more"
+      await C.locator('#lobbyCard .rounds-pick .chip', { hasText: /^3$/ }).click();
+      await C.click('#lobbyCard .suggest-btn');
+      await A.waitForFunction(() => /\+1 more/.test(document.querySelector('.sug-card')?.innerText || ''), null, { timeout: 8000 });
+      check(tag + ': host sees "+1 more waiting"', true);
+      // decline the first
+      await A.click('.sug-decline');
+      await B.waitForFunction(() => /Declined/.test(document.querySelector('.sug-status')?.textContent || ''), null, { timeout: 8000 });
+      check(tag + ': decline shows on the guest', true);
+      const planAfterDecline = await A.evaluate(() => JSON.stringify(Ludus.lobby.session.plan));
+      check(tag + ': a declined idea changes nothing', planAfterDecline === prePlan, [prePlan, planAfterDecline]);
+      // accept the second (Cy: 3 rounds of the host game)
+      const pre = JSON.parse(planAfterDecline);
+      await A.waitForSelector('.sug-card .sug-accept', { timeout: 8000 });
+      const ct2 = await A.$eval('.sug-card', e => e.innerText);
+      await A.click('.sug-accept');
+      await C.waitForFunction(() => /Accepted/.test(document.querySelector('.sug-status')?.textContent || ''), null, { timeout: 8000 });
+      const plan = JSON.parse(await A.evaluate(() => JSON.stringify(Ludus.lobby.session.plan)));
+      check(tag + ': accept applies the plan on the host and shows Accepted on the guest', plan.g.join() === pre.g.join() && plan.n === 3, [pre, plan, ct2]);
+      const gplan = JSON.parse(await B.evaluate(() => JSON.stringify(Ludus.lobby.session.plan)));
+      check(tag + ': the other guest sees the new plan too', gplan.g.join() === pre.g.join() && gplan.n === 3, gplan);
+      // Map Hunt rules are stored by the host only on accept
+      await B.click('#lobbyCard .mode-tab[data-mode="t"]');
+      await B.click('#lobbyCard .gcard[data-id="geoguess"]');
+      await B.locator('#lobbyCard .geo-time .chip', { hasText: '2 min' }).click();
+      await B.locator('#lobbyCard .geo-move .chip', { hasText: 'NMPZ' }).click();
+      await B.click('#lobbyCard .suggest-btn');
+      await A.waitForSelector('.sug-card .sug-accept', { timeout: 8000 });
+      const geoBefore = await A.evaluate(() => JSON.stringify(Ludus.state.geo || null));
+      await A.click('.sug-accept');
+      await B.waitForFunction(() => /Accepted/.test(document.querySelector('.sug-status')?.textContent || ''), null, { timeout: 8000 });
+      const geoAfter = await A.evaluate(() => Ludus.state.geo);
+      check(tag + ': accepting stores Map Hunt time + movement on the host (before: ' + geoBefore + ')', geoAfter && geoAfter.time === 120 && geoAfter.move === 'nmpz', geoAfter);
+      const tabOn = await A.$eval('#lobbyCard .mode-tab.is-on', e => e.textContent);
+      check(tag + ': host tab follows the accepted mode', tabOn === 'Tournament', tabOn);
+      // the card is readable in this theme
+      const cardColors = await A.evaluate(() => { const e = document.querySelector('.sug-card') || document.querySelector('#lobbyCard'); const cs = getComputedStyle(e); return [cs.backgroundColor, cs.color]; });
+      check(tag + ': no page errors', errs([A, B, C]) === 0, [A.errors, B.errors, C.errors, cardColors]);
+      br.close();
+    }
+    // old host (no sg flag): the guest is not offered the feature
+    const br = await broker.start();
+    const A = await newPage(browser, br, { name: 'Ann' }), B = await newPage(browser, br, { name: 'Bo' });
+    await A.addInitScript(() => {});
+    const c = await flexCreate(A);
+    await A.evaluate(() => { const s = Ludus.lobby.session; const orig = s._hbObj.bind(s); s._hbObj = () => { const o = orig(); delete o.sg; return o; }; });
+    await flexJoin(B, c); await wait(5000);
+    check('host without suggestion support: guest sees plain lines, no suggest button', (await B.$$('#lobbyCard .suggest-btn')).length === 0 && /Games:/.test(await lobbyText(B)), await lobbyText(B));
+    // a stray suggestion to a host in a running game is declined, not queued
     br.close();
   },
   async tleave(browser) {

@@ -255,7 +255,7 @@
   // ---------- rooms ----------
   /* Messages are JSON objects on one topic per room: ludus/v1/<CODE>/m
        v:1 (version)  c: sender's random id   t: kind   q: game message number   r: round (rematch count)
-     kinds: join, welcome, rej, roster (inside hb), hb, bye, start, nack, rematch, g (a game message: k = its type, d = its data)
+     kinds: join, welcome, rej, roster (inside hb), hb, bye, start, nack, rematch, sg / sgr (a guest's suggestion and the host's answer; older Ludus ignores both), g (a game message: k = its type, d = its data)
   */
   const topicOf = code => 'ludus/v1/' + code + '/m';
   function cleanRoster(list) {
@@ -324,6 +324,7 @@
     this._emit('closed', { reason });
   };
   Session.prototype._stop = function () {
+    clearTimeout(this.sugTimer);
     clearInterval(this.tick); clearTimeout(this.guard); if (this.ser) { clearTimeout(this.ser.t1); clearTimeout(this.ser.t2); } clearInterval(this.claimTimer); clearInterval(this.joinTimer); clearTimeout(this.claimWait);
     const c = this.client;
     setTimeout(() => c.close(), 120);
@@ -380,7 +381,7 @@
   Session.prototype.count = function () { return this.roster.size; };
   Session.prototype._hbObj = function () {
     const o = { t: 'hb', q: this.sq, p: this._rosterWire(), mx: this.max, mn: this.min, g: this.gameId, gen: this.gen, sd: this.seed, pv: PV };
-    if (this.flex) { o.tn = { g: this.plan.g, n: this.plan.n }; if (this.legacy) o.lg = 1; }
+    if (this.flex) { o.tn = { g: this.plan.g, n: this.plan.n }; o.sg = 1; if (this.legacy) o.lg = 1; }   // sg: this host answers suggestions
     if (this.ser) o.sr = this._srWire();
     return o;
   };
@@ -442,6 +443,8 @@
       case 'start': return this._onStart(m);
       case 'nack': return this._onNack(m);
       case 'rematch': if (this.role === 'host') this._emit('rematch', { name: this._senderName(m.c) }); return;
+      case 'sg': return this.role === 'host' ? this._onSuggest(m) : undefined;
+      case 'sgr': return this._onSuggestReply(m);
       case 'tr': return this._onResult(m);
       case 'sb': return this._onBoard(m);
       case 'lob': return m.c === this.hostCid ? this._toLobbyLocal() : undefined;
@@ -532,6 +535,76 @@
     if (!tn || !Array.isArray(tn.g) || tn.g.length > 12 || !tn.g.every(x => typeof x === 'string' && TYPE_RE.test(x)) || ![0, 1, 3, 5].includes(tn.n)) return;
     if (JSON.stringify(tn) === JSON.stringify(this.plan)) return;
     this.plan = { g: tn.g.slice(), n: tn.n }; this._emit('plan', this.plan);
+  };
+  // ----- suggestions (a guest proposes games, rounds, single / tournament and Map Hunt rules; the host accepts or declines) -----
+  // sg  guest -> host: { i: id, p: { m: 's'|'t', g: [game ids], n: 1|3|5, geo?: { t?: seconds, m?: move mode } } }
+  // sgr host -> guest: { i: id, to: guest id, ok: bool, why?: 'busy' }
+  // Hosts that answer suggestions say so in every heartbeat (sg: 1); a guest only offers the feature to those, so older hosts are never asked.
+  const GEO_TIMES = [0, 30, 60, 120], GEO_MOVES = ['move', 'nomove', 'nmpz'];
+  const SUG_WAIT_MS = 45000, SUG_MAX = 6;
+  function cleanSuggestion(p) {
+    if (!p || typeof p !== 'object' || (p.m !== 's' && p.m !== 't') || !Array.isArray(p.g) || p.g.length > 12 || ![1, 3, 5].includes(p.n)) return null;
+    const g = p.g.filter((id, i, a) => typeof id === 'string' && TYPE_RE.test(id) && gameOf(id) && a.indexOf(id) === i);
+    if (!g.length || g.length !== p.g.length) return null;
+    if (p.m === 's' && g.length !== 1) return null;
+    if (p.m === 't' && g.length < 2) return null;
+    const out = { m: p.m, g, n: p.n };
+    if (p.geo && typeof p.geo === 'object') {
+      const geo = {};
+      if (GEO_TIMES.includes(p.geo.t)) geo.t = p.geo.t;
+      if (GEO_MOVES.includes(p.geo.m)) geo.m = p.geo.m;
+      if (geo.t !== undefined || geo.m !== undefined) out.geo = geo;
+    }
+    return out;
+  }
+  NET.cleanSuggestion = cleanSuggestion;
+  Session.prototype.canSuggest = function () { return this.role !== 'host' && this.ready && !this.over && this.conn === 'online' && !!this.hostSg && !this.legacy && !this.started; };
+  // guest: send a suggestion. Returns false when it cannot be sent.
+  Session.prototype.suggest = function (p) {
+    const c = cleanSuggestion(p);
+    if (!c || !this.canSuggest()) return false;
+    const i = hex(randBytes(4));
+    if (!this._pub({ t: 'sg', i, p: c })) return false;
+    clearTimeout(this.sugTimer);
+    this.mySug = { i, st: 'wait' };
+    this.sugTimer = setTimeout(() => { if (this.mySug && this.mySug.i === i && this.mySug.st === 'wait') { this.mySug = { i, st: 'late' }; this._emit('sugstate', this.mySug); } }, SUG_WAIT_MS);
+    this._emit('sugstate', this.mySug);
+    return true;
+  };
+  Session.prototype._onSuggestReply = function (m) {
+    if (this.role === 'host' || m.c !== this.hostCid || m.to !== this.cid || !this.mySug || m.i !== this.mySug.i || this.mySug.st === 'ok' || this.mySug.st === 'no') return;
+    clearTimeout(this.sugTimer);
+    this.mySug = { i: m.i, st: m.ok === true ? 'ok' : 'no', why: m.why === 'busy' ? 'busy' : '' };
+    this._emit('sugstate', this.mySug);
+  };
+  Session.prototype._onSuggest = function (m) {
+    if (typeof m.i !== 'string' || m.i.length > 12) return;
+    const seat = this._seatOf(m.c);
+    if (seat < 1) return;
+    const c = cleanSuggestion(m.p);
+    if (!c) return;
+    const decline = why => this._pub({ t: 'sgr', i: m.i, to: m.c, ok: false, why });
+    if (!this.flex || this.legacy || this.started) { decline('busy'); return; }
+    this.sugs = (this.sugs || []).filter(x => x.cid !== m.c);   // a newer suggestion from the same player replaces the older one
+    if (this.sugs.length >= SUG_MAX) { decline(''); return; }
+    this.sugs.push({ i: m.i, cid: m.c, name: this._senderName(m.c), p: c });
+    this._emit('suggest', this.sugs);
+  };
+  // host: the suggestions that are still waiting (only from players still in the room)
+  Session.prototype.suggestions = function () {
+    this.sugs = (this.sugs || []).filter(x => this._seatOf(x.cid) > 0);
+    return this.sugs;
+  };
+  // host: accept or decline one. Accepting changes the plan; the Map Hunt rules (geo) are returned for the app to store.
+  Session.prototype.answerSuggestion = function (i, accept) {
+    const k = (this.sugs || []).findIndex(x => x.i === i);
+    if (k < 0) return null;
+    const sg = this.sugs.splice(k, 1)[0];
+    let ok = false;
+    if (accept && this.role === 'host') ok = this.setPlan(sg.p.g, sg.p.n);
+    this._pub({ t: 'sgr', i: sg.i, to: sg.cid, ok });
+    this._emit('suggest', this.sugs);
+    return { ok, p: sg.p, name: sg.name };
   };
   Session.prototype._srWire = function () { const s = this.ser; return { st: s.st, gs: s.gs, gi: s.gi, ri: s.ri, n: s.n, sc: s.sc, why: s.why || '' }; };
   Session.prototype._applySr = function (sr) {
@@ -685,6 +758,7 @@
     }
     this.hostPv = Number.isInteger(m.pv) ? m.pv : 1; this.legacy = this.hostPv < 2;
     if (m.tn) this._setPlan(m.tn);
+    if ((m.sg === 1) !== !!this.hostSg) { this.hostSg = m.sg === 1; this._emit('plan', this.plan); }
     if ((m.lg === 1) !== !!this.oldPeer) { this.oldPeer = m.lg === 1; this._emit('plan', this.plan); }
     if (m.sr) this._applySr(m.sr); else if (this.ser && this.ser.st === 'final') this._toLobbyLocal();
     if (m.gen > this.gen && Number.isInteger(m.gen) && Number.isInteger(m.sd)) this._startFrom(m.gen, m.sd, m.g);
