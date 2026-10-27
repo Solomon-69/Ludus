@@ -61,7 +61,7 @@
     over: [[330, 0.12, 'triangle'], [247, 0.24, 'triangle']], tick: [[1200, 0.015, 'square']]
   };
   function sfx(name) {
-    if (!state.sound) return;
+    if (!state.sound || window.__ludusTestMuted) return;   // test runs (test hook "mute") stay silent
     const seq = tones[name] || tones.tap;
     try {
       actx = actx || new (window.AudioContext || window.webkitAudioContext)();
