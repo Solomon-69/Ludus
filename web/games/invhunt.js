@@ -224,17 +224,17 @@
       for (let x = -20 * u; x < w + 20 * u; x += 34 * u) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x + 18 * u, h); ctx.stroke(); }
       for (let y = 12 * u; y < h; y += 26 * u) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y - 6 * u); ctx.stroke(); }
       const P = CREATURES.Moth;
-      const s = 5 * u, tw = 11 * s, th = 8 * s, tx = w / 2 - tw / 2 - 18 * u, ty = h / 2 - th / 2 - 2 * u;
+      const s = 4.4 * u, tw = 11 * s, th = 8 * s, lab = 12 * u, blockH = th + 12 * u + 6 * u + lab, tx = w / 2 - tw / 2 - 18 * u, ty = (h - blockH) / 2 + 6 * u;   // mosaic and its label sit together, centred, label fully inside
       ctx.fillStyle = 'rgba(0,0,0,0.25)'; Ludus.draw.roundRect(ctx, tx - 6 * u + 2 * u, ty - 6 * u + 3 * u, tw + 12 * u, th + 12 * u, 4 * u); ctx.fill();
       ctx.fillStyle = '#f7f4ec'; Ludus.draw.roundRect(ctx, tx - 6 * u, ty - 6 * u, tw + 12 * u, th + 12 * u, 4 * u); ctx.fill();
       P.forEach((r, j) => [...r].forEach((c, i) => { if (c === '1') { ctx.fillStyle = (i + j) % 5 === 0 ? '#ffd23c' : '#ff3c7a'; ctx.fillRect(tx + i * s + 0.5, ty + j * s + 0.5, s - 1, s - 1); } }));
-      const x = tx + tw + 36 * u, y = h * 0.84, r = 11 * u, cy = y - r * 1.55;
+      const x = tx + tw + 36 * u, y = ty + th + 8 * u, r = 11 * u, cy = y - r * 1.55;
       ctx.fillStyle = 'rgba(0,0,0,0.28)'; ctx.beginPath(); ctx.ellipse(x, y + 0.5 * u, 6.5 * u, 2 * u, 0, 0, 7); ctx.fill();
       ctx.beginPath(); ctx.moveTo(x, y); ctx.bezierCurveTo(x - r * 0.35, y - r * 0.55, x - r, cy + r * 0.7, x - r, cy); ctx.arc(x, cy, r, Math.PI, 0); ctx.bezierCurveTo(x + r, cy + r * 0.7, x + r * 0.35, y - r * 0.55, x, y); ctx.closePath();
       ctx.fillStyle = '#4b93ff'; ctx.fill();
       ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x, cy, r * 0.4, 0, 7); ctx.fill();
       ctx.fillStyle = 'rgba(255,255,255,0.88)'; ctx.font = `800 ${10 * u}px ui-monospace, Menlo, Consolas, monospace`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText('PA_1000', tx + tw / 2, ty + th + 16 * u);
+      ctx.fillText('PA_1000', tx + tw / 2, ty + th + 6 * u + 11 * u);
     },
     create(stage, api) {
       const el = K.el;
