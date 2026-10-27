@@ -9,6 +9,8 @@ All notable changes to Ludus. Versions follow the app's version number (`Info.pl
 - Settings: even gaps between cards, a taller More settings card.
 - Online page: tighter gaps and thicker cards, fits without scrolling.
 - Covers: Mosaic Hunt label no longer cut off; Languages has clean, centred speech bubbles.
+- Chess: play timed (3, 5, 10 or 15 minutes) or not; the clock starts on the first move.
+- Chess moves feel like Duolingo: lifted pieces, soft dots, no boxes; darker black pieces.
 
 ## 1.12.3 (2026-10-27)
 
