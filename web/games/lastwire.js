@@ -94,7 +94,6 @@
           ctx.beginPath(); ctx.moveTo(px + pw / 2 + 6, y - 3); ctx.lineTo(px + pw - 10, y); ctx.stroke();
         }
       });
-      D.spark(ctx, px + pw - 18, py + 5 + ph * 0.12, ph * 0.1, '#ffd2c2');
     },
     create(stage, api) {
       const D = Ludus.draw, L = logic;
