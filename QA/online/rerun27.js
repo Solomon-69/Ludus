@@ -10,6 +10,7 @@ async function page(browser, size, opts = {}) {
   const p = await ctx.newPage(); p.errors = [];
   p.on('pageerror', e => p.errors.push(String(e.stack || e)));
   p.on('console', m => { if (m.type() === 'error' && !/net::|Failed to load resource|ERR_INTERNET|ERR_NAME|TensorFlow Lite/.test(m.text())) p.errors.push(m.text()); });
+  if (opts.names !== false) await p.addInitScript(() => { window.__LUDUS_ORIGINAL_NAMES__ = { fiveletters: 'Sample Five', blocks: 'Sample Stack' }; });   // stand-in for the local original-names.json (the real list is never in the repo)
   await p.addInitScript(() => { window.ludusDebug = window.ludusDebug || {}; try { if (!localStorage.getItem('ludus.v1')) localStorage.setItem('ludus.v1', JSON.stringify({ reduceMotion: true, introDone: true, theme: 'light' })); } catch (e) {} });
   await p.goto('file://' + path.join(L.WEB, 'index.html')); await p.waitForTimeout(400);
   return p;
@@ -29,10 +30,18 @@ const cards = p => p.$$eval('#grid .card', els => els.map(e => e.dataset.id));
     await A.evaluate(() => { const r = [...document.querySelectorAll('.row')].find(x => x.querySelector('.row-title')?.textContent === 'Original names'); r.querySelector('.switch').click(); });
     await A.click('#settingsBack'); await wait(300); await chip(A, 'All'); await wait(200);
     const nm = await A.evaluate(() => document.querySelector('.card[data-id="fiveletters"] .card-name')?.textContent);
-    check('Original names on: Five Letters shows as Wordle', nm === 'Wordle', nm);
-    const found = await A.evaluate(async () => { const s = document.getElementById('search'); if (!s) return null; s.value = 'tetris'; s.dispatchEvent(new Event('input')); await new Promise(r => setTimeout(r, 200)); const id = document.querySelector('#grid .card')?.dataset.id; s.value = ''; s.dispatchEvent(new Event('input')); return id; });
-    check('search finds a game by its original name (tetris -> Blocks)', found === 'blocks', found);
+    check('Original names on: Five Letters shows the name from the local file', nm === 'Sample Five', nm);
+    const found = await A.evaluate(async () => { const s = document.getElementById('search'); if (!s) return null; s.value = 'sample stack'; s.dispatchEvent(new Event('input')); await new Promise(r => setTimeout(r, 200)); const id = document.querySelector('#grid .card')?.dataset.id; s.value = ''; s.dispatchEvent(new Event('input')); return id; });
+    check('search finds a game by its original name (file name -> Blocks)', found === 'blocks', found);
     await A.evaluate(() => { Ludus.state.originalNames = false; });
+    {   // no local file: the switch quietly does nothing
+      const N = await page(browser, { width: 520, height: 740 }, { names: false });
+      await N.click('#openSettings'); await wait(400); await N.click('#moreToggle'); await wait(500);
+      await N.evaluate(() => { const r = [...document.querySelectorAll('.row')].find(x => x.querySelector('.row-title')?.textContent === 'Original names'); r.querySelector('.switch').click(); });
+      const st = await N.evaluate(() => ({ on: !!Ludus.state.originalNames, t: [...document.querySelectorAll('.row')].find(x => x.querySelector('.row-title')?.textContent === 'Original names').querySelector('.switch').getAttribute('aria-checked') }));
+      check('Original names without a local file: switch stays off and does nothing', !st.on && st.t === 'false', JSON.stringify(st));
+      await N.context().close();
+    }
     // ---- tabs
     check('2 Player tab is called "Same laptop"', await A.$('#filters .chip:text-is("Same laptop")') !== null);
     await chip(A, 'Same laptop'); await wait(200); const same = await cards(A);

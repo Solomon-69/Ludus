@@ -107,9 +107,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
         window.__LUDUS_INVISIBLE__ = \(invisible);
         window.__LUDUS_DOCK__ = \(UserDefaults.standard.bool(forKey: dockKey));
         window.__LUDUS_DARK__ = \(isDark());
+        window.__LUDUS_ORIGINAL_NAMES__ = \(originalNamesLiteral());
         window.__LUDUS_VERSION__ = \(String(reflecting: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"));
         \(testBoot())
         """
+    }
+
+    /// Your own list of names from ~/Library/Application Support/Ludus/original-names.json (never shipped).
+    /// Only a flat text-to-text map is accepted; anything else means "no list". Travels as a quoted string, never as code.
+    private func originalNamesLiteral() -> String {
+        guard let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else { return "null" }
+        let url = base.appendingPathComponent("Ludus/original-names.json")
+        guard let data = try? Data(contentsOf: url), data.count < 20_000,
+              let obj = (try? JSONSerialization.jsonObject(with: data)) as? [String: String],
+              let clean = try? JSONSerialization.data(withJSONObject: [String(data: try JSONSerialization.data(withJSONObject: obj), encoding: .utf8) ?? "{}"]),
+              let array = String(data: clean, encoding: .utf8) else { return "null" }
+        return "JSON.parse(\(array)[0])"
     }
 
     /// The saved state as a JS expression: the JSON travels as a quoted string and is parsed by

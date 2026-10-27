@@ -247,6 +247,7 @@ internal sealed class PopupForm : Form
                $"window.__LUDUS_LOGIN__ = {Bool(Store.LoginEnabled())};\n" +
                $"window.__LUDUS_DARK__ = {Bool(theme.SystemDark)};\n" +
                $"window.__LUDUS_INVISIBLE__ = {Bool(Store.LoadInvisible())};\n" +
+               $"window.__LUDUS_ORIGINAL_NAMES__ = {Store.LoadOriginalNamesJson()};\n" +
                $"window.__LUDUS_SKIP_INTRO__ = {Bool(SkipIntro)};\n" +
                $"window.__LUDUS_VERSION__ = '{System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0"}';\n" +
                (TestFailStart ? "window.__LUDUS_TEST_FAIL__ = true;\n" : "") +

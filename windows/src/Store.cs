@@ -18,6 +18,20 @@ internal static class Store
     private const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
     private const string RunValue = "Ludus";
 
+    /// <summary>Your own list of names from %APPDATA%\Ludus\original-names.json (never shipped). Only a flat text-to-text map; otherwise "null".</summary>
+    public static string LoadOriginalNamesJson()
+    {
+        try
+        {
+            var path = Path.Combine(Folder, "original-names.json");
+            var info = new FileInfo(path);
+            if (!info.Exists || info.Length > 20000) return "null";
+            var map = JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText(path));
+            return map == null ? "null" : JsonSerializer.Serialize(map);
+        }
+        catch { return "null"; }
+    }
+
     // ---- Room invites (ludus://join/CODE) ----
 
     private static string PendingJoinPath => Path.Combine(Folder, "pending-join.txt");

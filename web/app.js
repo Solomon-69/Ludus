@@ -15,10 +15,15 @@
   // Off: every name is the original. On: a name the player typed (kept in S.names, also while switched off) replaces it.
   const NAME_MAX = 24;
   const customName = g => (S.renameGames && S.names && typeof S.names[g.id] === 'string' && S.names[g.id].trim()) || '';
-  // "Original names" (Settings > More): a built-in preset that shows each game under the classic name it is based on.
-  // It only changes what is shown, never ids or saves; a name typed in Rename games still wins. Off by default.
-  const ORIGINAL_NAMES = {};
-  const presetName = g => (S.originalNames && ORIGINAL_NAMES[g.id]) || '';
+  // "Original names" (Settings > More): shows your own list of names, read from original-names.json in the Ludus app folder
+  // (the app hands it over as window.__LUDUS_ORIGINAL_NAMES__). Nothing is built in or shipped. Only changes what is shown.
+  const ORIGINAL_NAMES = (() => {
+    const out = {}, src = window.__LUDUS_ORIGINAL_NAMES__;
+    if (src && typeof src === 'object') for (const k of Object.keys(src)) if (typeof src[k] === 'string' && src[k].trim()) out[k] = src[k].trim().slice(0, 40);
+    return out;
+  })();
+  const hasPreset = Object.keys(ORIGINAL_NAMES).length > 0;
+  const presetName = g => (hasPreset && S.originalNames && ORIGINAL_NAMES[g.id]) || '';
   const dispName = g => customName(g) || presetName(g) || g.name;
   L.displayName = dispName;
   const REVEAL_MS = 1200;   // how long the final board stays on screen before the result bar slides up
@@ -943,8 +948,9 @@
       moreRows.push(row('Invisible icon', invisibleHelp, sw(!!window.__LUDUS_INVISIBLE__, v => { window.__LUDUS_INVISIBLE__ = v; L.native('invisible', { on: v }); }, 'Invisible icon')));
     }
     moreRows.push(row('Rename games', 'Click a game’s name to give it your own', sw(!!S.renameGames, v => { S.renameGames = v; L.save(); }, 'Rename games')));
-    moreRows.push(row('Original names', 'Show each game under the classic name it is based on',
-      sw(!!S.originalNames, v => { S.originalNames = v; L.save(); renderCards(); }, 'Original names')));
+    const origSw = sw(hasPreset && !!S.originalNames, v => { S.originalNames = v; L.save(); renderCards(); }, 'Original names');
+    if (!hasPreset) { origSw.onclick = null; origSw.setAttribute('aria-disabled', 'true'); origSw.style.opacity = '.5'; }   // no file: quietly does nothing
+    moreRows.push(row('Original names', 'Show your own list of original game names', origSw));
     moreRows.push(privacyRow());
     // The More card: a settings row that says what is inside, and springs open in place.
     const moreCard = el('div', 'group more-card');
