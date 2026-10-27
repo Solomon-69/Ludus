@@ -10,9 +10,19 @@ All notable changes to Ludus. Versions follow the app's version number (`Info.pl
 - **Mosaic Hunt** rebuilt: real mosaic spots with live close-up photos (credited, never stored in the app), guess on a map
   and score like Map Hunt, with a small fixed map and a card that follows light or dark mode. Offline it falls back to drawn pictures and bundled map tiles.
 - **Privacy blur** (More settings): blurs the game when someone else looks at your screen or you look away. Uses the camera,
-  checked on your computer only; nothing is saved or sent. The Mac and Windows apps ask for camera permission first.
+  checked on your computer only; nothing is saved or sent. On the Mac the app asks for camera permission first. On Windows the app
+  switches the camera on only while Privacy blur is on, and Windows' own camera privacy setting decides whether desktop apps may use it.
+  If your computer has no built-in face finder, Ludus downloads a small one once (Google's MediaPipe, an exact version, and each file
+  is checked against a fixed fingerprint before it runs).
 - **Worm Arena online** for 2 to 4 players plus bots: everyone steers their own worm, last worm standing wins.
-- **Original names** (More settings): show each game under the classic name it is based on. Off by default.
+- **Suggestions in online rooms**: players who are not the host can now see the host's choices (the picked games have an orange outline)
+  and suggest games, the number of rounds, single game or tournament, and the Map Hunt time and movement. The host gets a card in the
+  app with Accept or Decline, and the player sees whether it was accepted or declined. Older Ludus versions simply never see the feature.
+- **Original names** (More settings): show your own list of names instead of ours. The list comes from a file you make yourself,
+  `original-names.json`, in Ludus's app folder (Mac: `~/Library/Application Support/Ludus/`, Windows: `%APPDATA%\Ludus\`). No names
+  are built in. Without the file the switch does nothing.
+- **Clearer turns** in two-sided games (Chess, Four in a Row, Dots and Boxes, Ultimate Tic-Tac-Toe, Hex, Wall Race and others): the
+  player whose turn it is gets a coloured card with a pulsing dot, and the waiting player's card fades back.
 - The 2 Player tab is now called **Same laptop** and only lists games two people play on one computer; Duel lists games
   against the computer. The game you played last waits at the top of its tab as "Continue", and every tab opens at the top.
 - The Online connection light is a solid dot from the start: green when online, red when offline.
