@@ -499,73 +499,95 @@
     setTimeout(() => { if (pending.has(id)) { pending.delete(id); cb(null); } }, ms + 5000);
   }
 
-  // ---------- pieces (vector, drawn on a 100 x 100 box centred on the square) ----------
-  const INK = {
-    w: { fill: '#fbf3e6', line: '#4a3426', detail: '#4a3426' },
-    b: { fill: '#33251c', line: '#120b07', detail: '#e2cfb8' }
-  };
-  function pieceShape(ctx, t, ink) {
-    const rr = (x, y, w, h, r) => { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); };
-    const paint = () => { ctx.fill(); ctx.stroke(); };
-    const circle = (x, y, r) => { ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); paint(); };
-    ctx.fillStyle = ink.fill; ctx.strokeStyle = ink.line; ctx.lineWidth = 3.4; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
-    const body = () => { ctx.beginPath(); ctx.moveTo(-20, 30); ctx.bezierCurveTo(-18, 16, -12, 8, -12, -2); ctx.lineTo(12, -2); ctx.bezierCurveTo(12, 8, 18, 16, 20, 30); ctx.closePath(); paint(); };
-    const base = () => { rr(-28, 28, 56, 11, 5); paint(); };
-    const collar = (y, w) => { rr(-w / 2, y, w, 7, 3.5); paint(); };
+  // ---------- pieces: soft chunky shapes, no outlines, two tones (a lighter face over a darker rim) ----------
+  // Every part is filled and stroked in the same colour, so all corners come out rounded. Drawn on a 100 x 100 box.
+  function PARTS(t) {
+    const rr = (g, x, y, w, h, r) => { g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); };
+    const P = [];
+    const add = f => P.push(f);
+    const base = () => add(g => rr(g, -25, 22, 50, 14, 7));
+    const bell = (top, wt) => add(g => { g.moveTo(-21, 26); g.bezierCurveTo(-20, 12, -wt, 8, -wt, top); g.lineTo(wt, top); g.bezierCurveTo(wt, 8, 20, 12, 21, 26); g.closePath(); });
+    const D = [];   // details: {kind:'line'|'dot'|'slot', ...}
     if (t === 1) {
-      ctx.beginPath(); ctx.moveTo(-19, 30); ctx.bezierCurveTo(-19, 15, -10, 9, -9, 0); ctx.lineTo(9, 0); ctx.bezierCurveTo(10, 9, 19, 15, 19, 30); ctx.closePath(); paint();
-      collar(-6, 26); circle(0, -17, 12); base();
+      bell(-2, 10); add(g => rr(g, -14, -9, 28, 9, 4.5)); add(g => g.arc(0, -20, 12.5, 0, Math.PI * 2)); base();
+      D.push({ hi: [-4, -24, 4.2] });
     } else if (t === 4) {
-      ctx.beginPath(); ctx.moveTo(-20, 30); ctx.lineTo(-16, -8); ctx.lineTo(16, -8); ctx.lineTo(20, 30); ctx.closePath(); paint();
-      ctx.beginPath(); ctx.moveTo(-23, -5); ctx.lineTo(-23, -34); ctx.lineTo(-13, -34); ctx.lineTo(-13, -26); ctx.lineTo(-4, -26); ctx.lineTo(-4, -34);
-      ctx.lineTo(4, -34); ctx.lineTo(4, -26); ctx.lineTo(13, -26); ctx.lineTo(13, -34); ctx.lineTo(23, -34); ctx.lineTo(23, -5); ctx.closePath(); paint();
+      add(g => rr(g, -17, -12, 34, 40, 5));
+      add(g => rr(g, -23, -27, 46, 19, 6));
+      add(g => rr(g, -23, -38, 12, 16, 4)); add(g => rr(g, -6, -38, 12, 16, 4)); add(g => rr(g, 11, -38, 12, 16, 4));
       base();
+      D.push({ slot: [-12, -21, 24, 6, 3] }, { line: [[-15, 4], [15, 4]], w: 4 });
     } else if (t === 3) {
-      ctx.beginPath(); ctx.moveTo(-18, 30); ctx.bezierCurveTo(-16, 17, -8, 11, -8, 2); ctx.lineTo(8, 2); ctx.bezierCurveTo(8, 11, 16, 17, 18, 30); ctx.closePath(); paint();
-      ctx.beginPath(); ctx.moveTo(0, -33); ctx.bezierCurveTo(15, -25, 18, -11, 10, -3); ctx.lineTo(-10, -3); ctx.bezierCurveTo(-18, -11, -15, -25, 0, -33); ctx.closePath(); paint();
-      collar(-5, 28); circle(0, -37, 5);
-      ctx.strokeStyle = ink.detail; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(6, -24); ctx.lineTo(-2, -14); ctx.stroke(); ctx.strokeStyle = ink.line; ctx.lineWidth = 3.4;
-      base();
+      bell(0, 9); add(g => rr(g, -15, -8, 30, 9, 4.5));
+      add(g => { g.moveTo(0, -36); g.bezierCurveTo(17, -26, 19, -12, 11, -6); g.lineTo(-11, -6); g.bezierCurveTo(-19, -12, -17, -26, 0, -36); g.closePath(); });
+      add(g => g.arc(0, -38, 5.5, 0, Math.PI * 2)); base();
+      D.push({ line: [[9, -27], [-1, -16]], w: 4.5 });
     } else if (t === 2) {
-      ctx.beginPath(); ctx.moveTo(-17, 30); ctx.lineTo(-12, 8); ctx.bezierCurveTo(-16, 3, -27, 0, -27, -9); ctx.lineTo(-23, -18);
-      ctx.bezierCurveTo(-16, -26, -9, -30, -4, -31); ctx.lineTo(-1, -41); ctx.lineTo(5, -32);
-      ctx.bezierCurveTo(19, -28, 25, -12, 23, 6); ctx.lineTo(21, 30); ctx.closePath(); paint();
-      ctx.fillStyle = ink.detail; ctx.beginPath(); ctx.arc(-9, -20, 2.8, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.arc(-22, -8, 1.8, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = ink.detail; ctx.lineWidth = 2.6; ctx.beginPath(); ctx.moveTo(7, -28); ctx.bezierCurveTo(15, -22, 18, -10, 16, 4); ctx.stroke();
-      ctx.fillStyle = ink.fill; ctx.strokeStyle = ink.line; ctx.lineWidth = 3.4;
+      add(g => { g.moveTo(-15, 26); g.lineTo(-11, 6); g.bezierCurveTo(-17, 3, -28, 2, -28, -8); g.bezierCurveTo(-28, -14, -25, -19, -20, -23);
+        g.bezierCurveTo(-14, -29, -8, -31, -4, -32); g.lineTo(-1, -42); g.lineTo(6, -33);
+        g.bezierCurveTo(20, -28, 25, -12, 23, 6); g.lineTo(21, 26); g.closePath(); });
       base();
+      D.push({ dot: [-10, -19, 3.2] }, { line: [[8, -27], [16, -14], [16, 6]], w: 3.6 }, { dot: [-23, -8, 1.8] });
     } else if (t === 5) {
-      body();
-      ctx.beginPath(); ctx.moveTo(-14, 0); ctx.lineTo(-24, -24); ctx.lineTo(-10, -12); ctx.lineTo(0, -30); ctx.lineTo(10, -12); ctx.lineTo(24, -24); ctx.lineTo(14, 0); ctx.closePath(); paint();
-      circle(-24, -27, 4.6); circle(0, -34, 4.6); circle(24, -27, 4.6);
-      collar(-4, 30); base();
+      bell(-2, 12);
+      add(g => { g.moveTo(-14, -2); g.lineTo(-25, -24); g.lineTo(-12, -14); g.lineTo(0, -31); g.lineTo(12, -14); g.lineTo(25, -24); g.lineTo(14, -2); g.closePath(); });
+      add(g => g.arc(-25, -27, 5, 0, Math.PI * 2)); add(g => g.arc(0, -35, 5, 0, Math.PI * 2)); add(g => g.arc(25, -27, 5, 0, Math.PI * 2));
+      add(g => rr(g, -16, -6, 32, 9, 4.5)); base();
+      D.push({ dot: [0, -14, 3.6] });
     } else {
-      body();
-      ctx.beginPath(); ctx.moveTo(-16, 0); ctx.bezierCurveTo(-25, -10, -22, -23, -12, -21); ctx.bezierCurveTo(-6, -20, -3, -15, 0, -13);
-      ctx.bezierCurveTo(3, -15, 6, -20, 12, -21); ctx.bezierCurveTo(22, -23, 25, -10, 16, 0); ctx.closePath(); paint();
-      rr(-3.5, -42, 7, 26, 2.5); paint(); rr(-10, -35, 20, 6.5, 2.5); paint();
-      collar(-4, 30); base();
+      bell(-2, 12);
+      add(g => { g.moveTo(-16, -1); g.bezierCurveTo(-28, -10, -24, -27, -12, -25); g.bezierCurveTo(-6, -24, -3, -20, 0, -17); g.bezierCurveTo(3, -20, 6, -24, 12, -25); g.bezierCurveTo(24, -27, 28, -10, 16, -1); g.closePath(); });
+      add(g => rr(g, -4, -44, 8, 24, 3)); add(g => rr(g, -11, -37, 22, 7.5, 3.5));
+      add(g => rr(g, -16, -6, 32, 9, 4.5)); base();
+      D.push({ line: [[-10, -11], [10, -11]], w: 3.4 });
+    }
+    return { P, D };
+  }
+  // colours per app theme (light / dark) and side. On the dark board the black side gets a lighter rim so it never sinks in.
+  const PAL = {
+    light: { w: { face: '#dde5ee', rim: '#9aaec2', det: '#92a7bb', hi: '#fbfdff' }, b: { face: '#565e67', rim: '#30353b', det: '#2b3035', hi: '#6f7882' } },
+    dark: { w: { face: '#d9e2eb', rim: '#90a3b5', det: '#8a9db0', hi: '#f6f9fc' }, b: { face: '#56697a', rim: '#8ea2b2', det: '#2a3640', hi: '#6c8090' } }
+  };
+  const themeName = () => (document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light');
+  function paintParts(g, parts, color, dy) {
+    g.save(); g.translate(0, dy); g.fillStyle = color; g.strokeStyle = color; g.lineWidth = 3; g.lineJoin = 'round';
+    for (const f of parts) { g.beginPath(); f(g); g.fill(); g.stroke(); }
+    g.restore();
+  }
+  function paintDetails(g, list, k) {
+    g.lineCap = 'round'; g.lineJoin = 'round';
+    for (const d of list) {
+      if (d.hi) { g.fillStyle = k.hi; g.beginPath(); g.arc(d.hi[0], d.hi[1], d.hi[2], 0, Math.PI * 2); g.fill(); continue; }
+      g.fillStyle = k.det; g.strokeStyle = k.det;
+      if (d.dot) { g.beginPath(); g.arc(d.dot[0], d.dot[1], d.dot[2], 0, Math.PI * 2); g.fill(); }
+      if (d.slot) { const [x, y, w, h, r] = d.slot; g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.fill(); }
+      if (d.line) { g.lineWidth = d.w; g.beginPath(); d.line.forEach((pt, i) => (i ? g.lineTo(pt[0], pt[1]) : g.moveTo(pt[0], pt[1]))); g.stroke(); }
     }
   }
-  function drawPieceVec(ctx, t, white, x, y, s) {
-    ctx.save();
-    ctx.translate(x, y); ctx.scale(s / 100, s / 100);
-    ctx.fillStyle = 'rgba(0,0,0,0.16)'; ctx.beginPath(); ctx.ellipse(0, 40, 27, 5, 0, 0, Math.PI * 2); ctx.fill();
-    pieceShape(ctx, t, white ? INK.w : INK.b);
-    ctx.restore();
+  // one piece into its own canvas (px x px), the piece itself filling 86% of it
+  function pieceCanvas(t, white, theme, px) {
+    const c = document.createElement('canvas'); c.width = c.height = px;
+    const g = c.getContext('2d'), k = PAL[theme][white ? 'w' : 'b'], { P, D } = PARTS(t), u = px * 0.86 / 100;
+    g.translate(px / 2, px / 2); g.scale(u, u);
+    paintParts(g, P, k.rim, 5); paintParts(g, P, k.face, 0); paintDetails(g, D, k);
+    g.globalCompositeOperation = 'destination-over'; g.fillStyle = 'rgba(0,0,0,0.12)';
+    g.beginPath(); g.ellipse(0, 41, 26, 4.5, 0, 0, Math.PI * 2); g.fill();
+    return c;
   }
   const sprites = new Map();
   function sprite(t, white, s, dpr) {
-    const px = Math.max(8, Math.round(s * dpr)), key = t + (white ? 'w' : 'b') + px;
+    const px = Math.max(8, Math.round(s * dpr)), theme = themeName(), key = t + (white ? 'w' : 'b') + px + theme[0];
     let c = sprites.get(key);
     if (c) return c;
-    if (sprites.size > 80) sprites.clear();
-    c = document.createElement('canvas'); c.width = px; c.height = px;
-    const g = c.getContext('2d');
-    drawPieceVec(g, t, white, px / 2, px / 2, px * 0.86);
+    if (sprites.size > 96) sprites.clear();
+    c = pieceCanvas(t, white, theme, px);
     sprites.set(key, c);
     return c;
+  }
+  // a piece of size s centred on (x, y), from the sprite cache
+  function drawPieceVec(ctx, t, white, x, y, s) {
+    const m = ctx.getTransform(), dpr = Math.max(1, Math.min(4, Math.hypot(m.a, m.b) || 1)), box = s / 0.86;
+    ctx.drawImage(sprite(t, white, box, dpr), x - box / 2, y - box / 2, box, box);
   }
 
   const LEVELS = ['Easy', 'Medium', 'Hard', 'Expert'];
@@ -612,12 +634,13 @@
       let pos, plies, sans, keys, lastMove = null, phase = 'play', sel = -1, drag = null, promo = null, anims = [], fades = [];
       let banner = null, thinking = false, reqId = 0, hoverSq = -1, cursor = -1, kbd = false, chips = [], geo = null, checkFlash = 0;
       let wasConnected = on ? on.connected : true, lastSync = 0;
+      let clock = 0, clockAt = 0, chipPress = null;   // game clock (seconds of play, counts up) and the level chip being pressed
 
       const flip = () => myColor === -1;
       const mayAct = () => phase === 'play' && !api.ended && !promo && (friendLocal || pos.side === myColor);
       function reset() {
         pos = core.loadFen(core.START); plies = []; sans = []; keys = [core.key(pos)]; lastMove = null;
-        phase = 'play'; sel = -1; drag = null; promo = null; anims = []; fades = []; banner = null; thinking = false;
+        phase = 'play'; sel = -1; drag = null; promo = null; anims = []; fades = []; banner = null; thinking = false; clock = 0;
         cursor = myColor === 1 ? 0x14 : 0x64;
       }
 
@@ -750,12 +773,12 @@
       // ---------- layout ----------
       function layout() {
         const { w, h } = view;
-        const top = 56, capH = 20, chipH = on ? 0 : 38, pad = 12;
-        const avail = h - top - capH * 2 - chipH - pad;
+        const top = 56, capT = 32, capH = 20, chipH = on ? 0 : 44, pad = 12;
+        const avail = h - top - capT - capH - chipH - pad;
         const s = Math.max(12, Math.floor(Math.min(w - pad * 2, avail) / 8));
-        const bs = s * 8, block = capH * 2 + bs + chipH;
-        const y0 = top + Math.max(0, (h - top - pad - block) / 2);
-        geo = { s, bs, bx: Math.round((w - bs) / 2), by: Math.round(y0 + capH), capTop: y0 + capH / 2, capBot: y0 + capH + bs + capH / 2, chipY: y0 + capH * 2 + bs + 6, chipH };
+        const bs = s * 8, block = capT + capH + bs + chipH;
+        const y0 = top + Math.max(0, (h - top - pad - block) / 2), by = Math.round(y0 + capT);
+        geo = { s, bs, bx: Math.round((w - bs) / 2), by, capTop: y0 + capT / 2 - 1, capBot: by + bs + capH / 2 + 2, chipY: by + bs + capH + 8, chipH };
         return geo;
       }
       function sqXY(sq) {
@@ -793,13 +816,40 @@
         const val = [0, 1, 3, 3, 5, 9], mat = c => { let v = 0; for (const t in have[c]) v += val[t] * have[c][t]; return v; };
         return { byWhite: lost(-1), byBlack: lost(1), diff: mat(1) - mat(-1) };
       }
-      function capRow(list, color, y, adv, col) {
-        if (!list.length && adv <= 0) return;
-        const s = geo.s * 0.46, step = s * 0.62;
-        let x = geo.bx + 2;
-        let prev = 0;
-        for (const t of list) { if (prev && prev !== t) x += s * 0.22; drawPieceVec(ctx, t, color === 1, x + s / 2, y, s); x += step; prev = t; }
-        if (adv > 0) D.text(ctx, '+' + adv, x + s * 0.5 + 6, y + 1, 11, col.ink2, 650, 'left');
+      function capRow(list, color, y, maxX) {
+        if (!list.length) return;
+        const s = geo.s * 0.46, x0 = geo.bx + 2, groups = new Set(list).size - 1;
+        let step = s * 0.62, gapG = s * 0.22;
+        const need = (list.length - 1) * step + groups * gapG + s;
+        if (need > maxX - x0) { const k = Math.max(0.35, (maxX - x0 - s) / Math.max(1, need - s)); step *= k; gapG *= k; }
+        let x = x0, prev = 0;
+        for (const t of list) { if (prev && prev !== t) x += gapG; drawPieceVec(ctx, t, color === 1, x + s / 2, y, s); x += step; prev = t; }
+      }
+      // the game clock pill above the board: round clock + mm:ss, then a second segment with who is ahead on material
+      const fmtClock = t => { t = Math.floor(t); const h = Math.floor(t / 3600), m = Math.floor(t / 60) % 60, sec = t % 60; return (h ? h + ':' + String(m).padStart(2, '0') : String(m).padStart(2, '0')) + ':' + String(sec).padStart(2, '0'); };
+      function clockPill(col, lead, leader) {
+        const ph = 26, txt = fmtClock(clock), w1 = clock >= 3600 ? 92 : 76, w2 = lead ? 58 : 60, pw = w1 + w2;
+        const x = geo.bx + geo.bs - pw, y = Math.round(geo.capTop - ph / 2);
+        D.roundRect(ctx, x, y + 2, pw, ph, ph / 2); ctx.fillStyle = col.dark ? col.bg : col.bg2; ctx.fill();
+        D.roundRect(ctx, x, y, pw, ph, ph / 2); ctx.fillStyle = col.dark ? col.surface2 : col.surface; ctx.fill();
+        ctx.strokeStyle = col.dark ? 'rgba(255,245,230,0.1)' : 'rgba(32,28,23,0.12)'; ctx.lineWidth = 1.5; ctx.stroke();
+        ctx.fillStyle = ctx.strokeStyle; ctx.fillRect(x + w1 - 0.75, y + 5, 1.5, ph - 10);
+        // clock face
+        const cx = x + 17, cy = y + ph / 2, r = 7.5;
+        ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fillStyle = col.dark ? '#b9cddd' : '#cbdcea'; ctx.fill();
+        const a = -Math.PI / 2 + (clock % 60) / 60 * Math.PI * 2;
+        ctx.strokeStyle = '#557891'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(a) * r * 0.62, cy + Math.sin(a) * r * 0.62); ctx.stroke();
+        ctx.beginPath(); ctx.arc(cx, cy, 1.6, 0, Math.PI * 2); ctx.fillStyle = '#557891'; ctx.fill();
+        D.text(ctx, txt, x + 30, cy + 0.5, 13, col.ink2, 800, 'left');
+        // material
+        const mx = x + w1 + w2 / 2;
+        if (!lead) D.text(ctx, 'Even', mx, cy + 0.5, 12, col.ink3, 750);
+        else {
+          drawPieceVec(ctx, 1, leader === 1, mx - 12, cy, 15);
+          D.text(ctx, '+' + lead, mx - 2, cy + 0.5, 13, leader === myColor && !friendLocal ? col.good : col.ink2, 800, 'left');
+        }
+        return x;
       }
       function hud(col) {
         const ended = phase === 'end' || api.ended, bottom = myColor, topC = -myColor;
@@ -818,16 +868,21 @@
         chips = [];
         if (on || !geo.chipH) return;
         const { bx, bs, chipY } = geo;
-        const labW = bs >= 300 ? 54 : 0, gap = 6, cw = Math.min(84, (bs - labW - gap * 3) / 4), ch = 26;
-        const total = labW + cw * 4 + gap * 3, x0 = bx + (bs - total) / 2;
+        const labW = bs >= 300 ? 54 : 0, gap = 8, cw = Math.min(86, (bs - labW - gap * 3) / 4), ch = 30, rim = 3;
+        const total = labW + cw * 4 + gap * 3, x0 = bx + (bs - total) / 2, now = performance.now();
         if (labW) D.text(ctx, friendLocal ? 'vs Bot' : 'Bot', x0 + labW / 2 - 4, chipY + ch / 2, 11.5, col.ink2, 650);
         LEVELS.forEach((name, i) => {
           const x = x0 + labW + i * (cw + gap), active = botMode && i === level;
-          D.roundRect(ctx, x, chipY, cw, ch, 13);
-          ctx.fillStyle = active ? col.accent : (col.dark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)'); ctx.fill();
-          if (!active) { ctx.strokeStyle = col.line; ctx.lineWidth = 1; ctx.stroke(); }
-          D.fitText(ctx, name, x + cw / 2, chipY + ch / 2 + 0.5, cw - 8, 11.5, active ? '#fff' : col.ink2, 650, 9);
-          chips.push({ x, y: chipY, w: cw, h: ch, i });
+          // soft rounded key: a darker rim under the face, which sinks onto the rim while pressed
+          const down = chipPress && chipPress.i === i && now - chipPress.t < 140 && !api.reduceMotion ? rim - 1 : 0;
+          D.roundRect(ctx, x, chipY + rim, cw, ch, 12);
+          ctx.fillStyle = active ? col.accent : (col.dark ? col.bg : col.bg2); ctx.fill();
+          if (active) { ctx.fillStyle = 'rgba(0,0,0,0.22)'; ctx.fill(); }
+          D.roundRect(ctx, x, chipY + down, cw, ch, 12);
+          ctx.fillStyle = active ? col.accent : (col.dark ? col.surface2 : col.surface); ctx.fill();
+          if (!active) { ctx.strokeStyle = col.dark ? 'rgba(255,245,230,0.1)' : 'rgba(32,28,23,0.12)'; ctx.lineWidth = 1.5; ctx.stroke(); }
+          D.fitText(ctx, name, x + cw / 2, chipY + down + ch / 2 + 0.5, cw - 8, 12, active ? '#fff' : col.ink2, 750, 9);
+          chips.push({ x, y: chipY, w: cw, h: ch + rim, i });
         });
       }
       function pickLevel(i) {
@@ -849,22 +904,27 @@
         hud(col);
         const { s, bs, bx, by } = geo;
         // captured pieces next to each player
+        if (dt > 0 && phase !== 'end' && !api.ended) clock += Math.min(0.25, (now - (clockAt || now)) / 1000);
+        clockAt = now;
         const cap = captured(), mineTook = myColor === 1 ? cap.byWhite : cap.byBlack, theyTook = myColor === 1 ? cap.byBlack : cap.byWhite;
-        capRow(theyTook, myColor, geo.capTop, -cap.diff * myColor, col);
-        capRow(mineTook, -myColor, geo.capBot, cap.diff * myColor, col);
+        const pillX = clockPill(col, Math.abs(cap.diff), cap.diff > 0 ? 1 : -1);
+        capRow(theyTook, myColor, geo.capTop, pillX - 8);
+        capRow(mineTook, -myColor, geo.capBot, bx + bs);
         // frame and squares
-        D.roundRect(ctx, bx - 6, by - 6, bs + 12, bs + 12, 12);
-        ctx.fillStyle = col.dark ? '#3a332b' : '#e4d6c2'; ctx.fill();
+        D.roundRect(ctx, bx - 5, by - 5, bs + 10, bs + 13, 13);
+        ctx.fillStyle = col.dark ? '#141b21' : '#dfe5ec'; ctx.fill();
         ctx.save();
-        D.roundRect(ctx, bx, by, bs, bs, 6); ctx.clip();
-        const light = col.dark ? '#9c8a74' : '#f1e5d3', dark = col.dark ? '#6a5645' : '#c39d7b';
+        D.roundRect(ctx, bx, by, bs, bs, 8); ctx.clip();
+        // calm, low-contrast squares: near white and pale grey in light, two close slate tones in dark
+        const light = col.dark ? '#2a3640' : '#fbfcfd', dark = col.dark ? '#212c35' : '#eaeef2';
         for (let r = 0; r < 8; r++) for (let f = 0; f < 8; f++) {
           const { x, y } = sqXY(r * 16 + f);
           ctx.fillStyle = (r + f) % 2 ? light : dark; ctx.fillRect(x, y, s, s);
         }
         const tint = (sq, color, a) => { const { x, y } = sqXY(sq); ctx.globalAlpha = a; ctx.fillStyle = color; ctx.fillRect(x, y, s, s); ctx.globalAlpha = 1; };
-        if (lastMove) { tint(lastMove.from, col.accent, 0.26); tint(lastMove.to, col.accent, 0.34); }
-        if (sel >= 0) tint(sel, col.accent, 0.5);
+        // last move: a soft yellow square (muted gold in dark)
+        if (lastMove) { tint(lastMove.from, col.dark ? '#4d4532' : '#fbefc2', 1); tint(lastMove.to, col.dark ? '#62553a' : '#f7e49c', 1); }
+        if (sel >= 0) tint(sel, col.accent, 0.38);
         // king in check: red glow
         if (phase !== 'end' ? core.inCheck(pos) : (banner && banner.text === 'Checkmate')) {
           const k = pos.ksq[pos.side === 1 ? 0 : 1], { x, y } = sqXY(k);
@@ -874,13 +934,13 @@
           ctx.fillStyle = g; ctx.fillRect(x, y, s, s);
         }
         // coordinates
-        const fs = Math.max(8, Math.min(11, s * 0.2));
+        const fs = Math.max(8, Math.min(11, s * 0.2)), coord = col.dark ? 'rgba(200,220,235,0.34)' : 'rgba(60,85,110,0.4)';
         for (let i = 0; i < 8; i++) {
           const fSq = flip() ? (7 - i) : i, rSq = flip() ? i : 7 - i;
           const bottomSq = (flip() ? 7 : 0) * 16 + fSq, leftSq = rSq * 16 + (flip() ? 7 : 0);
           const a = sqXY(bottomSq), b = sqXY(leftSq);
-          D.text(ctx, 'abcdefgh'[fSq], a.x + s - fs * 0.55, a.y + s - fs * 0.6, fs, ((bottomSq >> 4) + (bottomSq & 7)) % 2 ? dark : light, 700);
-          D.text(ctx, String(rSq + 1), b.x + fs * 0.55, b.y + fs * 0.7, fs, ((leftSq >> 4) + (leftSq & 7)) % 2 ? dark : light, 700);
+          D.text(ctx, 'abcdefgh'[fSq], a.x + s - fs * 0.55, a.y + s - fs * 0.6, fs, coord, 750);
+          D.text(ctx, String(rSq + 1), b.x + fs * 0.55, b.y + fs * 0.7, fs, coord, 750);
         }
         // pieces
         const hidden = new Set(anims.map(a => a.to));
@@ -901,7 +961,7 @@
           for (const m of targetsFrom(sel)) {
             const t = core.mTo(m); if (seen.has(t)) continue; seen.add(t);
             const { x, y } = sqXY(t), capture = pos.b[t] || (core.mFlags(m) & core.F_EP);
-            ctx.fillStyle = col.dark ? 'rgba(20,12,6,0.42)' : 'rgba(60,35,15,0.26)';
+            ctx.fillStyle = col.dark ? 'rgba(190,215,235,0.2)' : 'rgba(45,70,100,0.17)';
             ctx.beginPath();
             if (capture) { ctx.arc(x + s / 2, y + s / 2, s * 0.47, 0, Math.PI * 2); ctx.arc(x + s / 2, y + s / 2, s * 0.38, 0, Math.PI * 2, true); }
             else ctx.arc(x + s / 2, y + s / 2, s * (hoverSq === t ? 0.2 : 0.15), 0, Math.PI * 2);
@@ -930,8 +990,9 @@
         if (promo) {
           ctx.fillStyle = 'rgba(0,0,0,0.32)'; ctx.fillRect(bx, by, bs, bs);
           promoBoxes().forEach((b, i) => {
-            ctx.fillStyle = col.dark ? '#2b2621' : '#fffaf3';
-            D.roundRect(ctx, b.x + 2, b.y + 2, b.s - 4, b.s - 4, 10); ctx.fill();
+            D.roundRect(ctx, b.x + 3, b.y + 5, b.s - 6, b.s - 6, 12); ctx.fillStyle = 'rgba(0,0,0,0.22)'; ctx.fill();
+            ctx.fillStyle = col.dark ? '#2b3740' : col.surface;
+            D.roundRect(ctx, b.x + 3, b.y + 2, b.s - 6, b.s - 6, 12); ctx.fill();
             const hov = hoverSq === -100 - i;
             if (hov) { ctx.strokeStyle = col.accent; ctx.lineWidth = 2.5; ctx.stroke(); }
             pieceAt(b.t * pos.side, b.x, b.y, b.s, 1, hov ? 1.06 : 0.94);
@@ -943,8 +1004,9 @@
           const k = api.reduceMotion ? 1 : D.ease.outBack(Math.min(1, (now - banner.t0) / 380));
           const bw = Math.min(bs - 24, 260), bh = 62, cx = bx + bs / 2, cy = by + bs / 2;
           ctx.save(); ctx.translate(cx, cy); ctx.scale(k, k);
-          D.roundRect(ctx, -bw / 2, -bh / 2, bw, bh, 16); ctx.fillStyle = col.dark ? 'rgba(30,26,22,0.94)' : 'rgba(255,250,243,0.96)'; ctx.fill();
-          ctx.strokeStyle = col.accent; ctx.lineWidth = 2; ctx.stroke();
+          D.roundRect(ctx, -bw / 2, -bh / 2 + 4, bw, bh, 18); ctx.fillStyle = col.dark ? 'rgba(0,0,0,0.4)' : 'rgba(40,55,75,0.16)'; ctx.fill();
+          D.roundRect(ctx, -bw / 2, -bh / 2, bw, bh, 18); ctx.fillStyle = col.dark ? 'rgba(37,49,58,0.97)' : 'rgba(255,255,255,0.97)'; ctx.fill();
+          ctx.strokeStyle = col.dark ? 'rgba(255,255,255,0.1)' : 'rgba(40,55,75,0.13)'; ctx.lineWidth = 1.5; ctx.stroke();
           D.text(ctx, banner.text, 0, -9, 19, col.ink, 750);
           D.fitText(ctx, banner.sub, 0, 14, bw - 20, 11.5, col.ink2, 600, 9);
           ctx.restore();
@@ -961,7 +1023,7 @@
       // ---------- input wiring ----------
       api.on(view.canvas, 'pointerdown', e => {
         const { x, y } = local(e); kbd = false;
-        for (const c of chips) if (x >= c.x && x <= c.x + c.w && y >= c.y && y <= c.y + c.h) { pickLevel(c.i); return; }
+        for (const c of chips) if (x >= c.x && x <= c.x + c.w && y >= c.y && y <= c.y + c.h) { chipPress = { i: c.i, t: performance.now() }; pickLevel(c.i); return; }
         if (promo) {
           const hit = promoBoxes().find(b => x >= b.x && x < b.x + b.s && y >= b.y && y < b.y + b.s);
           if (hit) choosePromo(hit.t); else { promo = null; sel = -1; api.sfx('tick'); }
@@ -1035,6 +1097,7 @@
         for (const u of sv.moves) { const m = core.fromUci(pos, u); if (!m) { reset(); return false; } applyRaw(m); }
         const st = status();
         if (st) { reset(); return false; }
+        if (Number.isFinite(sv.c) && sv.c > 0) clock = Math.min(sv.c, 359999);
         if (botMode && pos.side !== myColor) botTurn();
         return true;
       }
@@ -1056,7 +1119,7 @@
         return true;
       });
       if (window.ludusDebug) {
-        window.ludusDebug.chess = () => ({ fen: core.fen(pos), plies: plies.slice(), sans: sans.slice(), side: pos.side, my: myColor, phase, level, thinking, ended: api.ended, worker: !!worker, workerBroken, mode: on ? 'online' : friendLocal ? 'friend' : 'bot' });
+        window.ludusDebug.chess = () => ({ fen: core.fen(pos), plies: plies.slice(), sans: sans.slice(), side: pos.side, my: myColor, phase, level, thinking, ended: api.ended, worker: !!worker, workerBroken, clock, mode: on ? 'online' : friendLocal ? 'friend' : 'bot' });
         window.ludusDebug.chessMove = u => { const m = core.fromUci(pos, u); if (!m || !mayAct()) return false; commit(m, true, true); return true; };
         window.ludusDebug.chessGeo = sq => { layout(); const p = sqXY(sq); const r = view.canvas.getBoundingClientRect(); return { x: r.left + p.x + geo.s / 2, y: r.top + p.y + geo.s / 2, s: geo.s }; };
       }
@@ -1064,7 +1127,7 @@
       return {
         save() {
           if (on || api.ended || !plies.length || phase === 'end') return null;
-          return { v: 1, moves: plies.slice(), my: myColor };
+          return { v: 1, moves: plies.slice(), my: myColor, c: Math.floor(clock) };
         }
       };
     }
