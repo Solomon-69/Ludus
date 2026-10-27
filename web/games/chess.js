@@ -578,20 +578,16 @@
     onlineHint: 'Your pieces are at the bottom. Drag or click to move',
     _core: core,
     art(ctx, w, h) {
-      const D = Ludus.draw;
-      const cell = Math.min(w / 6.2, h / 4.4), cols = 5, rows = 2;
-      const ox = (w - cell * cols) / 2, oy = h - cell * rows - h * 0.1;
+      // checkmate: the white queen stands over the fallen black king
+      const cell = h * 0.24, oy = h - cell * 1.9, cols = Math.round(w * 0.64 / cell), big = h * 0.9;
       ctx.save();
-      D.roundRect(ctx, ox - 4, oy - 4, cell * cols + 8, cell * rows + 8, 8); ctx.fillStyle = 'rgba(255,255,255,0.18)'; ctx.fill();
-      for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
-        ctx.fillStyle = (r + c) % 2 ? 'rgba(0,0,0,0.16)' : 'rgba(255,255,255,0.22)';
-        ctx.fillRect(ox + c * cell, oy + r * cell, cell, cell);
+      for (let r = 0; r < 3; r++) for (let c = 0; c < cols; c++) {
+        ctx.fillStyle = (r + c) % 2 ? 'rgba(0,0,0,0.16)' : 'rgba(255,255,255,0.2)';
+        ctx.fillRect(w * 0.18 + c * cell, oy + r * cell, cell, cell);
       }
-      const big = cell * 2.1;
-      drawPieceVec(ctx, 2, true, ox + cell * 1.5, oy + cell * 0.2 - big * 0.12, big);
-      drawPieceVec(ctx, 6, false, ox + cell * 3.6, oy + cell * 0.1 - big * 0.1, big * 0.92);
-      drawPieceVec(ctx, 1, true, ox + cell * 4.55, oy + cell * 0.95, cell * 0.95);
-      D.spark(ctx, ox + cell * 1.5, oy - big * 0.62, cell * 0.32, '#fff7ef');
+      drawPieceVec(ctx, 5, true, w * 0.42, oy - big * 0.02, big * 0.86);
+      ctx.translate(w * 0.63, oy + cell * 0.35); ctx.rotate(Math.PI / 2.3);
+      drawPieceVec(ctx, 6, false, 0, 0, big * 0.78);
       ctx.restore();
     },
     create(stage, api) {
