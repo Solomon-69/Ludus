@@ -7,8 +7,8 @@
   --box: #EFE7DA;        /* text fields and info cards: a step deeper than the panel, with a hairline edge */
   --box-line: #E2D8C8;
   --ink: #201c17;
-  --ink-2: #6b6256;
-  --ink-3: #766d61;
+  --ink-2: #5b5348;
+  --ink-3: #6a6155;
   --line: rgba(32, 28, 23, 0.09);
   --accent: #d97757;
   --accent-ink: #fff8f2;
@@ -34,8 +34,8 @@
   --box: #322d27;
   --box-line: transparent;
   --ink: #f3ede3;
-  --ink-2: #b5aa9b;
-  --ink-3: #a79d8e;
+  --ink-2: #cbc1b2;
+  --ink-3: #b2a899;
   --line: rgba(255, 245, 230, 0.08);
   --accent-soft: rgba(217, 119, 87, 0.2);
   --shadow: 0 1px 1px rgba(0, 0, 0, 0.25), 0 8px 20px -8px rgba(0, 0, 0, 0.6);
