@@ -122,7 +122,7 @@
 
       const ghostBase = () => [5.6, 6.6, 7.3][L0] + Math.min(1.2, (level - 1) * 0.3);
       const pacSpeed = () => 7.4 + Math.min(1, (level - 1) * 0.2);
-      const frightTime = () => Math.max(1.5, [8, 6, 4][L0] - (level - 1) * 1);
+      const frightTime = () => Math.max(6, [18, 15, 12][L0] - (level - 1) * 1);   // plenty of time to hunt the chasers down
 
       function resetActors() {
         pac = { x: 9, y: 15, dir: 'left', want: 'left', tx: 9, ty: 15, mouth: 0, moving: true };
