@@ -295,7 +295,7 @@
   const GRASS = [[-620, 22], [-520, 12], [-460, 9], [-170, 4], [-20, 1], [120, 0]];
 
   Ludus.register({
-    id: 'climb', name: 'Hammer Climb', tag: 'Arcade', tint: '#7d6a58',
+    id: 'climb', name: 'Hammer Climb', tag: 'Arcade', tint: '#7d6a58', resetOnQuit: true,
     hint: 'The mouse moves the hammer head. Plant it, keep moving to lever yourself · <kbd>←</kbd><kbd>→</kbd> swing <kbd>↑</kbd><kbd>↓</kbd> reach · <kbd>-</kbd><kbd>+</kbd> sensitivity',
     _rules: { build, makeWorld, step, newState, clampArm, probe, DIFFS, START, HL, HMIN, PR, HR, STEP, VIEW },
     art(ctx, w, h) {

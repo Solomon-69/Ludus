@@ -1,51 +1,71 @@
 # update-real.ps1: the real in-app update, the way a person on an older Ludus gets it.
-# Installs an older release from GitHub, starts it, drives its own Settings > Update (check, install) over
-# WebView2's debugging port (no clicks), and checks it downloads with a rising percentage, swaps itself and
-# comes back as the newest release, all within a time limit. The log goes to $Out.
+# Installs an older release from GitHub, starts it, presses its own Settings > Check, Update, Install through
+# Windows UI Automation (the accessibility tree, no mouse), watches the "Downloading... N%" line, then checks the
+# app closed, swapped its files and came back as the newest release, all within a time limit.
+# Runs in Windows PowerShell 5.1 (UI Automation). Writes a log to $Out.
 param([string]$From, [string]$To, [string]$Out = 'update-test', [int]$Limit = 240)
 $ErrorActionPreference = 'Stop'
-. "$PSScriptRoot/winlib.ps1"
+. "$PSScriptRoot/uia.ps1"
 New-Item -ItemType Directory -Force $Out | Out-Null
 $Out = (Resolve-Path $Out).Path
+$log = Join-Path $Out "update-$From-to-$To.txt"
+$fails = 0
+$t0 = Get-Date
+function Say($m) { $s = "[{0,6:N1}s] {1}" -f ((Get-Date) - $t0).TotalSeconds, $m; Write-Host $s; Add-Content $log $s }
+function Check($ok, $m) { if ($ok) { Say "PASS $m" } else { Say "FAIL $m"; $script:fails++ } }
+Set-Content $log ''
+
 $repo = 'https://github.com/Solomon-69/Ludus/releases/download'
 $root = Join-Path $env:RUNNER_TEMP 'ludus-old'
-Remove-Item -Recurse -Force $root -ErrorAction SilentlyContinue
+if (Test-Path $root) { Remove-Item -Recurse -Force $root }
 New-Item -ItemType Directory -Force $root | Out-Null
-
-Write-Host "Installing Ludus $From (the older release)"
-Invoke-WebRequest "$repo/v$From/Ludus-windows.zip" -OutFile (Join-Path $root 'old.zip')
+Say "installing Ludus $From"
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+(New-Object Net.WebClient).DownloadFile("$repo/v$From/Ludus-windows.zip", (Join-Path $root 'old.zip'))
 Expand-Archive (Join-Path $root 'old.zip') -DestinationPath $root
 $exe = (Get-ChildItem $root -Recurse -Filter Ludus.exe | Select-Object -First 1).FullName
-$dir = Split-Path $exe -Parent
 $ver = { (Get-Item $exe).VersionInfo.FileVersion }
-Write-Host "installed at $dir, file version $(& $ver)"
+Say "installed $exe, version $(& $ver)"
 
-# WebView2's debugging port for this app only (a per-user policy; the env var alone is ignored by current runtimes)
-$env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = '--remote-debugging-port=9333 --remote-allow-origins=*'
-$k = 'HKCU:\Software\Policies\Microsoft\Edge\WebView2\AdditionalBrowserArguments'
-New-Item -Path $k -Force | Out-Null
-New-ItemProperty -Path $k -Name 'Ludus.exe' -Value '--remote-debugging-port=9333 --remote-allow-origins=*' -PropertyType String -Force | Out-Null
-$start = Get-Date
+$t0 = Get-Date
 $p = Start-Process -FilePath $exe -ArgumentList '--test-open' -PassThru
-$log = Join-Path $Out "update-$From-to-$To.txt"
-node "$PSScriptRoot/../../QA/updater-test/cdp-update.mjs" 9333 $log $Limit
-$drove = $LASTEXITCODE -eq 0
-$r = Get-Content "$log.json" -Raw | ConvertFrom-Json
-Check $r.sawAvailable "older Ludus $From found the newer release in-app"
-Check ($r.maxPct -gt 0) "download progress went above 0% (max $($r.maxPct)%)"
-Check $drove "update downloaded, verified and Ludus closed itself to swap ($($r.result))"
+$win = Ui-Window $p.Id 90
+Check ($null -ne $win) 'Ludus window found'
+$gear = Ui-Wait $win 'Settings' 'Button' 90
+Check ($null -ne $gear) 'Settings button found'
+if ($gear) { [void](Ui-Press $gear) }
+$check = Ui-Wait $win 'Check' 'Button' 20
+if (-not $check) { Ui-Dump $win (Join-Path $Out 'uia-settings.txt') }
+Check ($null -ne $check) 'Settings > Check for updates found'
+if ($check) { [void](Ui-Press $check) }
+$upd = Ui-Wait $win 'Update to *' 'Button' 40
+Check ($null -ne $upd) "older Ludus $From found the newer release ($(if ($upd) { $upd.Current.Name }))"
+if ($upd) { [void](Ui-Press $upd) }
+$inst = Ui-Wait $win 'Install' 'Button' 10
+if ($inst) { [void](Ui-Press $inst); Say 'Install pressed' }
 
-# The swap helper copies the new files over and starts Ludus again.
+# Watch the progress line until the app quits to swap itself.
+$max = 0; $last = ''; $errSeen = $false
+while (((Get-Date) - $t0).TotalSeconds -lt $Limit -and -not $p.HasExited) {
+  foreach ($e in (Ui-All $win '*%*')) { if ($e.Current.Name -match '(\d+)%') { $n = [int]$Matches[1]; if ($n -gt $max) { $max = $n } } }
+  if (Ui-All $win '*Installing*') { if ($max -lt 100) { $max = 100 } }
+  if (Ui-All $win 'Couldn*update*') { $errSeen = $true; break }
+  if ("$max" -ne $last) { Say "progress $max%"; $last = "$max" }
+  Start-Sleep -Milliseconds 200
+}
+Check (-not $errSeen) 'no "Couldn''t update" error'
+Check ($max -gt 0) "download progress went above 0% (max $max%)"
+Check $p.HasExited 'Ludus closed itself to swap in the new version'
+
 $ok = $false
-while (((Get-Date) - $start).TotalSeconds -lt $Limit) {
+while (((Get-Date) - $t0).TotalSeconds -lt $Limit) {
   $v = & $ver
   $running = Get-Process Ludus -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $exe }
   if ($v -like "$To*" -and $running) { $ok = $true; break }
   Start-Sleep -Milliseconds 500
 }
-$secs = [int]((Get-Date) - $start).TotalSeconds
-Check $ok "Ludus came back as $To within $Limit s (took $secs s, file version now $(& $ver))"
+Check $ok "Ludus came back as $To within $Limit s (took $([int]((Get-Date) - $t0).TotalSeconds) s, version now $(& $ver))"
 Copy-Item "$env:APPDATA\Ludus\*.log" $Out -ErrorAction SilentlyContinue
 Get-Process Ludus -ErrorAction SilentlyContinue | Stop-Process -Force
-if ($script:Failures.Count) { Write-Host "$($script:Failures.Count) check(s) failed"; exit 1 }
-Write-Host 'all update checks passed'
+Say "$fails failure(s)"
+exit $fails

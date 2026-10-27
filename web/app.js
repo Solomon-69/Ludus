@@ -781,18 +781,21 @@
     if (FILTERS.includes(tab) && S.filter !== tab) { S.filter = tab; L.save(); }
     renderFilters();
   }
-  function goHome() {
-    hideCrash(); leaveOnline(); persist(); stop(); hideOver(); $('pauseSheet').hidden = true;
+  // how === 'quit': the player left with Back / Quit (not the panel closing). Games marked resetOnQuit start over then.
+  function goHome(how) {
+    const reset = how === 'quit' && current && current.game.resetOnQuit && !online;
+    hideCrash(); leaveOnline(); if (reset) forget(current.game.id); else persist(); stop(); hideOver(); $('pauseSheet').hidden = true;
     const fromSearch = !!searchReturn; leaveSearch();
     show('home'); renderCards();
     if (fromSearch) { const gr = $('grid'); if (gr) gr.scrollTop = 0; }
     L.native('playing', { id: null }); L.native('wide', { on: false });
   }
 
-  $('backBtn').onclick = goHome;
-  $('leaveBtn').onclick = goHome;
-  $('quitBtn').onclick = goHome;
-  $('overQuitBtn').onclick = goHome;
+  const quitHome = () => goHome('quit');
+  $('backBtn').onclick = quitHome;
+  $('leaveBtn').onclick = quitHome;
+  $('quitBtn').onclick = quitHome;
+  $('overQuitBtn').onclick = quitHome;
   $('pauseBtn').onclick = pause;
   $('resumeBtn').onclick = resume;
   $('restartBtn').onclick = restart;
@@ -811,7 +814,7 @@
       if (revealing()) { if (e.key === 'Escape') e.preventDefault(); return; }
       if (overShown()) {
         const armed = performance.now() - overAt > 300;   // a key still held from the last move must not restart
-        if (e.key === 'Escape') { e.preventDefault(); goHome(); }
+        if (e.key === 'Escape') { e.preventDefault(); quitHome(); }
         else if (armed && (e.key === 'Enter' || e.key === ' ' || e.key === 'r' || e.key === 'R')) { e.preventDefault(); restart(); }
         return;
       }

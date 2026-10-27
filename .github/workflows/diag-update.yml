@@ -8,10 +8,8 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: '22' }
       - name: 1.12.15 updates in-app to 1.12.16
-        shell: pwsh
+        shell: powershell
         run: ./windows/ci/update-real.ps1 -From '1.12.15' -To '1.12.16' -Out update-test -Limit 240
       - uses: actions/upload-artifact@v4
         if: always()
@@ -23,26 +21,11 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with: { dotnet-version: '8.0.x' }
-      - uses: actions/setup-node@v4
-        with: { node-version: '22' }
       - run: dotnet publish windows/Ludus.csproj -c Release -o out/Ludus
         shell: pwsh
-      - name: Hammer Climb start probe
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force probe | Out-Null
-          $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = '--remote-debugging-port=9334 --remote-allow-origins=*'
-          $k = 'HKCU:\Software\Policies\Microsoft\Edge\WebView2\AdditionalBrowserArguments'
-          New-Item -Path $k -Force | Out-Null
-          New-ItemProperty -Path $k -Name 'Ludus.exe' -Value '--remote-debugging-port=9334 --remote-allow-origins=*' -PropertyType String -Force | Out-Null
-          $p = Start-Process out/Ludus/Ludus.exe -ArgumentList '--test-open' -PassThru
-          Start-Sleep -Seconds 25
-          Get-CimInstance Win32_Process -Filter "Name='msedgewebview2.exe' OR Name='Ludus.exe'" | ForEach-Object { Write-Host "PROC $($_.ProcessId) $($_.CommandLine.Substring(0, [Math]::Min(400, $_.CommandLine.Length)))" }
-          netstat -ano | Select-String LISTENING | Select-String '933' | ForEach-Object { Write-Host "NET $_" }
-          try { Write-Host ("LIST " + (Invoke-WebRequest http://127.0.0.1:9334/json/list -UseBasicParsing).Content) } catch { Write-Host "LIST failed $_" }
-          node QA/updater-test/cdp-probe.mjs 9334 QA/climb-start.js probe/climb.json probe/climb.png
-          Copy-Item "$env:APPDATA\Ludus\*.log" probe -ErrorAction SilentlyContinue
-          Stop-Process $p -Force -ErrorAction SilentlyContinue
+      - name: Hammer Climb probe
+        shell: powershell
+        run: ./windows/ci/climb-probe.ps1 -Exe out/Ludus/Ludus.exe -Out probe
       - uses: actions/upload-artifact@v4
         if: always()
         with: { name: diag-climb, path: probe }
