@@ -961,6 +961,18 @@
     // Next frame, once the home screen has been laid out without transitions.
     requestAnimationFrame(() => { top(); root.classList.remove('instant'); requestAnimationFrame(top); });
   };
+  // Right-click on the icon while the panel is closed: open straight on Settings. This skips the home screen work of
+  // ludusOpened (no home redraw, no card animation, no slide), so home never shows for even a single frame.
+  window.ludusOpenedSettings = () => {
+    if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
+    root.classList.add('instant');
+    if (view !== 'home' && view !== 'settings' && !(online && online.started)) goHome();
+    if (S.filter !== 'All') { S.filter = 'All'; L.save(); renderFilters(); renderCards(); }
+    const g = $('grid'); if (g) g.scrollTop = 0;
+    window.ludusOpenSettings();
+    requestAnimationFrame(() => requestAnimationFrame(() => root.classList.remove('instant')));
+    return 'settings';
+  };
   // Go back to All games while the panel is closing, with transitions off, so the next open shows
   // the finished home screen straight away instead of the game flashing and sliding out.
   window.ludusClosed = () => {
