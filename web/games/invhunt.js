@@ -367,7 +367,7 @@
             if (tok !== photoTok) return;
             img.src = u; img.alt = `Photo of mosaic ${id}`; photo.classList.remove('wait'); photo.classList.add('ok');
             pcredit.innerHTML = ''; pcredit.append('Photo: ');
-            const a = el('a', '', PHOTO_SITE); a.href = 'https://www.invader-spotter.art/'; a.target = '_blank'; a.rel = 'noopener noreferrer'; pcredit.appendChild(a);
+            const a = el('span', '', PHOTO_SITE);   // plain credit: the app's web view opens no outside pages pcredit.appendChild(a);
           };
           probe.onerror = tryNext;
           probe.src = u;

@@ -18,9 +18,11 @@
     check('filter ' + f, ok && ids.length > 0, ids.length);
   }
   // H3 thumbnails drawn (non-blank canvases)
-  const blank = [...document.querySelectorAll('.card canvas')].filter(c => {
+  const countBlank = () => [...document.querySelectorAll('.card canvas')].filter(c => {
     const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; for (let i = 3; i < d.length; i += 400) if (d[i]) return false; return true;
   }).length;
+  let blank = countBlank();
+  for (let i = 0; i < 20 && blank; i++) { await wait(100); blank = countBlank(); }   // cards draw on the next frame, which is late on a busy Mac
   check('thumbnails drawn', blank === 0, blank + ' blank');
   check('2 Player chip says Same laptop', [...document.querySelectorAll('.chip')].some(c => c.textContent === 'Same laptop'));
   check('2 player section', !Ludus.games.some(g => g.tag === '2 Player') || [...document.querySelectorAll('.section-label')].some(l => /2 players/.test(l.textContent)));

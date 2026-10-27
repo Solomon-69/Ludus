@@ -96,13 +96,13 @@ that the host sees **Start now** as soon as `min` players are in. Seats are 0-3 
 accent, blue, green and purple. When a player leaves and at least `min` remain, the game goes on (use `onLeave`);
 below `min` the app ends the room. The home screen has no 3-4 Player tab any more: parties of 2, 3 or 4 all start from the **Online** tab (the host picks games that fit the party).
 
-## Real-time games (paddle game, Air Hockey, Tag, claim-the-land game, swallow-the-city game)
+## Real-time games (paddle game, Air Hockey, Tag, claim-the-land game, swallow-the-city game, Worm Arena)
 
 These use `web/rt.js`. **The host's screen runs the game** (physics, bots, scoring) and ~18 times a second sends a
 compact copy of the state with `sendFast('st', ...)`. Every guest sends only its controls (`sendFastTo(0, 'in', ...)`,
 on change and every 200 ms) and draws the host's copy, smoothed between the last two copies (`link.sample()`, drawn
 about 90 ms in the past). Things that must not be lost go over the normal numbered messages instead: claim-the-land game sends
-changed territory rows (`terr`, run-length coded), swallow-the-city game sends eaten objects (`gone`) and new cars (`spawn`), every
+changed territory rows (`terr`, run-length coded), swallow-the-city game sends eaten objects (`gone`) and new cars (`spawn`), Worm Arena gives every pellet an id: the first pellets come from the shared `rand()` stream on every screen, then the host sends new pellets (`fa`) and eaten ones (`fg`); the guest predicts its own worm's head. Every
 game sends the final result (`end`). swallow-the-city game builds its city from the shared `rand()` stream, so every screen starts
 with the same city and only the changes travel. A guest validates every number it reads from a state copy.
 Known limits: the host's tab must stay in front (a hidden browser tab slows its timers); a guest sees the world

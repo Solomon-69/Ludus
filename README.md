@@ -78,7 +78,7 @@ Every board game has a <b>vs Bot / vs Friend</b> switch at the top. Pick Friend 
 
 ### Play online with a room code
 
-Fifteen games have an <b>Online</b> button next to vs Bot / vs Friend: the board games Chess, Four in a Row, Dots and Boxes, Ultimate Tic-Tac-Toe, Hex, Wall Race, Rock Paper Scissors, Dead Centre and Last Wire, the action games Paddle Duel and Air Hockey, and Tag, Land Claim, City Swallow and Worm Arena, which take <b>2 to 4 players</b> (start them from the <b>Online</b> tab; the host can press <b>Start now</b> once the room has enough players, or the game starts by itself when every seat is taken). Most games are for two players.
+Eighteen games can be played online from the <b>Online</b> tab: the board games Chess, Four in a Row, Dots and Boxes, Ultimate Tic-Tac-Toe, Hex, Wall Race, Rock Paper Scissors, Dead Centre and Last Wire, the action games Paddle Duel, Air Hockey and Pop Duel, the guessing games Map Hunt and Clue Spotter, and Tag, Land Claim, City Swallow and Worm Arena, which take <b>2 to 4 players</b> ( the host can press <b>Start now</b> once the room has enough players, or the game starts by itself when every seat is taken). Most games are for two players.
 
 One player taps <b>Create room</b> and gets a 5 character room code. The <b>Copy invite</b> button copies a short message with the code and a `ludus://join/CODE` link. The other player taps <b>Join room</b> and types or pastes the code, or just clicks the link. It works on Mac and Windows. There is no account and no server of ours: the copies of Ludus talk through free public relays, and that only happens when you choose Play online. Rooms are not private: anyone who knows the code can join. See [PRIVACY.md](PRIVACY.md) and [web/ONLINE.md](web/ONLINE.md).
 
@@ -153,7 +153,7 @@ Ludus follows your Mac's light or dark look, or you can choose one. Everything e
 
 
 **Also:** best scores and progress for every game stay on your Mac. There are no accounts, no
-ads and no analytics, and Ludus makes no network connections unless you choose Play online. It is one small native app,
+ads and no analytics. Ludus only goes online for Play online, Map Hunt, Mosaic Hunt and Privacy blur (see Privacy). It is one small native app,
 and the games inside are plain HTML, CSS and JavaScript.
 
 
@@ -237,7 +237,7 @@ Nothing leaves your Mac. Ludus has no accounts, no analytics and no ads. It only
 press Play online (then only game moves and a random room code go through a public relay), play Map Hunt
 or Mosaic Hunt (photos and map tiles), or turn on Privacy blur (the camera picture is checked on your
 computer and never saved or sent). Scores, saved games and settings are stored locally. The game pages run in a
-sandboxed web view that can only load files from inside the app. See [PRIVACY.md](PRIVACY.md).
+sandboxed web view that only shows the app's own pages; pictures, map tiles and the Privacy blur face finder are the only things it fetches. See [PRIVACY.md](PRIVACY.md).
 
 ## Requirements
 

@@ -692,7 +692,7 @@
         humans.forEach(o => { if (!o.alive) return; ctx.fillStyle = soft; ctx.beginPath(); ctx.arc(mx + o.px[0] * k, my + o.py[0] * k, 4.6, 0, TAU); ctx.fill(); ctx.fillStyle = o.c.base; ctx.beginPath(); ctx.arc(mx + o.px[0] * k, my + o.py[0] * k, 3.2, 0, TAU); ctx.fill(); });
         // bottom-left: boost button (pointer play)
         let bottomRow = mr * 2 + edge;
-        if (!friend) {
+        if (solo) {
           const g = btnGeom(), act = ptr.down || ptr.btn || anyKey(KEYMAP[0].boost);
           ctx.beginPath(); ctx.arc(g.x, g.y, g.r, 0, TAU); ctx.fillStyle = act ? me.c.base : soft; ctx.fill();
           ctx.lineWidth = 1.5; ctx.strokeStyle = act ? me.c.dark : col.line; ctx.stroke();
@@ -704,7 +704,7 @@
         // opening caption
         if (intro > 0 && phase === 'play') {
           ctx.save(); ctx.globalAlpha = clamp(intro, 0, 1);
-          const msg = friend ? 'P1: A D + Space    P2: ← → + /' : 'Move to steer · hold click or Space to boost';
+          const msg = friend && !on ? 'P1: A D + Space    P2: ← → + /' : 'Move to steer · hold click or Space to boost';
           ctx.font = `650 ${12 * u}px ${FONT}`;
           const tw = Math.min(w - 24, ctx.measureText(msg).width + 28 * u), cy = h - bottomRow - 22 * u;
           pill(w / 2 - tw / 2, cy - 15 * u, tw, 30 * u, soft, 15 * u);
@@ -718,14 +718,15 @@
 
       // ---------- online ----------
       function finishOnline(res) {
-        if (phase === 'over' && overDone) return; overDone = true; phase = 'over';
+        if (overDone) return;
         const rows = res.map(q => ({ h: humans.find(x => x.human === q[0]), len: q[1], alive: q[2] === 1 })).filter(r => r.h);
-        if (!rows.length) return;
+        if (!rows.length) { pendingEnd = res; return; }   // the result came before the first copy of the arena: shown once it is in
+        overDone = true; phase = 'over'; pendingEnd = null;
         const win = rows.slice().sort((a, b) => (b.alive - a.alive) || (b.len - a.len))[0], mineR = rows.find(r => isMine(r.h));
         api.over({ score: mineR ? mineR.len : 0, won: !!mineR && win === mineR, title: mineR && win === mineR ? 'You win' : win.h.name + ' wins',
           message: rows.map(r => r.h.name + ' ' + r.len).join(' · ') });
       }
-      let overDone = false, link = null, pred = null, gv = BASE_V;
+      let overDone = false, pendingEnd = null, link = null, pred = null, gv = BASE_V;
       const validW = q => Array.isArray(q) && num(q[0]) && num(q[1]) && num(q[2]) && num(q[3]) && Number.isInteger(q[4]);
       function applyState(d) {
         if (!Array.isArray(d.wl) || !Array.isArray(d.w) || d.wl.length !== d.w.length || d.w.length > 40) return;
@@ -742,6 +743,7 @@
           humans.sort((a, b) => a.human - b.human);
           const me = myWorm(); if (me && pred) pred.set([me.px[0], me.py[0]]);
           camSnap = true;
+          if (pendingEnd) finishOnline(pendingEnd);
         }
         if (['play', 'dying', 'over'].includes(d.ph) && phase !== 'over') phase = d.ph;
         d.w.forEach((q, k) => {
@@ -785,6 +787,7 @@
           me.px[0] = pred.v[0]; me.py[0] = pred.v[1]; resize(me); follow(me);
         } else if (me) pred.set([me.px[0], me.py[0]]);
         if (phase === 'dying') phaseT -= dt;
+        if (ephem.length > EPHEM_MAX) ephem = ephem.filter(f => !f.gone);   // the host removes old drops; forget them here too
       }
       if (on) {
         link = Ludus.rt(api, {

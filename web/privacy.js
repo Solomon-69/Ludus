@@ -64,6 +64,8 @@
     return Math.abs(nose.x - mid) / span < FACING;
   }
 
+  let fails = 0;
+  const MAX_FAILS = 25;   // about 10 s of failed checks in a row
   async function tick() {
     if (busy || !video || video.readyState < 2) return;
     busy = true;
@@ -71,8 +73,11 @@
       const list = await faces();
       const owner = list[0];
       const reason = !owner ? 'away' : !owner.facing ? 'away' : list.slice(1).some(f => f.facing) ? 'watcher' : '';
-      decide(reason);
-    } catch (e) { /* a dropped frame is fine; the next tick tries again */ }
+      decide(reason); fails = 0;
+    } catch (e) {
+      // one dropped frame is fine; a face finder that keeps failing must not leave the switch on doing nothing
+      if (++fails >= MAX_FAILS) { stop(); fails = 0; if (api.onFail) api.onFail('The face finder stopped working'); }
+    }
     busy = false;
   }
   function decide(reason) {
@@ -92,7 +97,7 @@
   function start(cb) {
     onChange = cb || onChange;
     if (stream && timer) return Promise.resolve(true);
-    if (!pending) pending = open().finally(() => { pending = null; });
+    if (!pending) { const p = open().finally(() => { if (pending === p) pending = null; }); pending = p; }
     return pending;
   }
   let gen = 0;   // bumped by stop(): a start still loading when stopped lets its camera go at once
@@ -119,7 +124,7 @@
     return true;
   }
   function stop() {
-    gen++;
+    gen++; pending = null;   // a start still loading lets its camera go by itself (gen) and no longer counts as running
     clearInterval(timer); timer = 0;
     if (stream) stream.getTracks().forEach(t => t.stop());
     stream = null;
@@ -127,6 +132,6 @@
     if (blurred) { blurred = false; onChange(false, ''); }
   }
 
-  window.LudusPrivacy = { start, stop, supported, running: () => !!(stream || pending), engine: () => kind,
+  const api = window.LudusPrivacy = { onFail: null, start, stop, supported, running: () => !!(stream || pending), engine: () => kind,
     _test: { facingFrom, decide: r => decide(r), state: () => blurred } };
 })();
