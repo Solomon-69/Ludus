@@ -1,5 +1,5 @@
 /* Worm Arena: a big round arena full of glowing food and AI worms. Steer with the pointer (or the keys), hold click / Space to boost
-   (costs length, drops food). Touch another worm's body with your head and you pop into food. Length = score.
+   (costs length). Your own body is safe to cross. Touch another worm's body with your head and you pop into food. Length = score.
    vs Friend: two people on one keyboard in the same arena, one camera that zooms to keep both in view; first to die loses. */
 (function () {
   const D = Ludus.draw;
@@ -57,7 +57,8 @@
   }
 
   Ludus.register({
-    id: 'slither', name: 'Worm Arena', aka: 'snake worm arena', tag: 'Arcade', versus: true, tint: '#7c6bb5',
+    id: 'slither', name: 'Worm Arena', aka: 'snake worm arena', tag: 'Arcade', versus: true, tint: '#7c6bb5', online: { min: 2, max: 4 },
+    onlineHint: '<b>Online</b> 2 to 4 players plus bots · pointer or <kbd>A</kbd><kbd>D</kbd> / arrows steer, hold click or <kbd>Space</kbd> to boost · last worm standing wins',
     hint: 'Pointer steers, hold click or <kbd>Space</kbd> to boost · <kbd>←</kbd><kbd>→</kbd> turn · vs Friend: <b>P1</b> A D + Space, <b>P2</b> ← → + /',
     art(ctx, w, h, colors) {
       // A smooth worm: evenly spaced round segments along a gentle S-curve, tapering to the tail, eyes on the head.
@@ -87,6 +88,16 @@
       const view = api.canvas();
       const { ctx, canvas } = view;
       const friend = api.friend, LV = api.level;
+      // Online: the host's screen runs the arena (bots, food, who eats whom); guests steer their own worm at once
+      // (predicted here, eased to the host's copy) and draw the host's copy. Food has ids so every screen agrees.
+      const on = api.online, guest = !!(on && !on.isHost);
+      const solo = !friend || !!on;            // one worm on this screen: pointer steering, camera on that worm
+      const SEATCOL = [null, P2COL, '#4f9d69', '#9b6dd6'];
+      const isMine = w => (on ? w.human === on.seat + 1 : !!w.human);
+      const num = v => typeof v === 'number' && isFinite(v);
+      const remote = {};                       // host: a guest's controls by human number { a: target angle, b: boost }
+      let rng = Math.random, live = false, nextFood = 1;
+      const foodById = new Map(), fAdd = [], fGone = [];
       const AI = [
         { think: 0.2, aggr: false, margin: 0.8, noise: 0.28, bots: 15 },
         { think: 0.12, aggr: true, margin: 1, noise: 0.1, bots: 19 },
@@ -97,22 +108,25 @@
       const fcells = new Array(FN * FN);
       let foodCount = 0, wildCount = 0, ephem = [];
       const fIdx = (x, y) => clamp(((x + R) / FC) | 0, 0, FN - 1) + clamp(((y + R) / FC) | 0, 0, FN - 1) * FN;
-      function addFood(x, y, v, r, hex, wild) {
-        const f = { x, y, v, r, hex, ph: Math.random() * 6.28, wild, gone: false, cell: fIdx(x, y) };
+      function addFood(x, y, v, r, hex, wild, id) {
+        const f = { id: id || nextFood++, x, y, v, r, hex, ph: Math.random() * 6.28, wild, gone: false, cell: fIdx(x, y) };
+        foodById.set(f.id, f);
+        if (on && !guest && live) fAdd.push([f.id, Math.round(x), Math.round(y), Math.round(v * 100) / 100, Math.round(r * 10) / 10, hex, wild ? 1 : 0]);
         (fcells[f.cell] || (fcells[f.cell] = [])).push(f);
         foodCount++; if (wild) wildCount++; else ephem.push(f);
         return f;
       }
       function removeFood(f) {
-        if (f.gone) return; f.gone = true;
+        if (f.gone) return; f.gone = true; foodById.delete(f.id);
+        if (on && !guest && live) fGone.push(f.id);
         const a = fcells[f.cell], i = a.indexOf(f);
         if (i >= 0) { a[i] = a[a.length - 1]; a.pop(); }
         foodCount--; if (f.wild) wildCount--;
       }
       function spawnWild() {
-        const a = Math.random() * TAU, d = Math.sqrt(Math.random()) * (R - 60);
-        const roll = Math.random(), big = roll > 0.97 ? 2 : roll > 0.86 ? 1 : 0;
-        addFood(Math.cos(a) * d, Math.sin(a) * d, [1, 2, 4][big], [4.2, 5.6, 7.6][big], PALETTE[(Math.random() * PALETTE.length) | 0], true);
+        const a = rng() * TAU, d = Math.sqrt(rng()) * (R - 60);
+        const roll = rng(), big = roll > 0.97 ? 2 : roll > 0.86 ? 1 : 0;
+        addFood(Math.cos(a) * d, Math.sin(a) * d, [1, 2, 4][big], [4.2, 5.6, 7.6][big], PALETTE[(rng() * PALETTE.length) | 0], true);
       }
 
       // ---------- world: worms ----------
@@ -133,7 +147,7 @@
         W.push(w); return w;
       }
       function place(w, x, y, ang, mass) {
-        w.mass = mass; const z = sizeFor(mass); w.r = z.r; w.sp = z.sp; w.n = z.n; w.ang = w.tgt = ang; w.v = BASE_V; w.boost = false; w.alive = true; w.drop = 0; w.killer = '';
+        w.mass = mass; const z = sizeFor(mass); w.r = z.r; w.sp = z.sp; w.n = z.n; w.ang = w.tgt = ang; w.v = BASE_V; w.boost = false; w.killerIdx = -2; w.alive = true; w.drop = 0; w.killer = '';
         for (let i = 0; i < w.n; i++) { w.px[i] = x - Math.cos(ang) * w.sp * i; w.py[i] = y - Math.sin(ang) * w.sp * i; }
         updateBB(w);
       }
@@ -168,22 +182,22 @@
       // ---------- input ----------
       const keys = new Set();
       const ptr = { on: false, x: 0, y: 0, down: false, btn: false };
-      const KEYMAP = friend
+      const KEYMAP = friend && !on
         ? [{ left: ['KeyA'], right: ['KeyD'], boost: ['Space', 'KeyW'] }, { left: ['ArrowLeft'], right: ['ArrowRight'], boost: ['Slash', 'Enter', 'ArrowUp'] }]
         : [{ left: ['ArrowLeft', 'KeyA'], right: ['ArrowRight', 'KeyD'], boost: ['Space', 'ArrowUp', 'KeyW'] }];
       const anyKey = (list) => list.some(k => keys.has(k));
-      api.keys(e => { keys.add(keyName(e)); if (!friend) ptr.on = ptr.on && !['ArrowLeft', 'ArrowRight', 'KeyA', 'KeyD'].includes(keyName(e)); });
+      api.keys(e => { keys.add(keyName(e)); if (solo) ptr.on = ptr.on && !['ArrowLeft', 'ArrowRight', 'KeyA', 'KeyD'].includes(keyName(e)); });
       api.keysUp(e => keys.delete(keyName(e)));
       api.on(window, 'blur', () => { keys.clear(); ptr.down = false; ptr.btn = false; });
       const local = e => { const r = canvas.getBoundingClientRect(); return [(e.clientX - r.left) * view.w / Math.max(1, r.width), (e.clientY - r.top) * view.h / Math.max(1, r.height)]; };
       const btnGeom = () => { const s = Math.max(0.85, Math.min(1.2, Math.min(view.w, view.h) / 420)), rad = 27 * s; return { x: 12 + rad, y: view.h - 12 - rad, r: rad }; };
       api.on(canvas, 'pointermove', e => {
         const [x, y] = local(e); ptr.x = x; ptr.y = y;
-        if (!friend) { const g = btnGeom(); if (!(ptr.btn && Math.hypot(x - g.x, y - g.y) < g.r * 1.6) && !(e.pointerType === 'touch' && Math.hypot(x - g.x, y - g.y) < g.r * 1.2)) ptr.on = true; }
+        if (solo) { const g = btnGeom(); if (!(ptr.btn && Math.hypot(x - g.x, y - g.y) < g.r * 1.6) && !(e.pointerType === 'touch' && Math.hypot(x - g.x, y - g.y) < g.r * 1.2)) ptr.on = true; }
       });
       api.on(canvas, 'pointerdown', e => {
         const [x, y] = local(e); ptr.x = x; ptr.y = y;
-        if (friend) return;
+        if (!solo) return;
         const g = btnGeom();
         if (Math.hypot(x - g.x, y - g.y) < g.r * 1.25) { ptr.btn = true; return; }
         ptr.on = true;
@@ -196,26 +210,35 @@
       let phase = 'play', phaseT = 0, clock = 0, board = [], boardT = 0, eatSfxT = 0, intro = 6, shake = 0;
       const parts = [], gulps = [];
       const humans = [];
+      const accent = () => getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#d97757';
+      const myWorm = () => humans.find(isMine) || null;
       function setup() {
         W.length = 0; humans.length = 0; ephem = []; fcells.fill(undefined); foodCount = 0; wildCount = 0; parts.length = 0; gulps.length = 0;
+        live = false; foodById.clear(); nextFood = 1;
+        rng = on ? on.rand : Math.random;      // online every screen lays the same first food from the room's shared stream
         for (let i = 0; i < WILD_FOOD; i++) spawnWild();
-        const hs = friend ? [['P1', null, 1], ['P2', P2COL, 2]] : [['You', null, 1]];
-        const acc = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#d97757';
+        rng = Math.random; live = true;
+        phase = 'play'; phaseT = 0; clock = 0; intro = 6; camSnap = true;
+        if (guest) return;                      // the host's copy brings the worms
+        const hs = on ? on.seats.map(st => [Ludus.rt.seatName(api, st), SEATCOL[st] || null, st + 1])
+          : friend ? [['P1', null, 1], ['P2', P2COL, 2]] : [['You', null, 1]];
         hs.forEach(([name, hex, id], i) => {
-          const a = Math.random() * TAU, off = friend ? (i ? 1 : -1) * 90 : 0;
-          const w = newWorm({ name, hex: hex || acc, human: id, mass: START_MASS, ang: a });
-          place(w, Math.cos(a + 1.57) * off + (Math.random() - 0.5) * 300, Math.sin(a + 1.57) * off + (Math.random() - 0.5) * 300, a, START_MASS);
+          const a = Math.random() * TAU, off = friend && !on ? (i ? 1 : -1) * 90 : 0;
+          const w = newWorm({ name, hex: hex || accent(), human: id, mass: START_MASS, ang: a });
+          if (on) { const b = i * TAU / hs.length + 0.4; place(w, Math.cos(b) * 520, Math.sin(b) * 520, b + Math.PI * 0.5, START_MASS); }
+          else place(w, Math.cos(a + 1.57) * off + (Math.random() - 0.5) * 300, Math.sin(a + 1.57) * off + (Math.random() - 0.5) * 300, a, START_MASS);
           w.prot = 1.6; humans.push(w);
         });
         const hx = humans[0].px[0], hy = humans[0].py[0];
-        for (let i = 0; i < AI.bots; i++) {
+        for (let i = 0; i < (on ? Math.min(AI.bots, 14) : AI.bots); i++) {
           const mass = START_MASS + Math.pow(Math.random(), 2.4) * 420;
           const w = newWorm({ name: NAMES[i % NAMES.length], hex: PALETTE[i % PALETTE.length], mass, ang: 0 });
           let x, y, t = 0; do { const s = safeSpot(300); x = s[0]; y = s[1]; t++; } while (Math.hypot(x - hx, y - hy) < 520 && t < 30);
           place(w, x, y, Math.random() * TAU, mass);
         }
-        rebuildGrid(); phase = 'play'; phaseT = 0; clock = 0; intro = 6;
-        cam.x = hx; cam.y = hy; cam.s = 0; camSnap = true;
+        rebuildGrid();
+        const me = myWorm() || humans[0];
+        cam.x = me.px[0]; cam.y = me.py[0]; cam.s = 0; camSnap = true;
       }
 
       // ---------- killing / food ----------
@@ -243,7 +266,7 @@
         w.alive = false; w.deadLen = Math.round(w.mass); w.killer = by || '';
         dropFood(w); burst(w);
         if (w.human) {
-          api.sfx('lose'); shake = api.reduceMotion ? 0 : 0.7;
+          if (isMine(w)) { api.sfx('lose'); shake = api.reduceMotion ? 0 : 0.7; } else api.sfx('hit');
           let rk = 1; for (const o of W) if (o !== w && o.alive && o.mass > w.mass) rk++;
           w.rank = rk;
         } else {
@@ -284,12 +307,6 @@
           }
         }
         if (ate && w.human && eatSfxT <= 0) { api.sfx('tick'); eatSfxT = 0.07; }
-      }
-      function dropBoostFood(w) {
-        const k = w.n - 1; const a = Math.random() * TAU;
-        addFood(w.px[k] + Math.cos(a) * 4, w.py[k] + Math.sin(a) * 4, w.drop, 3.4, w.hex, false);
-        w.drop = 0;
-        if (ephem.length > EPHEM_MAX) { const f = ephem.shift(); removeFood(f); }
       }
 
       // ---------- AI ----------
@@ -370,39 +387,26 @@
       // ---------- update ----------
       const cam = { x: 0, y: 0, s: 0.6 };
       let camSnap = true;
-      function wormUpdate(w, dt) {
-        // steering
-        if (w.human) {
-          const map = KEYMAP[w.human - 1] || KEYMAP[0], ax = (anyKey(map.right) ? 1 : 0) - (anyKey(map.left) ? 1 : 0);
-          if (ax) w.tgt = w.ang + ax * 1.1;
-          else if (!friend && ptr.on) {
-            const sx = (w.px[0] - cam.x) * cam.s + view.w / 2, sy = (w.py[0] - cam.y) * cam.s + view.h / 2;
-            if (Math.hypot(ptr.x - sx, ptr.y - sy) > 6) w.tgt = Math.atan2(ptr.y - sy, ptr.x - sx);
-          } else w.tgt = w.ang;
-          w.boost = anyKey(map.boost) || (!friend && (ptr.down || ptr.btn));
-        } else {
-          w.ai.t -= dt;
-          if (w.ai.t <= 0) { w.ai.t = AI.think * (0.8 + Math.random() * 0.4); think(w); }
-          w.boost = w.ai.boostWant;
+      // this screen's controls for worm w: { a: the angle to turn to, b: boost }
+      function control(w) {
+        const map = KEYMAP[on ? 0 : w.human - 1] || KEYMAP[0], ax = (anyKey(map.right) ? 1 : 0) - (anyKey(map.left) ? 1 : 0);
+        let a = w.ang;
+        if (ax) a = w.ang + ax * 1.1;
+        else if (solo && ptr.on) {
+          const sx = (w.px[0] - cam.x) * cam.s + view.w / 2, sy = (w.py[0] - cam.y) * cam.s + view.h / 2;
+          if (Math.hypot(ptr.x - sx, ptr.y - sy) > 6) a = Math.atan2(ptr.y - sy, ptr.x - sx);
         }
-        if (w.prot > 0) w.prot -= dt;
-        if (w.boost && w.mass <= MIN_BOOST) w.boost = false;
-        const omega = 4.5 / (1 + w.mass / 1100) * (w.boost ? 0.85 : 1);
-        const da = angDiff(w.tgt, w.ang), mt = omega * dt;
-        w.ang += clamp(da, -mt, mt);
-        const tv = w.boost ? BOOST_V : BASE_V;
-        w.v += (tv - w.v) * Math.min(1, dt * 9);
-        if (w.boost) {
-          const cost = (3.2 + w.mass * 0.016) * dt;
-          w.mass -= cost; w.drop += cost * 0.7;
-          if (w.drop >= 0.6) dropBoostFood(w);
-        }
-        // size from mass
+        return { a, b: anyKey(map.boost) || (solo && (ptr.down || ptr.btn)) };
+      }
+      const turnRate = w => 4.5 / (1 + w.mass / 1100) * (w.boost ? 0.85 : 1);
+      // size from mass (radius, spacing, segment count)
+      function resize(w) {
         const z = sizeFor(w.mass); w.r = z.r; w.sp = z.sp;
         if (z.n > w.n) { for (let i = w.n; i < z.n; i++) { w.px[i] = w.px[w.n - 1]; w.py[i] = w.py[w.n - 1]; } w.n = z.n; } else if (z.n < w.n) w.n = z.n;
-        // move: head then the chain follows
+      }
+      // the chain follows the head
+      function follow(w) {
         const px = w.px, py = w.py, sp = w.sp, n = w.n;
-        px[0] += Math.cos(w.ang) * w.v * dt; py[0] += Math.sin(w.ang) * w.v * dt;
         let a = px[0], b = py[0], c = a, d = b;
         for (let i = 1; i < n; i++) {
           const dx = px[i - 1] - px[i], dy = py[i - 1] - py[i], dist = Math.sqrt(dx * dx + dy * dy);
@@ -412,6 +416,32 @@
           if (y < b) b = y; else if (y > d) d = y;
         }
         const bb = w.bb; bb[0] = a; bb[1] = b; bb[2] = c; bb[3] = d;
+      }
+      function wormUpdate(w, dt) {
+        // steering
+        if (w.human) {
+          if (on && !isMine(w)) { const c = remote[w.human]; w.tgt = c ? c.a : w.ang; w.boost = !!(c && c.b); }
+          else { const c = control(w); w.tgt = c.a; w.boost = c.b; }
+        } else {
+          w.ai.t -= dt;
+          if (w.ai.t <= 0) { w.ai.t = AI.think * (0.8 + Math.random() * 0.4); think(w); }
+          w.boost = w.ai.boostWant;
+        }
+        if (w.prot > 0) w.prot -= dt;
+        if (w.boost && w.mass <= MIN_BOOST) w.boost = false;
+        const omega = turnRate(w);
+        const da = angDiff(w.tgt, w.ang), mt = omega * dt;
+        w.ang += clamp(da, -mt, mt);
+        const tv = w.boost ? BOOST_V : BASE_V;
+        w.v += (tv - w.v) * Math.min(1, dt * 9);
+        if (w.boost) {
+          const cost = (3.2 + w.mass * 0.016) * dt;
+          w.mass -= cost;   // boosting burns length; no pellet trail is left behind (food only drops on death)
+        }
+        resize(w);
+        // move: head then the chain follows
+        w.px[0] += Math.cos(w.ang) * w.v * dt; w.py[0] += Math.sin(w.ang) * w.v * dt;
+        follow(w);
         eatNear(w, dt);
         w.eatT = Math.max(0, w.eatT - dt);
       }
@@ -419,6 +449,11 @@
       function update(dt) {
         clock += dt; eatSfxT -= dt; shake = Math.max(0, shake - dt * 2.2);
         if (intro > 0 && (api.touched || ptr.on)) intro -= dt * 2.5; else if (intro > 0) intro -= dt * 0.35;
+        if (link) link.step();
+        if (guest) guestStep(dt); else hostStep(dt);
+        after(dt);
+      }
+      function hostStep(dt) {
         for (let i = 0; i < 4 && wildCount < WILD_FOOD; i++) spawnWild();
         if (phase !== 'over') {
           rebuildGrid();
@@ -427,7 +462,7 @@
           for (const w of W) {
             if (!w.alive || w.prot > 0) continue;
             const h = hitTest(w);
-            if (h !== -1) kill(w, h === -2 ? 'the wall' : W[h].name);
+            if (h !== -1) { w.killerIdx = h === -2 ? -1 : h; kill(w, h === -2 ? 'the wall' : W[h].name); }
           }
           for (const w of W) if (!w.alive && !w.human && w.respawn > 0) {
             w.respawn -= dt;
@@ -437,15 +472,18 @@
             }
           }
         }
-        // humans: end of run
+        // humans: end of run (online: when one worm or none is left)
         if (phase === 'play') {
           const dead = humans.filter(h => !h.alive);
-          if (dead.length && (!friend || dead.length)) { phase = 'dying'; phaseT = 1.15; }
+          if (on ? humans.length - dead.length <= (humans.length > 1 ? 1 : 0) : dead.length) { phase = 'dying'; phaseT = 1.15; }
         } else if (phase === 'dying') {
           phaseT -= dt;
           if (phaseT <= 0) {
             phase = 'over';
-            if (!friend) {
+            if (on) {
+              const res = humans.map(h => [h.human, h.alive ? Math.round(h.mass) : h.deadLen, h.alive ? 1 : 0]);
+              on.send('end', res); finishOnline(res);
+            } else if (!friend) {
               const h = humans[0];
               api.over({ score: h.deadLen, title: h.killer === 'the wall' ? 'Hit the wall' : 'Eaten by ' + h.killer, message: `Length ${h.deadLen} · rank ${h.rank} of ${W.filter(o => o.alive).length + 1}` });
             } else {
@@ -455,6 +493,8 @@
             }
           }
         }
+      }
+      function after(dt) {
         // lists
         boardT -= dt;
         if (boardT <= 0) { boardT = 0.25; board = W.filter(w => w.alive).sort((a, b) => b.mass - a.mass); }
@@ -463,10 +503,13 @@
         for (const g of gulps) g.t += dt * 9;
         for (let i = gulps.length - 1; i >= 0; i--) if (gulps[i].t >= 1) gulps.splice(i, 1);
         // score
-        const alive = humans.filter(h => h.alive);
-        api.score(friend ? Math.max(...humans.map(h => (h.alive ? h.mass : h.deadLen))) : (humans[0].alive ? humans[0].mass : humans[0].deadLen));
-        // camera
-        const ref = alive.length ? alive : humans;
+        if (!humans.length) return;   // a guest before the host's first copy
+        const alive = humans.filter(h => h.alive), mine = myWorm();
+        if (on) api.score(mine ? (mine.alive ? mine.mass : mine.deadLen) : 0);
+        else api.score(friend ? Math.max(...humans.map(h => (h.alive ? h.mass : h.deadLen))) : (humans[0].alive ? humans[0].mass : humans[0].deadLen));
+        // camera (online: your own worm; once it is out, the biggest worm still in)
+        const ref = on ? (mine && mine.alive ? [mine] : alive.length ? [alive.reduce((a, b) => (b.mass > a.mass ? b : a))] : [mine || humans[0]])
+          : alive.length ? alive : humans;
         let tx = 0, ty = 0, rmax = 0;
         ref.forEach(h => { tx += h.px[0]; ty += h.py[0]; rmax = Math.max(rmax, h.r); });
         tx /= ref.length; ty /= ref.length;
@@ -511,7 +554,6 @@
         ctx.strokeStyle = c.base; ctx.lineWidth = r * 2; ctx.stroke(path);
         if (r * S > 3) {
           ctx.save(); ctx.translate(-r * 0.16, -r * 0.24); ctx.strokeStyle = c.light; ctx.lineWidth = r * 0.78; ctx.stroke(path); ctx.restore();
-          ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = r * 0.5; ctx.setLineDash([0, w.sp * 2.4]); ctx.stroke(path); ctx.setLineDash([]);
         }
         // head
         const hx = px[0], hy = py[0], ca = Math.cos(w.ang), sa = Math.sin(w.ang);
@@ -622,9 +664,9 @@
         pill(lx, ly, lbW, lbH, soft, 12 * u);
         label('Leaders', lx + 10 * u, ly + 12 * u, 9.5 * u, col.ink3, 700, 'left');
         let shown = board.slice(0, rows);
-        const me = humans.find(o => o.alive) || humans[0];
+        const me = (on ? myWorm() : humans.find(o => o.alive)) || humans[0];
         let extra = null;
-        if (board.indexOf(me) >= rows && me.alive) { shown = board.slice(0, rows - 1); extra = me; }
+        if (me && board.indexOf(me) >= rows && me.alive) { shown = board.slice(0, rows - 1); extra = me; }
         const row = (o, rank, i) => {
           const y = ly + 24 * u + i * rh + rh / 2 - 1, isH = !!o.human;
           if (isH) { pill(lx + 4 * u, y - rh / 2 + 1, lbW - 8 * u, rh - 2, col.dark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.05)', 7 * u); }
@@ -650,10 +692,10 @@
         humans.forEach(o => { if (!o.alive) return; ctx.fillStyle = soft; ctx.beginPath(); ctx.arc(mx + o.px[0] * k, my + o.py[0] * k, 4.6, 0, TAU); ctx.fill(); ctx.fillStyle = o.c.base; ctx.beginPath(); ctx.arc(mx + o.px[0] * k, my + o.py[0] * k, 3.2, 0, TAU); ctx.fill(); });
         // bottom-left: boost button (pointer play)
         let bottomRow = mr * 2 + edge;
-        if (!friend) {
+        if (solo) {
           const g = btnGeom(), act = ptr.down || ptr.btn || anyKey(KEYMAP[0].boost);
-          ctx.beginPath(); ctx.arc(g.x, g.y, g.r, 0, TAU); ctx.fillStyle = act ? me.c.base : soft; ctx.fill();
-          ctx.lineWidth = 1.5; ctx.strokeStyle = act ? me.c.dark : col.line; ctx.stroke();
+          ctx.beginPath(); ctx.arc(g.x, g.y, g.r, 0, TAU); ctx.fillStyle = act && me ? me.c.base : soft; ctx.fill();
+          ctx.lineWidth = 1.5; ctx.strokeStyle = act && me ? me.c.dark : col.line; ctx.stroke();
           ctx.save(); ctx.translate(g.x, g.y); ctx.strokeStyle = act ? '#fffaf3' : ink; ctx.lineWidth = 2.6 * u; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
           for (const dy of [-5.5, 2.5]) { ctx.beginPath(); ctx.moveTo(-6.5 * u, (dy + 4) * u); ctx.lineTo(0, (dy - 2) * u); ctx.lineTo(6.5 * u, (dy + 4) * u); ctx.stroke(); }
           ctx.restore();
@@ -662,7 +704,7 @@
         // opening caption
         if (intro > 0 && phase === 'play') {
           ctx.save(); ctx.globalAlpha = clamp(intro, 0, 1);
-          const msg = friend ? 'P1: A D + Space    P2: ← → + /' : 'Move to steer · hold click or Space to boost';
+          const msg = friend && !on ? 'P1: A D + Space    P2: ← → + /' : 'Move to steer · hold click or Space to boost';
           ctx.font = `650 ${12 * u}px ${FONT}`;
           const tw = Math.min(w - 24, ctx.measureText(msg).width + 28 * u), cy = h - bottomRow - 22 * u;
           pill(w / 2 - tw / 2, cy - 15 * u, tw, 30 * u, soft, 15 * u);
@@ -674,8 +716,109 @@
         }
       }
 
+      // ---------- online ----------
+      function finishOnline(res) {
+        if (overDone) return;
+        const rows = res.map(q => ({ h: humans.find(x => x.human === q[0]), len: q[1], alive: q[2] === 1 })).filter(r => r.h);
+        if (!rows.length) { pendingEnd = res; return; }   // the result came before the first copy of the arena: shown once it is in
+        overDone = true; phase = 'over'; pendingEnd = null;
+        const win = rows.slice().sort((a, b) => (b.alive - a.alive) || (b.len - a.len))[0], mineR = rows.find(r => isMine(r.h));
+        api.over({ score: mineR ? mineR.len : 0, won: !!mineR && win === mineR, title: mineR && win === mineR ? 'You win' : win.h.name + ' wins',
+          message: rows.map(r => r.h.name + ' ' + r.len).join(' · ') });
+      }
+      let overDone = false, pendingEnd = null, link = null, pred = null, gv = BASE_V;
+      const validW = q => Array.isArray(q) && num(q[0]) && num(q[1]) && num(q[2]) && num(q[3]) && Number.isInteger(q[4]);
+      function applyState(d) {
+        if (!Array.isArray(d.wl) || !Array.isArray(d.w) || d.wl.length !== d.w.length || d.w.length > 40) return;
+        const sig = d.wl.map(q => Array.isArray(q) ? q.join('|') : '').join(',');
+        if (sig !== applyState.sig) {   // the roster: rebuild the worms (first copy, or a player left)
+          applyState.sig = sig; W.length = 0; humans.length = 0;
+          d.wl.forEach((q, k) => {
+            const human = Number.isInteger(q[2]) && q[2] >= 0 && q[2] <= 4 ? q[2] : 0, hex = /^#[0-9a-f]{6}$/i.test(q[1]) ? q[1] : PALETTE[k % PALETTE.length];
+            const s = d.w[k], w = newWorm({ name: String(q[0] || 'Worm').slice(0, 12), hex: human === 1 ? accent() : hex, human, mass: validW(s) ? clamp(s[3], 1, 1e5) : START_MASS, ang: 0 });
+            if (validW(s)) place(w, s[0], s[1], s[2], w.mass);
+            w.alive = validW(s) && (s[4] & 1) === 1;
+            if (human) humans.push(w);
+          });
+          humans.sort((a, b) => a.human - b.human);
+          const me = myWorm(); if (me && pred) pred.set([me.px[0], me.py[0]]);
+          camSnap = true;
+          if (pendingEnd) finishOnline(pendingEnd);
+        }
+        if (['play', 'dying', 'over'].includes(d.ph) && phase !== 'over') phase = d.ph;
+        d.w.forEach((q, k) => {
+          const w = W[k]; if (!w || !validW(q)) return;
+          const was = w.alive, alive = (q[4] & 1) === 1, before = w.mass;
+          w.mass = clamp(q[3], 1, 1e5); w.boost = (q[4] & 2) === 2; w.prot = (q[4] & 4) === 4 ? 1 : 0;
+          if (!isMine(w) || !alive) w.ang = q[2];
+          if (isMine(w) && w.mass > before + 0.5 && eatSfxT <= 0) { api.sfx('tick'); eatSfxT = 0.07; }
+          if (!was && alive) { place(w, q[0], q[1], q[2], w.mass); if (isMine(w) && pred) pred.set([q[0], q[1]]); }
+          else if (was && !alive) {
+            w.alive = false; w.deadLen = Math.round(before); burst(w);
+            const by = Number.isInteger(q[5]) && q[5] >= 0 ? W[q[5]] : null; w.killer = q[5] === -1 ? 'the wall' : by ? by.name : '';
+            if (w.human) { let rk = 1; for (const o of W) if (o !== w && o.alive && o.mass > w.mass) rk++; w.rank = rk; }
+            if (isMine(w)) { api.sfx('lose'); shake = api.reduceMotion ? 0 : 0.7; } else if (w.human) api.sfx('hit');
+          }
+          w.alive = alive;
+        });
+      }
+      function guestStep(dt) {
+        const sm = link.sample();
+        if (sm && Array.isArray(sm.a.w) && Array.isArray(sm.b.w)) {
+          const { a, b, t } = sm, M = Ludus.rt.mix;
+          W.forEach((w, k) => {
+            if (!w.alive || (isMine(w) && phase === 'play')) return;
+            const qa = a.w[k], qb = b.w[k]; if (!validW(qb)) return;
+            const ok = validW(qa) && (qa[4] & 1) === (qb[4] & 1);
+            w.px[0] = ok ? M(qa[0], qb[0], t, 220) : qb[0]; w.py[0] = ok ? M(qa[1], qb[1], t, 220) : qb[1];
+            resize(w); follow(w);
+          });
+        }
+        const me = myWorm();
+        if (me && me.alive && phase === 'play' && link.latest()) {
+          // the guest's own worm moves here at once, with the same turning and speed rules as the host
+          const c = control(me);
+          me.boost = c.b && me.mass > MIN_BOOST;
+          pred.frame(dt, v => {
+            const mt = turnRate(me) * dt; me.ang += clamp(angDiff(c.a, me.ang), -mt, mt);
+            gv += ((me.boost ? BOOST_V : BASE_V) - gv) * Math.min(1, dt * 9);
+            v[0] += Math.cos(me.ang) * gv * dt; v[1] += Math.sin(me.ang) * gv * dt;
+          });
+          me.px[0] = pred.v[0]; me.py[0] = pred.v[1]; resize(me); follow(me);
+        } else if (me) pred.set([me.px[0], me.py[0]]);
+        if (phase === 'dying') phaseT -= dt;
+        if (ephem.length > EPHEM_MAX) ephem = ephem.filter(f => !f.gone);   // the host removes old drops; forget them here too
+      }
+      if (on) {
+        link = Ludus.rt(api, {
+          hz: 20,
+          snapshot: () => {
+            while (fAdd.length) on.send('fa', fAdd.splice(0, 60));
+            while (fGone.length) on.send('fg', fGone.splice(0, 400));
+            const r1 = v => Math.round(v * 10) / 10;
+            return { ph: phase, wl: W.map(w => [w.name, w.hex, w.human]),
+              w: W.map(w => [Math.round(w.px[0]), Math.round(w.py[0]), Math.round(w.ang * 100) / 100, r1(w.mass),
+                (w.alive ? 1 : 0) | (w.boost ? 2 : 0) | (w.prot > 0 ? 4 : 0), w.alive ? -2 : Number.isInteger(w.killerIdx) ? w.killerIdx : -2]) };
+          },
+          input: () => { const me = myWorm(); if (!me) return { a: 0, b: 0 }; const c = control(me); return { a: Math.round(c.a * 1000) / 1000, b: c.b ? 1 : 0 }; },
+          onInput: (seat, d) => { if (num(d.a) && Math.abs(d.a) < 1e4) remote[seat + 1] = { a: d.a, b: d.b === 1 }; },
+          onState: applyState
+        });
+        if (guest) pred = link.predictor({ pick: s => { const me = myWorm(), k = W.indexOf(me), q = k >= 0 && Array.isArray(s.w) ? s.w[k] : null; return validW(q) ? [q[0], q[1]] : null; }, snap: 160 });
+        if (!guest) on.onLeave(seat => { const h = humans.find(x => x.human === seat + 1); if (h && h.alive) kill(h, ''); delete remote[seat + 1]; });
+      }
+
       setup();
-      if (window.ludusDebug) window.ludusDebug.slither = () => ({ W, humans, cam, ptr, keys, board, phase, foodCount, wildCount, parts, view, kill, rebuildGrid, addFood, place, segN, R, AI });
+      if (on && guest) on.queue((type, d) => {
+        if (type === 'fa' && Array.isArray(d)) d.forEach(q => {
+          if (Array.isArray(q) && Number.isInteger(q[0]) && !foodById.has(q[0]) && num(q[1]) && num(q[2]) && num(q[3]) && num(q[4]))
+            addFood(clamp(q[1], -R, R), clamp(q[2], -R, R), clamp(q[3], 0, 500), clamp(q[4], 1, 14), /^#[0-9a-f]{6}$/i.test(q[5]) ? q[5] : PALETTE[0], q[6] === 1, q[0]);
+        });
+        else if (type === 'fg' && Array.isArray(d)) d.forEach(id => { const f = foodById.get(id); if (f) removeFood(f); });
+        else if (type === 'end' && Array.isArray(d)) finishOnline(d.filter(q => Array.isArray(q) && Number.isInteger(q[0]) && num(q[1])));
+        return true;
+      });
+      if (window.ludusDebug) window.ludusDebug.slither = () => ({ foodIds: () => [...foodById.keys()], W, humans, cam, ptr, keys, board, phase, foodCount, wildCount, parts, view, kill, rebuildGrid, addFood, place, segN, R, AI });
       api.loop(dt => { update(dt); render(); });
       return { save: () => null, pause() { keys.clear(); ptr.down = false; ptr.btn = false; }, resume() { keys.clear(); } };
     }

@@ -9,9 +9,10 @@ const S = {
     const c = await flexCreate(A); await flexJoin(B, c);
     check('host sees both players', (await rows(A)).length >= 2 && /Bo/.test(await lobbyText(A)), await lobbyText(A));
     await pick(A, ['Paddle Duel', 'Air Hockey'], 3); await wait(700);
-    const gt = await lobbyText(B);
-    check('guest sees the picked games and rounds live', /Paddle Duel, Air Hockey|Air Hockey, Paddle Duel/.test(gt) && /3 rounds per game/.test(gt), gt);
-    check('guest has no pickers', (await B.$$('#lobbyCard .pick-chips')).length === 0);
+    const gnames = await B.$$eval('#lobbyCard .gcard.is-on .gcard-name', els => els.map(e => e.textContent.replace(/^\S\s+/, '').trim()).sort());
+    const grounds = await B.$eval('#lobbyCard .rounds-pick .chip.is-on', e => e.textContent);
+    check('guest sees the picked games (orange outline) and rounds live', gnames.join() === 'Air Hockey,Paddle Duel' && grounds === '3', [gnames, grounds]);
+    check('guest cannot change the host\'s pick (only suggest)', (await B.$$('#lobbyCard .suggest-btn')).length === 1 && (await A.$$('#lobbyCard .suggest-btn')).length === 0);
     await A.click('#lobbyCard button.primary');
     const order = ['Paddle Duel', 'Air Hockey'], plan = [[0, 0, 1], [0, 1, 0]];
     let a = 0, b = 0, gwA = 0, gwB = 0;
@@ -35,6 +36,85 @@ const S = {
     await A.click('#lobbyCard button:text-is("Rematch")'); await Promise.all([waitPlaying(A), waitPlaying(B)]);
     check('rematch resets the scores', (await B.evaluate(() => JSON.stringify(ludusOnline().session.ser.sc.map(e => e[2])))) === '[0,0]');
     check('no page errors', errs([A, B]) === 0, [A.errors, B.errors]);
+    br.close();
+  },
+  async suggest(browser) {
+    // A guest suggests games, rounds, single / tournament and Map Hunt rules; the host accepts or declines; the guest sees the result.
+    for (const dark of [false, true]) {
+      const tag = dark ? 'dark' : 'light', br = await broker.start();
+      const A = await newPage(browser, br, { name: 'Ann', dark }), B = await newPage(browser, br, { name: 'Bo', dark }), C = await newPage(browser, br, { name: 'Cy', dark });
+      const c = await flexCreate(A); await flexJoin(B, c); await flexJoin(C, c);
+      await pick(A, ['Tag'], 1); await wait(700);
+      const outlined = async P => P.$$eval('#lobbyCard .gcard.is-on', els => els.map(e => e.dataset.id || e.textContent.replace(/^\S\s+/, '')).sort().join().toLowerCase());
+      const hostSel = await outlined(A);
+      check(tag + ': host pick has the orange outline on both guests', (await outlined(B)) === hostSel && (await outlined(C)) === hostSel && hostSel !== '', [hostSel, await outlined(B), await outlined(C)]);
+      const ring = await B.$eval('#lobbyCard .gcard.is-on', e => getComputedStyle(e).boxShadow);
+      check(tag + ': outline is the orange accent', /217, 119, 87/.test(ring), ring);
+      check(tag + ': host shows no suggestion yet', (await A.$$('.sug-card')).length === 0);
+      const prePlan = await A.evaluate(() => JSON.stringify(Ludus.lobby.session.plan));
+      // guest B: tournament of two games + 5 rounds
+      await B.click('#lobbyCard .mode-tab[data-mode="t"]');
+      for (const id of ['slither', 'geoguess']) { const el = await B.$('#lobbyCard .gcard[data-id="' + id + '"]'); if (!el) throw new Error('no cover ' + id); await el.click(); }
+      await B.locator('#lobbyCard .rounds-pick .chip', { hasText: /^5$/ }).click();
+      await B.locator('#lobbyCard .geo-time .chip', { hasText: '30 s' }).click();
+      await B.locator('#lobbyCard .geo-move .chip', { hasText: 'No move' }).click();
+      await shot(B, 'suggest_guest_' + tag);
+      await B.click('#lobbyCard .suggest-btn');
+      await A.waitForSelector('.sug-card', { timeout: 8000 });
+      const ct = await A.$eval('.sug-card', e => e.innerText);
+      check(tag + ': host sees an in-app card with the idea', /Bo suggests/.test(ct) && /Tournament/.test(ct) && /5 rounds/.test(ct) && /30 s/.test(ct) && /No move/.test(ct), ct);
+      check(tag + ': guest sees "waiting"', /Waiting for the host/.test(await B.$eval('.sug-status', e => e.textContent)));
+      await shot(A, 'suggest_host_' + tag);
+      check(tag + ': the other guest is not shown the card', (await C.$$('.sug-card')).length === 0);
+      // second guest suggests while the first is pending: host gets "+1 more"
+      await C.locator('#lobbyCard .rounds-pick .chip', { hasText: /^3$/ }).click();
+      await C.click('#lobbyCard .suggest-btn');
+      await A.waitForFunction(() => /\+1 more/.test(document.querySelector('.sug-card')?.innerText || ''), null, { timeout: 8000 });
+      check(tag + ': host sees "+1 more waiting"', true);
+      // decline the first
+      await A.click('.sug-decline');
+      await B.waitForFunction(() => /Declined/.test(document.querySelector('.sug-status')?.textContent || ''), null, { timeout: 8000 });
+      check(tag + ': decline shows on the guest', true);
+      const planAfterDecline = await A.evaluate(() => JSON.stringify(Ludus.lobby.session.plan));
+      check(tag + ': a declined idea changes nothing', planAfterDecline === prePlan, [prePlan, planAfterDecline]);
+      // accept the second (Cy: 3 rounds of the host game)
+      const pre = JSON.parse(planAfterDecline);
+      await A.waitForSelector('.sug-card .sug-accept', { timeout: 8000 });
+      const ct2 = await A.$eval('.sug-card', e => e.innerText);
+      await A.click('.sug-accept');
+      await C.waitForFunction(() => /Accepted/.test(document.querySelector('.sug-status')?.textContent || ''), null, { timeout: 8000 });
+      const plan = JSON.parse(await A.evaluate(() => JSON.stringify(Ludus.lobby.session.plan)));
+      check(tag + ': accept applies the plan on the host and shows Accepted on the guest', plan.g.join() === pre.g.join() && plan.n === 3, [pre, plan, ct2]);
+      const gplan = JSON.parse(await B.evaluate(() => JSON.stringify(Ludus.lobby.session.plan)));
+      check(tag + ': the other guest sees the new plan too', gplan.g.join() === pre.g.join() && gplan.n === 3, gplan);
+      // Map Hunt rules are stored by the host only on accept
+      await B.click('#lobbyCard .mode-tab[data-mode="t"]');
+      await B.click('#lobbyCard .gcard[data-id="geoguess"]');
+      await B.locator('#lobbyCard .geo-time .chip', { hasText: '2 min' }).click();
+      await B.locator('#lobbyCard .geo-move .chip', { hasText: 'NMPZ' }).click();
+      await B.click('#lobbyCard .suggest-btn');
+      await A.waitForSelector('.sug-card .sug-accept', { timeout: 8000 });
+      const geoBefore = await A.evaluate(() => JSON.stringify(Ludus.state.geo || null));
+      await A.click('.sug-accept');
+      await B.waitForFunction(() => /Accepted/.test(document.querySelector('.sug-status')?.textContent || ''), null, { timeout: 8000 });
+      const geoAfter = await A.evaluate(() => Ludus.state.geo);
+      check(tag + ': accepting stores Map Hunt time + movement on the host (before: ' + geoBefore + ')', geoAfter && geoAfter.time === 120 && geoAfter.move === 'nmpz', geoAfter);
+      const tabOn = await A.$eval('#lobbyCard .mode-tab.is-on', e => e.textContent);
+      check(tag + ': host tab follows the accepted mode', tabOn === 'Tournament', tabOn);
+      // the card is readable in this theme
+      const cardColors = await A.evaluate(() => { const e = document.querySelector('.sug-card') || document.querySelector('#lobbyCard'); const cs = getComputedStyle(e); return [cs.backgroundColor, cs.color]; });
+      check(tag + ': no page errors', errs([A, B, C]) === 0, [A.errors, B.errors, C.errors, cardColors]);
+      br.close();
+    }
+    // old host (no sg flag): the guest is not offered the feature
+    const br = await broker.start();
+    const A = await newPage(browser, br, { name: 'Ann' }), B = await newPage(browser, br, { name: 'Bo' });
+    await A.addInitScript(() => {});
+    const c = await flexCreate(A);
+    await A.evaluate(() => { const s = Ludus.lobby.session; const orig = s._hbObj.bind(s); s._hbObj = () => { const o = orig(); delete o.sg; return o; }; });
+    await flexJoin(B, c); await wait(5000);
+    check('host without suggestion support: guest sees plain lines, no suggest button', (await B.$$('#lobbyCard .suggest-btn')).length === 0 && /Games:/.test(await lobbyText(B)), await lobbyText(B));
+    // a stray suggestion to a host in a running game is declined, not queued
     br.close();
   },
   async tleave(browser) {
@@ -201,7 +281,7 @@ const S = {
       const t = await lobbyText(N);
       check('old guest naming another game: room drops to Paddle Duel only', (await N.$$('#lobbyCard .pick-chips')).length === 0 && /Paddle Duel only/.test(t), t);
       await N.click('#lobbyCard button.primary'); await Promise.all([started(O), started(N)]);
-      check('...Paddle Duel runs on both', /Paddle Duel/.test(await N.$eval('#gameName', e => e.textContent)) && /Paddle Duel/.test(await O.$eval('#gameName', e => e.textContent)));
+      check('...Paddle Duel runs on both', /Paddle Duel/.test(await N.$eval('#gameName', e => e.textContent)) && /Paddle Duel|Pong/.test(await O.$eval('#gameName', e => e.textContent)))   // Ludus 1.6.0 still calls it Pong;
       await probe(N, O, 'Online-section host + old guest'); br.close(); }
     // 4) an old guest cannot join a running tournament; the host is told to say "update"
     { const br = await broker.start(); const [A, B] = [await newPage(browser, br, { name: 'Ann' }), await newPage(browser, br, { name: 'Bo' })];
@@ -226,6 +306,28 @@ const S = {
     check('Land Claim: no page errors', errs([A, B]) === 0, [A.errors, B.errors]);
     br.close();
   },
+  async worm(browser) {   // Worm Arena online: same worms and food on both screens, guest steers, a death ends the round on both
+    const br = await broker.start(); const { pages: [A, B] } = await party(browser, br, 'Worm Arena', 2); await wait(3000);
+    await A.evaluate(() => ludusDebug.slither().humans.forEach(h => { h.prot = 99; }));   // no random deaths during the test
+    br.latency = { base: 120, jitter: 80 };
+    await Promise.all([hold(A, 'a', 600), hold(B, 'd', 600)]); await wait(1500);
+    const g = p => p.evaluate(() => { const s = ludusDebug.slither(); return { n: s.W.length, h: s.humans.map(q => [q.human, Math.round(q.px[0]), Math.round(q.py[0]), q.alive]), food: s.foodCount }; });
+    const [ga, gb] = [await g(A), await g(B)];
+    check('Worm Arena: guest has the same worms as the host', ga.n === gb.n && ga.h.length === 2 && gb.h.length === 2, [ga.n, gb.n]);
+    check('Worm Arena: both screens see both players about the same place', ga.h.every((q, i) => Math.hypot(q[1] - gb.h[i][1], q[2] - gb.h[i][2]) < 70), [ga.h, gb.h]);
+    check('Worm Arena: food counts agree', Math.abs(ga.food - gb.food) < 120, [ga.food, gb.food]);
+    br.latency = { base: 0, jitter: 0 }; await wait(1500);
+    const ids = p => p.evaluate(() => { const s = ludusDebug.slither(); return s.foodIds(); });
+    const [ia, ib] = [await ids(A), await ids(B)], setB = new Set(ib), miss = ia.filter(x => !setB.has(x)).length;
+    check('Worm Arena: the same food ids on both screens', miss < 30 && Math.abs(ia.length - ib.length) < 30, { host: ia.length, guest: ib.length, miss });
+    await A.evaluate(() => { const s = ludusDebug.slither(); s.humans.forEach(h => { h.prot = 0; }); s.place(s.humans.find(h => h.human === 1), 0, 0, 0, s.humans[0].mass); s.kill(s.humans.find(h => h.human === 2), 'the wall'); });
+    await Promise.all([A, B].map(p => p.waitForFunction(() => /win/.test(document.getElementById('overTitle').textContent), null, { timeout: 8000 }).catch(() => null)));
+    const t = p => p.evaluate(() => document.getElementById('overTitle').textContent.trim());
+    const [ta, tb] = [await t(A), await t(B)];
+    check('Worm Arena: round ends on both screens (host wins)', ta === 'You win' && / wins$/.test(tb), [ta, tb]);
+    check('Worm Arena: no page errors', errs([A, B]) === 0, [A.errors, B.errors]);
+    br.close();
+  },
   async futurehost(browser) {
     const br = await broker.start(); const N = await newPage(browser, br, { name: 'New' });
     br.filter = (topic, payload) => { try { const m = JSON.parse(payload); if (m.t === 'join') { const out = { t: 'welcome', to: m.c, s: 1, p: [[0, 'Host', 'h0'], [1, 'You', m.c]], mx: 2, mn: 2, g: 'fourup', pv: 9, mp: 9, v: 1, c: 'h0' }; br.conns.forEach(o => { if (o.subs.has(topic)) o.send(br.rawFrame(topic, JSON.stringify(out))); }); } } catch (e) {} };
@@ -241,18 +343,20 @@ const GAMES = {
   pong:   { name: 'Paddle Duel', own: 'ArrowDown', other: 'w', mine: '() => [0, ludusDebug.pongNet().p2]', host: '() => [0, ludusDebug.pongNet().p2]', seen: '() => [0, ludusDebug.pongNet().p1]', tol: 10 },
   hockey: { name: 'Air Hockey', own: 'a', other: 'd', mine: '() => { const m = ludusDebug.hockey().m2; return [m.x, m.y]; }', host: '() => { const m = ludusDebug.hockey().m2; return [m.x, m.y]; }', seen: '() => { const m = ludusDebug.hockey().m1; return [m.x, m.y]; }', tol: 14 },
   tag:    { name: 'Tag', own: 'ArrowRight', other: 'd', start: 'enter', mine: "() => { const p = ludusDebug.tagMe(); return [p.x, p.y]; }", host: "() => { const p = ludusDebug.tagMe('p2'); return [p.x, p.y]; }", seen: "() => { const p = ludusDebug.tagMe('p1'); return [p.x, p.y]; }", tol: 20 },
+  slither: { name: 'Worm Arena', own: 'ArrowRight', other: 'd', start: 'wait', mine: "() => { const w = ludusDebug.slither().humans.find(h => h.human === 2); return [w.ang * 100, 0]; }", host: "() => { const w = ludusDebug.slither().humans.find(h => h.human === 2); return [w.ang * 100, 0]; }", seen: "() => { const w = ludusDebug.slither().humans.find(h => h.human === 1); return [w.px[0], w.py[0]]; }", tol: 35, setup: "() => ludusDebug.slither().humans.forEach(h => { h.prot = 99; })", wait: 1200 },
   holeio: { name: 'City Swallow', own: 'd', other: 'd', start: 'wait', mine: "() => { const p = ludusDebug.holeMe(); return [p.x, p.y]; }", host: "() => { const p = ludusDebug.holeMe(2); return [p.x, p.y]; }", seen: "() => { const p = ludusDebug.holeMe(1); return [p.x, p.y]; }", tol: 30 },
 };
 async function lagGame(browser, id) {
   const G = GAMES[id], br = await broker.start();
   const { pages: [A, B] } = await party(browser, br, G.name, 2);
-  if (G.start === 'enter') { await A.keyboard.press('Enter'); await wait(3200); } else if (G.start === 'wait') await wait(5000); else await wait(800);
+  if (G.start === 'enter') { await A.keyboard.press('Enter'); await wait(3200); } else if (G.start === 'wait') await wait(G.wait || 5000);   // Worm Arena: its worms swim into the arena wall about 10 s after the start, so the lag steps must finish before that else await wait(800);
+  if (G.setup) await A.evaluate(src => eval(src)(), G.setup);
   br.latency = { base: 150, jitter: 150 };
   // 1) the guest's own thing answers on the next frame
   await B.evaluate(src => { window.__p = eval(src); window.__s = []; window.__kd = null; addEventListener('keydown', () => { if (window.__kd === null) window.__kd = performance.now(); }, true); (function f() { window.__s.push({ t: performance.now(), p: window.__p() }); if (window.__s.length > 800) window.__s.shift(); requestAnimationFrame(f); })(); }, G.mine);
   await wait(300);
   await B.keyboard.down(G.own); await wait(180);
-  const r = await B.evaluate(() => { const kd = window.__kd, p0 = window.__s.filter(s => s.t < kd).pop(); const hit = window.__s.find(s => s.t >= kd && Math.hypot(s.p[0] - p0.p[0], s.p[1] - p0.p[1]) > 0.4); return { ms: hit ? hit.t - kd : null }; });
+  const r = await B.evaluate(() => { const kd = window.__kd, p0 = window.__s.filter(s => s.t < kd).pop(); const hit = window.__s.find(s => s.t >= kd && Math.hypot(s.p[0] - p0.p[0], s.p[1] - p0.p[1]) > 0.4); return { ms: hit ? hit.t - kd : null, kd }; });
   check(G.name + ': guest\'s own thing moves within 60 ms of the key (relay 150-300 ms)', r.ms !== null && r.ms < 60, r);
   await wait(700); await B.keyboard.up(G.own); await wait(3000);
   const [mine, theirs] = [await B.evaluate(() => window.__p()), await A.evaluate(src => eval(src)(), G.host)];
@@ -297,7 +401,7 @@ S.layout = async browser => {
   for (const [sn, size] of Object.entries(sizes)) for (const dark of [false, true]) {
     const tag = sn + (dark ? '_dark' : '_light'), br = await broker.start();
     const A = await newPage(browser, br, { name: 'Alexandria', size, dark }), B = await newPage(browser, br, { name: 'Bartholome', size, dark });
-    check(tag + ' chip row fits (All, Arcade, Puzzle, Duel, 2 Player, Online) with no clipping', await A.$eval('#filters', e => e.scrollWidth <= e.clientWidth + 1 && [...e.children].every(c => c.getBoundingClientRect().right <= e.getBoundingClientRect().right + 1)));
+    check(tag + ' chip row fits (All, Arcade, Puzzle, Duel, Same laptop, Online) with no clipping', await A.$eval('#filters', e => e.scrollWidth <= e.clientWidth + 1 && [...e.children].every(c => c.getBoundingClientRect().right <= e.getBoundingClientRect().right + 1)));
     await onlineTab(A); await shot(A, 'online_page_' + tag);
     check(tag + ' Online page: no overlap', (await overlap(A)).length === 0, await overlap(A));
     const c = await flexCreate(A); await flexJoin(B, c); await pick(A, ['Paddle Duel', 'Air Hockey', 'Four in a Row'], 3); await wait(500);
@@ -317,6 +421,7 @@ S.layout = async browser => {
     await shot(C, 'overbar_host_' + tag); await shot(D, 'overbar_guest_' + tag);
     check(tag + ' result bar (Rematch / Ask for rematch): no overlap', (await overlap(C)).length === 0 && (await overlap(D)).length === 0, [await overlap(C), await overlap(D)]);
     br.close(); br2.close();
+    await Promise.all([A, B, C, D].map(p => p.context().close().catch(() => {})));   // free the memory before the next size (8 GB Mac)
   }
 };
 

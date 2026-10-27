@@ -23,3 +23,10 @@ QA/AGENT-BRIEF.md
 QA/PROGRESS.md
 reference/
 .preview.html
+
+# Local tool caches
+.base-ast/
+node_modules
+
+# Personal list for the Original names preset (never committed)
+original-names.json

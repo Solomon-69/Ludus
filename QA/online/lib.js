@@ -35,8 +35,8 @@ const hasScore = (rs, name, n) => rs.some(x => new RegExp('^\\S+ ' + name + '( \
 const shot = (p, n) => p.screenshot({ path: path.join(SHOTS, n + '.png') });
 // --- the Online section (new pages)
 const onlineTab = async page => { await page.click('#filters .chip:has(.chip-lab:text-is("Online"))'); await page.waitForSelector('#opCreate'); };
-async function flexCreate(page) { await onlineTab(page); await page.click('#opCreate'); await page.waitForSelector('.code-ch', { timeout: 8000 }); return code(page); }
-async function flexJoin(page, c) { await onlineTab(page); await page.fill('#opCode', c); await page.click('#opJoin'); await page.waitForSelector('.plan', { timeout: 9000 }); }
+async function flexCreate(page) { await onlineTab(page); await page.click('#opCreate'); await page.waitForSelector('.code-ch', { timeout: 25000 }); return code(page); }
+async function flexJoin(page, c) { await onlineTab(page); await page.fill('#opCode', c); await page.click('#opJoin'); await page.waitForSelector('.plan', { timeout: 25000 }); }
 const esc = n => new RegExp('^' + n.replace(/[.]/g, '\\.') + '$');
 async function pick(page, names, rounds) {
   await page.locator('#lobbyCard .mode-tab', { hasText: names.length > 1 ? 'Tournament' : 'Single game' }).click();

@@ -18,36 +18,18 @@ internal static class Store
     private const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
     private const string RunValue = "Ludus";
 
-    // ---- Original names: the player's own list (never shipped), %APPDATA%\Ludus\original-names.json, game id -> name ----
-
-    public static string NamesPath => Path.Combine(Folder, "original-names.json");
-
-    /// <summary>The file's names as a JSON object of strings, or "null" when the file is missing or not valid.</summary>
+    /// <summary>Your own list of names from %APPDATA%\Ludus\original-names.json (never shipped). Only a flat text-to-text map; otherwise "null".</summary>
     public static string LoadOriginalNamesJson()
     {
         try
         {
-            if (!File.Exists(NamesPath)) return "null";
-            using var doc = JsonDocument.Parse(File.ReadAllText(NamesPath));
-            if (doc.RootElement.ValueKind != JsonValueKind.Object) return "null";
-            var clean = new Dictionary<string, string>();
-            foreach (var p in doc.RootElement.EnumerateObject())
-                if (p.Value.ValueKind == JsonValueKind.String) clean[p.Name] = p.Value.GetString() ?? "";
-            return JsonSerializer.Serialize(clean).Replace("\u2028", "\\u2028").Replace("\u2029", "\\u2029");
+            var path = Path.Combine(Folder, "original-names.json");
+            var info = new FileInfo(path);
+            if (!info.Exists || info.Length > 20000) return "null";
+            var map = JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText(path));
+            return map == null ? "null" : JsonSerializer.Serialize(map);
         }
-        catch (Exception) { return "null"; }
-    }
-
-    /// <summary>Opens Explorer on the names file, or on its folder (made if needed) when the file does not exist yet.</summary>
-    public static void RevealNamesFile()
-    {
-        try
-        {
-            Directory.CreateDirectory(Folder);
-            var args = File.Exists(NamesPath) ? $"/select,\"{NamesPath}\"" : $"\"{Folder}\"";
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", args) { UseShellExecute = true });
-        }
-        catch (Exception ex) { Log($"Could not open the names folder: {ex.Message}"); }
+        catch { return "null"; }
     }
 
     // ---- Room invites (ludus://join/CODE) ----

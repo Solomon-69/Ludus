@@ -536,6 +536,22 @@
         });
         if (best && bestD <= 90) step(best);
       }
+      // Double-click the street: step to the next spot nearest where you clicked (in front, or behind once you turn round).
+      api.on(panoEl, 'dblclick', e => {
+        if (!viewer || !cur || phase !== 'play' || cfg.move !== 'move' || typeof viewer.mouseEventToCoords !== 'function') return;
+        e.preventDefault();
+        let c = null; try { c = viewer.mouseEventToCoords(e); } catch (err) { return; }
+        if (!c || !isFinite(c[1])) return;
+        const want = wrap360(cur.az + c[1]);
+        let best = null, bestD = 100;
+        cur.next.slice(0, 1).concat(cur.prev.slice(0, 1)).forEach(nb => { const d = Math.abs(wrap180(bearing(cur, nb) - want)); if (d < bestD) { bestD = d; best = nb; } });
+        if (best) step(best);
+      });
+      // Trackpad pinch: Safari / the Mac app send gesture events (not wheel), so zoom the view by the pinch scale.
+      let pinchHfov = 0;
+      api.on(panoEl, 'gesturestart', e => { if (!viewer) return; e.preventDefault(); pinchHfov = viewer.getHfov(); });
+      api.on(panoEl, 'gesturechange', e => { if (!viewer || !pinchHfov || !(e.scale > 0)) return; e.preventDefault(); viewer.setHfov(Math.max(50, Math.min(110, pinchHfov / e.scale)), false); });
+      api.on(panoEl, 'gestureend', e => { e.preventDefault(); pinchHfov = 0; });
       async function toStart() {
         const p = place(round); if (phase !== 'play' || moving || cfg.move !== 'move') return;
         moving = true;
@@ -948,7 +964,7 @@
         pause() { paused = true; root.classList.add('geo-paused'); },
         resume() { paused = false; root.classList.remove('geo-paused'); },
         destroy() {
-          destroyed = true; clearTimeout(hoverT); offs.forEach(f => f()); cancelAnimationFrame(resAnim);
+          destroyed = true; offs.forEach(f => f()); cancelAnimationFrame(resAnim);
           try { viewer && viewer.destroy(); } catch (e) {}
           try { miniMap && miniMap.remove(); } catch (e) {}
           try { resMap && resMap.remove(); } catch (e) {}

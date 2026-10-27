@@ -83,37 +83,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
         content.addUserScript(WKUserScript(source: bootScript(), injectionTime: .atDocumentStart, forMainFrameOnly: true))
         config.userContentController = content
         config.preferences.setValue(true, forKey: "allowFileAccessFromFileURLs")
+        // WebKit hides navigator.mediaDevices on file:// pages unless this is on (Privacy blur needs the camera).
+        config.preferences.setValue(true, forKey: "mediaDevicesEnabled")
         webView = WKWebView(frame: NSRect(origin: .zero, size: currentSize()), configuration: config)
         webView.setValue(false, forKey: "drawsBackground")
         webView.allowsMagnification = false
         webView.navigationDelegate = self
+        webView.uiDelegate = self   // camera permission for Privacy blur (Camera.swift)
         if let dir = Bundle.main.resourceURL?.appendingPathComponent("web"),
            FileManager.default.fileExists(atPath: dir.appendingPathComponent("index.html").path) {
             webView.loadFileURL(dir.appendingPathComponent("index.html"), allowingReadAccessTo: dir)
             armWatchdog()
         } else { DispatchQueue.main.async { self.showFallback() } }
-    }
-
-    /// The player's own list of game names (never shipped with Ludus): ~/Library/Application Support/Ludus/original-names.json, game id -> name.
-    private var namesFileURL: URL {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("Ludus", isDirectory: true).appendingPathComponent("original-names.json")
-    }
-    /// The file's names as a JS expression: an object of strings, or null when the file is missing or not valid.
-    private func originalNamesLiteral() -> String {
-        guard let data = try? Data(contentsOf: namesFileURL),
-              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return "null" }
-        let clean = obj.compactMapValues { $0 as? String }
-        guard let out = try? JSONSerialization.data(withJSONObject: clean),
-              let text = String(data: out, encoding: .utf8) else { return "null" }
-        return text.replacingOccurrences(of: "\u{2028}", with: "\\u2028").replacingOccurrences(of: "\u{2029}", with: "\\u2029")
-    }
-    /// Shows the names file in Finder (or its folder, made if needed, when the file does not exist yet).
-    private func revealNamesFile() {
-        let url = namesFileURL
-        if FileManager.default.fileExists(atPath: url.path) { NSWorkspace.shared.activateFileViewerSelecting([url]); return }
-        try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        NSWorkspace.shared.open(url.deletingLastPathComponent())
     }
 
     /// Runs before the page's own scripts: hands over saved scores/settings and the Mac's state.
@@ -127,10 +108,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
         window.__LUDUS_DOCK__ = \(UserDefaults.standard.bool(forKey: dockKey));
         window.__LUDUS_DARK__ = \(isDark());
         window.__LUDUS_ORIGINAL_NAMES__ = \(originalNamesLiteral());
-        window.__LUDUS_NAMES_PATH__ = \(String(reflecting: namesFileURL.path));
         window.__LUDUS_VERSION__ = \(String(reflecting: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"));
         \(testBoot())
         """
+    }
+
+    /// Your own list of names from ~/Library/Application Support/Ludus/original-names.json (never shipped).
+    /// Only a flat text-to-text map is accepted; anything else means "no list". Travels as a quoted string, never as code.
+    private func originalNamesLiteral() -> String {
+        guard let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else { return "null" }
+        let url = base.appendingPathComponent("Ludus/original-names.json")
+        guard let data = try? Data(contentsOf: url), data.count < 20_000,
+              let obj = (try? JSONSerialization.jsonObject(with: data)) as? [String: String],
+              let clean = try? JSONSerialization.data(withJSONObject: [String(data: try JSONSerialization.data(withJSONObject: obj), encoding: .utf8) ?? "{}"]),
+              let array = String(data: clean, encoding: .utf8) else { return "null" }
+        return "JSON.parse(\(array)[0])"
     }
 
     /// The saved state as a JS expression: the JSON travels as a quoted string and is parsed by
@@ -296,10 +288,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
             setLogin(body["on"] as? Bool ?? false)
         case "invisible":
             setInvisible(body["on"] as? Bool ?? false)
-        case "names":
-            webView.evaluateJavaScript("window.ludusNames && ludusNames(\(originalNamesLiteral()))")
-        case "revealNames":
-            revealNamesFile()
         case "dock":
             UserDefaults.standard.set(body["on"] as? Bool ?? false, forKey: dockKey)
             applyDockPolicy()
@@ -762,6 +750,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
                 + "catcher=\(statusItem.button?.subviews.contains { $0 is ClickCatcher } ?? false) "
                 + "anchor=\(NSStringFromRect(anchorWindow?.frame ?? .zero)) panel=\(NSStringFromRect(popover.contentViewController?.view.window?.frame ?? .zero))\n"
             appendLog(line)
+        case "probe":
+            // Mosaic Hunt photo and camera support, as this real web view sees them.
+            webView.evaluateJavaScript("(()=>{const i=document.querySelector('.ih-photo img');return JSON.stringify({img:i?{src:i.currentSrc,ok:i.complete&&i.naturalWidth>0}:null,cam:!!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia),privacy:!!(window.LudusPrivacy&&LudusPrivacy.supported())})})()") { [weak self] result, _ in
+                self?.appendLog("\(Date()) probe \(result as? String ?? "nil")\n")
+            }
+        case "camera":
+            // Ask for the camera like Privacy blur does; logs granted / refused, or nothing while the system prompt is up.
+            webView.evaluateJavaScript("navigator.mediaDevices.getUserMedia({video:true}).then(s=>{s.getTracks().forEach(t=>t.stop());window.__camTest='granted'},e=>{window.__camTest='refused '+e.name});window.__camTest='asking';'asking'") { [weak self] result, _ in
+                self?.appendLog("\(Date()) camera \(result as? String ?? "nil")\n")
+            }
+        case "camstate":
+            webView.evaluateJavaScript("String(window.__camTest)") { [weak self] result, _ in self?.appendLog("\(Date()) camstate \(result as? String ?? "nil")\n") }
         case "state":
             webView.evaluateJavaScript("window.ludusState && ludusState()") { [weak self] result, _ in
                 self?.appendLog("\(Date()) \(result as? String ?? "nil")\n")

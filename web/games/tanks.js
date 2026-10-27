@@ -5,10 +5,11 @@
   const PMC = 6, PMRW = 7, LROWS = 5, MAX_MC = 14, C = 56, WT = 4, TR = 10, SR = 3;
   const FIRST_TO = 3, MAX_SHELLS = 5, RELOAD = 0.3, SHELL_LIFE = 7, GRACE = 0.25, READY = 1.2, AFTER = 1.8;
 
-  // Two people, one keyboard: P1 = WASD (+F / left Shift), P2 = arrows (+ / , right Shift, Enter).
+  // Two people, one keyboard: P1 = WASD + Space (F / left Shift also fire), P2 = arrows + Enter (/ , right Shift also fire).
+  // Up/down drive forward/back, left/right turn. vs Bot: either key set drives your tank.
   function makePads(api) {
-    const C1 = { KeyW: 'up', KeyS: 'down', KeyA: 'left', KeyD: 'right', KeyF: 'act', ShiftLeft: 'act' };
-    const K1 = { w: 'up', s: 'down', a: 'left', d: 'right', f: 'act' };
+    const C1 = { KeyW: 'up', KeyS: 'down', KeyA: 'left', KeyD: 'right', Space: 'act', KeyF: 'act', ShiftLeft: 'act' };
+    const K1 = { w: 'up', s: 'down', a: 'left', d: 'right', ' ': 'act', f: 'act' };
     const C2 = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right', Slash: 'act', ShiftRight: 'act', Enter: 'act', NumpadEnter: 'act' };
     const K2 = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right', '/': 'act', Enter: 'act' };
     const blank = () => ({ up: false, down: false, left: false, right: false, act: false, hit: {} });
@@ -75,7 +76,7 @@
 
   Ludus.register({
     id: 'tanks', name: 'Tank Arena', aka: 'Tank Duel', tag: '2 Player', wide: true, tint: '#c98a3a', versus: true, defaultVs: 'friend',
-    hint: 'vs Bot: <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> drive, <kbd>F</kbd> or <kbd>/</kbd> fire · vs Friend: <b>P1</b> WASD + F, <b>P2</b> arrows + /',
+    hint: '<kbd>↑</kbd><kbd>↓</kbd> drive, <kbd>←</kbd><kbd>→</kbd> turn (or <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>), <kbd>Space</kbd> fires · vs Friend: <b>P1</b> WASD + Space, <b>P2</b> arrows + Enter',
     _rules: { makeMaze, wallRects, MC: PMC, MRW: PMRW },
     art(ctx, w, h) {
       // Top-down arena: a framed floor, a few walls, two tanks (tracks, hull, turret, barrel) and a shell in flight.

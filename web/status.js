@@ -3,7 +3,7 @@
 (function () {
   const L = window.Ludus;
   const root = document.documentElement;
-  L.VERSION = '1.5';                       // the shell may override with window.__LUDUS_VERSION__ (the real app version)
+  L.VERSION = '1.12.0';                       // the shell may override with window.__LUDUS_VERSION__ (the real app version)
   // The one place that says where updates come from: the latest release of this GitHub repository.
   // It is private for now, so a 404 just means "Couldn't check". No token is ever stored in the app.
   L.UPDATE_API = 'https://api.github.com/repos/Solomon-69/Ludus/releases/latest';
@@ -61,13 +61,12 @@
   U.install = () => {
     if (U.state !== 'confirm') return;
     set('progress', { pct: 0 });
-    if (!L.native('update', { zip: U.zip, sums: U.sums, name: U.name, version: U.latest })) set('error'); /* no shell (browser): nothing to install */
+    if (!L.native('update', { zip: U.zip, sums: U.sums, name: U.name, version: U.latest })) { /* no shell (browser): nothing to install */ }
   };
   // The shell reports back: progress 0..100, "verifying", or an error. A finished update restarts the app, so there is no "done".
   window.ludusUpdateState = (kind, v) => {
     if (kind === 'progress') set('progress', { pct: Math.max(0, Math.min(100, +v || 0)) });
     else if (kind === 'error') set('error');
-    else if (kind === 'done') set('idle');
   };
   conn.on(up => { if (!up && (U.state === 'idle' || U.state === 'cantcheck' || U.state === 'uptodate')) set('offline'); else if (up && U.state === 'offline') set('idle'); });
   L.update = U;

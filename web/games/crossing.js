@@ -272,17 +272,15 @@
         if (v === YOU) { ctx.globalAlpha *= 0.55; D.spark(ctx, x, y, R * 0.3 * s, '#fff8f2', 0); }
         ctx.globalAlpha = 1;
       }
-      // Soft ring that breathes out from the newest stone of each side.
+      // Hex outline that hugs the newest stone of each side and gently breathes (same shape as the cell).
       function pulseRing(G, i, c) {
         const r = Math.floor(i / N), cc = i % N, x = G.cx(r, cc), y = G.cy(r);
-        ctx.save(); ctx.strokeStyle = c; ctx.lineWidth = 2;
-        if (api.reduceMotion) { ctx.globalAlpha = 0.6; ctx.beginPath(); ctx.arc(x, y, G.R * 0.98, 0, Math.PI * 2); ctx.stroke(); ctx.restore(); return; }
-        const age = clock - placeT[i];
-        for (let k = 0; k < 2; k++) {
-          const ph = ((age + k * 0.8) % 1.6) / 1.6;
-          ctx.globalAlpha = 0.55 * (1 - ph) * Math.min(1, age / 0.3);
-          ctx.beginPath(); ctx.arc(x, y, G.R * (0.8 + 0.55 * D.ease.outCubic(ph)), 0, Math.PI * 2); ctx.stroke();
-        }
+        ctx.save(); ctx.strokeStyle = c; ctx.lineJoin = 'round'; ctx.lineWidth = Math.max(1.5, G.R * 0.09);
+        if (api.reduceMotion) { ctx.globalAlpha = 0.55; hexPath(x, y, G.R - 1); ctx.stroke(); ctx.restore(); return; }
+        const age = clock - placeT[i], fadeIn = Math.min(1, age / 0.3);
+        const wave = 0.5 - 0.5 * Math.cos(age * Math.PI * 2 / 1.8);   // 0..1..0, smooth, 1.8 s per breath
+        ctx.globalAlpha = (0.3 + 0.35 * wave) * fadeIn;
+        hexPath(x, y, (G.R - 1) * (1 + 0.07 * wave)); ctx.stroke();
         ctx.restore();
       }
       // Winning chain: a glowing line drawn stone to stone, then a light that keeps running along it.

@@ -102,7 +102,8 @@
 
   // o = { lat, lon, zoom }. Never throws: if MapLibre cannot start, the flat map takes over.
   function create(el, credit, o) {
-    if (canGL()) { try { return createGL(el, credit, o); } catch (e) { el.innerHTML = ''; } }
+    // o.flat: the plain map (bundled picture tiles draw reliably on it with no internet, e.g. Mosaic Hunt offline)
+    if (!o.flat && canGL()) { try { return createGL(el, credit, o); } catch (e) { el.innerHTML = ''; } }
     return createFlat(el, credit, o);
   }
   window.__GEO_MAP__ = { create, canGL };

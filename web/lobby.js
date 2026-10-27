@@ -108,6 +108,7 @@
       return box;
     }
     if (!host) {
+      if (session.hostSg) return guestPlan(box);
       box.appendChild(el('div', 'plan-line', 'Games: ' + (plan.g.map(gname).join(', ') || '...')));
       box.appendChild(el('div', 'plan-line', roundsText(plan.n)));
       return box;
@@ -151,6 +152,114 @@
     else if (plan.g.length && !playable.length) box.appendChild(el('p', 'lobby-note', 'None of the picked games fit ' + session.count() + ' players. Pick another game.'));
     else if (playable.length < plan.g.length) box.appendChild(el('p', 'lobby-note', 'Some picked games need a different number of players and will be skipped.'));
     return box;
+  }
+  // ---------- suggestions: a guest proposes, the host accepts or declines ----------
+  const GEO_TIMES = [[30, '30 s'], [60, '60 s'], [120, '2 min'], [0, 'No limit']];
+  const GEO_MOVES = [['move', 'Move'], ['nomove', 'No move'], ['nmpz', 'NMPZ']];
+  let draft = null;   // the guest's own idea: { s: session, dirty, m: 's'|'t', g: [ids], n, geo: { t?, m? } }
+  function syncDraft() {
+    const plan = session.plan;
+    draft.g = plan.g.slice(); draft.n = plan.n === 0 ? 3 : plan.n; draft.m = plan.g.length > 1 || plan.n === 0 ? 't' : 's';
+  }
+  const draftPayload = () => {
+    const p = { m: draft.m, g: draft.g.slice(), n: draft.n };
+    if (draft.geo.t !== undefined || draft.geo.m !== undefined) p.geo = Object.assign({}, draft.geo);
+    return p;
+  };
+  function describe(p) {
+    const lines = [];
+    lines.push((p.m === 't' ? 'Tournament: ' : 'Single game: ') + p.g.map(gname).join(', '));
+    lines.push(p.n === 1 ? '1 round per game' : p.n + ' rounds per game');
+    if (p.geo) {
+      const t = GEO_TIMES.find(x => x[0] === p.geo.t), m = GEO_MOVES.find(x => x[0] === p.geo.m);
+      lines.push('Map Hunt: ' + [t && 'time ' + t[1], m && m[1]].filter(Boolean).join(', '));
+    }
+    return lines;
+  }
+  function guestPlan(box) {
+    const plan = session.plan, n = Math.max(2, session.count());
+    if (!draft || draft.s !== session) { draft = { s: session, dirty: false, geo: {} }; syncDraft(); }
+    else if (!draft.dirty) syncDraft();
+    const touch = fn => { draft.dirty = true; fn(); render(); };
+    box.classList.add('guest-plan');
+    box.appendChild(el('div', 'field-label', 'Games: the host’s pick has an orange outline'));
+    const chips = el('div', 'pick-chips game-grid');
+    L.games.filter(g => g.online && g.online.max >= n && g.online.min <= session.max).forEach(g => {
+      const host_on = plan.g.includes(g.id), mine = draft.g.includes(g.id);
+      const c = chip('', host_on, () => touch(() => {
+        if (draft.m === 's') draft.g = [g.id];
+        else if (mine) { if (draft.g.length > 1) draft.g = draft.g.filter(x => x !== g.id); } else draft.g = draft.g.concat(g.id);
+      }));
+      c.classList.add('gcard'); c.classList.toggle('is-sug', mine); c.dataset.id = g.id; c.setAttribute('aria-label', gname(g.id) + (host_on ? ', host’s pick' : '') + (mine ? ', in your suggestion' : ''));
+      c.appendChild(cover(g)); c.appendChild(el('span', 'gcard-name', gname(g.id)));
+      chips.appendChild(c);
+    });
+    box.appendChild(chips);
+    box.appendChild(el('div', 'field-label', 'Your suggestion'));
+    const tabs = el('div', 'mode-tabs'); tabs.setAttribute('role', 'tablist');
+    [['s', 'Single game'], ['t', 'Tournament']].forEach(([m, t]) => {
+      const tb = el('button', 'mode-tab' + (draft.m === m ? ' is-on' : ''), t); tb.type = 'button'; tb.setAttribute('role', 'tab'); tb.setAttribute('aria-selected', String(draft.m === m)); tb.dataset.mode = m;
+      tb.onclick = () => { if (draft.m !== m) { L.sfx('click'); touch(() => { draft.m = m; if (m === 's') draft.g = draft.g.slice(0, 1); }); } };
+      tabs.appendChild(tb);
+    });
+    box.appendChild(tabs);
+    box.appendChild(el('div', 'field-label', 'Rounds'));
+    const rr = el('div', 'pick-chips rounds-pick');
+    [1, 3, 5].forEach(v => rr.appendChild(chip(String(v), draft.n === v, () => touch(() => { draft.n = v; }))));
+    box.appendChild(rr);
+    if (draft.g.includes('geoguess') || plan.g.includes('geoguess')) {
+      box.appendChild(el('div', 'field-label', 'Map Hunt time per round'));
+      const tr = el('div', 'pick-chips geo-time');
+      GEO_TIMES.forEach(([v, t]) => tr.appendChild(chip(t, draft.geo.t === v, () => touch(() => { if (draft.geo.t === v) delete draft.geo.t; else draft.geo.t = v; }))));
+      box.appendChild(tr);
+      box.appendChild(el('div', 'field-label', 'Map Hunt movement'));
+      const mr = el('div', 'pick-chips geo-move');
+      GEO_MOVES.forEach(([v, t]) => mr.appendChild(chip(t, draft.geo.m === v, () => touch(() => { if (draft.geo.m === v) delete draft.geo.m; else draft.geo.m = v; }))));
+      box.appendChild(mr);
+    }
+    const payload = draftPayload(), valid = !!L.net.cleanSuggestion(payload);
+    const same = payload.m === (plan.g.length > 1 || plan.n === 0 ? 't' : 's') && payload.n === (plan.n === 0 ? 3 : plan.n) && payload.g.join() === plan.g.join() && !payload.geo;
+    const st = session.mySug && session.mySug.st;
+    const go = btn('Suggest to the host', 'primary small suggest-btn', () => { if (session.suggest(payload)) { draft.dirty = false; render(); } });
+    go.disabled = !valid || same || st === 'wait' || !session.canSuggest();
+    box.appendChild(go);
+    const status = el('div', 'sug-status' + (st ? ' ' + st : ''));
+    status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
+    if (st === 'wait') status.textContent = 'Sent. Waiting for the host…';
+    else if (st === 'ok') status.textContent = 'Accepted. The host is using your idea.';
+    else if (st === 'no') status.textContent = session.mySug.why === 'busy' ? 'Declined: the host is playing right now.' : 'Declined by the host.';
+    else if (st === 'late') status.textContent = 'No answer yet. You can send it again.';
+    else if (draft.m === 't' && draft.g.length < 2) status.textContent = 'Pick at least 2 games for a tournament.';
+    else status.textContent = 'Tap covers and rules, then send your idea. The host chooses.';
+    box.appendChild(status);
+    return box;
+  }
+  // host: the oldest waiting suggestion as an accept / decline card
+  function suggestionCard() {
+    const list = session.suggestions();
+    if (!list.length) return null;
+    const sg = list[0], card_ = el('div', 'sug-card'); card_.setAttribute('role', 'group'); card_.setAttribute('aria-label', 'Suggestion from ' + sg.name);
+    card_.appendChild(el('div', 'sug-head', sg.name + ' suggests'));
+    describe(sg.p).forEach(t => card_.appendChild(el('div', 'sug-line', t)));
+    const row = el('div', 'sug-actions');
+    row.appendChild(btn('Accept', 'primary small sug-accept', () => {
+      const r = session.answerSuggestion(sg.i, true);
+      if (r && r.ok) {
+        modeFor = { s: session, mode: r.p.m === 't' ? 'tournament' : 'single' };
+        if (r.p.geo) {
+          const g = Object.assign({}, L.state.geo);
+          if (r.p.geo.t !== undefined) g.time = r.p.geo.t;
+          if (r.p.geo.m !== undefined) g.move = r.p.geo.m;
+          L.state.geo = g; L.save();
+        }
+        ops && ops.toast && ops.toast('Accepted ' + r.name + '’s idea');
+      } else if (r) ops && ops.toast && ops.toast('Could not use that idea');
+      render();
+    }));
+    row.appendChild(btn('Decline', 'small sug-decline', () => { session.answerSuggestion(sg.i, false); render(); }));
+    card_.appendChild(row);
+    if (list.length > 1) card_.appendChild(el('div', 'sug-more', '+' + (list.length - 1) + ' more waiting'));
+    return card_;
   }
   // The standings table used between rounds and at the end
   function standings(ser, winners) {
@@ -239,6 +348,7 @@
       live.textContent = host ? (n >= session.min ? 'Ready to start. ' + n + '/' + mx + ' players' : n < 2 ? 'Waiting for a friend to join' : 'Waiting for players ' + n + '/' + mx) : 'Waiting for the host to start. ' + n + '/' + mx + ' players';
       card.appendChild(live);
       card.appendChild(avatars(n, mx));
+      if (host) { const sc = suggestionCard(); if (sc) card.appendChild(sc); }
       if (session.flex || session.plan.g.length) card.appendChild(planBlock(host));
       if (host) {
         // a room for more than two: the host may start once enough are in, without waiting for every seat
@@ -289,6 +399,8 @@
       }
     }));
     offs.push(s.on('plan', () => { if (screen === 'room') render(); }));
+    offs.push(s.on('sugstate', () => { if (screen === 'room') { render(); L.sfx('tap'); } }));
+    offs.push(s.on('suggest', () => { if (screen === 'room') { render(); L.sfx('tap'); } }));
     offs.push(s.on('oldpeer', () => { ops && ops.toast && ops.toast('Your friend needs to update Ludus for tournaments'); }));
     offs.push(s.on('error', e => { const w = WHY[e.code] || WHY.offline; discard(); if (e.code === 'no-room' || e.code === 'full' || e.code === 'started' || e.code === 'game' || e.code === 'update') { screen = e.code === 'update' ? 'notice' : 'join'; if (e.code === 'update') { error = [w[0], w[1], 'OK']; ops.noticeOk = ops.onCancel; } else error = w[1]; } else { screen = 'choose'; error = ''; ops.toast && ops.toast(w[0]); } render(); }));
     offs.push(s.on('closed', e => { const w = WHY[e.reason] || WHY['host-left']; discard(); screen = 'notice'; error = [w[0], w[1], 'OK']; ops.noticeOk = ops.onCancel; render(); }));
@@ -324,6 +436,7 @@
   function cancelToHome() { const f = ops && ops.goHome; hide(); if (f) f(); }
 
   L.lobby = {
+    get session() { return session; },   // for the tests
     get isOpen() { return !!sheet && !sheet.hidden; },
     open(g, o) {
       ensure(); discard();

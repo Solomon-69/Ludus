@@ -176,6 +176,15 @@ internal sealed class PopupForm : Form
                 if (!e.Uri.StartsWith(Origin, StringComparison.OrdinalIgnoreCase)) e.Cancel = true;
             };
             core.NewWindowRequested += (_, e) => e.Handled = true;
+            // Privacy blur needs the camera; only our own page may have it, and nothing else (no mic, location, ...).
+            core.PermissionRequested += (_, e) =>
+            {
+                var own = Uri.TryCreate(e.Uri, UriKind.Absolute, out var u) && u.Scheme == Uri.UriSchemeHttps
+                          && string.Equals(u.Host, Host, StringComparison.OrdinalIgnoreCase);
+                e.State = own && e.PermissionKind == CoreWebView2PermissionKind.Camera
+                    ? CoreWebView2PermissionState.Allow : CoreWebView2PermissionState.Deny;
+                e.Handled = true;
+            };
             core.NavigationCompleted += (_, e) =>
             {
                 ready = e.IsSuccess;
@@ -237,9 +246,8 @@ internal sealed class PopupForm : Form
                $"window.__LUDUS_STATE__ = {Store.LoadStateJson()};\n" +
                $"window.__LUDUS_LOGIN__ = {Bool(Store.LoginEnabled())};\n" +
                $"window.__LUDUS_DARK__ = {Bool(theme.SystemDark)};\n" +
-               $"window.__LUDUS_ORIGINAL_NAMES__ = {Store.LoadOriginalNamesJson()};\n" +
-               $"window.__LUDUS_NAMES_PATH__ = {JsonSerializer.Serialize(Store.NamesPath)};\n" +
                $"window.__LUDUS_INVISIBLE__ = {Bool(Store.LoadInvisible())};\n" +
+               $"window.__LUDUS_ORIGINAL_NAMES__ = {Store.LoadOriginalNamesJson()};\n" +
                $"window.__LUDUS_SKIP_INTRO__ = {Bool(SkipIntro)};\n" +
                $"window.__LUDUS_VERSION__ = '{System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0"}';\n" +
                (TestFailStart ? "window.__LUDUS_TEST_FAIL__ = true;\n" : "") +
@@ -361,12 +369,6 @@ internal sealed class PopupForm : Form
                     Store.SetLogin(on);
                     PushLogin();
                     LoginChanged?.Invoke();
-                    break;
-                case "names":
-                    RunScript("window.ludusNames && ludusNames(" + Store.LoadOriginalNamesJson() + ")");
-                    break;
-                case "revealNames":
-                    Store.RevealNamesFile();
                     break;
                 case "invisible":
                     var hide = msg.TryGetProperty("on", out var hideProp) && hideProp.ValueKind == JsonValueKind.True;
