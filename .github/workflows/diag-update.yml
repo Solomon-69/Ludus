@@ -33,6 +33,10 @@ jobs:
           New-Item -ItemType Directory -Force probe | Out-Null
           $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = '--remote-debugging-port=9334'
           $p = Start-Process out/Ludus/Ludus.exe -ArgumentList '--test-open' -PassThru
+          Start-Sleep -Seconds 25
+          Get-CimInstance Win32_Process -Filter "Name='msedgewebview2.exe' OR Name='Ludus.exe'" | ForEach-Object { Write-Host "PROC $($_.ProcessId) $($_.CommandLine.Substring(0, [Math]::Min(400, $_.CommandLine.Length)))" }
+          netstat -ano | Select-String LISTENING | Select-String '933' | ForEach-Object { Write-Host "NET $_" }
+          try { Write-Host ("LIST " + (Invoke-WebRequest http://127.0.0.1:9334/json/list -UseBasicParsing).Content) } catch { Write-Host "LIST failed $_" }
           node QA/updater-test/cdp-probe.mjs 9334 QA/climb-start.js probe/climb.json probe/climb.png
           Copy-Item "$env:APPDATA\Ludus\*.log" probe -ErrorAction SilentlyContinue
           Stop-Process $p -Force -ErrorAction SilentlyContinue
