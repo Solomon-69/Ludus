@@ -3,6 +3,10 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.12 (2026-10-27)
+
+- Online: the join code is shown as five tiles that fill from left to right (a dash while empty); a recent party's code shows faintly. Paste still works with a code or an invite message.
+
 ## 1.12.11 (2026-10-27)
 
 - Settings: opening More settings scrolls down with it so the new options are in view.

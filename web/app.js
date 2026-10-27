@@ -154,7 +154,25 @@
     code.addEventListener('input', () => { const v = code.value, m = L.net.extractCode(v); code.value = m || L.net.cleanCode(v); msg.textContent = !m && v.replace(/\s/g, '').length > 6 ? 'No room code found in that text.' : ''; });
     code.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); go(); } });
     const jb = el('button', 'btn primary', 'Join'); jb.type = 'button'; jb.id = 'opJoin'; jb.onclick = go;
-    const jr = el('div', 'join-row'); jr.appendChild(code); jr.appendChild(jb);   // the code and the Join button side by side
+    // Five tiles show the code as it is typed (a dash while empty); the real input sits invisibly on top, so paste, the keyboard and
+    // screen readers all keep working. With a recent party, its code shows faintly in the empty tiles.
+    const hint = (S.party && S.party.code && L.net.validCode(S.party.code)) ? S.party.code : '';
+    const wrap = el('div', 'code-wrap'), tiles = el('div', 'code-tiles'); tiles.setAttribute('aria-hidden', 'true');
+    const cells = [0, 1, 2, 3, 4].map(() => { const c = el('span', 'code-tile'); tiles.appendChild(c); return c; });
+    const paint = () => {
+      const v = code.value, focus = document.activeElement === code;
+      cells.forEach((c, i) => {
+        const ch = v[i] || '', was = c.textContent;
+        c.textContent = ch || (v ? '' : hint[i] || '') || '\u2013';
+        c.classList.toggle('filled', !!ch); c.classList.toggle('hint', !ch && !v && !!hint);
+        c.classList.toggle('now', focus && i === Math.min(v.length, 4));
+        if (ch && ch !== was && !S.reduceMotion) { c.classList.remove('pop'); void c.offsetWidth; c.classList.add('pop'); }
+      });
+    };
+    ['input', 'focus', 'blur'].forEach(ev => code.addEventListener(ev, paint));
+    code.placeholder = ''; paint();
+    wrap.append(tiles, code);
+    const jr = el('div', 'join-row'); jr.appendChild(wrap); jr.appendChild(jb);   // the code and the Join button side by side
     join.appendChild(jr); join.appendChild(msg);
     const note = el('p', 'lobby-note', 'Code, invite message or ludus:// link. Needs the internet.');
     if (!L.conn.shown) {   // offline: the name stays editable, everything that needs the internet is dimmed and does nothing
