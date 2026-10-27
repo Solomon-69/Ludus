@@ -545,14 +545,19 @@
   }
   // colours per app theme (light / dark) and side. On the dark board the black side gets a lighter rim so it never sinks in.
   const PAL = {
-    light: { w: { face: '#dde5ee', rim: '#9aaec2', det: '#92a7bb', hi: '#fbfdff' }, b: { face: '#565e67', rim: '#30353b', det: '#2b3035', hi: '#6f7882' } },
+    light: { w: { face: '#dde5ee', rim: '#9aaec2', det: '#92a7bb', hi: '#fbfdff' }, b: { face: '#262c35', rim: '#121419', det: '#5a6573', hi: '#3a424d' } },
     // cover only: a charcoal piece with a light rim, so the fallen king reads on the green card
-    cover: { b: { face: '#2f353b', rim: '#dfe7ef', det: '#dfe7ef', hi: '#4a525a' } },
-    dark: { w: { face: '#d9e2eb', rim: '#90a3b5', det: '#8a9db0', hi: '#f6f9fc' }, b: { face: '#56697a', rim: '#8ea2b2', det: '#2a3640', hi: '#6c8090' } }
+    cover: { b: { face: '#22272f', rim: '#dfe7ef', det: '#dfe7ef', hi: '#3a424d' } },
+    dark: { w: { face: '#d9e2eb', rim: '#90a3b5', det: '#8a9db0', hi: '#f6f9fc' }, b: { face: '#22272f', rim: '#111318', det: '#5a6573', hi: '#363e49', edge: '#9aa4b2' } }
   };
   const themeName = () => (document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light');
   function paintParts(g, parts, color, dy) {
     g.save(); g.translate(0, dy); g.fillStyle = color; g.strokeStyle = color; g.lineWidth = 3; g.lineJoin = 'round';
+    for (const f of parts) { g.beginPath(); f(g); g.fill(); g.stroke(); }
+    g.restore();
+  }
+  function paintEdge(g, parts, color, dy) {
+    g.save(); g.translate(0, dy); g.fillStyle = color; g.strokeStyle = color; g.lineWidth = 7; g.lineJoin = 'round';
     for (const f of parts) { g.beginPath(); f(g); g.fill(); g.stroke(); }
     g.restore();
   }
@@ -571,6 +576,13 @@
     const c = document.createElement('canvas'); c.width = c.height = px;
     const g = c.getContext('2d'), k = PAL[theme][white ? 'w' : 'b'], { P, D } = PARTS(t), u = px * 0.86 / 100;
     g.translate(px / 2, px / 2); g.scale(u, u);
+    if (k.edge) {
+      // a thin light edge around the near-black pieces on the dark board, so they never vanish into it
+      const e = document.createElement('canvas'); e.width = e.height = px;
+      const eg = e.getContext('2d'); eg.translate(px / 2, px / 2); eg.scale(u, u);
+      eg.lineWidth = 7; paintEdge(eg, P, k.edge, 5); paintEdge(eg, P, k.edge, 0);
+      g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = 0.35; g.drawImage(e, 0, 0); g.restore();
+    }
     paintParts(g, P, k.rim, 5); paintParts(g, P, k.face, 0); paintDetails(g, D, k);
     g.globalCompositeOperation = 'destination-over'; g.fillStyle = 'rgba(0,0,0,0.12)';
     g.beginPath(); g.ellipse(0, 41, 26, 4.5, 0, 0, Math.PI * 2); g.fill();
@@ -594,11 +606,12 @@
 
   const LEVELS = ['Easy', 'Medium', 'Hard', 'Expert'];
   const BOT_MS = [400, 700, 1000, 2200];
+  const TIMES = [0, 3, 5, 10];   // clock choices, minutes per side (0 = not timed)
   const BOOK = { '': ['e2e4', 'd2d4', 'c2c4', 'g1f3'], e2e4: ['e7e5', 'c7c5', 'e7e6', 'c7c6'], d2d4: ['d7d5', 'g8f6'], c2c4: ['e7e5', 'g8f6', 'c7c5'], g1f3: ['d7d5', 'g8f6'] };
 
   Ludus.register({
     id: 'chess', name: 'Chess', tag: 'Duel', versus: true, online: { min: 2, max: 2 }, tint: '#4f7a66',
-    hint: 'Drag a piece, or click it and then a square. <kbd>←</kbd><kbd>↑</kbd><kbd>→</kbd><kbd>↓</kbd> + <kbd>Space</kbd> work too. Pick the bot level under the board',
+    hint: 'Drag a piece, or click it and then a square. <kbd>←</kbd><kbd>↑</kbd><kbd>→</kbd><kbd>↓</kbd> + <kbd>Space</kbd> work too. Pick the bot level and the clock under the board',
     onlineHint: 'Your pieces are at the bottom. Drag or click to move',
     _core: core,
     art(ctx, w, h) {
@@ -638,13 +651,20 @@
       let pos, plies, sans, keys, lastMove = null, phase = 'play', sel = -1, drag = null, promo = null, anims = [], fades = [];
       let banner = null, thinking = false, reqId = 0, hoverSq = -1, cursor = -1, kbd = false, chips = [], geo = null, checkFlash = 0;
       let wasConnected = on ? on.connected : true, lastSync = 0;
-      let clock = 0, clockAt = 0, chipPress = null;   // game clock (seconds of play, counts up) and the level chip being pressed
+      // clocks: tc = minutes per side (0 = not timed), rem = time left per side in ms. A clock only runs once the first piece has moved.
+      // Online, White's choice is used: it rides on every move message, and Black's moves echo it back (an older Ludus that does
+      // not echo it makes the game untimed). Each screen only declares its own flag and tells the other with a 'flag' message.
+      const prefTime = () => (TIMES.includes(S.chessTime) ? S.chessTime : 0);
+      let tc = 0, tcOk = !on, flagged = false, clockAt = 0, chipPress = null, timeSide = false;
+      const rem = { 1: 0, '-1': 0 };
+      function setTc(m) { tc = m; rem[1] = rem[-1] = m * 60000; flagged = false; }
 
       const flip = () => myColor === -1;
       const mayAct = () => phase === 'play' && !api.ended && !promo && (friendLocal || pos.side === myColor);
       function reset() {
         pos = core.loadFen(core.START); plies = []; sans = []; keys = [core.key(pos)]; lastMove = null;
-        phase = 'play'; sel = -1; drag = null; promo = null; anims = []; fades = []; banner = null; thinking = false; clock = 0;
+        phase = 'play'; sel = -1; drag = null; promo = null; anims = []; fades = []; banner = null; thinking = false;
+        setTc(on ? (myColor === 1 ? prefTime() : 0) : prefTime());
         cursor = myColor === 1 ? 0x14 : 0x64;
       }
 
@@ -668,7 +688,7 @@
       }
       const ANIM_MS = 210;
       function commit(m, animate, local) {
-        const from = core.mFrom(m), to = core.mTo(m), fl = core.mFlags(m), pc = pos.b[from];
+        const from = core.mFrom(m), to = core.mTo(m), fl = core.mFlags(m), pc = pos.b[from], mover = pos.side;
         const capSq = fl & core.F_EP ? to - 16 * pos.side : to, cap = pos.b[capSq];
         const s = applyRaw(m);
         sel = -1; promo = null;
@@ -682,7 +702,7 @@
         const chk = /[+#]$/.test(s);
         api.sfx(chk ? 'power' : cap ? 'eat' : fl & core.F_CASTLE ? 'merge' : 'tap');
         if (chk) checkFlash = now;
-        if (local && on) on.send('mv', { u: core.uci(m), n: plies.length - 1 });
+        if (local && on) on.send('mv', tc ? { u: core.uci(m), n: plies.length - 1, tc, left: Math.round(rem[mover]) } : { u: core.uci(m), n: plies.length - 1 });
         phase = 'anim';
         api.timeout(afterMove, dur + 15);
       }
@@ -694,7 +714,7 @@
         phase = 'play';
         if (botMode && pos.side !== myColor) botTurn();
       }
-      const WHY = { mate: 'Checkmate', stalemate: 'Stalemate', fifty: 'Draw by the 50-move rule', material: 'Draw: not enough pieces to mate', repetition: 'Draw by repetition' };
+      const WHY = { mate: 'Checkmate', stalemate: 'Stalemate', fifty: 'Draw by the 50-move rule', material: 'Draw: not enough pieces to mate', repetition: 'Draw by repetition', time: 'Out of time' };
       function endGame(st) {
         phase = 'end'; thinking = false;
         const moves = Math.ceil(plies.length / 2);
@@ -706,7 +726,7 @@
           else if (on) title = won ? 'You win' : nameOf(st.winner) + ' wins';
           else title = won ? 'You win' : 'Bot wins';
         } else { won = false; title = 'Draw'; }
-        banner = { text: st.kind === 'mate' ? 'Checkmate' : st.kind === 'stalemate' ? 'Stalemate' : 'Draw', sub: why, t0: performance.now() };
+        banner = { text: st.kind === 'mate' ? 'Checkmate' : st.kind === 'stalemate' ? 'Stalemate' : st.kind === 'time' ? 'Time is up' : 'Draw', sub: st.kind === 'time' ? nameOf(-st.winner) + ' ran out of time' : why, t0: performance.now() };
         api.sfx(st.winner ? (friendLocal || won ? 'win' : 'lose') : 'over');
         if (botMode) { S.chessNextSide = -myColor; Ludus.save(); }
         api.timeout(() => {
@@ -777,12 +797,15 @@
       // ---------- layout ----------
       function layout() {
         const { w, h } = view;
-        const top = 56, capT = 32, capH = 20, chipH = on ? 0 : 44, pad = 12;
-        const avail = h - top - capT - capH - chipH - pad;
-        const s = Math.max(12, Math.floor(Math.min(w - pad * 2, avail) / 8));
-        const bs = s * 8, block = capT + capH + bs + chipH;
+        const top = 56, capT = 32, capB = 32, lvlH = on ? 0 : 44, rowT = on ? 0 : 36, pad = 12;
+        const fit = extra => Math.max(12, Math.floor(Math.min(w - pad * 2, h - top - capT - capB - extra - pad) / 8));
+        // the clock picker goes beside the board when there is room there, otherwise in a row under the level buttons
+        let s = fit(lvlH + rowT);
+        timeSide = !on && (w - 8 * fit(lvlH)) / 2 >= 104;
+        if (timeSide) s = fit(lvlH);
+        const chipH = lvlH + (timeSide ? 0 : rowT), bs = s * 8, block = capT + capB + bs + chipH;
         const y0 = top + Math.max(0, (h - top - pad - block) / 2), by = Math.round(y0 + capT);
-        geo = { s, bs, bx: Math.round((w - bs) / 2), by, capTop: y0 + capT / 2 - 1, capBot: by + bs + capH / 2 + 2, chipY: by + bs + capH + 8, chipH };
+        geo = { s, bs, bx: Math.round((w - bs) / 2), by, capTop: y0 + capT / 2 - 1, capBot: by + bs + capB / 2 + 2, chipY: by + bs + capB + 6, chipH };
         return geo;
       }
       function sqXY(sq) {
@@ -820,40 +843,43 @@
         const val = [0, 1, 3, 3, 5, 9], mat = c => { let v = 0; for (const t in have[c]) v += val[t] * have[c][t]; return v; };
         return { byWhite: lost(-1), byBlack: lost(1), diff: mat(1) - mat(-1) };
       }
-      function capRow(list, color, y, maxX) {
-        if (!list.length) return;
-        const s = geo.s * 0.46, x0 = geo.bx + 2, groups = new Set(list).size - 1;
+      function capRow(list, color, y, maxX, adv, col) {
+        const s = geo.s * 0.46, x0 = geo.bx + 2, groups = Math.max(0, new Set(list).size - 1), room = maxX - x0 - (adv > 0 ? 30 : 0);
         let step = s * 0.62, gapG = s * 0.22;
         const need = (list.length - 1) * step + groups * gapG + s;
-        if (need > maxX - x0) { const k = Math.max(0.35, (maxX - x0 - s) / Math.max(1, need - s)); step *= k; gapG *= k; }
+        if (list.length && need > room) { const k = Math.max(0.35, (room - s) / Math.max(1, need - s)); step *= k; gapG *= k; }
         let x = x0, prev = 0;
         for (const t of list) { if (prev && prev !== t) x += gapG; drawPieceVec(ctx, t, color === 1, x + s / 2, y, s); x += step; prev = t; }
+        if (adv > 0) D.text(ctx, '+' + adv, list.length ? x + s * 0.5 + 4 : x0, y + 1, 12, col.ink2, 800, 'left');
       }
-      // the game clock pill above the board: round clock + mm:ss, then a second segment with who is ahead on material
-      const fmtClock = t => { t = Math.floor(t); const h = Math.floor(t / 3600), m = Math.floor(t / 60) % 60, sec = t % 60; return (h ? h + ':' + String(m).padStart(2, '0') : String(m).padStart(2, '0')) + ':' + String(sec).padStart(2, '0'); };
-      function clockPill(col, lead, leader) {
-        const ph = 26, txt = fmtClock(clock), w1 = clock >= 3600 ? 92 : 76, w2 = lead ? 58 : 60, pw = w1 + w2;
-        const x = geo.bx + geo.bs - pw, y = Math.round(geo.capTop - ph / 2);
+      // a side's chess clock: a soft pill at the right end of its row, ringed while it runs, red when time is short
+      const fmtClock = ms => { const t = Math.ceil(Math.max(0, ms) / 1000); return Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0'); };
+      function clockPill(col, side, cyRow) {
+        if (!tc) return geo.bx + geo.bs;
+        const ph = 26, pw = 80, x = geo.bx + geo.bs - pw, y = Math.round(cyRow - ph / 2), left = rem[side];
+        const running = plies.length > 0 && pos.side === side && phase !== 'end' && !api.ended, low = left < 20000;
         D.roundRect(ctx, x, y + 2, pw, ph, ph / 2); ctx.fillStyle = col.dark ? col.bg : col.bg2; ctx.fill();
         D.roundRect(ctx, x, y, pw, ph, ph / 2); ctx.fillStyle = col.dark ? col.surface2 : col.surface; ctx.fill();
-        ctx.strokeStyle = col.dark ? 'rgba(255,245,230,0.1)' : 'rgba(32,28,23,0.12)'; ctx.lineWidth = 1.5; ctx.stroke();
-        ctx.fillStyle = ctx.strokeStyle; ctx.fillRect(x + w1 - 0.75, y + 5, 1.5, ph - 10);
-        // clock face
-        const cx = x + 17, cy = y + ph / 2, r = 7.5;
+        ctx.strokeStyle = running ? (low ? col.bad : col.accent) : (col.dark ? 'rgba(255,245,230,0.1)' : 'rgba(32,28,23,0.12)');
+        ctx.lineWidth = running ? 2 : 1.5; ctx.stroke();
+        const cx = x + 16, cy = y + ph / 2, r = 7.5;
         ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fillStyle = col.dark ? '#b9cddd' : '#cbdcea'; ctx.fill();
-        const a = -Math.PI / 2 + (clock % 60) / 60 * Math.PI * 2;
+        const a = -Math.PI / 2 + (running && !api.reduceMotion ? ((left / 1000) % 60) / 60 * -Math.PI * 2 : Math.PI / 3);
         ctx.strokeStyle = '#557891'; ctx.lineWidth = 2; ctx.lineCap = 'round';
         ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(a) * r * 0.62, cy + Math.sin(a) * r * 0.62); ctx.stroke();
         ctx.beginPath(); ctx.arc(cx, cy, 1.6, 0, Math.PI * 2); ctx.fillStyle = '#557891'; ctx.fill();
-        D.text(ctx, txt, x + 30, cy + 0.5, 13, col.ink2, 800, 'left');
-        // material
-        const mx = x + w1 + w2 / 2;
-        if (!lead) D.text(ctx, 'Even', mx, cy + 0.5, 12, col.ink3, 750);
-        else {
-          drawPieceVec(ctx, 1, leader === 1, mx - 12, cy, 15);
-          D.text(ctx, '+' + lead, mx - 2, cy + 0.5, 13, leader === myColor && !friendLocal ? col.good : col.ink2, 800, 'left');
-        }
+        D.text(ctx, fmtClock(left), x + pw - 12, cy + 0.5, 13.5, low && plies.length ? col.bad : running ? col.ink : col.ink2, 800, 'right');
         return x;
+      }
+      function tickClocks(dt, now) {
+        const real = Math.min(250, now - (clockAt || now)); clockAt = now;
+        if (!tc || flagged || dt <= 0 || !plies.length || api.ended || (phase !== 'play' && phase !== 'anim')) return;
+        const sd = pos.side;
+        rem[sd] = Math.max(0, rem[sd] - real);
+        if (rem[sd] > 0 || (on && (sd !== myColor || !tcOk))) return;
+        flagged = true; reqId++;
+        if (on) on.send('flag', { n: plies.length });
+        endGame({ kind: 'time', winner: -sd });
       }
       function hud(col) {
         const ended = phase === 'end' || api.ended, bottom = myColor, topC = -myColor;
@@ -888,6 +914,41 @@
           D.fitText(ctx, name, x + cw / 2, chipY + down + ch / 2 + 0.5, cw - 8, 12, active ? '#fff' : col.ink2, 750, 9);
           chips.push({ x, y: chipY, w: cw, h: ch + rim, i });
         });
+        drawTimePicker(col);
+      }
+      // Timed or not: a soft segmented control. Under the level buttons, or standing beside the board when there is room.
+      const TIME_LABELS = ['Off', '3 min', '5 min', '10 min'];
+      function drawTimePicker(col) {
+        const { bx, bs, by, chipY } = geo, cur = TIMES.indexOf(prefTime());
+        let rects;
+        if (timeSide) {
+          const sw = 72, sh = 30, x = bx + bs + 14, y0 = by + bs - sh * 4 - 6;
+          D.text(ctx, 'Clock', x + sw / 2, y0 - 14, 11.5, col.ink2, 700);
+          rects = TIMES.map((m, i) => ({ x, y: y0 + i * sh, w: sw, h: sh }));
+        } else {
+          const tw = Math.min(bs, 300), lab = 46, sw = (tw - lab) / 4, sh = 28, x0 = bx + (bs - tw) / 2 + lab, y = chipY + 42;
+          D.text(ctx, 'Clock', x0 - lab / 2 - 2, y + sh / 2 + 3, 11.5, col.ink2, 700);
+          rects = TIMES.map((m, i) => ({ x: x0 + i * sw, y: y + 3, w: sw, h: sh }));
+        }
+        const f = rects[0], l = rects[3], pad = 3;
+        D.roundRect(ctx, f.x - pad, f.y - pad, l.x + l.w - f.x + pad * 2, l.y + l.h - f.y + pad * 2, 14);
+        ctx.fillStyle = col.dark ? col.bg : col.bg2; ctx.fill();
+        rects.forEach((r, i) => {
+          const on1 = i === cur;
+          if (on1) {
+            D.roundRect(ctx, r.x, r.y + 1.5, r.w, r.h, 11); ctx.fillStyle = col.dark ? 'rgba(0,0,0,0.35)' : 'rgba(32,28,23,0.1)'; ctx.fill();
+            D.roundRect(ctx, r.x, r.y, r.w, r.h, 11); ctx.fillStyle = col.dark ? col.surface2 : col.surface; ctx.fill();
+          }
+          D.fitText(ctx, TIME_LABELS[i], r.x + r.w / 2, r.y + r.h / 2 + 0.5, r.w - 6, 12, on1 ? col.ink : col.ink3, on1 ? 800 : 700, 9);
+          chips.push({ x: r.x, y: r.y, w: r.w, h: r.h, i, time: true });
+        });
+      }
+      function pickTime(i) {
+        const m = TIMES[i];
+        if (m === prefTime()) return;
+        S.chessTime = m; Ludus.save(); api.sfx('click');
+        if (!plies.length && phase === 'play') setTc(m);
+        else api.toast(m ? 'Next game: ' + m + ' min each' : 'Next game: not timed');
       }
       function pickLevel(i) {
         S.chessLevel = i; Ludus.save();
@@ -908,12 +969,10 @@
         hud(col);
         const { s, bs, bx, by } = geo;
         // captured pieces next to each player
-        if (dt > 0 && phase !== 'end' && !api.ended) clock += Math.min(0.25, (now - (clockAt || now)) / 1000);
-        clockAt = now;
+        tickClocks(dt, now);
         const cap = captured(), mineTook = myColor === 1 ? cap.byWhite : cap.byBlack, theyTook = myColor === 1 ? cap.byBlack : cap.byWhite;
-        const pillX = clockPill(col, Math.abs(cap.diff), cap.diff > 0 ? 1 : -1);
-        capRow(theyTook, myColor, geo.capTop, pillX - 8);
-        capRow(mineTook, -myColor, geo.capBot, bx + bs);
+        capRow(theyTook, myColor, geo.capTop, clockPill(col, -myColor, geo.capTop) - 8, -cap.diff * myColor, col);
+        capRow(mineTook, -myColor, geo.capBot, clockPill(col, myColor, geo.capBot) - 8, cap.diff * myColor, col);
         // frame and squares
         D.roundRect(ctx, bx - 5, by - 5, bs + 10, bs + 13, 13);
         ctx.fillStyle = col.dark ? '#141b21' : '#dfe5ec'; ctx.fill();
@@ -1027,7 +1086,7 @@
       // ---------- input wiring ----------
       api.on(view.canvas, 'pointerdown', e => {
         const { x, y } = local(e); kbd = false;
-        for (const c of chips) if (x >= c.x && x <= c.x + c.w && y >= c.y && y <= c.y + c.h) { chipPress = { i: c.i, t: performance.now() }; pickLevel(c.i); return; }
+        for (const c of chips) if (x >= c.x && x <= c.x + c.w && y >= c.y && y <= c.y + c.h) { if (c.time) pickTime(c.i); else { chipPress = { i: c.i, t: performance.now() }; pickLevel(c.i); } return; }
         if (promo) {
           const hit = promoBoxes().find(b => x >= b.x && x < b.x + b.s && y >= b.y && y < b.y + b.s);
           if (hit) choosePromo(hit.t); else { promo = null; sel = -1; api.sfx('tick'); }
@@ -1064,6 +1123,7 @@
           e.preventDefault(); kbd = true;
           pressSquare(cursor, 0, 0); drag = null;
         } else if (e.key >= '1' && e.key <= '4' && !on) pickLevel(+e.key - 1);
+        else if (String(e.key).toLowerCase() === 't' && !on) pickTime((TIMES.indexOf(prefTime()) + 1) % TIMES.length);
       });
 
       // ---------- online ----------
@@ -1090,6 +1150,7 @@
       if (on) {
         on.on('hi', (d, from) => { if (d && Number.isInteger(d.n) && d.n >= 0 && plies.length > d.n && plies.length <= 600) on.sendTo(from, 'hist', { m: plies.slice() }); });
         on.on('hist', d => { if (d) catchUp(d.m); });
+        on.on('flag', () => { if (tc && tcOk && phase !== 'end' && !api.ended) { flagged = true; rem[-myColor] = 0; endGame({ kind: 'time', winner: myColor }); } });
       }
 
       // ---------- save / restore (local games only) ----------
@@ -1101,7 +1162,9 @@
         for (const u of sv.moves) { const m = core.fromUci(pos, u); if (!m) { reset(); return false; } applyRaw(m); }
         const st = status();
         if (st) { reset(); return false; }
-        if (Number.isFinite(sv.c) && sv.c > 0) clock = Math.min(sv.c, 359999);
+        const ok = v => Number.isFinite(v) && v >= 0 && v <= sv.tc * 60000;
+        if (TIMES.includes(sv.tc) && sv.tc && Array.isArray(sv.r) && ok(sv.r[0]) && ok(sv.r[1])) { setTc(sv.tc); rem[1] = sv.r[0]; rem[-1] = sv.r[1]; }
+        else setTc(0);
         if (botMode && pos.side !== myColor) botTurn();
         return true;
       }
@@ -1119,11 +1182,16 @@
         if (d.n > plies.length) { askSync(); return true; }     // missed something: ask for the whole game
         const m = core.fromUci(pos, d.u);
         if (!m) return true;
+        const mover = pos.side;
         commit(m, true, false);
+        if (myColor === -1 && plies.length === 1) { if (TIMES.includes(d.tc) && d.tc) { setTc(d.tc); tcOk = true; } }   // Black takes White's clock
+        else if (myColor === 1 && tc && !tcOk) { if (d.tc === tc) tcOk = true; else setTc(0); }                       // no echo: an older Ludus, play untimed
+        if (tc && Number.isFinite(d.left)) rem[mover] = Math.max(0, Math.min(tc * 60000, d.left));
         return true;
       });
       if (window.ludusDebug) {
-        window.ludusDebug.chess = () => ({ fen: core.fen(pos), plies: plies.slice(), sans: sans.slice(), side: pos.side, my: myColor, phase, level, thinking, ended: api.ended, worker: !!worker, workerBroken, clock, mode: on ? 'online' : friendLocal ? 'friend' : 'bot' });
+        window.ludusDebug.chess = () => ({ fen: core.fen(pos), plies: plies.slice(), sans: sans.slice(), side: pos.side, my: myColor, phase, level, thinking, ended: api.ended, worker: !!worker, workerBroken, tc, tcOk, rem: [rem[1], rem[-1]], mode: on ? 'online' : friendLocal ? 'friend' : 'bot' });
+        window.ludusDebug.chessRem = (wms, bms) => { rem[1] = wms; rem[-1] = bms; };
         window.ludusDebug.chessMove = u => { const m = core.fromUci(pos, u); if (!m || !mayAct()) return false; commit(m, true, true); return true; };
         window.ludusDebug.chessGeo = sq => { layout(); const p = sqXY(sq); const r = view.canvas.getBoundingClientRect(); return { x: r.left + p.x + geo.s / 2, y: r.top + p.y + geo.s / 2, s: geo.s }; };
       }
@@ -1131,7 +1199,7 @@
       return {
         save() {
           if (on || api.ended || !plies.length || phase === 'end') return null;
-          return { v: 1, moves: plies.slice(), my: myColor, c: Math.floor(clock) };
+          return tc ? { v: 1, moves: plies.slice(), my: myColor, tc, r: [Math.round(rem[1]), Math.round(rem[-1])] } : { v: 1, moves: plies.slice(), my: myColor };
         }
       };
     }
