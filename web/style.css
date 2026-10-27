@@ -163,8 +163,12 @@ svg { display: block; }
 .renaming .card-name, .renaming .game-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* Rename games (Settings): the name becomes a small button; long names end with an ellipsis */
 .rename-name { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom;
-  border-radius: 6px; padding: 0 3px; margin: 0 -3px; cursor: text; box-shadow: inset 0 -1.5px 0 color-mix(in srgb, var(--accent) 55%, transparent); transition: background 0.15s; }
-.rename-name:hover, .rename-name:focus-visible { background: color-mix(in srgb, var(--accent) 14%, transparent); outline: 0; }
+  border-radius: 999px; padding: 1px 8px; margin: -1px -8px; cursor: text; background: transparent;
+  transition: background-color 0.22s var(--ease-out), transform 0.22s var(--ease-out); }
+/* hover: a soft round grey pill around just the name (no underline) */
+.rename-name:hover, .rename-name:focus-visible { background: color-mix(in srgb, var(--ink) 9%, transparent); outline: 0; }
+.rename-name:active { transform: scale(0.97); }
+@media (prefers-reduced-motion: reduce) { .rename-name { transition: none; } }
 .sheet.rename-sheet { position: fixed; z-index: 20; padding: 12px; }
 .rename-card { width: min(300px, 100%); }
 .rename-card input {

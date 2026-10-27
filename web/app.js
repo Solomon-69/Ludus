@@ -305,7 +305,7 @@
       b.dataset.id = g.id;
       const best = S.best[g.id] || 0;
       b.innerHTML = `<div class="art"><canvas></canvas></div>
-        <div><div class="tag">${found ? 'Best match' : feature ? 'Continue' : g.tag}${S.saves[g.id] ? '<i class="saved-dot">In progress</i>' : ''}</div>
+        <div><div class="tag">${found ? 'Best match' : feature ? 'Continue' : g.tag}${S.saves[g.id] && !feature ? '<i class="saved-dot">In progress</i>' : ''}</div>
         <div class="card-name"></div>
         <div class="card-meta"><span>${g.tag === TWO ? 'Played' : g.tag === 'Duel' ? 'Wins' : 'Best'}</span><b>${fmt(g.tag === TWO ? (S.plays[g.id] || 0) : best)}</b></div></div>`;
       fillName(b.querySelector('.card-name'), g, () => renderCards());

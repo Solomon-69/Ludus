@@ -182,7 +182,7 @@
 /* result screen: the big map with both pins and the line between them */
 .ih-res{position:absolute;inset:0;z-index:8;border-radius:var(--r-md);overflow:hidden;background:rgb(236,236,232)}
 .ih-res[hidden]{display:none}
-.ih-rmap{position:absolute;inset:0}
+.ih-rmap{position:absolute;inset:0;z-index:0;isolation:isolate}
 .ih-resbar{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);z-index:700;width:min(460px,calc(100% - 20px));display:flex;flex-direction:column;gap:8px;padding:12px 14px;border-radius:16px;background:var(--surface);color:var(--ink);box-shadow:var(--shadow-lift)}
 .ih-resbar{animation:ihup .34s cubic-bezier(.22,1,.36,1)}
 @keyframes ihup{from{opacity:0;transform:translate(-50%,10px)}to{opacity:1;transform:translate(-50%,0)}}

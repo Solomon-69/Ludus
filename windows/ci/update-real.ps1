@@ -20,7 +20,11 @@ $dir = Split-Path $exe -Parent
 $ver = { (Get-Item $exe).VersionInfo.FileVersion }
 Write-Host "installed at $dir, file version $(& $ver)"
 
-$env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = '--remote-debugging-port=9333'
+# WebView2's debugging port for this app only (a per-user policy; the env var alone is ignored by current runtimes)
+$env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = '--remote-debugging-port=9333 --remote-allow-origins=*'
+$k = 'HKCU:\Software\Policies\Microsoft\Edge\WebView2\AdditionalBrowserArguments'
+New-Item -Path $k -Force | Out-Null
+New-ItemProperty -Path $k -Name 'Ludus.exe' -Value '--remote-debugging-port=9333 --remote-allow-origins=*' -PropertyType String -Force | Out-Null
 $start = Get-Date
 $p = Start-Process -FilePath $exe -ArgumentList '--test-open' -PassThru
 $log = Join-Path $Out "update-$From-to-$To.txt"
