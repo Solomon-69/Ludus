@@ -618,9 +618,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
             }
         }
         webView.callAsyncJavaScript(
-            "window.ludusOpened && ludusOpened();"
-            // right-click: straight to Settings, with no slide (ludusOpened turns transitions back on next frame)
-            + (settings ? " document.documentElement.classList.add('instant'); window.ludusOpenSettings && ludusOpenSettings();" : "")
+            // right-click: straight to Settings in one step, with no home screen frame and no slide
+            (settings ? "window.ludusOpenedSettings ? ludusOpenedSettings() : (window.ludusOpened && ludusOpened(), window.ludusOpenSettings && ludusOpenSettings());"
+                      : "window.ludusOpened && ludusOpened();")
             + " await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));",
             arguments: [:], in: nil, in: .page) { _ in reveal() }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: reveal)   // never stay hidden
