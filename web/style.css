@@ -585,7 +585,9 @@ svg { display: block; }
 .sv .vol { width: 104px; }
 /* More settings: a card that says what is inside and springs open in place (app.js renderSettings). */
 .more-card { margin-top: 22px; }
-.more-head { width: 100%; text-align: left; cursor: pointer; transition: background 0.15s; }
+.more-head { width: 100%; text-align: left; cursor: pointer; transition: background 0.15s, padding 0.35s var(--spring); }
+/* folded, the card is a little taller so it reads as a card of its own; it settles to a normal row when opened */
+.more-card:not(.is-open) .more-head { padding-top: 15px; padding-bottom: 15px; }
 .more-head:hover { background: color-mix(in srgb, var(--ink) 3%, transparent); }
 .more-head:active .more-ico { transform: scale(0.92); }
 .more-head .row-title, .more-head .row-sub { display: block; }
