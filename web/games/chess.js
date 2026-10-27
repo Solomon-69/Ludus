@@ -1024,7 +1024,7 @@
         afterMove();
       }
       if (on) {
-        on.on('hi', (d, from) => { if (d && Number.isInteger(d.n) && d.n >= 0 && plies.length > d.n && plies.length <= 450) on.sendTo(from, 'hist', { m: plies.slice() }); });
+        on.on('hi', (d, from) => { if (d && Number.isInteger(d.n) && d.n >= 0 && plies.length > d.n && plies.length <= 600) on.sendTo(from, 'hist', { m: plies.slice() }); });
         on.on('hist', d => { if (d) catchUp(d.m); });
       }
 

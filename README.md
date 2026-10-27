@@ -10,7 +10,7 @@
 <p><b>44 little games in your menu bar. Take a little break.</b></p>
 
 <p>
-  <a href="https://github.com/Solomon-69/Ludus/releases/latest"><img alt="Version 1.7.0" src="https://img.shields.io/badge/version-1.7.0-d97757?style=flat-square"></a>
+  <a href="https://github.com/Solomon-69/Ludus/releases/latest"><img alt="Version 1.12.0" src="https://img.shields.io/badge/version-1.12.0-d97757?style=flat-square"></a>
   <img alt="macOS 14 or later" src="https://img.shields.io/badge/macOS-14%2B-1f1d1a?style=flat-square&logo=apple&logoColor=white">
   <img alt="Windows 10 or 11" src="https://img.shields.io/badge/Windows-10%20%7C%2011-1f1d1a?style=flat-square">
 </p>
@@ -62,12 +62,12 @@ Ludus puts 44 small, polished games one click away. Here is what is inside.
 
 ### Play a friend on one keyboard
 
-Every board game has a <b>vs Bot / vs Friend</b> switch at the top. Pick Friend and you take turns on the same keyboard, with Player 2 in blue. The real-time games in the 2 Player group give each of you your own keys, so you can both play at once.
+Every board game has a <b>vs Bot / vs Friend</b> switch at the top. Pick Friend and you take turns on the same keyboard, with Player 2 in blue. The real-time games in the Same laptop tab give each of you your own keys, so you can both play at once.
 
-- <b>Turn-based with a friend:</b> Four in a Row, Dots and Boxes, Ultimate Tic-Tac-Toe, Hex and Dead Centre.
+- <b>Turn-based with a friend:</b> Chess, Four in a Row, Dots and Boxes, Ultimate Tic-Tac-Toe, Hex and Dead Centre.
 - <b>Secret picks:</b> in Rock Paper Scissors, Player 1 picks with <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> and Player 2 with <kbd>J</kbd> <kbd>K</kbd> <kbd>L</kbd>. Both hands show only once you have both locked in.
 - <b>Real time:</b> Paddle Duel, Air Hockey, Tag, Sword Duel and Tank Arena, with one player on <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> and the other on the arrow keys. Tag takes up to four on one keyboard: P3 on <kbd>I</kbd> <kbd>J</kbd> <kbd>K</kbd> <kbd>L</kbd> (+<kbd>U</kbd>) and P4 on the number pad <kbd>8</kbd> <kbd>4</kbd> <kbd>5</kbd> <kbd>6</kbd> (+<kbd>0</kbd>).
-- All of them are in the <b>2 Player</b> tab. The panel widens by itself when a game needs the room.
+- The real-time ones are in the <b>Same laptop</b> tab; the board games keep their vs Friend switch. The panel widens by itself when a game needs the room.
 
 <br>
 
@@ -78,7 +78,7 @@ Every board game has a <b>vs Bot / vs Friend</b> switch at the top. Pick Friend 
 
 ### Play online with a room code
 
-Eighteen games can be played online from the <b>Online</b> tab: the board games Chess, Four in a Row, Dots and Boxes, Ultimate Tic-Tac-Toe, Hex, Wall Race, Rock Paper Scissors, Dead Centre and Last Wire, the action games Paddle Duel, Air Hockey and Pop Duel, the guessing games Map Hunt and Clue Spotter, and Tag, Land Claim, City Swallow and Worm Arena, which take <b>2 to 4 players</b> ( the host can press <b>Start now</b> once the room has enough players, or the game starts by itself when every seat is taken). Most games are for two players.
+Eighteen games can be played online from the <b>Online</b> tab: the board games Chess, Four in a Row, Dots and Boxes, Ultimate Tic-Tac-Toe, Hex, Wall Race, Rock Paper Scissors, Dead Centre and Last Wire, the action games Paddle Duel, Air Hockey and Pop Duel, the guessing games Map Hunt and Clue Spotter, and Tag, Land Claim, City Swallow, Worm Arena, Map Hunt and Clue Spotter, which take <b>2 to 4 players</b> ( the host can press <b>Start now</b> once the room has enough players, or the game starts by itself when every seat is taken). Most games are for two players.
 
 One player taps <b>Create room</b> and gets a 5 character room code. The <b>Copy invite</b> button copies a short message with the code and a `ludus://join/CODE` link. The other player taps <b>Join room</b> and types or pastes the code, or just clicks the link. It works on Mac and Windows. There is no account and no server of ours: the copies of Ludus talk through free public relays, and that only happens when you choose Play online. Rooms are not private: anyone who knows the code can join. See [PRIVACY.md](PRIVACY.md) and [web/ONLINE.md](web/ONLINE.md).
 
@@ -136,7 +136,7 @@ Clicking anywhere outside the panel pauses your game and saves it. Next time you
 ### Find a game in a second
 
 - Type in the search box. The best match appears first as a highlighted card, and <b>Related games</b> follow below it.
-- Tabs for All, Arcade, Puzzle, Duel, 2 Player and 3-4 Player.
+- Tabs for All, Arcade, Puzzle, Duel, Same laptop and Online.
 - Optional <b>Rename games</b> in Settings: turn it on and click a game's name to give it your own. The original name is still shown.
 
 <br>
@@ -199,7 +199,7 @@ brew install --cask ludus   # not available yet
 | **Puzzle** | 2048, Crate Push, Five Letters, Minefield, Memory, Solitaire, Sweet Match, Sudoku, Flag Quiz, Mosaic Hunt, Clue Spotter, Tongue Twister |
 | **Duel** (you against the computer) | Chess, Dots and Boxes, Dead Centre, Four in a Row, Last Wire, Ultimate Tic-Tac-Toe, Sword Duel, Hex, Rock Paper Scissors, Wall Race, Pop Duel, stick-figure brawler |
 | **Same laptop** (two people, one keyboard) | Air Hockey, Paddle Duel, Tag, Tank Arena, plus the arcade games with a vs Friend mode |
-| **Online, 2-4 players** | Tag, Land Claim, City Swallow, Worm Arena |
+| **Online, 2-4 players** | Tag, Land Claim, City Swallow, Worm Arena, Map Hunt, Clue Spotter |
 
 Chess, Four in a Row, Dots and Boxes, Ultimate Tic-Tac-Toe, Hex and Dead Centre also have a **vs Friend** mode: pick it at the top of the game.
 
