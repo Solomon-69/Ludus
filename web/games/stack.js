@@ -133,7 +133,6 @@
         const y0 = i === 0 ? -24 : (i - 1) * 12;
         drawBox(ctx, P, { x: s[0], z: s[1], w: s[2], d: s[3], y0, y1: i * 12 }, layerHue(base, i * 4), dark);
       });
-      D.spark(ctx, cx + w * 0.3, h * 0.2, Math.min(w, h) * 0.08, '#d97757', 0.3);
     },
     create(stage, api) {
       const lv = api.level, rm = api.reduceMotion;

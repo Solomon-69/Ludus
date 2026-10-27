@@ -62,7 +62,10 @@
       [[0, 1], [12, 0], [24, 3], [36, 2]].forEach(([n, s], i) => {
         const x = w / 2 - cw * 1.9 + i * cw * 0.95, rot = (i - 1.5) * 0.12;
         ctx.save(); ctx.translate(x + cw / 2, y + ch / 2); ctx.rotate(rot);
+        ctx.shadowColor = 'rgba(0,0,0,0.22)'; ctx.shadowBlur = cw * 0.16; ctx.shadowOffsetY = cw * 0.05;
         ctx.fillStyle = '#fffaf2'; D.roundRect(ctx, -cw / 2, -ch / 2, cw, ch, cw * 0.14); ctx.fill();
+        ctx.shadowColor = 'transparent';
+        ctx.strokeStyle = '#b9ad9b'; ctx.lineWidth = Math.max(1.2, cw * 0.035); ctx.stroke();   // a clear, warm edge so each card stands apart
         const col = s % 2 ? '#c8434f' : '#2b2722';
         D.text(ctx, ['A', 'K', 'Q', 'J'][i], -cw * 0.28, -ch * 0.32, cw * 0.28, col, 750);
         suitShape(ctx, s, 0, ch * 0.05, cw * 0.22, col);

@@ -86,7 +86,6 @@
       });
       ctx.strokeStyle = 'rgba(43,53,80,0.25)'; ctx.lineWidth = 1.5;
       for (let k = 1; k < 3; k++) { ctx.beginPath(); ctx.moveTo(ox + k * c, oy + 4); ctx.lineTo(ox + k * c, oy + s - 4); ctx.moveTo(ox + 4, oy + k * c); ctx.lineTo(ox + s - 4, oy + k * c); ctx.stroke(); }
-      D.spark(ctx, ox + s - 2, oy + 2, c * 0.28, '#d97757', 0.2);
     },
     create(stage, api) {
       const lv = api.level;
