@@ -105,14 +105,19 @@
         ctx.beginPath(); const tx = tailLeft ? x + 14 * u : x + bw - 14 * u;
         ctx.moveTo(tx - 5 * u, y + bh - 1); ctx.lineTo(tx + (tailLeft ? -4 : 4) * u, y + bh + 9 * u); ctx.lineTo(tx + 6 * u, y + bh - 1); ctx.closePath(); ctx.fill();
       };
-      ctx.save(); ctx.translate(0, (h - 78 * u) / 2);   // centred when the card is taller than it is wide
+      // Both bubbles are sized from their own words and centred together, so nothing is cut off at any card shape.
+      const fs = 16 * u, padX = 12 * u, bh = 30 * u, gap = 14 * u;
+      const f1 = `700 ${fs}px -apple-system, "Segoe UI", system-ui, sans-serif`, f2 = `700 ${fs}px "Hiragino Sans", "Yu Gothic", "Noto Sans CJK JP", system-ui, sans-serif`;
+      ctx.font = f1; const t1 = ctx.measureText('Hola').width; ctx.font = f2; const t2 = ctx.measureText('こんにちは').width;
+      let b1 = t1 + padX * 2, b2 = t2 + padX * 2, total = b1 + gap + b2, k = Math.min(1, (w * 0.9) / total);
+      const gh = bh + 20 * u;                       // staggered pair: second bubble sits lower
+      ctx.save(); ctx.translate(w / 2, h / 2 - 2 * u); ctx.scale(k, k); ctx.translate(-total / 2, -gh / 2);
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      const cx = w / 2;
-      bubble(cx - 82 * u, 12 * u, 72 * u, 30 * u, '#fffdf8', true);
-      ctx.fillStyle = '#2f5d62'; ctx.font = `700 ${16 * u}px -apple-system, "Segoe UI", system-ui, sans-serif`; ctx.fillText('Hola', cx - 46 * u, 27.5 * u);
-      bubble(cx + 6 * u, 30 * u, 76 * u, 30 * u, '#f2c94c', false);
-      ctx.fillStyle = '#3a2f12'; ctx.font = `700 ${16 * u}px "Hiragino Sans", "Yu Gothic", "Noto Sans CJK JP", system-ui, sans-serif`; ctx.fillText('こんにちは', cx + 44 * u, 45.5 * u);
-      ctx.fillStyle = 'rgba(255,255,255,0.9)'; ctx.font = `800 ${22 * u}px ui-rounded, -apple-system, system-ui, sans-serif`; ctx.fillText('?', cx - 2 * u, 59 * u);
+      bubble(0, 0, b1, bh, '#fffdf8', true);
+      ctx.fillStyle = '#2f5d62'; ctx.font = f1; ctx.fillText('Hola', b1 / 2, bh / 2 + 0.5 * u);
+      bubble(b1 + gap, 14 * u, b2, bh, '#f2c94c', false);
+      ctx.fillStyle = '#3a2f12'; ctx.font = f2; ctx.fillText('こんにちは', b1 + gap + b2 / 2, 14 * u + bh / 2 + 0.5 * u);
+      ctx.fillStyle = 'rgba(255,255,255,0.9)'; ctx.font = `800 ${20 * u}px ui-rounded, -apple-system, system-ui, sans-serif`; ctx.fillText('?', b1 + gap / 2, bh + 6 * u);
       ctx.restore();
     },
     create(stage, api) {
