@@ -35,6 +35,10 @@ internal static class Probe
         using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
         http.DefaultRequestHeaders.UserAgent.ParseAdd("Ludus-update-probe");
         http.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
+        // CI machines share GitHub's hourly limit for anonymous API calls; the test's own token avoids that.
+        // (Only this release lookup; the updater's downloads stay anonymous, exactly like a friend's.)
+        var token = Environment.GetEnvironmentVariable("GH_TOKEN");
+        if (!string.IsNullOrEmpty(token)) http.DefaultRequestHeaders.Authorization = new("Bearer", token);
         var rel = JsonDocument.Parse(await http.GetStringAsync("https://api.github.com/repos/Solomon-69/Ludus/releases/latest")).RootElement;
         var tag = rel.GetProperty("tag_name").GetString()!.TrimStart('v');
         string Url(string n) => rel.GetProperty("assets").EnumerateArray().First(a => a.GetProperty("name").GetString() == n).GetProperty("browser_download_url").GetString()!;
@@ -53,6 +57,7 @@ internal static class Probe
         if (await Task.WhenAny(dl, limit) == limit) { Log($"FAIL download not finished after 8 minutes (progress {max}%)"); return 1; }
         var staged = await dl;
         var secs = Clock.Elapsed.TotalSeconds - t0;
+        await Task.Delay(300);   // let the last progress report arrive (it is posted to the UI thread)
         Log($"download+verify+unzip took {secs:0.0}s, progress first above 0 at {firstAboveZero:0.0}s, highest {max}%");
         var fails = 0;
         void Check(bool ok, string what) { Log((ok ? "PASS " : "FAIL ") + what); if (!ok) fails++; }

@@ -3,6 +3,19 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.17 (2026-10-27)
+
+- Updating inside the app is sturdier, on Windows and Mac. The download now shows progress from the very first moments
+  (to one decimal, so even a slow connection visibly moves instead of sitting at 0%), carries on where it stopped if
+  the connection drops, tries again by itself, and if GitHub's download address does not answer it uses a second
+  address for the newest release. A download that stops moving for 30 seconds is retried instead of waiting forever.
+- If an update still cannot finish, Ludus says why in plain words and shows a Website button that opens the Ludus
+  download page, so you can get the new version by hand.
+- Windows: if a file is briefly in use while the new version is copied in, Ludus now keeps trying for a few seconds
+  instead of stopping, so it always opens again afterwards.
+- New automatic test: GitHub's own Windows and Mac machines install the previous version and update it to the newest
+  one with the real updater, on their own internet connection, and check it finishes.
+
 ## 1.12.16 (2026-10-27)
 
 - The category tabs on the home screen (All, Arcade, Puzzle, Duel, Same laptop, Online) now work like one toggle:

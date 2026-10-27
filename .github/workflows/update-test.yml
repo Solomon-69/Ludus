@@ -56,6 +56,8 @@ jobs:
 
       - name: Update the older Ludus with the real updater
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           New-Item -ItemType Directory -Force logs | Out-Null
           $res = Join-Path $PWD 'logs\update-${{ matrix.updater }}.txt'
@@ -99,6 +101,8 @@ jobs:
           ditto -x -k old/Ludus-mac.zip old/x
 
       - name: Update the older Ludus with the real updater
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p logs
           ./probe "logs/update-${{ matrix.updater }}.txt" old/x/Ludus.app ${{ matrix.updater }}

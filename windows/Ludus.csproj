@@ -17,7 +17,7 @@
     <Description>Take a little break</Description>
     <Company>Solomon</Company>
     <Copyright>Copyright (c) 2026 Solomon</Copyright>
-    <Version>1.12.16</Version>
+    <Version>1.12.17</Version>
     <ApplicationManifest>app.manifest</ApplicationManifest>
 
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
@@ -32,6 +32,11 @@
     <PublishReferencesDocumentationFiles>false</PublishReferencesDocumentationFiles>
     <DebugType>embedded</DebugType>
   </PropertyGroup>
+
+  <!-- Test tools under ci/ build on their own; never part of Ludus.exe. -->
+  <ItemGroup>
+    <Compile Remove="ci\**" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3912.50" />

@@ -22,9 +22,13 @@ struct Probe {
         do {
             var req = URLRequest(url: URL(string: "https://api.github.com/repos/Solomon-69/Ludus/releases/latest")!)
             req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+            // CI machines share GitHub's anonymous API limit; the test's own token is used for this lookup only.
+            if let t = ProcessInfo.processInfo.environment["GH_TOKEN"], !t.isEmpty { req.setValue("Bearer \(t)", forHTTPHeaderField: "Authorization") }
             let (data, _) = try await URLSession.shared.data(for: req)
-            let rel = try JSONSerialization.jsonObject(with: data) as! [String: Any]
-            let tag = (rel["tag_name"] as! String).replacingOccurrences(of: "v", with: "")
+            guard let rel = try JSONSerialization.jsonObject(with: data) as? [String: Any], let tagName = rel["tag_name"] as? String else {
+                throw NSError(domain: "probe", code: 1, userInfo: [NSLocalizedDescriptionKey: String(decoding: data.prefix(300), as: UTF8.self)])
+            }
+            let tag = tagName.replacingOccurrences(of: "v", with: "")
             let assets = rel["assets"] as! [[String: Any]]
             func url(_ n: String) -> URL { URL(string: assets.first { $0["name"] as? String == n }!["browser_download_url"] as! String)! }
             log("latest = \(tag)")
