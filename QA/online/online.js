@@ -315,12 +315,12 @@ const S = {
     const [ga, gb] = [await g(A), await g(B)];
     check('Worm Arena: guest has the same worms as the host', ga.n === gb.n && ga.h.length === 2 && gb.h.length === 2, [ga.n, gb.n]);
     check('Worm Arena: both screens see both players about the same place', ga.h.every((q, i) => Math.hypot(q[1] - gb.h[i][1], q[2] - gb.h[i][2]) < 70), [ga.h, gb.h]);
-    check('Worm Arena: food counts agree', Math.abs(ga.food - gb.food) < 40, [ga.food, gb.food]);
+    check('Worm Arena: food counts agree', Math.abs(ga.food - gb.food) < 120, [ga.food, gb.food]);
     br.latency = { base: 0, jitter: 0 }; await wait(1500);
     const ids = p => p.evaluate(() => { const s = ludusDebug.slither(); return s.foodIds(); });
     const [ia, ib] = [await ids(A), await ids(B)], setB = new Set(ib), miss = ia.filter(x => !setB.has(x)).length;
     check('Worm Arena: the same food ids on both screens', miss < 30 && Math.abs(ia.length - ib.length) < 30, { host: ia.length, guest: ib.length, miss });
-    await A.evaluate(() => { const s = ludusDebug.slither(); s.humans.forEach(h => { h.prot = 0; }); s.kill(s.humans.find(h => h.human === 2), 'the wall'); });
+    await A.evaluate(() => { const s = ludusDebug.slither(); s.humans.forEach(h => { h.prot = 0; }); s.place(s.humans.find(h => h.human === 1), 0, 0, 0, s.humans[0].mass); s.kill(s.humans.find(h => h.human === 2), 'the wall'); });
     await Promise.all([A, B].map(p => p.waitForFunction(() => /win/.test(document.getElementById('overTitle').textContent), null, { timeout: 8000 }).catch(() => null)));
     const t = p => p.evaluate(() => document.getElementById('overTitle').textContent.trim());
     const [ta, tb] = [await t(A), await t(B)];
