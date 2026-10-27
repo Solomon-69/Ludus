@@ -92,22 +92,28 @@
     hint: '<kbd>←</kbd><kbd>↑</kbd><kbd>→</kbd><kbd>↓</kbd> or WASD, swipe or click a direction',
     _test: { MAP, W, H, cellAt, isWallFor, chaseTarget, chooseDir, countPellets, freshGrid, OPP, DIRS },
     art(ctx, w, h) {
-      const D = Ludus.draw, cy = h * 0.52, r = Math.min(w, h) * 0.2;
-      ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 6; ctx.lineCap = 'round';
-      ctx.beginPath(); ctx.moveTo(8, cy - r * 1.6); ctx.lineTo(w - 8, cy - r * 1.6); ctx.moveTo(8, cy + r * 1.6); ctx.lineTo(w - 8, cy + r * 1.6); ctx.stroke();
+      // Pac-style chase: open-mouthed chomper, a trail of dots ending in a power dot, a ghost looking back at it.
+      const cy = h * 0.52, r = Math.min(w, h) * 0.22, px = w * 0.2;
+      ctx.strokeStyle = 'rgba(217,119,87,0.32)'; ctx.lineWidth = 5; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(12, cy - r * 1.75); ctx.lineTo(w - 12, cy - r * 1.75); ctx.moveTo(12, cy + r * 1.75); ctx.lineTo(w - 12, cy + r * 1.75); ctx.stroke();
+      const m = 0.34 * Math.PI;
       ctx.fillStyle = '#d97757';
-      ctx.beginPath(); ctx.arc(w * 0.24, cy, r, 0, 7); ctx.fill();
-      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(w * 0.24 + r * 0.3, cy - r * 0.25, r * 0.2, 0, 7); ctx.fill();
-      ctx.fillStyle = '#2f2a24'; ctx.beginPath(); ctx.arc(w * 0.24 + r * 0.36, cy - r * 0.25, r * 0.09, 0, 7); ctx.fill();
-      ctx.strokeStyle = '#2f2a24'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(w * 0.24 + r * 0.2, cy + r * 0.05, r * 0.4, 0.15 * Math.PI, 0.75 * Math.PI); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(px, cy); ctx.arc(px, cy, r, m, -m + Math.PI * 2); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#2f2a24'; ctx.beginPath(); ctx.arc(px + r * 0.05, cy - r * 0.52, r * 0.13, 0, 7); ctx.fill();
       ctx.fillStyle = '#f4e3d0';
-      for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.arc(w * (0.4 + i * 0.09), cy, 2.4, 0, 7); ctx.fill(); }
-      D.spark(ctx, w * 0.67, cy, r * 0.42, '#f4e3d0', 0.3);
-      const gx = w * 0.84, gr = r * 0.85;
+      for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.arc(w * (0.36 + i * 0.1), cy, 2.6, 0, 7); ctx.fill(); }
+      const sx = w * 0.66;
+      ctx.fillStyle = 'rgba(244,227,208,0.22)'; ctx.beginPath(); ctx.arc(sx, cy, r * 0.5, 0, 7); ctx.fill();
+      ctx.fillStyle = '#f4e3d0'; ctx.beginPath(); ctx.arc(sx, cy, r * 0.28, 0, 7); ctx.fill();
+      const gx = w * 0.85, gr = r * 0.95, top = cy - gr * 0.1, bot = cy + gr;
       ctx.fillStyle = '#e58fb0';
-      blobPath(ctx, gx, cy, gr, 0); ctx.fill();
-      ctx.fillStyle = '#fff';
-      [-0.35, 0.35].forEach(o => { ctx.beginPath(); ctx.arc(gx + o * gr, cy - gr * 0.15, gr * 0.24, 0, 7); ctx.fill(); });
+      ctx.beginPath(); ctx.moveTo(gx - gr, bot); ctx.lineTo(gx - gr, top); ctx.arc(gx, top, gr, Math.PI, 0); ctx.lineTo(gx + gr, bot);
+      for (let i = 0; i < 3; i++) { const x1 = gx + gr - (i * 2 + 1) * gr / 3, x2 = gx + gr - (i + 1) * 2 * gr / 3; ctx.quadraticCurveTo(x1, bot - gr * 0.38, x2, bot); }
+      ctx.closePath(); ctx.fill();
+      [-0.4, 0.4].forEach(o => {
+        ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(gx + o * gr, top - gr * 0.05, gr * 0.27, gr * 0.33, 0, 0, 7); ctx.fill();
+        ctx.fillStyle = '#2f2a24'; ctx.beginPath(); ctx.arc(gx + o * gr - gr * 0.1, top - gr * 0.02, gr * 0.13, 0, 7); ctx.fill();
+      });
     },
     create(stage, api) {
       const D = Ludus.draw;

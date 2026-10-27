@@ -3,6 +3,10 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.7 (2026-10-27)
+
+- Chomp cover redrawn: open-mouthed chomper, dot trail, power dot and a clear ghost.
+
 ## 1.12.6 (2026-10-27)
 
 - Chomp: ghosts stay edible much longer after a power spark, so there is time to chase them down.
