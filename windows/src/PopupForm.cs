@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
@@ -16,6 +17,7 @@ internal sealed class PopupForm : Form
     private const string Host = "ludus.example";
     private const string Origin = "https://" + Host + "/";
     private const string StartPage = Origin + "index.html";
+    private const string SiteUrl = "https://solomon-69.github.io/Ludus/";
 
     private static readonly Size CompactDip = new(400, 600);
     private static readonly Size LargeDip = new(520, 740);
@@ -316,7 +318,7 @@ internal sealed class PopupForm : Form
         updating = true;
         try
         {
-            var staged = await Updater.DownloadAsync(zipUri, sumsUri, name,
+            var staged = await Updater.DownloadWithFallbackAsync(zipUri, sumsUri, name,
                 new Progress<double>(p => RunScript($"window.ludusUpdateState && ludusUpdateState('progress', {p.ToString(System.Globalization.CultureInfo.InvariantCulture)})")));
             Updater.StartSwap(staged, AppContext.BaseDirectory.TrimEnd('\\', '/'), Environment.ProcessId);
             Quit();   // the helper waits for this process to exit, swaps the files and opens Ludus again
@@ -401,7 +403,15 @@ internal sealed class PopupForm : Form
                     BeginInvoke((MethodInvoker)(() => ArmWatchdog(1500)));
                     break;
                 case "update":
-                    BeginInvoke((MethodInvoker)(() => StartUpdate(StringProp(msg, "zip"), StringProp(msg, "sums"), StringProp(msg, "name"))));
+                    {
+                        // Read the message now: the JSON document is disposed as soon as this handler returns, so reading it
+                        // inside the BeginInvoke callback threw and the update never started (stuck at 0%).
+                        string? uz = StringProp(msg, "zip"), us = StringProp(msg, "sums"), un = StringProp(msg, "name");
+                        BeginInvoke((MethodInvoker)(() => StartUpdate(uz, us, un)));
+                    }
+                    break;
+                case "site":   // "Download from the website": only ever this one fixed address
+                    try { Process.Start(new ProcessStartInfo(SiteUrl) { UseShellExecute = true }); } catch (Exception ex) { Store.Log($"open site failed: {ex.Message}"); }
                     break;
                 case "playing":
                     break;   // the Mac ignores this too; kept for future use

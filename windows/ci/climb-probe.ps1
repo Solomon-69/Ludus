@@ -23,25 +23,15 @@ Ui-Dump $win (Join-Path $Out 'uia-climb.txt')
 $r = Get-Content $json -Raw | ConvertFrom-Json
 $b = $r.panelBounds
 Save-Crop (Join-Path $Out '01-climb-menu.png') $b[0] $b[1] $b[2] $b[3]
-# the game canvas: the largest element inside the panel below the header
-$best = $null; $area = 0
-foreach ($e in $win.FindAll($TS::Descendants, [System.Windows.Automation.Condition]::TrueCondition)) {
-  try { $q = $e.Current.BoundingRectangle; $t = $e.Current.ControlType.ProgrammaticName
-        if ($t -match 'Image|Group|Pane|Custom' -and $q.Y -gt ($b[1] + 60) -and $q.Width * $q.Height -gt $area -and $q.Width -lt $b[2]) { $best = $q; $area = $q.Width * $q.Height } } catch { }
-}
-Write-Host "canvas guess: $best"
-if ($best) {
-  $w = $best.Width; $h = $best.Height
-  $cw = [Math]::Min($w - 32, 340); $ch = [Math]::Max(46, [Math]::Min(58, ($h - 170) / 4 - 10)); $tot = 64 + 4 * ($ch + 10) + 26; $top = [Math]::Max(12, ($h - $tot) / 2)
-  $x = [int]($best.X + $w / 2); $y = [int]($best.Y + $top + 64 + ($ch + 10) + $ch / 2)
-  Write-Host "click $x,$y"
-  [Mouse]::Click($x, $y)
-  Start-Sleep -Seconds 2
-  Save-Crop (Join-Path $Out '02-climb-after-click.png') $b[0] $b[1] $b[2] $b[3]
-  [Mouse]::Click($x + 60, $y - 80)
-  Start-Sleep -Seconds 2
-  Save-Crop (Join-Path $Out '03-climb-after-2nd-click.png') $b[0] $b[1] $b[2] $b[3]
-}
+# the "Normal" card sits a little above the middle of the panel (400x600 panel: about 274 px down)
+$x = [int]($b[0] + $b[2] / 2); $y = [int]($b[1] + $b[3] * 0.457)
+Write-Host "click $x,$y"
+[Mouse]::Click($x, $y)
+Start-Sleep -Seconds 2
+Save-Crop (Join-Path $Out '02-climb-after-click.png') $b[0] $b[1] $b[2] $b[3]
+# wave the mouse around the pot like a player would, then look again
+for ($i = 0; $i -lt 40; $i++) { [void][Mouse]::SetCursorPos([int]($x + 70 * [Math]::Cos($i / 4)), [int]($y + 120 + 70 * [Math]::Sin($i / 4))); Start-Sleep -Milliseconds 50 }
+Save-Crop (Join-Path $Out '03-climb-after-moves.png') $b[0] $b[1] $b[2] $b[3]
 Copy-Item "$env:APPDATA\Ludus\*" $Out -ErrorAction SilentlyContinue
 Get-Content (Join-Path $Out '*.log') -ErrorAction SilentlyContinue | Select-Object -Last 40
 Stop-Process $p -Force -ErrorAction SilentlyContinue

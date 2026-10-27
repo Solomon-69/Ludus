@@ -46,7 +46,39 @@ enum Updater {
         try fm.createDirectory(at: work, withIntermediateDirectories: true)
         defer { try? fm.removeItem(at: work) }
 
-        let (sumData, sumResp) = try await URLSession.shared.data(from: sums)
+        let newApp = try await stage(zip: zip, sums: sums, name: name, work: work, bundleName: bundle.lastPathComponent, progress: progress)
+        guard let plist = NSDictionary(contentsOf: newApp.appendingPathComponent("Contents/Info.plist")),
+              plist["CFBundleIdentifier"] as? String == (Bundle(url: bundle)?.bundleIdentifier ?? "com.solomon.Ludus") else { throw Failure(why: "not a Ludus app") }
+        try? shell("/usr/bin/xattr", ["-dr", "com.apple.quarantine", newApp.path])
+        _ = try fm.replaceItemAt(bundle, withItemAt: newApp)
+        relaunch(bundle)
+    }
+
+    /// A session with a real User-Agent and timeouts: a stalled connection fails in 30 s instead of hanging at 0%.
+    static let session: URLSession = {
+        let c = URLSessionConfiguration.ephemeral
+        c.timeoutIntervalForRequest = 30; c.timeoutIntervalForResource = 600
+        let v = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0"
+        c.httpAdditionalHeaders = ["User-Agent": "Ludus/\(v) (Mac)"]
+        return URLSession(configuration: c)
+    }()
+    static let repo = "Solomon-69/Ludus"
+
+    /// Download (release link, then the releases/latest/download link as a fallback), verify, unzip. Returns the unzipped app.
+    static func stage(zip: URL, sums: URL, name: String, work: URL, bundleName: String, progress: @escaping @Sendable (Double) -> Void) async throws -> URL {
+        do { return try await stageOnce(zip: zip, sums: sums, name: name, work: work, bundleName: bundleName, progress: progress) }
+        catch let f as Failure where f.why == "checksum mismatch" { throw f }
+        catch {
+            let b = "https://github.com/\(repo)/releases/latest/download/"
+            guard let z = URL(string: b + name), let s = URL(string: b + "SHA256SUMS.txt") else { throw error }
+            try? FileManager.default.removeItem(at: work.appendingPathComponent("x")); try? FileManager.default.removeItem(at: work.appendingPathComponent(name))
+            return try await stageOnce(zip: z, sums: s, name: name, work: work, bundleName: bundleName, progress: progress)
+        }
+    }
+
+    private static func stageOnce(zip: URL, sums: URL, name: String, work: URL, bundleName: String, progress: @escaping @Sendable (Double) -> Void) async throws -> URL {
+        let fm = FileManager.default
+        let (sumData, sumResp) = try await session.data(from: sums)
         guard (sumResp as? HTTPURLResponse)?.statusCode == 200, let text = String(data: sumData, encoding: .utf8),
               let want = expectedHash(in: text, for: name) else { throw Failure(why: "no checksum") }
 
@@ -55,7 +87,8 @@ enum Updater {
         fm.createFile(atPath: file.path, contents: nil)
         let out = try FileHandle(forWritingTo: file)
         var hasher = SHA256()
-        let (bytes, resp) = try await URLSession.shared.bytes(from: zip)
+        progress(1)   // started: the bar moves off 0 straight away
+        let (bytes, resp) = try await session.bytes(from: zip)
         guard (resp as? HTTPURLResponse)?.statusCode == 200 else { throw Failure(why: "download failed") }
         let total = Double(resp.expectedContentLength)
         var buf = Data(); var got = 0.0; var last = -1.0
@@ -63,7 +96,8 @@ enum Updater {
             buf.append(b)
             if buf.count >= 65536 {
                 hasher.update(data: buf); try out.write(contentsOf: buf); got += Double(buf.count); buf.removeAll(keepingCapacity: true)
-                if total > 0 { let p = min(99, (got / total * 100).rounded()); if p != last { last = p; progress(p) } }
+                let p = total > 0 ? min(99, max(1, (got / total * 100).rounded())) : min(95, 1 + (got / 1_000_000).rounded())
+                if p != last { last = p; progress(p) }
             }
         }
         if !buf.isEmpty { hasher.update(data: buf); try out.write(contentsOf: buf) }
@@ -72,16 +106,38 @@ enum Updater {
         guard have == want else { throw Failure(why: "checksum mismatch") }
         progress(100)
 
-        // Unzip, check it is really this app, clear quarantine, swap.
+        // Unzip and check it is an app.
         let unzipped = work.appendingPathComponent("x", isDirectory: true)
         try shell("/usr/bin/ditto", ["-x", "-k", file.path, unzipped.path])
-        let newApp = unzipped.appendingPathComponent(bundle.lastPathComponent)
-        guard let plist = NSDictionary(contentsOf: newApp.appendingPathComponent("Contents/Info.plist")),
-              plist["CFBundleIdentifier"] as? String == (Bundle(url: bundle)?.bundleIdentifier ?? "com.solomon.Ludus"),
-              fm.fileExists(atPath: newApp.appendingPathComponent("Contents/MacOS").path) else { throw Failure(why: "not a Ludus app") }
-        try? shell("/usr/bin/xattr", ["-dr", "com.apple.quarantine", newApp.path])
-        _ = try fm.replaceItemAt(bundle, withItemAt: newApp)
-        relaunch(bundle)
+        let newApp = unzipped.appendingPathComponent(bundleName)
+        guard fm.fileExists(atPath: newApp.appendingPathComponent("Contents/MacOS").path) else { throw Failure(why: "not a Ludus app") }
+        return newApp
+    }
+
+    /// Test aid (update-test workflow): `Ludus --selftest-update=RESULT`. No window. Does what Settings > Update does against
+    /// the real GitHub release (check, download with progress, verify, unzip) without installing; writes JSON to RESULT.
+    static func selfTestReal(result: String) async -> Bool {
+        let t0 = Date(); final class Box: @unchecked Sendable { var max = 0.0 }; let box = Box()
+        var ok = false, tag: String? = nil, err: String? = nil
+        let work = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("ludus-update-\(UUID().uuidString)", isDirectory: true)
+        do {
+            try FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
+            var req = URLRequest(url: URL(string: "https://api.github.com/repos/\(repo)/releases/latest")!)
+            req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+            let (data, _) = try await session.data(for: req)
+            let rel = try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
+            tag = rel["tag_name"] as? String
+            let assets = rel["assets"] as? [[String: Any]] ?? []
+            func url(_ n: String) -> URL? { (assets.first { $0["name"] as? String == n }?["browser_download_url"] as? String).flatMap(URL.init(string:)) }
+            guard let z = url("Ludus-mac.zip"), let s = url("SHA256SUMS.txt") else { throw Failure(why: "release has no files") }
+            let app = try await stage(zip: z, sums: s, name: "Ludus-mac.zip", work: work, bundleName: "Ludus.app", progress: { p in box.max = Swift.max(box.max, p) })
+            ok = FileManager.default.fileExists(atPath: app.appendingPathComponent("Contents/Info.plist").path)
+            if !ok { err = "no app in the download" }
+        } catch { err = "\(error)" }
+        try? FileManager.default.removeItem(at: work)
+        let out: [String: Any] = ["ok": ok, "tag": tag ?? NSNull(), "maxPct": box.max, "seconds": (Date().timeIntervalSince(t0) * 10).rounded() / 10, "error": err ?? NSNull()]
+        if let d = try? JSONSerialization.data(withJSONObject: out) { try? d.write(to: URL(fileURLWithPath: result)) }
+        return ok
     }
 
     /// Waits for this process to exit, then opens the (new) app again.

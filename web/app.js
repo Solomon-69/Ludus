@@ -121,7 +121,11 @@
   function placePill(animate) {
     const f = $('filters'), on = f.querySelector('.chip.is-on');
     if (!pill || !on) { if (pill) pill.style.opacity = '0'; return; }
-    const x = on.offsetLeft, y = on.offsetTop, w = on.offsetWidth, h = on.offsetHeight;
+    // sub-pixel exact (offset* round to whole pixels, which left the pill half a pixel past a tab's edge)
+    const fr = f.getBoundingClientRect(), r = on.getBoundingClientRect(), bl = f.clientLeft, bt = f.clientTop;
+    const pressed = Math.abs(r.width - on.offsetWidth) > 1;   // a tab mid press-scale: its layout box is the truth
+    const x = pressed ? on.offsetLeft : r.left - fr.left - bl + f.scrollLeft, y = pressed ? on.offsetTop : r.top - fr.top - bt + f.scrollTop;
+    const w = pressed ? on.offsetWidth : r.width, h = pressed ? on.offsetHeight : r.height;
     const moved = !pillAt || pillAt.x !== x || pillAt.w !== w || pillAt.y !== y || pillAt.h !== h;
     if (!moved && pill.style.opacity === '1') return;
     const slide = animate && pillAt && f.offsetParent !== null;
@@ -932,7 +936,7 @@
       else if (st === 'available') { say('A new version is ready'); ctl.append(btn('Update to ' + U.latest, 'warm', U.askInstall)); }
       else if (st === 'confirm') { say('Ludus restarts when it is done.'); ctl.append(btn('Not now', '', U.cancel), btn('Install', 'warm', U.install)); }
       else if (st === 'progress') { say(U.pct >= 100 ? 'Installing…' : 'Downloading… ' + Math.round(U.pct) + '%'); const bar = el('div', 'upd-bar'), fill = el('i'); fill.style.width = U.pct + '%'; bar.appendChild(fill); ctl.appendChild(bar); }
-      else if (st === 'error') { say('Couldn’t update. Try again.', 'bad'); ctl.append(btn('Try again', '', U.check)); }
+      else if (st === 'error') { say('Couldn’t update. Try again, or get it from the website.', 'bad'); ctl.append(btn('Website', '', U.openSite), btn('Try again', '', U.check)); }
       else if (st === 'cantcheck') { say('Couldn’t check'); ctl.append(btn('Check', '', U.check)); }
       else { say('Needs the internet.'); ctl.append(btn('Check', '', U.check, true)); }
     }

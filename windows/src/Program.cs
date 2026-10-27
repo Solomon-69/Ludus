@@ -43,6 +43,8 @@ internal static class Program
         // Test aid for the Windows CI: exercise the updater against a local fake release, then exit.
         var upd = args.FirstOrDefault(a => a.StartsWith("--update-selftest=", StringComparison.OrdinalIgnoreCase));
         if (upd != null) { Environment.Exit(Updater.SelfTestAsync(upd["--update-selftest=".Length..].Trim('"')).GetAwaiter().GetResult()); return; }
+        var real = args.FirstOrDefault(a => a.StartsWith("--selftest-update=", StringComparison.OrdinalIgnoreCase));
+        if (real != null) { Environment.Exit(Updater.SelfTestRealAsync(real["--selftest-update=".Length..].Trim('"')).GetAwaiter().GetResult()); return; }
 
         // Single instance: a second launch just asks the running Ludus to open its panel (or to quit).
         using var mutex = new Mutex(initiallyOwned: true, MutexName, out var firstInstance);
