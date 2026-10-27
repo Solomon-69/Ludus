@@ -3,6 +3,10 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.2 (2026-10-27)
+
+- Right-click the menu bar icon to open Settings. (Windows: right-click the tray icon; Open at login and Quit are in Settings.)
+
 ## 1.12.1 (2026-10-27)
 
 - **Privacy blur** works properly now: it finds your face at a normal sitting distance (before, it often missed it and
