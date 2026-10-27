@@ -15,9 +15,11 @@
 
   // Public relays that speak MQTT over a secure WebSocket, tried in this order.
   // A page can set window.__LUDUS_BROKERS__ (a list of URLs) before this file loads; used by the tests.
-  const BROKERS = ['wss://broker.emqx.io:8084/mqtt', 'wss://broker.hivemq.com:8884/mqtt', 'wss://test.mosquitto.org:8081'];
+  const BROKERS = ['wss://broker.emqx.io:8084/mqtt', 'wss://broker.hivemq.com:8884/mqtt', 'wss://test.mosquitto.org:8081', 'ntfy://ntfy.sh'];
+  // The last relay is not MQTT: ntfy.sh, a free public pub/sub service on the ordinary HTTPS port. It is the way in on networks that
+  // block the MQTT relays, and it is only tried after them (it throttles fast traffic, which suits menus and turn-based games).
   const KEEP_ALIVE = 30;            // seconds; the relay drops a quiet client after about 1.5x this
-  const CONNECT_TIMEOUT = 7000;     // ms to wait for one relay before trying the next
+  const CONNECT_TIMEOUT = 4000;     // ms to wait for one relay before trying the next
   const HEARTBEAT = 4000;           // ms between "I am still here" messages
   const PEER_TIMEOUT = 16000;       // ms of silence before a player (or the host) counts as gone
   const MAX_PACKET = 4096;          // bytes of one game message, in and out
@@ -160,6 +162,8 @@
     if (me.closed) return;
     const url = me.urls[me.idx % me.urls.length];
     me.url = url;
+    me.isNtfy = url.indexOf('ntfy:') === 0;
+    if (me.isNtfy) return me._connectNtfy();
     let ws, acked = false, buf = new Uint8Array(0);
     try { ws = new (NET.WebSocket || window.WebSocket)(url, 'mqtt'); } catch (e) { me._lost(false); return; }
     ws.binaryType = 'arraybuffer';
@@ -178,7 +182,7 @@
               me._startPing(ws);
               me.subs.forEach((fn, topic) => me._raw(P.subscribe(me.pid++ & 0xFFFF || 1, topic)));
               const q = me.outbox; me.outbox = [];
-              q.forEach(p => me._raw(p));
+              q.forEach(e => me._raw(e.p));
               me._set('online');
             } else { try { ws.close(); } catch (e) {} }
           } else if (type === 3) {   // PUBLISH
@@ -229,26 +233,82 @@
   };
   Mqtt.prototype.subscribe = function (topic, fn) {
     this.subs.set(topic, fn);
-    if (this.state === 'online') this._raw(P.subscribe(this.pid++ & 0xFFFF || 1, topic));
+    if (this.state === 'online') { if (this.isNtfy) this._ntfyOpen(topic); else this._raw(P.subscribe(this.pid++ & 0xFFFF || 1, topic)); }
   };
   Mqtt.prototype.unsubscribe = function (topic) {
     this.subs.delete(topic);
-    if (this.state === 'online') this._raw(P.unsubscribe(this.pid++ & 0xFFFF || 1, topic));
+    if (this.isNtfy) this._ntfyShut(topic);
+    else if (this.state === 'online') this._raw(P.unsubscribe(this.pid++ & 0xFFFF || 1, topic));
   };
   Mqtt.prototype.publish = function (topic, text, volatile) {
+    if (this.isNtfy && this.state === 'online') { this._ntfyPost(topic, text); return true; }
     const p = P.publish(topic, text);
-    if (this.state === 'online' && this._raw(p)) return true;
+    if (!this.isNtfy && this.state === 'online' && this._raw(p)) return true;
     if (volatile) return false;                 // live game state: an old copy is worthless, never queue it
-    this.outbox.push(p); if (this.outbox.length > QUEUE_LIMIT) this.outbox.shift();
+    this.outbox.push({ topic, text, p }); if (this.outbox.length > QUEUE_LIMIT) this.outbox.shift();
     return false;
   };
   Mqtt.prototype.close = function () {
     this.closed = true;
     clearInterval(this.pingTimer); clearTimeout(this.retryTimer);
     const ws = this.ws; this.ws = null;
-    if (ws) { try { ws.send(P.disconnect()); } catch (e) {} setTimeout(() => { try { ws.close(); } catch (e) {} }, 60); }
+    this._ntfyShutAll();
+    if (ws && this.isNtfy) { try { ws.close(); } catch (e) {} }
+    else if (ws) { try { ws.send(P.disconnect()); } catch (e) {} setTimeout(() => { try { ws.close(); } catch (e) {} }, 60); }
     this._set('offline');
     this.listeners = [];
+  };
+  // ---- the ntfy.sh relay: one WebSocket per room topic to listen, one HTTPS POST per message to send
+  const ntfyName = topic => 'lds-' + String(topic).replace(/[^A-Za-z0-9_-]/g, '-').slice(0, 58);
+  Mqtt.prototype._connectNtfy = function () {
+    const me = this;
+    let ws, acked = false;
+    try { ws = new (NET.WebSocket || window.WebSocket)('wss://ntfy.sh/lds-c-' + hex(randBytes(6)) + '/ws'); } catch (e) { me._lost(false); return; }
+    me.ws = ws;
+    const timer = setTimeout(() => { if (!acked) { try { ws.close(); } catch (e) {} } }, CONNECT_TIMEOUT);
+    ws.onmessage = ev => {
+      if (me.ws !== ws) return;
+      me.lastRx = Date.now();
+      let m; try { m = JSON.parse(ev.data); } catch (e) { return; }
+      if (m && m.event === 'open' && !acked) {
+        acked = true; me.attempt = 0; me.everOnline = true; me.curIdx = me.idx % me.urls.length; me.lastRx = Date.now();
+        me.subs.forEach((fn, t) => me._ntfyOpen(t));
+        const q = me.outbox; me.outbox = [];
+        q.forEach(e => me._ntfyPost(e.topic, e.text));
+        me._set('online');
+      }
+    };
+    ws.onclose = () => { clearTimeout(timer); if (me.ws !== ws) return; me.ws = null; me._ntfyShutAll(); me._lost(acked); };
+    ws.onerror = () => { try { ws.close(); } catch (e) {} };
+  };
+  Mqtt.prototype._ntfyOpen = function (topic) {
+    const me = this;
+    me.nsock = me.nsock || new Map();
+    if (me.nsock.has(topic)) return;
+    let ws; try { ws = new (NET.WebSocket || window.WebSocket)('wss://ntfy.sh/' + ntfyName(topic) + '/ws?since=8s'); } catch (e) { return; }
+    me.nsock.set(topic, ws);
+    ws.onmessage = ev => {
+      let m; try { m = JSON.parse(ev.data); } catch (e) { return; }
+      if (!m || m.event !== 'message' || typeof m.message !== 'string') return;
+      const fn = me.subs.get(topic);
+      if (fn) { try { fn(m.message); } catch (e) { /* ignore a handler error */ } }
+    };
+    ws.onclose = () => {   // a dropped listener comes back while the room still wants it
+      if (me.nsock && me.nsock.get(topic) === ws) { me.nsock.delete(topic); if (!me.closed && me.subs.has(topic) && me.state === 'online') setTimeout(() => me._ntfyOpen(topic), 800); }
+    };
+    ws.onerror = () => { try { ws.close(); } catch (e) {} };
+  };
+  Mqtt.prototype._ntfyShut = function (topic) {
+    const ws = this.nsock && this.nsock.get(topic); if (!ws) return;
+    this.nsock.delete(topic); try { ws.close(); } catch (e) {}
+  };
+  Mqtt.prototype._ntfyShutAll = function () {
+    if (!this.nsock) return;
+    const all = [...this.nsock.values()]; this.nsock.clear();
+    all.forEach(ws => { try { ws.close(); } catch (e) {} });
+  };
+  Mqtt.prototype._ntfyPost = function (topic, text) {
+    try { fetch('https://ntfy.sh/' + ntfyName(topic), { method: 'POST', body: text }).catch(() => {}); } catch (e) { /* offline: the room's own resend covers it */ }
   };
   NET.Mqtt = Mqtt;
 

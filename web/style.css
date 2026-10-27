@@ -8,7 +8,7 @@
   --box-line: #E2D8C8;
   --ink: #201c17;
   --ink-2: #6b6256;
-  --ink-3: #9a9085;
+  --ink-3: #766d61;
   --line: rgba(32, 28, 23, 0.09);
   --accent: #d97757;
   --accent-ink: #fff8f2;
@@ -35,7 +35,7 @@
   --box-line: transparent;
   --ink: #f3ede3;
   --ink-2: #b5aa9b;
-  --ink-3: #847a6e;
+  --ink-3: #a79d8e;
   --line: rgba(255, 245, 230, 0.08);
   --accent-soft: rgba(217, 119, 87, 0.2);
   --shadow: 0 1px 1px rgba(0, 0, 0, 0.25), 0 8px 20px -8px rgba(0, 0, 0, 0.6);
@@ -80,7 +80,7 @@ svg { display: block; }
 .brand { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
 .logo { width: 34px; height: 22px; color: var(--accent); flex: none; }
 .brand-name { font: 650 17px/1.1 var(--font-round); letter-spacing: -0.01em; }
-.brand-sub { color: var(--ink-3); font-size: 11.5px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.brand-sub { color: var(--ink-2); font-size: 12px; font-weight: 500; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .spacer { flex: 1; }
 .icon-btn {
   width: 32px; height: 32px; border-radius: 10px; flex: none;
@@ -250,7 +250,7 @@ svg { display: block; }
 /* Settings */
 .settings-body { flex: 1; overflow-y: auto; padding: 4px 14px 18px; scrollbar-width: none; }
 .settings-body::-webkit-scrollbar { display: none; }
-.group-label { font-size: 11px; line-height: 13px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-3); margin: 5px 4px 4px; }
+.group-label { font-size: 11px; line-height: 13px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-2); margin: 5px 4px 4px; }
 .group-label:first-child { margin-top: 14px; }
 /* every gap between setting cards is the same 22px: a label gap is 5 + 13 + 4 */
 .group + .group-label { margin-top: 5px; }
@@ -259,7 +259,7 @@ svg { display: block; }
 .row + .row { border-top: 1px solid var(--line); }
 .row-text { flex: 1; min-width: 0; }
 .row-title { font-weight: 560; }
-.row-sub { color: var(--ink-3); font-size: 11px; margin-top: 1px; }
+.row-sub { color: var(--ink-2); font-size: 12px; margin-top: 1px; }
 .row.danger .row-title { color: var(--bad); }
 
 /* Smooth switch: flips the instant it is clicked, one spring, no focus ring. */

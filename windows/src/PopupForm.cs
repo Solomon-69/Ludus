@@ -351,6 +351,13 @@ internal sealed class PopupForm : Form
                     Store.SaveSize(size);
                     if (Visible) Relayout();   // one layout at the new size, no animated reflow
                     break;
+                case "fit":
+                    {
+                        double fh = msg.TryGetProperty("h", out var fhProp) && fhProp.ValueKind == JsonValueKind.Number ? fhProp.GetDouble() : 0;
+                        int? want = fh > 0 ? (int)Math.Round(fh) : (int?)null;
+                        if (want != fitDip) { fitDip = want; if (Visible) SlideToFit(); }
+                    }
+                    break;
                 case "wide":
                     wide = msg.TryGetProperty("on", out var wideProp) && wideProp.ValueKind == JsonValueKind.True;
                     if (Visible) Relayout();
@@ -550,6 +557,31 @@ internal sealed class PopupForm : Form
     }
 
     /// <summary>Puts the panel at its right size and place for the monitor it is on, and zooms the page to match.</summary>
+    /// <summary>The Online page asks for only the height its content needs (DIP); null = the normal panel height.</summary>
+    private int? fitDip;
+    private System.Windows.Forms.Timer? slideTimer;
+
+    /// <summary>Slides the panel to its new height (about 0.2 s, ease out) instead of jumping.</summary>
+    private void SlideToFit()
+    {
+        slideTimer?.Stop(); slideTimer?.Dispose(); slideTimer = null;
+        var from = Bounds; var to = PopupBounds();
+        if (from == to || from.Width <= 0) { Relayout(); return; }
+        var t0 = DateTime.UtcNow;
+        var timer = new System.Windows.Forms.Timer { Interval = 15 };
+        slideTimer = timer;
+        timer.Tick += (_, _) =>
+        {
+            var k = Math.Min(1.0, (DateTime.UtcNow - t0).TotalMilliseconds / 200.0);
+            var e = 1 - Math.Pow(1 - k, 3);
+            Bounds = new Rectangle(
+                (int)Math.Round(from.X + (to.X - from.X) * e), (int)Math.Round(from.Y + (to.Y - from.Y) * e),
+                (int)Math.Round(from.Width + (to.Width - from.Width) * e), (int)Math.Round(from.Height + (to.Height - from.Height) * e));
+            if (k >= 1.0) { timer.Stop(); timer.Dispose(); if (slideTimer == timer) slideTimer = null; Relayout(); }
+        };
+        timer.Start();
+    }
+
     private void Relayout()
     {
         Bounds = PopupBounds();
@@ -574,7 +606,7 @@ internal sealed class PopupForm : Form
         // The page is laid out for the full DIP size. On a screen too small for it (a laptop at 125% or 150%),
         // shrink the whole panel and zoom the page by the same amount, so nothing is ever squashed or cut off.
         var wantW = dip.Width * scale;
-        var wantH = dip.Height * scale;
+        var wantH = ((!wide && fitDip is int fd) ? Math.Min(dip.Height, Math.Max(320, fd)) : dip.Height) * scale;
         var fit = Math.Min(1.0, Math.Min((work.Width - gap * 2) / wantW, (work.Height - gap * 2) / wantH));
         fitZoom = Math.Max(0.4, fit);
         var w = Math.Max(1, (int)Math.Round(wantW * fitZoom));

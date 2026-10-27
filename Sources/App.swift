@@ -263,6 +263,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
                let json = String(data: data, encoding: .utf8) {
                 UserDefaults.standard.set(json, forKey: stateKey)
             }
+        case "fit":
+            let h = (body["h"] as? Double) ?? Double(body["h"] as? Int ?? 0)
+            let want: CGFloat? = h > 0 ? CGFloat(h) : nil
+            if want != fitHeight { fitHeight = want; resizePopover(animated: true) }
         case "size":
             UserDefaults.standard.set(body["size"] as? String ?? "compact", forKey: sizeKey)
             resizePopover(animated: true)
@@ -432,10 +436,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
         webView.appearance = themeAppearance
     }
 
+    /// The Online page asks for just the height its content needs; the panel slides to it (nil = the normal height).
+    private var fitHeight: CGFloat?
+
     private func currentSize() -> NSSize {
         let isLarge = UserDefaults.standard.string(forKey: sizeKey) == "large"
         if wide { return isLarge ? Self.wideLarge : Self.wideCompact }
-        return isLarge ? Self.large : Self.compact
+        let base = isLarge ? Self.large : Self.compact
+        if let f = fitHeight { return NSSize(width: base.width, height: min(base.height, max(320, f))) }
+        return base
     }
 
     private func setLogin(_ on: Bool) {

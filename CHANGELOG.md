@@ -3,6 +3,13 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.10 (2026-10-27)
+
+- Online: if the free MQTT relays are blocked or down on your network, Ludus now falls back to ntfy.sh (an ordinary HTTPS service), so Create room works on any network. Both players connect outward, so players on different networks meet fine.
+- Online: relays that do not answer are skipped after 4 seconds instead of 7.
+- The Online page panel now slides to fit its content (Mac and Windows), instead of leaving a gap at the bottom.
+- Small grey text (subtitle, Settings descriptions, section labels) is darker and easier to read.
+
 ## 1.12.9 (2026-10-27)
 
 - Online page: the join box shows the code of your most recent party instead of made-up letters.

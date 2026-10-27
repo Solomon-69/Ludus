@@ -68,6 +68,7 @@
       el.classList.toggle('is-behind', v !== next && order[v] < order[next]);
     });
     view = next;
+    if (next !== 'home') fitPanel(0);
   }
 
   // ---------- wide or tall ----------
@@ -193,11 +194,24 @@
   const CROWN = '<svg viewBox="0 0 16 12" width="12" height="9" aria-hidden="true"><path d="M1 3.2 4.6 6 8 1l3.4 5L15 3.2 13.6 11H2.4z" fill="currentColor"/></svg>';
   const PARTY_COLS = ['#d97757', '#5b8def', '#4f9d69', '#9b6dd6'];   // the seat colours used in online games
   function fmt(n) { return n >= 10000 ? (n / 1000).toFixed(n >= 100000 ? 0 : 1) + 'k' : String(n); }
+  // The Online page only needs as much panel as it has content: tell the Mac / Windows shell where the page ends so the bottom
+  // edge slides to fit (0 = back to the normal height). Other pages and games always ask for 0.
+  var fitSent = 0;
+  function fitPanel(h) {
+    if (h === undefined) {
+      const pg = document.querySelector('.online-page');
+      h = pg ? Math.ceil(pg.lastElementChild.getBoundingClientRect().bottom + 22) : 0;
+      requestAnimationFrame(() => { const p2 = document.querySelector('.online-page'); if (p2 && S.filter === ONLINE) { const h2 = Math.ceil(p2.lastElementChild.getBoundingClientRect().bottom + 22); if (Math.abs(h2 - fitSent) > 2) { fitSent = h2; L.native('fit', { h: h2 }); } } });
+      return;
+    }
+    if (h !== fitSent) { fitSent = h; L.native('fit', { h }); }
+  }
   function renderCards() {
     const grid = $('grid'); grid.innerHTML = '';
     const list = visibleGames();
     const searching = !!norm(query);
-    if (S.filter === ONLINE && !searching) { renderOnlinePage(grid); return; }
+    if (S.filter === ONLINE && !searching) { renderOnlinePage(grid); fitPanel(); return; }
+    fitPanel(0);
     // The game you played last leads every tab it belongs to as "Continue", so it can be picked up again.
     const lastGame = !searching && list.find(g => g.id === S.last);
     const rest = list.filter(g => g !== lastGame);
