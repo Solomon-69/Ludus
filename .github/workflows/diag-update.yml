@@ -16,3 +16,26 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with: { name: diag-update, path: update-test }
+  climb:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with: { dotnet-version: '8.0.x' }
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - run: dotnet publish windows/Ludus.csproj -c Release -o out/Ludus
+        shell: pwsh
+      - name: Hammer Climb start probe
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force probe | Out-Null
+          $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = '--remote-debugging-port=9334'
+          $p = Start-Process out/Ludus/Ludus.exe -ArgumentList '--test-open' -PassThru
+          node QA/updater-test/cdp-probe.mjs 9334 QA/climb-start.js probe/climb.json probe/climb.png
+          Copy-Item "$env:APPDATA\Ludus\*.log" probe -ErrorAction SilentlyContinue
+          Stop-Process $p -Force -ErrorAction SilentlyContinue
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: diag-climb, path: probe }
