@@ -3,6 +3,11 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.15 (2026-10-27)
+
+- The Online page is the same height as the other tabs; its sections spread out with equal gaps instead of the panel shrinking.
+- Right-click on the menu bar or tray icon now opens and closes Ludus like a left click. The shortcut straight to Settings was unreliable, so it is gone; Settings is the gear icon.
+
 ## 1.12.14 (2026-10-27)
 
 - Switching between the Online tab and the other tabs no longer blanks the panel for a moment: the page stays visible while the bottom edge slides.

@@ -42,8 +42,8 @@ internal sealed class TrayContext : ApplicationContext
         tray.Visible = !Store.LoadInvisible();
         tray.MouseClick += (_, e) =>
         {
-            if (e.Button == MouseButtons.Left) popup.Toggle(TrayCenter() ?? Cursor.Position);
-            else if (e.Button == MouseButtons.Right) popup.OpenSettings(TrayCenter() ?? Cursor.Position);   // straight to Settings (also when already open)
+            // Left and right click both open or close the panel (the jump straight to Settings was unreliable).
+            if (e.Button == MouseButtons.Left || e.Button == MouseButtons.Right) popup.Toggle(TrayCenter() ?? Cursor.Position);
         };
         theme.TaskbarChanged += () =>
         {

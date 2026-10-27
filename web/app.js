@@ -228,7 +228,7 @@
     const grid = $('grid'); grid.innerHTML = '';
     const list = visibleGames();
     const searching = !!norm(query);
-    if (S.filter === ONLINE && !searching) { renderOnlinePage(grid); fitPanel(); return; }
+    if (S.filter === ONLINE && !searching) { renderOnlinePage(grid); fitPanel(0); return; }
     fitPanel(0);
     // The game you played last leads every tab it belongs to as "Continue", so it can be picked up again.
     const lastGame = !searching && list.find(g => g.id === S.last);

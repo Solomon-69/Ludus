@@ -492,7 +492,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
             let catcher = ClickCatcher(frame: button.bounds)
             catcher.autoresizingMask = [.width, .height]
             catcher.onClick = { [weak self] in self?.handleStatusClick(settings: false) }
-            catcher.onSettingsClick = { [weak self] in self?.handleStatusClick(settings: true) }
             button.addSubview(catcher)
         }
     }
@@ -544,8 +543,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
     // MARK: - Popover
 
     @objc private func statusClicked() {
-        let event = NSApp.currentEvent
-        handleStatusClick(settings: StatusClick.isSettingsClick(type: event?.type, modifiers: event?.modifierFlags ?? []))
+        // Right-click and Control-click open the panel like a normal click (the jump straight to Settings was unreliable).
+        handleStatusClick(settings: false)
     }
 
     private func handleStatusClick(settings: Bool) {
@@ -820,14 +819,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
 /// pressing the button underneath, so no highlight pill is ever drawn.
 final class ClickCatcher: NSView {
     var onClick: (() -> Void)?
-    var onSettingsClick: (() -> Void)?   // right click or Control-click: open on Settings
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
     override func mouseDown(with event: NSEvent) {}
     override func mouseUp(with event: NSEvent) {
-        if StatusClick.isSettingsClick(type: event.type, modifiers: event.modifierFlags) { onSettingsClick?() } else { onClick?() }
+        onClick?()
     }
     override func rightMouseDown(with event: NSEvent) {}
-    override func rightMouseUp(with event: NSEvent) { onSettingsClick?() }
+    override func rightMouseUp(with event: NSEvent) { onClick?() }
 }
 
 @main

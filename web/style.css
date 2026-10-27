@@ -503,7 +503,7 @@ svg { display: block; }
 @media (prefers-reduced-motion: reduce) { .online-chip .dot, .conn-chip i, .code-ch, .seat.on { animation: none !important; } }
 
 /* Online page and tournament lobby */
-.online-page { grid-column: 1 / -1; display: flex; flex-direction: column; justify-content: flex-start; gap: 12px; max-width: 360px; width: 100%; margin: 0 auto; padding: 4px 0 2px; text-align: center; }
+.online-page { grid-column: 1 / -1; display: flex; flex-direction: column; justify-content: space-between; gap: 12px; max-width: 360px; width: 100%; margin: 0 auto; padding: 4px 0 2px; text-align: center; }
 /* the Online page fills the panel's height (the panel never changes size): its groups spread out instead of leaving an empty band */
 .grid:has(> .online-page) { grid-template-rows: 1fr; align-content: stretch; }
 .op-group { display: flex; flex-direction: column; gap: 10px; }
