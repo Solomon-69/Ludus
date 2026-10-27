@@ -3,6 +3,13 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.1 (2026-10-27)
+
+- **Privacy blur** works properly now: it finds your face at a normal sitting distance (before, it often missed it and
+  kept the game blurred) and notices someone looking from further back. Still checked only on this computer, nothing saved or sent.
+- New Chess cover: the queen stands over the fallen king.
+- Chess cover pieces never overlap, at any card size.
+
 ## 1.12.0 (2026-10-27)
 
 - New game: **Chess**. Play the computer (four levels, it thinks in the background so the board never stutters), a friend
