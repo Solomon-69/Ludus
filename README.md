@@ -10,7 +10,7 @@
 <p><b>44 little games in your menu bar. Take a little break.</b></p>
 
 <p>
-  <a href="https://github.com/Solomon-69/Ludus/releases/latest"><img alt="Version 1.12.2" src="https://img.shields.io/badge/version-1.12.2-d97757?style=flat-square"></a>
+  <a href="https://github.com/Solomon-69/Ludus/releases/latest"><img alt="Version 1.12.3" src="https://img.shields.io/badge/version-1.12.3-d97757?style=flat-square"></a>
   <img alt="macOS 14 or later" src="https://img.shields.io/badge/macOS-14%2B-1f1d1a?style=flat-square&logo=apple&logoColor=white">
   <img alt="Windows 10 or 11" src="https://img.shields.io/badge/Windows-10%20%7C%2011-1f1d1a?style=flat-square">
 </p>
@@ -153,7 +153,7 @@ Ludus follows your Mac's light or dark look, or you can choose one. Everything e
 
 
 **Also:** best scores and progress for every game stay on your Mac. There are no accounts, no
-ads and no analytics. Ludus only goes online for Play online, Map Hunt, Mosaic Hunt and Privacy blur (see Privacy). It is one small native app,
+ads and no analytics. Ludus only goes online for Play online, Map Hunt and Mosaic Hunt (see Privacy). It is one small native app,
 and the games inside are plain HTML, CSS and JavaScript.
 
 
@@ -235,9 +235,8 @@ Open Settings with the gear in the top corner of the panel.
 
 Nothing leaves your Mac. Ludus has no accounts, no analytics and no ads. It only goes online when you
 press Play online (then only game moves and a random room code go through a public relay), play Map Hunt
-or Mosaic Hunt (photos and map tiles), or turn on Privacy blur (the camera picture is checked on your
-computer and never saved or sent). Scores, saved games and settings are stored locally. The game pages run in a
-sandboxed web view that only shows the app's own pages; pictures, map tiles and the Privacy blur face finder are the only things it fetches. See [PRIVACY.md](PRIVACY.md).
+or Mosaic Hunt (photos and map tiles). Ludus never uses the camera or microphone. Scores, saved games and settings are stored locally. The game pages run in a
+sandboxed web view that only shows the app's own pages; pictures and map tiles are the only things it fetches. See [PRIVACY.md](PRIVACY.md).
 
 ## Requirements
 
@@ -272,7 +271,7 @@ everything, quit Ludus and run `defaults delete com.solomon.Ludus`.
 <details>
 <summary><b>Does Ludus use the internet?</b></summary>
 
-Not unless you ask it to. Every game works the same with Wi-Fi off. Ludus only goes online when you choose <b>Play online</b>, play Map Hunt or Mosaic Hunt (photos and maps), or turn on Privacy blur (a one-time face finder download; the camera picture never leaves your computer).
+Not unless you ask it to. Every game works the same with Wi-Fi off. Ludus only goes online when you choose <b>Play online</b> or play Map Hunt or Mosaic Hunt (photos and maps).
 </details>
 
 <details>

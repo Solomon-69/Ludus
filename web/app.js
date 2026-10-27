@@ -67,7 +67,6 @@
       el.classList.toggle('is-behind', v !== next && order[v] < order[next]);
     });
     view = next;
-    privacySync();   // the camera runs only while a game is open
   }
 
   // ---------- wide or tall ----------
@@ -854,46 +853,7 @@
     const offB = L.conn.on(() => { if (!r.isConnected) { offA(); offB(); return; } draw(); });
     return r;
   }
-  // ---------- privacy blur (privacy.js): the camera watches for onlookers while a game is open ----------
   const MORE_CLOSE_MS = 460;   // the More card's closing animation (style.css .more-box)
-  function setPrivacyBlur(on, reason) {
-    root.classList.toggle('privacy-blur', !!on);
-    const t = $('privacyWhy'); if (t && on) t.textContent = reason === 'watcher' ? 'Hidden while someone else is looking' : 'Look at the screen to carry on';
-  }
-  function privacyFail(msg) {
-    S.privacyBlur = false; L.save(); setPrivacyBlur(false);
-    const sub = document.querySelector('#privacyRow .row-sub'), swb = document.querySelector('#privacyRow .switch');
-    if (swb) swb.setAttribute('aria-checked', 'false');
-    if (sub) { sub.textContent = msg + '. ' + PRIVACY_NOTE; sub.classList.add('bad'); }
-    toast(msg);
-  }
-  function privacySync() {
-    const P = window.LudusPrivacy; if (!P) return;
-    const want = !!S.privacyBlur && view === 'game' && !document.hidden;
-    P.onFail = privacyFail;
-    if (want && !P.running()) P.start(setPrivacyBlur).then(ok => {
-      if (ok && !(S.privacyBlur && view === 'game' && !document.hidden)) P.stop();
-      else if (!ok && S.privacyBlur && view === 'game' && !document.hidden && !P.running()) privacySync();   // an older start was cancelled: start again
-    }).catch(e => privacyFail(e.message));
-    else if (!want && P.running()) P.stop();
-    if (!want) setPrivacyBlur(false);
-  }
-  document.addEventListener('visibilitychange', privacySync);
-  const PRIVACY_NOTE = 'The camera is checked on this computer only: nothing is saved or sent, and it is on only during a game';
-  function privacyRow() {
-    const ok = !!(window.LudusPrivacy && window.LudusPrivacy.supported());
-    const r = row('Privacy blur', ok ? 'Blurs the game if someone else looks or you look away. ' + PRIVACY_NOTE : 'Needs a camera, which this window cannot use',
-      sw(!!S.privacyBlur && ok, v => {
-        S.privacyBlur = v; L.save();
-        const sub = r.querySelector('.row-sub'); sub.classList.remove('bad'); sub.textContent = 'Blurs the game if someone else looks or you look away. ' + PRIVACY_NOTE;
-        // Ask for the camera now, while the player is here to answer, then let it go until a game opens.
-        if (v) window.LudusPrivacy.start(setPrivacyBlur).then(() => privacySync()).catch(e => privacyFail(e.message));
-        else privacySync();
-      }, 'Privacy blur'));
-    r.id = 'privacyRow';
-    if (!ok) { const b = r.querySelector('.switch'); b.disabled = true; b.setAttribute('aria-disabled', 'true'); }
-    return r;
-  }
   let settingsFrom = 'home';   // the screen the gear was pressed on: Back returns there (a game stays paused behind it)
   function renderSettings() {
     const body = $('settingsBody'); body.innerHTML = '';
@@ -951,7 +911,6 @@
     const origSw = sw(hasPreset && !!S.originalNames, v => { S.originalNames = v; L.save(); renderCards(); }, 'Original names');
     if (!hasPreset) { origSw.onclick = null; origSw.setAttribute('aria-disabled', 'true'); origSw.style.opacity = '.5'; }   // no file: quietly does nothing
     moreRows.push(row('Original names', 'Show your own list of original game names', origSw));
-    moreRows.push(privacyRow());
     // The More card: a settings row that says what is inside, and springs open in place.
     const moreCard = el('div', 'group more-card');
     const preview = moreRows.map(r => { const t = r.querySelector('.row-title'); return t ? t.textContent : ''; }).filter(Boolean).join(', ');

@@ -77,7 +77,6 @@ Map Hunt libraries and data
 ----------------------------
 web/vendor/pannellum.* (Pannellum 2.5.6, Matthew Petroff, MIT License, https://pannellum.org) shows the 360 street photos (two small local patches: a picture that finishes loading after its viewer was closed, or a download that failed, is not read again).
 web/vendor/maplibre-gl.* (MapLibre GL JS 5.7.0, MapLibre contributors, BSD 3-Clause License, https://maplibre.org) draws the guess maps on the graphics card.
-web/privacy.js loads MediaPipe Tasks Vision 0.10.14 (Google, Apache License 2.0, https://github.com/google-ai-edge/mediapipe) and the BlazeFace face model at runtime when Privacy blur is on; they are not bundled.
 web/vendor/leaflet.* (Leaflet 1.9.4, Volodymyr Agafonkin, BSD 2-Clause License, https://leafletjs.com) draws the plain flat fallback map when MapLibre cannot run.
 Map data comes from OpenFreeMap (https://openfreemap.org) vector tiles built from OpenMapTiles (https://openmaptiles.org, schema, CC-BY 4.0) and OpenStreetMap
 (c) OpenStreetMap contributors, ODbL; the fonts for the labels (Noto Sans, SIL Open Font License) are served by the same host. The map look is drawn in
