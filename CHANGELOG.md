@@ -3,17 +3,13 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
-## 1.12.6 (2026-10-27)
+## 1.8 (2026-10-27)
 
 - Chomp: ghosts stay edible much longer after a power spark, so there is time to chase them down.
-
-## 1.12.5 (2026-10-27)
 
 - Chess: play timed (3, 5, 10 or 15 minutes per side) or not timed; the clock starts on the first move.
 - Chess moves feel like Duolingo: lifted pieces, soft dots for legal moves, pale yellow last move, no boxes. Black pieces are darker.
 - Chomp: when you are caught, the maze dims and a spotlight stays on the ghost that got you (the red circle is gone).
-
-## 1.12.4 (2026-10-27)
 
 - Right-click the menu bar icon opens Settings straight away, always at the top, with no flash of the home screen.
 - Settings: even gaps between cards, a taller More settings card.
