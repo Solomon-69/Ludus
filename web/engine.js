@@ -339,7 +339,14 @@
         ctx.save();
         draw.roundRect(ctx, px, y, pw, h, 12);
         ctx.fillStyle = c.dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)'; ctx.fill();
-        if (active) { ctx.strokeStyle = o.who === 'bot' ? c.ink3 : (o.who === 'p2' ? draw.P2 : c.accent); ctx.lineWidth = 1.5; ctx.stroke(); }
+        // whose turn it is: the active card gets a tinted fill, a thick coloured edge and a pulsing dot; the waiting card fades back
+        const sideCol = o.who === 'bot' ? c.ink3 : (o.who === 'p2' ? draw.P2 : c.accent);
+        if (active) {
+          ctx.save(); ctx.globalAlpha = 0.16; ctx.fillStyle = sideCol; ctx.fill(); ctx.restore();
+          ctx.strokeStyle = sideCol; ctx.lineWidth = 2.5; ctx.stroke();
+          const dotX = right ? px + 9 : px + pw - 9;
+          ctx.save(); ctx.globalAlpha = 0.55 + 0.45 * Math.sin(t * 5); ctx.beginPath(); ctx.arc(dotX, y + 9, 3.2, 0, Math.PI * 2); ctx.fillStyle = sideCol; ctx.fill(); ctx.restore();
+        } else if (opts.turn === 'left' || opts.turn === 'right') ctx.globalAlpha = 0.6;
         const ax = right ? px + pw - 20 : px + 20;
         draw.avatar(ctx, ax, y + h / 2, 13, o.who, c);
         const tx = right ? ax - 19 : ax + 19, align = right ? 'right' : 'left';
@@ -369,7 +376,12 @@
       };
       side(opts.left, x, false);
       side(opts.right, x + w - pw, true);
-      if (opts.status) draw.fitText(ctx, opts.status, x + w / 2, y + h / 2, Math.max(40, w - 2 * pw - 16), 12, c.accent, 650, 10);
+      let status = opts.status;
+      if (!status && (opts.turn === 'left' || opts.turn === 'right')) {   // a game that sends no text still says whose turn it is
+        const o = opts.turn === 'left' ? opts.left : opts.right;
+        status = o ? (o.who === 'you' && (!o.label || o.label === 'You') ? 'Your turn' : String(o.label || (o.who === 'bot' ? 'Bot' : 'Player')) + '\u2019s turn') : '';
+      }
+      if (status) draw.fitText(ctx, status, x + w / 2, y + h / 2, Math.max(40, w - 2 * pw - 16), 12, c.accent, 650, 10);
       return h;
     }
   };
