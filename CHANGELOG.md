@@ -3,6 +3,13 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.4 (2026-10-27)
+
+- Right-click the menu bar icon opens Settings straight away, always at the top, with no flash of the home screen.
+- Settings: even gaps between cards, a taller More settings card.
+- Online page: tighter gaps and thicker cards, fits without scrolling.
+- Covers: Mosaic Hunt label no longer cut off; Languages has clean, centred speech bubbles.
+
 ## 1.12.3 (2026-10-27)
 
 - Privacy blur removed: it could pick an iPhone camera instead of the Mac's, and it wasn't reliable enough.
