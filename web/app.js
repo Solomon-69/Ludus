@@ -149,7 +149,11 @@
     f.scrollTo({ left: Math.max(0, to), behavior: calm ? 'auto' : 'smooth' });
   }
   function pickFilter(name, focus) {
-    S.filter = name; L.save(); L.sfx('click'); renderFilters(true); renderCards();
+    const changed = S.filter !== name;
+    S.filter = name; L.save(); L.sfx('click'); renderFilters(true);
+    if (changed) fadeOutGrid();
+    renderCards();
+    if (changed) riseOnline();
     const gr = $('grid'); if (gr) gr.scrollTop = 0;
     if (focus) { const b = [...$('filters').querySelectorAll('.chip')][FILTERS.indexOf(name)]; if (b) b.focus({ preventScroll: true }); }
   }
@@ -191,6 +195,8 @@
     // The blocks (heading, name, last party, Create room, joining) share the page's full height with equal gaps
     // between them, so there is no empty band at the bottom; the panel itself keeps the same size as every other tab.
     const page = el('div', 'online-page'), head = el('div', 'op-group op-head'), start = el('div', 'op-card'), join = el('div', 'op-card');
+    // every block has a key, so a redraw can glide each one from where it was (see glideOnline)
+    head.dataset.k = 'head'; start.dataset.k = 'start'; join.dataset.k = 'join';
     // two columns on a wide panel (intro and last party | create and join); one column otherwise (the columns are display: contents)
     const colA = el('div', 'op-col'), colB = el('div', 'op-col');
     page.appendChild(colA); page.appendChild(colB);
@@ -205,11 +211,7 @@
     const nm = el('input'); nm.type = 'text'; nm.maxLength = 10; nm.placeholder = 'Player'; nm.value = L.net.cleanName(S.onlineName, ''); nm.autocomplete = 'off'; nm.spellcheck = false; nm.setAttribute('aria-label', 'Your name');
     nm.addEventListener('input', () => { S.onlineName = L.net.cleanName(nm.value, ''); L.save(); });
     f.appendChild(nm); mid.appendChild(f);
-    if (S.party && S.party.code) {
-      const pc = partyCard(S.party); colA.appendChild(pc);
-      if (!opHadParty && opRendered && !S.reduceMotion) pc.classList.add('op-enter');   // a party just appeared (back from a room): it opens in
-    }
-    opHadParty = !!(S.party && S.party.code); opRendered = true;
+    if (S.party && S.party.code) { const pc = partyCard(S.party); pc.dataset.k = 'party'; colA.appendChild(pc); }
     colB.appendChild(start);
     const mk = el('button', 'btn primary', 'Create room'); mk.type = 'button'; mk.id = 'opCreate';
     mk.onclick = () => { L.sfx('click'); createFlexRoom(); };
@@ -246,12 +248,12 @@
       [mk, jb, code].forEach(x => { x.disabled = true; });
       page.querySelectorAll('.party-card button').forEach(x => { x.disabled = true; });
     }
-    colB.appendChild(el('div', 'op-or', 'or join a room')); colB.appendChild(join); colB.appendChild(note);
+    const or = el('div', 'op-or', 'or join a room'); or.dataset.k = 'or'; note.dataset.k = 'note';
+    colB.appendChild(or); colB.appendChild(join); colB.appendChild(note);
     grid.appendChild(page);
   }
   // The last room you were in: an orange "Last party · <game>" tag on top, then the players as small name chips (a
   // crown on the host's) with Forget and Rejoin on the right.
-  let opHadParty = false, opRendered = false;   // the Online page last showed a Last party card (for its open / fold animation)
   function partyCard(p) {
     const card = el('div', 'party-card');
     const games = (p.games || []).map(id => { const g = L.games.find(x => x.id === id); return g ? dispName(g) : id; });
@@ -271,15 +273,9 @@
     });
     const acts = el('div', 'party-acts');
     const fg = el('button', 'btn small ghost', 'Forget'); fg.type = 'button'; fg.id = 'opForget';
-    // Forget: the card folds away (height and fade, spring), then the page settles; instant with reduced motion
-    fg.onclick = () => {
-      L.sfx('click'); S.party = null; opHadParty = false; L.save();
-      if (S.reduceMotion) { renderCards(); return; }
-      card.style.height = card.offsetHeight + 'px'; card.classList.add('op-leave');
-      void card.offsetHeight; card.style.height = '0px';
-      let done = false; const fin = () => { if (done) return; done = true; if (S.filter === 'Online' || document.querySelector('.online-page')) renderCards(); };
-      card.addEventListener('transitionend', e => { if (e.propertyName === 'height') fin(); }); setTimeout(fin, 500);
-    };
+    // Forget: the page is drawn without the card at once; glideOnline fades the old card out whole (never squashed or clipped)
+    // while the blocks below glide up into place with one shared curve. Instant with reduced motion.
+    fg.onclick = () => { L.sfx('click'); S.party = null; L.save(); renderCards(); };
     const rj = el('button', 'btn small primary', 'Rejoin'); rj.type = 'button'; rj.id = 'opRejoin'; rj.onclick = () => { L.sfx('click'); rejoinParty(); };
     acts.appendChild(fg); acts.appendChild(rj);
     row.appendChild(ppl); row.appendChild(acts); card.appendChild(row);
@@ -287,6 +283,62 @@
   }
   const CROWN = '<svg viewBox="0 0 16 12" width="12" height="9" aria-hidden="true"><path d="M1 3.2 4.6 6 8 1l3.4 5L15 3.2 13.6 11H2.4z" fill="currentColor"/></svg>';
   const PARTY_COLS = ['#d97757', '#5b8def', '#4f9d69', '#9b6dd6'];   // the seat colours used in online games
+  // ---------- Online page motion ----------
+  // A redraw of the Online page (Forget, a Last party appearing after a room, going offline...) never jumps: every keyed
+  // block is measured before and after (FLIP), blocks that moved glide from their old place with transform only, a new block
+  // fades and grows in once the others have started making room, and a block that went away (the Last party card) stays
+  // whole on a layer behind the others and fades out first while they slide over its place. One curve and one length for all.
+  const GLIDE = 'cubic-bezier(0.3, 1.1, 0.45, 1)', GLIDE_MS = 300, FADE_OUT = 'cubic-bezier(0.2, 0.7, 0.3, 1)';
+  const calmMotion = () => root.classList.contains('reduce') || root.classList.contains('instant') || (matchMedia('(prefers-reduced-motion: reduce)').matches && !root.classList.contains('motion-ok'));
+  function snapOnline() {
+    const pg = document.querySelector('#grid > .online-page'); if (!pg) return null;
+    const m = new Map(); pg.querySelectorAll('[data-k]').forEach(e => { if (!e.classList.contains('op-ghost')) m.set(e.dataset.k, { el: e, r: e.getBoundingClientRect() }); });
+    return m.size ? m : null;
+  }
+  function glideOnline(prev) {
+    const pg = document.querySelector('#grid > .online-page'); if (!pg || !prev || calmMotion()) return;
+    const seen = new Set(), pr = pg.getBoundingClientRect();
+    pg.querySelectorAll('[data-k]').forEach(e => {
+      const k = e.dataset.k, o = prev.get(k), r = e.getBoundingClientRect(); seen.add(k);
+      if (!o) {   // new: in after the others start to move, from a touch smaller and higher, opacity first
+        e.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 200, delay: 90, easing: 'ease-out', fill: 'backwards' });
+        e.animate([{ transform: 'translateY(-6px) scale(0.965)' }, { transform: 'none' }], { duration: GLIDE_MS, delay: 40, easing: GLIDE, fill: 'backwards' });
+        return;
+      }
+      const dx = o.r.left - r.left, dy = o.r.top - r.top;
+      if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
+      e.animate([{ transform: 'translate(' + dx + 'px,' + dy + 'px)' }, { transform: 'none' }], { duration: GLIDE_MS, easing: GLIDE });
+    });
+    prev.forEach((o, k) => {
+      if (seen.has(k) || o.r.height < 1) return;
+      const g = o.el; g.classList.add('op-ghost'); g.setAttribute('aria-hidden', 'true'); g.inert = true;
+      g.querySelectorAll('[id]').forEach(x => x.removeAttribute('id'));   // the live page owns the ids (#opRejoin...)
+      Object.assign(g.style, { left: (o.r.left - pr.left) + 'px', top: (o.r.top - pr.top) + 'px', width: o.r.width + 'px', height: o.r.height + 'px' });
+      pg.insertBefore(g, pg.firstChild);   // first child: the blocks gliding over its place paint on top of it
+      g.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 170, easing: FADE_OUT, fill: 'forwards' });
+      g.animate([{ transform: 'none' }, { transform: 'translateY(-4px) scale(0.96)' }], { duration: GLIDE_MS, easing: GLIDE, fill: 'forwards' }).onfinish = () => g.remove();
+    });
+  }
+  // Switching tabs: what was showing fades out on a layer over the grid (no blank frame), and the new tab's content comes in
+  // (game cards with their own rise; the Online page block by block, like the cards).
+  function fadeOutGrid() {
+    const grid = $('grid'); if (calmMotion() || !grid.firstElementChild || view !== 'home') return;
+    document.querySelectorAll('.grid-ghost').forEach(x => x.remove());
+    const host = grid.parentElement, gr = grid.getBoundingClientRect(), hr = host.getBoundingClientRect(), top = grid.scrollTop;
+    const layer = el('div', 'grid-ghost'), inner = el('div', grid.className);
+    layer.setAttribute('aria-hidden', 'true'); layer.inert = true;
+    Object.assign(layer.style, { left: (gr.left - hr.left) + 'px', top: (gr.top - hr.top) + 'px', width: gr.width + 'px', height: gr.height + 'px' });
+    while (grid.firstChild) inner.appendChild(grid.firstChild);
+    inner.querySelectorAll('[id]').forEach(x => x.removeAttribute('id'));
+    layer.appendChild(inner); host.appendChild(layer); inner.scrollTop = top;
+    layer.animate([{ opacity: 1 }, { opacity: 0, transform: 'translateY(-4px)' }], { duration: 160, easing: FADE_OUT, fill: 'forwards' }).onfinish = () => layer.remove();
+  }
+  function riseOnline() {
+    const pg = document.querySelector('#grid > .online-page'); if (!pg || calmMotion()) return;
+    [...pg.querySelectorAll('[data-k]')].sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top || a.getBoundingClientRect().left - b.getBoundingClientRect().left).forEach((e, i) => {
+      e.animate([{ opacity: 0, transform: 'translateY(12px) scale(0.97)' }, { opacity: 1, transform: 'none' }], { duration: 420, delay: 40 + i * 32, easing: 'cubic-bezier(0.34, 1.3, 0.5, 1)', fill: 'backwards' });
+    });
+  }
   function fmt(n) { return n >= 10000 ? (n / 1000).toFixed(n >= 100000 ? 0 : 1) + 'k' : String(n); }
   // The Online page only needs as much panel as it has content: tell the Mac / Windows shell where the page ends so the bottom
   // edge slides to fit (0 = back to the normal height). Other pages and games always ask for 0.
@@ -301,10 +353,12 @@
     if (h !== fitSent) { fitSent = h; L.native('fit', { h }); }
   }
   function renderCards() {
-    const grid = $('grid'); grid.innerHTML = '';
+    const grid = $('grid');
     const list = visibleGames();
     const searching = !!norm(query);
-    if (S.filter === ONLINE && !searching) { renderOnlinePage(grid); fitPanel(0); return; }
+    const prevOnline = S.filter === ONLINE && !searching ? snapOnline() : null;   // measured before the old page goes
+    grid.innerHTML = '';
+    if (S.filter === ONLINE && !searching) { renderOnlinePage(grid); fitPanel(0); if (prevOnline) glideOnline(prevOnline); return; }
     fitPanel(0);
     // The game you played last leads every tab it belongs to as "Continue", so it can be picked up again.
     const lastGame = !searching && list.find(g => g.id === S.last);
