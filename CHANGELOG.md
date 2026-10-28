@@ -10,6 +10,7 @@ All notable changes to Ludus. Versions follow the app's version number (`Info.pl
 - New "Load names file" button in Settings > More settings (Mac and Windows): pick your original-names.json and Original names turns on straight away. The file is copied into Ludus's own folder, so it keeps working. Without a file, the switch says it needs one.
 - Dark mode: every raised edge is now a dark shadow under its button or card (it was lighter than the card before). The category tabs (All, Arcade...) are raised pills with a real lower edge.
 - The party room card's corners now run parallel to the panel around it.
+- Hammer Climb no longer loses the hammer when the mouse leaves the panel (Mac and Windows): a click locks the mouse to the climb (Esc lets it go), and dragging in any game keeps working outside the panel until you let go of the button.
 - Blocks has a new game-over: the stack flashes as it locks, each row flashes and folds away from the top down while the board dims, then the Game over card comes up. Reduce motion skips straight to the end.
 
 ## 1.12.22 (28 Oct 2026)
