@@ -4,6 +4,8 @@
 async () => {
   const w = ms => new Promise(r => setTimeout(r, ms));
   window.ludusDebug = window.ludusDebug || {}; Ludus.state.introDone = true; window.ludusOpenGame('climb'); await w(800);
+  // the climb waits for the first move (1.12.23): a key press starts it
+  window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' })); window.dispatchEvent(new KeyboardEvent('keyup', { key: 'ArrowRight' })); await w(100);
   for (let i = 0; i < 20 && !(Ludus.games.find(x => x.id === 'climb')._peek().time > 0.3); i++) await w(150);
   const g = Ludus.games.find(x => x.id === 'climb'), pk = g._peek();
   const out = { state0: pk.state, levels: 'DIFFS' in g._rules };

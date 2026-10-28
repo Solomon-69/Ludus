@@ -48,7 +48,7 @@ $s = State
 Check ($s -and -not $s.climbDiff) "climb: starts straight into the climb with no difficulty menu (climbDiff=$($s.climbDiff))"
 
 # ---- 1b. Hammer Climb keeps control when the mouse leaves the panel ----
-# Press inside the climb, then move the cursor well outside the panel: the hammer must keep moving (the pointer is locked
+# Press inside the climb, then move the mouse well past the panel's edge: the hammer must keep moving (the pointer is locked
 # to the game, or captured while the button is held), compared with the board standing still on its own.
 function Diff-Png([string]$a, [string]$b) {
   $x = [System.Drawing.Bitmap]::FromFile($a); $y = [System.Drawing.Bitmap]::FromFile($b); $n = 0
@@ -68,11 +68,11 @@ $cx = [int]($bd[0] + $bd[2] / 2); $cy = [int]($bd[1] + $bd[3] * 0.6)
 $s1 = Join-Path $Out 'drag-still1.png'; $s2 = Join-Path $Out 'drag-still2.png'
 Save-Crop $s1 $bd[0] $bd[1] $bd[2] $bd[3] 0; Start-Sleep -Milliseconds 600; Save-Crop $s2 $bd[0] $bd[1] $bd[2] $bd[3] 0
 $still = Diff-Png $s1 $s2
-$ox = [int]($bd[0] - 140); if ($ox -lt 5) { $ox = [int]($bd[0] + $bd[2] + 140) }
-for ($i = 0; $i -le 12; $i++) { [void][Mouse]::SetCursorPos([int]($cx + ($ox - $cx) * $i / 12), $cy); Start-Sleep -Milliseconds 30 }
+# real mouse movement (relative, like a hand on the mouse): far enough left to leave the panel if nothing held it
+for ($i = 0; $i -lt 16; $i++) { [Mouse]::mouse_event(1, -25, 0, 0, [UIntPtr]::Zero); Start-Sleep -Milliseconds 30 }
 $o1 = Join-Path $Out 'drag-out1.png'; $o2 = Join-Path $Out 'drag-out2.png'
 Start-Sleep -Milliseconds 400; Save-Crop $o1 $bd[0] $bd[1] $bd[2] $bd[3] 0
-for ($i = 1; $i -le 12; $i++) { [void][Mouse]::SetCursorPos($ox, [int]($cy - 260 * $i / 12)); Start-Sleep -Milliseconds 30 }
+for ($i = 0; $i -lt 12; $i++) { [Mouse]::mouse_event(1, 0, -22, 0, [UIntPtr]::Zero); Start-Sleep -Milliseconds 30 }
 Start-Sleep -Milliseconds 400; Save-Crop $o2 $bd[0] $bd[1] $bd[2] $bd[3] 0
 $moved = Diff-Png $o1 $o2
 [Mouse]::mouse_event(4, 0, 0, 0, [UIntPtr]::Zero); Start-Sleep -Milliseconds 200

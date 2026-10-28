@@ -23,7 +23,7 @@
   // slope: steepness, slick: how slippery ice and the slide are, holds: extra rough stones, len: how long each part is.
   const P0 = { step: 1, gap: 1, slope: 1, slick: 1, holds: 2, len: 1 };
   // The sky: floating rocks, each a little higher and to the right of the last (checked climbable by QA/climb-reach.js).
-  const SKY = { n: 8, dx: 150, rise: 70, w: 124, th: 54, sumW: 250 };
+  const SKY = { n: 10, dx: 178, rise: 82, w: 118, th: 54, sumW: 250 };   // 1.12.24: wider gaps, two more rocks
 
   // ---------- the mountain, laid out left to right. [material, x1,y1, x2,y2, ...] simple polygons ----------
   function blob(k, cx, cy, rx, ry, seed, n) {
@@ -61,7 +61,7 @@
     if (P.holds >= 3) nub(40, 34, 0);
     mark(-80, 16, 'The pit'); R(-80, 16, 92, 92 * st + 16, 260, H1 + 16);
     // 2. the pipes: four metal pipes, each a step above the last and overlapping it, over a rock shelf
-    const p0 = 520, pr = 96 * st, pl = 210 * ln, nP = 4;
+    const p0 = 520, pr = 96 * st, pl = 210 * ln, nP = 6;
     let pa = p0, pTop = H1;
     for (let i = 0; i < nP; i++) {
       pTop = H1 + (i + 1) * pr;
@@ -106,13 +106,14 @@
     deco.slide = [s0, Hs + 2, sx1, Hl + 2];
     mark(F1 + 40, Hs + 16, 'The slide'); R(s0 + Ls / 2, Hs - Ds / 2 + 20, sx1 + 40, Hv + 16);
     // 6. the mountain: a valley floor, then a long staircase of rock with snow on the upper steps
-    const m0 = sx1 + 160 * gp, nM = Math.round(7 * ln), tr = 118, rise = 100 * st;
-    const stair = ['rock', m0, Hv - 4];
+    // 1.12.24: no wall at the foot of the mountain: the valley floor rises in a gentle ramp onto the first tread
+    const m0 = sx1 + 160 * gp, nM = Math.round(11 * ln), tr = 118, rise = 100 * st;
+    const stair = ['rock', m0 - tr * 1.6, Hv - 4];
     let yS = Hv;
     for (let j = 0; j < nM; j++) {
       yS += rise * (j % 2 ? 1.06 : 0.94);
       const y = yS, x = m0 + j * tr;
-      stair.push(x, y, x + tr, y);
+      if (j === 0) stair.push(x + tr * 0.55, y, x + tr, y); else stair.push(x, y, x + tr, y);
       if (j >= nM - 3) deco.snow.push([x, x + tr, y]);
       R(x + tr / 2, y + 16);
       if (P.holds >= 2 && j % 3 === 1) out.push(blob('nub', x + 4, y - rise * 0.5, 13, 9, 80 + j, 8));
@@ -122,10 +123,10 @@
     out.push(['rock', sx1 - 10, 0, mE + 10, 0, mE + 10, Hv, sx1 - 10, Hv], stair);
     mark(m0 - 60, Hv + 16, 'The mountain');
     // 7. the ice: one long icy slope with a few rough stones
-    const Li = 560 * ln, Ri = Li * 0.6 * sl, i1 = mE + 80 + Li, Tp = yT + 8 + Ri;
+    const Li = 680 * ln, Ri = Li * 0.72 * sl,   /* 1.12.24: longer and steeper */ i1 = mE + 80 + Li, Tp = yT + 8 + Ri;
     out.push(['rock', mE, 0, i1 + 140, 0, i1 + 140, Tp, i1, Tp, mE + 80, yT, mE, yT],
       ['ice', mE, yT, mE + 80, yT + 8, i1, Tp, i1 + 10, Tp - 30, mE + 80, yT - 22, mE, yT - 20]);
-    const nI = P.holds + 2;
+    const nI = P.holds + 3;
     for (let j = 0; j < nI; j++) { const t = (j + 0.7) / (nI + 0.4); out.push(blob('nub', mE + 80 + t * Li, yT + 12 + t * Ri, 22, 14, 11 + j, 10)); }
     deco.ice = [mE + 80, yT + 8, i1, Tp];
     mark(mE + 40, yT + 24, 'Ice'); R(mE + 80, yT + 24, i1, Tp + 16);
@@ -596,8 +597,7 @@
           ctx.beginPath(); ctx.moveTo(fx, fy); ctx.lineTo(fx, fy - 30 * k); ctx.stroke();
           ctx.fillStyle = on ? col.accent : (d ? 'rgba(255,245,230,0.3)' : 'rgba(90,74,58,0.3)');
           ctx.beginPath(); ctx.moveTo(fx, fy - 30 * k); ctx.lineTo(fx + 14 * k, fy - 25 * k); ctx.lineTo(fx, fy - 20 * k); ctx.fill();
-          // no label on the start flag: the pot sits under it and the section pill already names it
-          if (i > 0) { ctx.globalAlpha = 0.75; D.text(ctx, m.name, fx + 4 * k, fy - 40 * k, 10.5, col.ink2, 700, 'left'); ctx.globalAlpha = 1; }
+          // 1.12.24: no names in the world: the section pill at the top names where you are
         });
         // summit flag
         const fp = toScreen(world.deco.flag[0], world.deco.flag[1]);
