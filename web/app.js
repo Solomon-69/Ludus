@@ -117,7 +117,15 @@
   // The category tabs share one pill that slides from the old tab to the new one and takes the new tab's width, like a
   // segmented toggle. The tabs are built once and only their "on" state changes, so the pill has somewhere to slide from
   // (and keyboard focus stays on the tab). First placement, panel resizes and size changes place it without a slide.
-  let pill = null, pillAt = null;
+  let pill = null, pillIn = null, pillAt = null;
+  function syncPillLabels(f) {
+    if (!pillIn) return;
+    f.querySelectorAll('.chip').forEach((c, i) => {
+      let l = pillIn.children[i]; if (!l) { l = el('span', 'tab-pill-lab'); pillIn.appendChild(l); }
+      if (l.dataset.h !== c.innerHTML) { l.dataset.h = c.innerHTML; l.replaceChildren(...[...c.childNodes].map(n => n.cloneNode(true))); }
+      l.style.cssText = `left:${c.offsetLeft}px;top:${c.offsetTop}px;width:${c.offsetWidth}px;height:${c.offsetHeight}px`;
+    });
+  }
   function placePill(animate) {
     const f = $('filters'), on = f.querySelector('.chip.is-on');
     if (!pill || !on) { if (pill) pill.style.opacity = '0'; return; }
@@ -130,9 +138,11 @@
     if (!moved && pill.style.opacity === '1') return;
     const slide = animate && pillAt && f.offsetParent !== null;
     if (!slide) pill.classList.add('no-slide');
-    // the pill rides OVER the tabs and carries the chosen tab's label, so it never slides under a name
-    if (pill.dataset.k !== on.textContent) { pill.dataset.k = on.textContent; pill.replaceChildren(...[...on.childNodes].map(n => n.cloneNode(true))); }
+    // The pill rides OVER the tabs. Inside it sits a second, light-on-dark copy of the whole tab row, held still while the
+    // pill moves (it counter-slides), so each name flips colour exactly where the pill's edge passes it: no ghost text.
+    syncPillLabels(f);
     pill.style.transform = `translate(${x}px, ${y}px)`; pill.style.width = w + 'px'; pill.style.height = h + 'px'; pill.style.opacity = '1';
+    if (pillIn) pillIn.style.transform = `translate(${-x}px, ${-y}px)`;
     pillAt = { x, y, w, h };
     if (!slide) { void pill.offsetWidth; pill.classList.remove('no-slide'); }
   }
@@ -158,7 +168,7 @@
     let chips = [...f.querySelectorAll('.chip')];
     if (chips.length !== FILTERS.length) {
       f.innerHTML = ''; pillAt = null;
-      pill = el('i', 'tab-pill'); pill.setAttribute('aria-hidden', 'true'); f.appendChild(pill); f.classList.add('has-pill');
+      pill = el('i', 'tab-pill'); pill.setAttribute('aria-hidden', 'true'); pillIn = el('span', 'tab-pill-in'); pill.appendChild(pillIn); f.appendChild(pill); f.classList.add('has-pill');
       FILTERS.forEach(name => {
         const b = document.createElement('button');
         b.className = 'chip';

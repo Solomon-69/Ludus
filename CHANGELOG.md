@@ -3,6 +3,10 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.30 (28 Oct 2026)
+
+- The category tabs: the pill now moves like a window over the tab row. Each name flips colour exactly where the pill's edge passes it, so there is no doubled or ghost text mid-slide, and the glide is a touch slower and smoother.
+
 ## 1.12.29 (28 Oct 2026)
 
 - The category tabs (All, Arcade, Puzzle, ...): the sliding pill now glides over each tab instead of under it, carrying the chosen name with it.
