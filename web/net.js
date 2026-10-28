@@ -40,6 +40,11 @@
   const gameOf = id => { const L = window.Ludus; return L && L.games && L.games.find(g => g.id === id && g.online); };
 
   NET.brokers = () => (Array.isArray(window.__LUDUS_BROKERS__) && window.__LUDUS_BROKERS__.length ? window.__LUDUS_BROKERS__ : BROKERS);
+  // The relay that answered last time. A new room starts there, so a network that blocks the MQTT ports (only 80/443 open)
+  // gets a room code at once from ntfy.sh instead of waiting for three relays to time out first.
+  const RELAY_KEY = 'ludus.relay';
+  NET.goodRelay = url => { try { if (url) localStorage.setItem(RELAY_KEY, url); else return localStorage.getItem(RELAY_KEY) || ''; } catch (e) {} return ''; };
+  NET.startRelay = urls => { const i = urls.indexOf(NET.goodRelay()); return i >= 0 ? i : 0; };
   NET.WebSocket = null;             // tests can put a fake here; null means the browser's own
   NET.ALPHABET = ALPHABET;
   NET.cleanCode = s => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 5);
@@ -204,7 +209,7 @@
           const type = first >> 4;
           if (type === 2) {   // CONNACK
             if (body.length >= 2 && body[1] === 0) {
-              acked = true; me.attempt = 0; me.everOnline = true; me.curIdx = me.idx % me.urls.length; me.lastRx = Date.now(); delete NET.relayDown[url];
+              acked = true; me.attempt = 0; me.everOnline = true; me.curIdx = me.idx % me.urls.length; me.lastRx = Date.now(); NET.goodRelay(me.url); delete NET.relayDown[url];
               me._startPing(ws);
               me.subs.forEach((fn, topic) => me._raw(P.subscribe(me.pid++ & 0xFFFF || 1, topic)));
               const q = me.outbox; me.outbox = [];
@@ -302,7 +307,7 @@
       me.lastRx = Date.now();
       let m; try { m = JSON.parse(ev.data); } catch (e) { return; }
       if (m && m.event === 'open' && !acked) {
-        acked = true; me.attempt = 0; me.everOnline = true; me.curIdx = me.idx % me.urls.length; me.lastRx = Date.now(); delete NET.relayDown[me.url];
+        acked = true; me.attempt = 0; me.everOnline = true; me.curIdx = me.idx % me.urls.length; me.lastRx = Date.now(); NET.goodRelay(me.url); delete NET.relayDown[me.url];
         me.subs.forEach((fn, t) => me._ntfyOpen(t));
         me._ntfyFlush();
         me._set('online');
@@ -434,7 +439,7 @@
     // fallback (see NET.codeRelays). A relay that cannot be reached, or where nobody answers, moves the room to the next one.
     me.route = role === 'guest' ? NET.codeRelays(opts.code, urls) : me.wantCode ? NET.codeRelays(me.wantCode, urls) : null;
     me.hop = 0;
-    me._dial(me.route ? me.route[0] : 0, !!me.route);
+    me._dial(me.route ? me.route[0] : NET.startRelay(urls), !!me.route);
     me.lastHost = Date.now(); me.lastHb = 0;
     me.tick = setInterval(() => me._tick(), 1000);
     me.candidate = role === 'host' ? '' : opts.code;
@@ -445,7 +450,7 @@
     const c = me.client = new Mqtt({ urls: me.urls, clientId: 'ludus_' + hex(randBytes(8)), pinned, start: idx, onFail: pinned ? () => { if (!me._canHop()) return false; setTimeout(() => me._hop(), 0); return true; } : null });
     c.onState(s => { if (me.client === c) me._conn(s); });
     clearTimeout(me.guard);
-    me.guard = setTimeout(() => { if (!me.ready && !me.over && me.conn !== 'online' && me.client === c && !me._hop()) me._fail('offline'); }, pinned ? 32000 : 14000);
+    me.guard = setTimeout(() => { if (!me.ready && !me.over && me.conn !== 'online' && me.client === c && !me._hop()) me._fail('offline'); }, pinned ? 32000 : Math.max(14000, me.urls.length * (CONNECT_TIMEOUT + 500) + 4000));   // a new room: every relay gets tried once
   };
   Session.prototype._canHop = function () { return !!this.route && !this.noHop && !this.ready && !this.over && this.hop + 1 < this.route.length; };
   // the next relay of the code's route: nobody there could be reached, or nobody answered

@@ -462,7 +462,8 @@
     offs.push(s.on('sugstate', () => { if (screen === 'room') { render(); L.sfx('tap'); } }));
     offs.push(s.on('suggest', () => { if (screen === 'room') { render(); L.sfx('tap'); } }));
     offs.push(s.on('oldpeer', () => { ops && ops.toast && ops.toast('Your friend needs to update Ludus for tournaments'); }));
-    offs.push(s.on('error', e => { const w = WHY[e.code] || WHY.offline; discard(); if (e.code === 'no-room' || e.code === 'full' || e.code === 'started' || e.code === 'game' || e.code === 'update') { screen = e.code === 'update' ? 'notice' : 'join'; if (e.code === 'update') { error = [w[0], w[1], 'OK']; ops.noticeOk = ops.onCancel; } else error = w[1]; } else { screen = 'choose'; error = ''; ops.toast && ops.toast(w[0]); } render(); }));
+    offs.push(s.on('error', e => { const w = WHY[e.code] || WHY.offline; discard(); if (e.code === 'no-room' || e.code === 'full' || e.code === 'started' || e.code === 'game' || e.code === 'update') { screen = e.code === 'update' ? 'notice' : 'join'; if (e.code === 'update') { error = [w[0], w[1], 'OK']; ops.noticeOk = ops.onCancel; } else error = w[1]; } else if (!game) { ops.toast && ops.toast(w[0]); const back = ops.onCancel; hide(); if (back) back(); return; }   // a room from the Online page: back to that page, not the per-game card
+      else { screen = 'choose'; error = ''; ops.toast && ops.toast(w[0]); } render(); }));
     offs.push(s.on('closed', e => { const w = WHY[e.reason] || WHY['host-left']; discard(); screen = 'notice'; error = [w[0], w[1], 'OK']; ops.noticeOk = ops.onCancel; render(); }));
     offs.push(s.on('start', e => {
       if (s.appHooked) { unhook(); session = null; return; }   // the app already runs this room's rounds
