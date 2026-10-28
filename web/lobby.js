@@ -17,7 +17,7 @@
     removed: ['Left the room', 'You were disconnected from the room.'],
     update: ['Update Ludus', 'Your friend needs to update Ludus before you can play together.']
   };
-  let sheet = null, card = null, session = null, offs = [], ops = null, game = null, screen = '', error = '', copied = false, copyTimer = 0, autoStart = 0;
+  let rcode = '', sheet = null, card = null, session = null, offs = [], ops = null, game = null, screen = '', error = '', copied = false, copyTimer = 0, autoStart = 0;
 
   const $ = id => document.getElementById(id);
   function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; }
@@ -359,7 +359,7 @@
       card.appendChild(btn('Cancel', 'ghost', cancel));
       card.appendChild(el('p', 'lobby-note', 'Needs the internet. Anyone who knows the code can join.'));
     } else if (screen === 'creating' || screen === 'joining') {
-      title(screen === 'creating' ? 'Opening a room' : 'Looking for room ' + (session ? session.code : ''));
+      title(screen === 'creating' ? 'Opening a room' : 'Looking for room ' + (session ? session.code : rcode));
       card.appendChild(connChip(session ? session.conn : 'connecting'));
       card.appendChild(el('p', 'lobby-sub', screen === 'creating' ? 'Getting a room code ready.' : 'Asking the host to let you in.'));
       card.appendChild(btn('Cancel', 'ghost', cancel));
@@ -438,6 +438,7 @@
       title(error[0]);
       card.appendChild(el('p', 'lobby-sub', error[1]));
       card.appendChild(btn(error[2] || 'OK', 'primary', () => { const f = ops && ops.noticeOk; hide(); if (f) f(); }));
+      if (error[3]) card.appendChild(btn(error[3], 'ghost', () => { hide(); }));   // a second way out (Try again / Close)
     }
   }
 
@@ -506,10 +507,12 @@
       sheet.hidden = false; render();
     },
     // A message card over the game ("The host left"). ok runs when the player presses OK.
-    notice(title, text, ok) {
+    notice(title, text, ok, label, closeLabel) {
       ensure(); ops = ops || {};
-      ops.noticeOk = ok; screen = 'notice'; error = [title, text, 'OK']; sheet.hidden = false; render();
+      ops.noticeOk = ok; screen = 'notice'; error = [title, text, label || 'OK', closeLabel || '']; sheet.hidden = false; render();
     },
+    // Rejoin: show at once that a room is being looked for (the session behind it is not made yet or is the app's own), with Cancel.
+    progress(code, o) { ensure(); discard(); game = null; ops = o; error = ''; rcode = code; screen = 'joining'; sheet.hidden = false; render(); },
     // Show the room screen for a session that is already in the room (joined from a ludus:// link).
     attach(g, s, o) { ensure(); discard(); game = g; ops = o; hookSession(s); screen = 'room'; error = ''; sheet.hidden = false; render(); },
     close() { discard(); if (sheet) sheet.hidden = true; },
