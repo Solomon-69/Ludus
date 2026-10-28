@@ -835,7 +835,7 @@ svg { display: block; }
    back on release. Disabled controls are flat. Edges are mixed from each control's own colour, so light and dark both
    work and accent changes carry through. Switches, swatches and sliders stay as they are.
    =================================================================================================================== */
-:root { --edge: 4px; --edge-mix: 24%; --raise-ease: cubic-bezier(0.34, 1.56, 0.64, 1); }
+:root { --edge: 4px; --edge-mix: 30%; --raise-ease: cubic-bezier(0.34, 1.56, 0.64, 1); }
 :root[data-theme="dark"] { --edge-mix: 55%; }
 :root .btn:not(.ghost), :root .small-btn, :root .icon-btn, :root .card, :root .mode-tab.is-on, :root .seg-thumb, :root .tab-pill,
 :root .vs-toggle button.is-on, :root .pick-chips .chip, :root .lk-btn, :root .lk-chip, :root .lk-opt, :root .ih-guess {
@@ -925,8 +925,7 @@ svg { display: block; }
    suggestion card, the search field, the segmented and tab tracks, toasts and the tooltip. Only the edge: they are not
    buttons, so nothing lifts or sinks (game cards and picker tiles are tappable and keep the lift and press above). The edge
    is a box-shadow, so sizes, paddings and corners are unchanged. */
-:root { --slab: 4px; --slab-mix: 14%; }
-:root[data-theme="dark"] { --slab-mix: 26%; }   /* a dark card sits on a darker page: the edge stays between the two so it reads */
+:root { --slab: 4px; --slab-mix: 24%; }
 :root .group, :root .op-head, :root .op-card, :root .party-card, :root .lobby-card, :root .sheet-card, :root .rename-card, :root .over-bar,
 :root .sug-card, :root .seat, :root .search, :root .seg, :root .mode-tabs, :root .vs-toggle, :root .toast, :root .over-peek, :root .ui-tip {
   --slab-face: var(--surface);
@@ -939,6 +938,7 @@ svg { display: block; }
 :root .seg { --slab-c: color-mix(in srgb, var(--ink) 14%, transparent); }
 :root .seat, :root .search, :root .seg, :root .mode-tabs, :root .vs-toggle, :root .toast, :root .over-peek { --slab: 3px; }
 :root .ui-tip { --slab: 2px; }
+:root .group, :root .lobby-card, :root .sheet-card, :root .rename-card, :root .over-bar { --slab: 5px; }
 :root .group, :root .search { box-shadow: 0 var(--slab) 0 var(--slab-c), var(--shadow); }
 :root .search:focus-within { box-shadow: 0 var(--slab) 0 var(--slab-c), var(--shadow), 0 0 0 2px color-mix(in srgb, var(--accent) 55%, transparent); }
 :root .op-head, :root .op-card, :root .party-card { box-shadow: inset 0 0 0 1px var(--box-line), 0 var(--slab) 0 var(--slab-c); }
@@ -947,3 +947,22 @@ svg { display: block; }
 :root .seat, :root .seg, :root .mode-tabs, :root .vs-toggle { box-shadow: 0 var(--slab) 0 var(--slab-c); }
 :root .seat.lead { box-shadow: inset 0 0 0 2px var(--accent), 0 var(--slab) 0 var(--slab-c); }
 :root .ui-tip { box-shadow: 0 var(--slab) 0 var(--slab-c), var(--shadow), 0 0 0 1px var(--line); }
+
+/* Edges that read (light and dark). Light: near-black controls (primary buttons, the selected tab pill, chosen chips) are a
+   charcoal face on a near-black edge, so the edge shows against the cream page. Dark: a dark card sits on a darker page, so a
+   darker strip would vanish; dark faces get a lighter lip instead (light faces keep their darker edge). */
+:root { --ink-face: color-mix(in srgb, var(--ink) 80%, #fff); }
+:root:not([data-theme="dark"]) .btn.primary, :root:not([data-theme="dark"]) .tab-pill, :root:not([data-theme="dark"]) .mode-tab.is-on,
+:root:not([data-theme="dark"]) .pick-chips .chip.is-on, :root:not([data-theme="dark"]) .lk-chip.on {
+  background: var(--ink-face); --face: var(--ink-face); --edge-c: var(--ink);
+}
+:root[data-theme="dark"] .btn:not(.primary):not(.ghost), :root[data-theme="dark"] .small-btn:not(.warm), :root[data-theme="dark"] .icon-btn,
+:root[data-theme="dark"] .card, :root[data-theme="dark"] .seg-thumb, :root[data-theme="dark"] .vs-toggle button.is-on,
+:root[data-theme="dark"] .lk-btn:not(.lk-primary), :root[data-theme="dark"] .lk-opt:not(.right):not(.wrong),
+:root[data-theme="dark"] .pick-chips .chip:not(.is-on) { --edge-c: color-mix(in srgb, var(--face) 74%, #fff); }
+:root[data-theme="dark"] .group, :root[data-theme="dark"] .op-head, :root[data-theme="dark"] .op-card, :root[data-theme="dark"] .party-card,
+:root[data-theme="dark"] .lobby-card, :root[data-theme="dark"] .sheet-card, :root[data-theme="dark"] .rename-card, :root[data-theme="dark"] .over-bar,
+:root[data-theme="dark"] .sug-card, :root[data-theme="dark"] .seat, :root[data-theme="dark"] .search, :root[data-theme="dark"] .mode-tabs,
+:root[data-theme="dark"] .vs-toggle, :root[data-theme="dark"] .ui-tip { --slab-c: color-mix(in srgb, var(--slab-face) 76%, #fff); }
+:root[data-theme="dark"] .seg { --slab-c: color-mix(in srgb, var(--ink) 16%, transparent); }
+:root[data-theme="dark"] .toast, :root[data-theme="dark"] .over-peek { --slab-c: color-mix(in srgb, var(--ink) 55%, #000); }
