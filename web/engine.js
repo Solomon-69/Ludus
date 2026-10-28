@@ -99,7 +99,7 @@
     const now = performance.now();
     if (now - (lastAt[name] || -1e9) < (GAP[name] || 35)) return;
     while (recent.length && now - recent[0] > 120) recent.shift();
-    if (recent.length >= MAX_BURST) return;
+    if (recent.length >= MAX_BURST && !/^(win|over|best|result)$/.test(name)) return;   // the burst cap never eats an end-of-game sound
     lastAt[name] = now; recent.push(now);
     if (window.__ludusSfxSpy) { try { window.__ludusSfxSpy(name); } catch (e) {} }   // headless sound tests
     if (window.__ludusTestMuted) return;   // test runs (test hook "mute") stay silent
