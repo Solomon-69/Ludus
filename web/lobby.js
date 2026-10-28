@@ -32,7 +32,17 @@
     });
   }
   function unhook() { offs.forEach(f => f()); offs = []; clearTimeout(autoStart); }
-  function discard() { unhook(); if (session) { try { session.leave(); } catch (e) {} } session = null; }
+  function discard() { unhook(); if (session) { try { session.leave(); } catch (e) {} } session = null; popped.clear(); }
+  // The room redraws on every roster or plan change: seats and code boxes pop in once, when they first show, never again
+  // on a redraw (that read as a flash of the whole card each time somebody joined or the host picked a game).
+  // (a redraw right after the first one, while the pop is still playing, carries it on from where it was)
+  const popped = new Map();
+  const popOnce = (node, key) => {
+    const t = popped.get(key), now = performance.now();
+    if (t === undefined) popped.set(key, now); else if (now - t < 500) node.style.animationDelay = (t - now) + 'ms'; else node.classList.add('still');
+    return node;
+  };
+  const calmMotion = () => { const r = document.documentElement.classList; return r.contains('reduce') || r.contains('instant') || (matchMedia('(prefers-reduced-motion: reduce)').matches && !r.contains('motion-ok')); };
 
   // ---------- pieces ----------
   function connChip(state) {
@@ -46,7 +56,7 @@
     const mine = session ? session.seat : -1;
     for (let i = 0; i < max; i++) {
       const p = session && session.roster.get(i);
-      const s = el('div', 'seat' + (p ? ' on' : ''));
+      const s = el('div', 'seat' + (p ? ' on' : '')); if (p) popOnce(s, 'seat' + i + ':' + p.name);
       const dot = el('div', 'seat-dot', p ? Array.from(p.name)[0].toUpperCase() : '');
       if (p) dot.style.background = SEAT_COLORS[i % SEAT_COLORS.length];
       s.appendChild(dot);
@@ -86,7 +96,7 @@
   function codeBoxes(code) {
     const row = el('div', 'code-row');
     row.setAttribute('aria-label', 'Room code ' + code.split('').join(' '));
-    code.split('').forEach(ch => row.appendChild(el('div', 'code-ch', ch)));
+    code.split('').forEach((ch, i) => row.appendChild(popOnce(el('div', 'code-ch', ch), 'code' + code + i)));
     return row;
   }
   function copyCode(code, label) {
@@ -310,8 +320,25 @@
   }
 
   // ---------- screens ----------
+  // A redraw that changes the card's height (Opening a room -> the room, a seat filling...) eases the card to its new
+  // height instead of snapping, with one curve; a new screen also fades its content in. Instant with reduced motion.
+  let rendering = false, screenAt = -1e9;
   function render() {
-    ensure();
+    if (rendering) return renderBody();
+    ensure(); rendering = true;
+    const h0 = !sheet.hidden && card.firstChild ? card.getBoundingClientRect().height : 0, s0 = card.dataset.screen, now = performance.now();
+    try { renderBody(); } finally { rendering = false; }
+    // not while the sheet itself is still coming in (it was hidden: the old height belongs to an earlier room)
+    const opening = sheet.hidden || card.getAnimations().some(x => x.animationName === 'sheetIn' && (x.currentTime || 0) < 300);
+    if (!h0 || opening || calmMotion()) return;
+    const h1 = card.getBoundingClientRect().height;
+    if (Math.abs(h1 - h0) >= 2) card.animate([{ height: h0 + 'px' }, { height: h1 + 'px' }], { duration: 300, easing: 'cubic-bezier(0.3, 1.1, 0.45, 1)' });
+    // a new screen fades its content in; a redraw a moment later (the roster arriving) carries the same fade on
+    if (s0 !== screen) screenAt = now;
+    const since = now - screenAt;
+    if (since < 260) [...card.children].forEach(c => c.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 200, delay: 60 - since, easing: 'ease-out', fill: 'backwards' }));
+  }
+  function renderBody() {
     card.innerHTML = '';
     card.dataset.screen = screen;
     const on = game && game.online;
