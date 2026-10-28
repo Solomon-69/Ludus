@@ -270,7 +270,7 @@
     // Forget: the page is drawn without the card at once; glideOnline fades the old card out whole (never squashed or clipped)
     // while the blocks below glide up into place with one shared curve. Instant with reduced motion.
     fg.onclick = () => { L.sfx('click'); S.party = null; L.save(); renderCards(); };
-    const rj = el('button', 'btn small primary', 'Rejoin'); rj.type = 'button'; rj.id = 'opRejoin'; rj.onclick = () => { L.sfx('click'); rejoinParty(); };
+    const rj = el('button', 'btn small primary', 'Rejoin'); rj.type = 'button'; rj.id = 'opRejoin'; rj.onclick = () => { L.sfx('click'); if (roomAlive() && roomSession().code === p.code) unparkRoom(); else rejoinParty(); };
     acts.appendChild(fg); acts.appendChild(rj);
     row.appendChild(ppl); row.appendChild(acts); card.appendChild(row);
     return card;
@@ -587,7 +587,7 @@
     $('gameName').textContent = 'Online'; $('vsToggle').hidden = true; $('gameScores').style.display = 'none'; $('hint').innerHTML = ''; $('stage').innerHTML = '';
     $('onlineChip').hidden = true; $('leaveBtn').hidden = true; $('pauseBtn').hidden = true; $('orientBtn').hidden = true;
     L.native('wide', { on: false });
-    show('game');
+    if (!L.lobby.parked) show('game');   // parked: the room is set up behind All games
   }
   // The last party (room code, names, games) is kept in the saved state so the Online page can offer Rejoin. Only "Forget" removes it.
   function trackParty(s, role) {
@@ -671,6 +671,7 @@
       online = { game: g, session: s, started: false, shown: g.id };
       renderVsToggle(g);
       L.lobby.attach(g, s, lobbyOps(g));
+      if (L.lobby.parked) { show('home'); renderCards(); L.native('wide', { on: false }); }   // joined while Ludus was showing All games
     });
     return true;
   }
@@ -709,6 +710,7 @@
   }
   function showRound(g) {
     online.game = g;
+    L.lobby.wake();
     if (view !== 'game' || online.shown !== g.id) {
       online.shown = g.id;
       start(g.id, true);                                  // the game's screen, header and name
@@ -725,6 +727,7 @@
     if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
   }
   function endOnline(title, text) {
+    if (L.lobby.parked) { leaveOnline(); return; }   // nobody is looking at the room: just leave it, the Last party card stays
     if (online) online.session = null;
     stop(); hideOver();
     L.lobby.notice(title, text, goHome);
@@ -1230,7 +1233,10 @@
     if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
     // Ludus always opens on All games, wherever it was left. A game left open is saved and waits
     // in the "Continue" card at the top.
-    if (inRoom()) { resumeRoomView(); return; }   // in a party: come back to it (the room, or the round being played)
+    // A round being played stays as it is. A party that is waiting (lobby, scoreboard or still joining) stays joined but
+    // goes behind All games; Rejoin on the Last party card brings it back.
+    if (online && online.started && inRoom()) return;
+    if (roomAlive()) parkRoom();
     if (view !== 'home') { root.classList.add('instant'); goHome(); }   // safety net; normally done on close
     if (S.filter !== 'All') { S.filter = 'All'; L.save(); renderFilters(); renderCards(); }
     const top = () => { const g = $('grid'); if (g) g.scrollTop = 0; };
@@ -1243,7 +1249,7 @@
   window.ludusOpenedSettings = () => {
     if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
     root.classList.add('instant');
-    if (view !== 'home' && view !== 'settings' && !inRoom()) goHome();
+    if (!(online && online.started && inRoom())) { if (roomAlive()) parkRoom(); else if (view !== 'home' && view !== 'settings') goHome(); }
     if (S.filter !== 'All') { S.filter = 'All'; L.save(); renderFilters(); renderCards(); }
     const g = $('grid'); if (g) g.scrollTop = 0;
     window.ludusOpenSettings();
@@ -1254,7 +1260,8 @@
   // the finished home screen straight away instead of the game flashing and sliding out.
   window.ludusClosed = () => {
     L.sfx('panelOff');
-    if (inRoom()) { L.save(true); return; }   // a party stays open while the panel is closed
+    if (online && online.started && inRoom()) { L.save(true); return; }   // a round being played stays open while the panel is closed
+    if (roomAlive()) { root.classList.add('instant'); parkRoom(); if (S.filter !== 'All') { S.filter = 'All'; renderFilters(); renderCards(); } { const g = $('grid'); if (g) g.scrollTop = 0; } L.save(true); return; }   // a waiting party stays joined, behind All games
     if (view !== 'home') {
       root.classList.add('instant');
       if (view === 'game') goHome(); else { show('home'); renderCards(); }
@@ -1266,7 +1273,23 @@
   window.ludusOpenGame = id => start(id);
   // still in an online room (waiting room, scoreboard or a round)
   function inRoom() { const s = online && online.session; return !!(s && !s.over && (s.ready || online.started)); }
-  // Reopening Ludus while in a party: a round being played stays as it is; otherwise the room lobby shows again.
+  // a room that is still open: joining, waiting, scoreboard or playing
+  // (a room made on the Online page keeps its session in the lobby until the first round starts)
+  function roomSession() { return online ? (online.session || L.lobby.session || null) : null; }
+  function roomAlive() { const s = roomSession(); return !!(s && !s.over); }
+  // The party stays joined while home shows: the lobby card hides, room events keep it up to date behind the scenes.
+  function parkRoom() {
+    L.lobby.park(); hideOver(); $('pauseSheet').hidden = true;
+    if (view !== 'home') { show('home'); renderCards(); }
+    L.native('playing', { id: null }); L.native('wide', { on: false });
+  }
+  // Rejoin on a party that is still joined: straight back to its room as it is now.
+  function unparkRoom() {
+    if (!online.session) online.session = roomSession();
+    L.lobby.unpark(); showOnlineShell();
+    resumeRoomView();
+  }
+  window.ludusParked = () => L.lobby.parked;   // test hook
   function resumeRoomView() {
     const s = online.session;
     if (online.started) return;

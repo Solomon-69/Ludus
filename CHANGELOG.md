@@ -3,6 +3,10 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.28 (28 Oct 2026)
+
+- Ludus always opens on All games at the top. A party that is waiting (the room, the scoreboard, or still joining) stays joined behind it, and Rejoin on the Last party card goes straight back to the same room. Only a round being played opens straight into the game. Before, a party left open made Ludus open on the Online room instead.
+
 ## 1.12.27 (28 Oct 2026)
 
 - Online: the Single game / Tournament switch now slides like the other switches: the dark pill glides to the new choice with a small spring and the text colours cross-fade. Reduce motion moves it at once.

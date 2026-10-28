@@ -86,7 +86,7 @@ const only = process.argv.slice(2), want = n => !only.length || only.includes(n)
       await B.evaluate(() => { ludusClosed(); ludusOpened(); });
       await wait(500);
       const sb0 = await sess(B);
-      check('reopen: panel closed and opened in the room: still in it, room showing', sb0 && !sb0.over && sb0.n === 2 && await B.evaluate(() => !document.getElementById('lobbySheet').hidden), sb0);
+      check('reopen: panel closed and opened in the room: still in it, Ludus on All games (1.12.28)', sb0 && !sb0.over && sb0.n === 2 && await B.evaluate(() => document.getElementById('lobbySheet').hidden && document.getElementById('home').classList.contains('is-active') && Ludus.state.filter === 'All'), sb0);
       await pick(A, ['Paddle Duel'], 1); await wait(400);
       await A.click('#lobbyCard button.primary'); await Promise.all([waitPlaying(A), waitPlaying(B)]);
       const seat0 = (await sess(B)).seat;

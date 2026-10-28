@@ -524,35 +524,42 @@
     if (ops && ops.onCancel) ops.onCancel();
   }
   function hide() { ensure(); sheet.hidden = true; unhook(); }
+  // Parked: the party stays joined and listening while Ludus shows All games; nothing a room event draws pops up over home.
+  let parked = false;
   function cancelToHome() { const f = ops && ops.goHome; hide(); if (f) f(); }
 
   L.lobby = {
     get session() { return session; },   // for the tests
     get isOpen() { return !!sheet && !sheet.hidden; },
     open(g, o) {
-      ensure(); discard();
+      ensure(); discard(); parked = false;
       game = g; ops = o; screen = 'choose'; error = '';
       sheet.hidden = false; render();
     },
     // A message card over the game ("The host left"). ok runs when the player presses OK.
     notice(title, text, ok, label, closeLabel) {
       ensure(); ops = ops || {};
-      ops.noticeOk = ok; screen = 'notice'; error = [title, text, label || 'OK', closeLabel || '']; sheet.hidden = false; render();
+      ops.noticeOk = ok; screen = 'notice'; error = [title, text, label || 'OK', closeLabel || '']; sheet.hidden = parked; render();
     },
     // Rejoin: show at once that a room is being looked for (the session behind it is not made yet or is the app's own), with Cancel.
-    progress(code, o) { ensure(); discard(); game = null; ops = o; error = ''; rcode = code; screen = 'joining'; sheet.hidden = false; render(); },
+    progress(code, o) { ensure(); discard(); parked = false; game = null; ops = o; error = ''; rcode = code; screen = 'joining'; sheet.hidden = false; render(); },
     // Show the room screen for a session that is already in the room (joined from a ludus:// link).
-    attach(g, s, o) { ensure(); discard(); game = g; ops = o; hookSession(s); screen = 'room'; error = ''; sheet.hidden = false; render(); },
-    close() { discard(); if (sheet) sheet.hidden = true; },
+    attach(g, s, o) { ensure(); discard(); game = g; ops = o; hookSession(s); screen = 'room'; error = ''; sheet.hidden = parked; render(); },
+    close() { discard(); parked = false; if (sheet) sheet.hidden = true; },
+    // hide the room card but stay in the party (Ludus opened on All games); unpark shows it again as it is now
+    park() { parked = true; if (sheet) sheet.hidden = true; },
+    unpark() { parked = false; if (sheet && session) { sheet.hidden = false; render(); } },
+    get parked() { return parked; },
+    wake() { parked = false; },   // a round started: the app shows it itself
     // redraw for this session (the room got a new leader while a scoreboard card is up)
     refresh(s) { if (sheet && !sheet.hidden && session === s && (screen === 'board' || screen === 'final')) render(); },
     hide,
     // A room made from the Online page: no game yet, the host picks games in the lobby.
-    openRoom(o, code, uid) { ensure(); discard(); game = null; ops = o; error = ''; sheet.hidden = false; createRoom(code, uid); return session; },
+    openRoom(o, code, uid) { ensure(); discard(); parked = false; game = null; ops = o; error = ''; sheet.hidden = false; createRoom(code, uid); return session; },
     // Scoreboard between rounds ('board') or the final standings ('final') for a session that is playing a tournament.
-    series(s, kind, o) { ensure(); unhook(); session = s; ops = o || ops; screen = kind; sheet.hidden = false; render(); L.sfx(kind === 'final' ? 'best' : 'result'); },
+    series(s, kind, o) { ensure(); unhook(); session = s; ops = o || ops; screen = kind; sheet.hidden = parked; render(); L.sfx(kind === 'final' ? 'best' : 'result'); },
     // Back to the waiting room (after a tournament, "Back to lobby").
-    resume(s, o) { ensure(); unhook(); session = s; ops = o || ops; hookSession(s); screen = 'room'; sheet.hidden = false; render(); },
+    resume(s, o) { ensure(); unhook(); session = s; ops = o || ops; hookSession(s); screen = 'room'; sheet.hidden = parked; render(); },
     // [title, text] for a room closing reason
     why(reason) { return WHY[reason] || WHY['host-left']; }
   };
