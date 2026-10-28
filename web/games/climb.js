@@ -1,8 +1,8 @@
 /* Hammer Climb: a spark sits in a pot and has only a long hammer.
    One long, wide, hand-made mountain that runs to the RIGHT: the tree and rocks, the boulders, the chimney,
    the slide and the orange-hell pit, furniture and pipes, ice mountain, the ridge, then the tall tower to the summit.
-   A menu picks the difficulty (Easy / Normal / Hard / Original): taller steps, wider gaps, steeper and
-   slicker slopes and fewer holds as it goes up.
+   then the sky: rocks floating over a sea of clouds, climbed rock to rock, and from the last one a final push into space.
+   One mountain, one difficulty (no levels to pick).
    Control: the mouse offset from the pot is where the hammer head wants to be (clamped to the arm, 1:1 with the view).
    The camera keeps the pot still on screen, so the cursor IS the head target. A free head chases it (stiff spring,
    capped speed). A head pressed into terrain sticks, so further mouse motion moves the POT instead (lever physics).
@@ -14,19 +14,16 @@
   const SPRING = 40, HSPD = 1300, VMAX = 1000, FLING = 640, BOUNCE = 0.18, STICK = 1.5, STICKV = 380, SUP = 0.25;
   // Materials: head slip (share of sideways drag that slides), pot friction.
   const MAT = {
-    rock: { slip: 0, mu: 0.9 }, orange: { slip: 0, mu: 0.8 }, wall: { slip: 1, mu: 0.3 }, wood: { slip: 0.03, mu: 0.8 },
+    rock: { slip: 0, mu: 0.9 }, float: { slip: 0, mu: 0.9 }, cloud: { slip: 0, mu: 0.95 }, edge: { slip: 1, mu: 0.3 }, orange: { slip: 0, mu: 0.8 }, wall: { slip: 1, mu: 0.3 }, wood: { slip: 0.03, mu: 0.8 },
     metal: { slip: 0.25, mu: 0.45 }, slide: { slip: 0.45, mu: 0.1 }, ice: { slip: 0.8, mu: 0.035 }, nub: { slip: 0, mu: 1 }
   };
   const XMIN = -700;
   const SENS = [0.6, 0.8, 1, 1.25, 1.5];
-  // step: height of climbs, gap: width of gaps, slope: steepness, slick: how slippery ice and the slide are,
-  // holds: extra rough stones, len: how long each part is.
-  const DIFFS = [
-    { key: 'easy', name: 'Easy', sub: 'Lower steps, narrow gaps, extra holds', step: 0.82, gap: 0.78, slope: 0.8, slick: 0.6, holds: 3, len: 0.9 },
-    { key: 'normal', name: 'Normal', sub: 'The mountain as it was meant to be', step: 1, gap: 1, slope: 1, slick: 1, holds: 2, len: 1 },
-    { key: 'hard', name: 'Hard', sub: 'Taller steps, wider gaps, fewer holds', step: 1.1, gap: 1.12, slope: 1.12, slick: 1.15, holds: 1, len: 1.15 },
-    { key: 'original', name: 'Original', sub: 'Long, steep and slick. Falls cost a lot', step: 1.16, gap: 1.2, slope: 1.22, slick: 1.25, holds: 0, len: 1.3 }
-  ];
+  // The one mountain (it used to be the middle, "Normal", of four levels). step: height of climbs, gap: width of gaps,
+  // slope: steepness, slick: how slippery ice and the slide are, holds: extra rough stones, len: how long each part is.
+  const P0 = { step: 1, gap: 1, slope: 1, slick: 1, holds: 2, len: 1 };
+  // The sky: floating rocks, each a little higher and to the right of the last (checked climbable by QA/climb-reach.js).
+  const SKY = { n: 8, dx: 150, rise: 70, w: 124, th: 54, sumW: 250 };
 
   // ---------- the mountain, laid out left to right. [material, x1,y1, x2,y2, ...] simple polygons ----------
   function blob(k, cx, cy, rx, ry, seed, n) {
@@ -41,10 +38,16 @@
     c = c === undefined ? 8 : c;
     return [k, x0 + c, y0, x1 - c, y0, x1, y0 + c, x1, y1 - c, x1 - c, y1, x0 + c, y1, x0, y1 - c, x0, y0 + c];
   }
-  function build(di) {
+  // a rock floating in the air: a flat top to stand on, a bevelled rim and a tapered underside
+  function floater(cx, top, w, th) {
+    const a = w / 2;
+    return ['float', cx - a, top - 10, cx - a + 10, top, cx + a - 10, top, cx + a, top - 10, cx + a * 0.66, top - th * 0.62,
+      cx + a * 0.18, top - th, cx - a * 0.3, top - th * 0.86, cx - a * 0.74, top - th * 0.5];
+  }
+  function build() {
     // An original mountain in the spirit of the famous pot-and-hammer climb: the start pit under a dead tree, the pipes,
     // orange rocks and a bucket, the chimney, the furniture, the long slide, the mountain, the ice, and a summit in space.
-    const P = DIFFS[di], st = P.step, gp = P.gap, ln = P.len, sl = P.slope, out = [], route = [], marks = [], deco = { snow: [], joints: [] };
+    const P = P0, st = P.step, gp = P.gap, ln = P.len, sl = P.slope, out = [], route = [], marks = [], deco = { snow: [], joints: [] };
     const mark = (x, y, name) => marks.push({ x, y, name });
     const R = (...pts) => { for (let i = 0; i < pts.length; i += 2) route.push([pts[i], pts[i + 1]]); };
     const nub = (x, y, i) => out.push(blob('nub', x, y, 16, 11, 70 + i, 8));
@@ -126,20 +129,34 @@
     for (let j = 0; j < nI; j++) { const t = (j + 0.7) / (nI + 0.4); out.push(blob('nub', mE + 80 + t * Li, yT + 12 + t * Ri, 22, 14, 11 + j, 10)); }
     deco.ice = [mE + 80, yT + 8, i1, Tp];
     mark(mE + 40, yT + 24, 'Ice'); R(mE + 80, yT + 24, i1, Tp + 16);
-    // 8. the summit: a last flat top under the stars. Stand on it and you lift off into space.
-    const sumX0 = i1 + 60, sumX1 = i1 + 300, XMAX = i1 + 900;
-    out.push(['rock', i1 + 100, 0, XMAX, 0, XMAX, Tp, i1 + 100, Tp]);
-    deco.flag = [(sumX0 + sumX1) / 2, Tp];
-    mark((sumX0 + sumX1) / 2, Tp + 16, 'Space'); R((sumX0 + sumX1) / 2, Tp + 16);
-    // the ground under it all, and the world's edges
+    // 8. the sky: a sea of clouds at the top of the ice (it catches falls), rocks floating above it, rock to rock upward,
+    //    and the last, widest rock is the summit. Stand on it and the final push launches you into space.
+    const k0 = i1 + 100, fx0 = i1 + 250;
+    out.push(['rock', i1, 0, k0 + 40, 0, k0 + 40, Tp, i1, Tp]);
+    mark(i1 + 60, Tp + 16, 'The sky'); R(i1 + 60, Tp + 16);
+    deco.floats = [];
+    let cx = fx0, top = Tp;
+    for (let j = 0; j < SKY.n; j++) {
+      cx = fx0 + j * SKY.dx; top = Tp + (j + 1) * SKY.rise;
+      out.push(floater(cx, top, SKY.w, SKY.th)); deco.floats.push([cx, top, SKY.w]); R(cx, top + 16);
+    }
+    const sumC = cx + SKY.dx + (SKY.sumW - SKY.w) / 2, sumY = top + SKY.rise;
+    out.push(floater(sumC, sumY, SKY.sumW, SKY.th * 1.5)); deco.floats.push([sumC, sumY, SKY.sumW]);
+    const sumX0 = sumC - SKY.sumW / 2 + 12, sumX1 = sumC + SKY.sumW / 2 - 12, XMAX = sumC + 900;
+    deco.clouds = [k0, XMAX, Tp];
+    out.push(['cloud', k0, Tp - 420, XMAX, Tp - 420, XMAX, Tp, k0, Tp], ['rock', k0, 0, XMAX, 0, XMAX, Tp - 420, k0, Tp - 420]);
+    deco.flag = [sumC, sumY];
+    mark(sumC, sumY + 16, 'Space'); R(sumC, sumY + 16);
+    // the ground under it all, and the world's edges (the right one is invisible: past it there is only sky)
     out.push(['rock', XMIN, -300, XMAX, -300, XMAX, 0, XMIN, 0],
       ['wall', XMIN - 400, -300, XMIN, -300, XMIN, 9000, XMIN - 400, 9000],
-      ['wall', XMAX, -300, XMAX + 400, -300, XMAX + 400, 99999, XMAX, 99999]);
-    return { P, shapes: out, route, marks, deco, XMAX, YTOP: Tp + 2000, summit: { y: Tp + 5, x0: sumX0, x1: sumX1 } };
+      ['edge', XMAX, -300, XMAX + 400, -300, XMAX + 400, 99999, XMAX, 99999]);
+    deco.backN = route.findIndex(q => q[1] >= Tp + 10);
+    return { P, shapes: out, route, marks, deco, XMAX, YTOP: sumY + 2500, skyY: Tp, summit: { y: sumY + 5, x0: sumX0, x1: sumX1 } };
   }
 
-  function makeWorld(di) {
-    const C0 = build(di), P = C0.P;
+  function makeWorld() {
+    const C0 = build(), P = C0.P;
     const world = C0.shapes.map(([k, ...f]) => {
       const p = []; for (let i = 0; i < f.length; i += 2) p.push([f[i], f[i + 1]]);
       const xs = p.map(q => q[0]), ys = p.map(q => q[1]);
@@ -169,7 +186,7 @@
     };
     world.total = rl[rl.length - 1];
     world.marks = C0.marks.map(m => Object.assign({ at: world.progress(m.x, m.y).at }, m));
-    Object.assign(world, { di, deco: C0.deco, XMAX: C0.XMAX, YTOP: C0.YTOP, summit: C0.summit, route: C0.route });
+    Object.assign(world, { deco: C0.deco, XMAX: C0.XMAX, YTOP: C0.YTOP, skyY: C0.skyY, summit: C0.summit, route: C0.route });
     return world;
   }
   // Closest point on a polygon's outline, and whether (x, y) is inside it.
@@ -294,86 +311,116 @@
   // ---------- art ----------
   function palette(d) {
     return {   // [fill, rim]
-      rock: d ? ['#5d534a', '#3e3731'] : ['#ddcdb3', '#bba98e'], wall: d ? ['#2e2924', '#2e2924'] : ['#cdbb9f', '#cdbb9f'],
+      rock: d ? ['#5d534a', '#3e3731'] : ['#ddcdb3', '#bba98e'], float: d ? ['#5b5560', '#3d3842'] : ['#cfc4bd', '#a8998f'],
+      cloud: d ? ['#4a4f5e', '#5d6476'] : ['#ffffff', '#e4e9f2'], wall: d ? ['#2e2924', '#2e2924'] : ['#cdbb9f', '#cdbb9f'],
       orange: d ? ['#a3582f', '#c8774a'] : ['#ec9a5e', '#cc7440'], wood: d ? ['#7a5940', '#56402f'] : ['#b5845a', '#8f6441'],
       metal: d ? ['#66737e', '#8b98a3'] : ['#a9b8c4', '#7f909d'], slide: d ? ['#a8873a', '#c9a64e'] : ['#efc65a', '#cc9f32'],
       ice: d ? ['#58788a', '#86a9ba'] : ['#d6edf5', '#a6cddb'], nub: d ? ['#7c6c5c', '#5c4f42'] : ['#bba483', '#9b835f']
     };
   }
-  const ORDER = ['wall', 'rock', 'orange', 'slide', 'wood', 'metal', 'ice', 'nub'];
+  const ORDER = ['wall', 'rock', 'cloud', 'float', 'orange', 'slide', 'wood', 'metal', 'ice', 'nub'];
   const LEAVES = [[-330, 650, 70], [-400, 590, 52], [-250, 600, 50], [-470, 500, 40], [-215, 390, 38], [-210, 570, 36]];
   const GRASS = [[-620, 90], [-520, 90], [-420, 90], [-170, 0], [-20, 0], [200, 0]];
 
   Ludus.register({
-    id: 'climb', name: 'Hammer Climb', tag: 'Arcade', tint: '#7d6a58', resetOnQuit: true,
+    id: 'climb', name: 'Hammer Climb', tag: 'Arcade', tint: '#3d4f93', resetOnQuit: true,
     hint: 'The mouse moves the hammer head. Plant it, keep moving to lever yourself · <kbd>←</kbd><kbd>→</kbd> swing <kbd>↑</kbd><kbd>↓</kbd> reach · <kbd>-</kbd><kbd>+</kbd> sensitivity',
-    _rules: { build, makeWorld, step, newState, clampArm, probe, DIFFS, START, HL, HMIN, PR, HR, STEP, VIEW },
+    _rules: { build, makeWorld, step, newState, clampArm, probe, SKY, START, HL, HMIN, PR, HR, STEP, VIEW },
     art(ctx, w, h) {
-      // one clear climb: a far range for depth, a stepped mountain with a snowy peak and flag, the pot on the first ledge,
-      // the hammer reaching from the pot to hook the next ledge
-      const X = v => w * v, Y = v => h * v;
-      ctx.fillStyle = 'rgba(255,255,255,0.12)';
-      ctx.beginPath(); ctx.moveTo(-5, h); ctx.lineTo(-5, Y(0.5)); ctx.lineTo(X(0.18), Y(0.36)); ctx.lineTo(X(0.34), Y(0.5)); ctx.lineTo(X(0.5), Y(0.3)); ctx.lineTo(X(0.7), Y(0.52)); ctx.lineTo(w + 5, Y(0.4)); ctx.lineTo(w + 5, h); ctx.fill();
-      const ridge = [[-0.05, 0.9], [0.14, 0.84], [0.36, 0.78], [0.42, 0.62], [0.64, 0.56], [0.7, 0.4], [0.84, 0.3], [1.05, 0.3]];
-      const trace = () => { ctx.beginPath(); ctx.moveTo(X(ridge[0][0]), h + 5); ridge.forEach(([x, y]) => ctx.lineTo(X(x), Y(y))); ctx.lineTo(w + 5, h + 5); ctx.closePath(); };
-      ctx.fillStyle = 'rgba(255,255,255,0.3)'; trace(); ctx.fill();
-      ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 1.5; ctx.lineJoin = 'round';
-      ctx.beginPath(); ridge.forEach(([x, y], i) => i ? ctx.lineTo(X(x), Y(y)) : ctx.moveTo(X(x), Y(y))); ctx.stroke();
-      // an orange boulder on the second ledge and a snowy cap on the peak
-      ctx.fillStyle = '#e8925a'; ctx.beginPath(); ctx.ellipse(X(0.56), Y(0.545), w * 0.06, h * 0.075, 0, Math.PI, 0); ctx.closePath(); ctx.fill();
-      ctx.fillStyle = '#fffaf2';
-      ctx.beginPath(); ctx.moveTo(X(0.77), Y(0.345)); ctx.lineTo(X(0.84), Y(0.3)); ctx.lineTo(X(1.02), Y(0.3)); ctx.lineTo(X(1.02), Y(0.34)); ctx.lineTo(X(0.94), Y(0.37)); ctx.lineTo(X(0.88), Y(0.345)); ctx.closePath(); ctx.fill();
-      // flag on the peak, fully inside the card
-      ctx.strokeStyle = '#fffaf2'; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(X(0.88), Y(0.3)); ctx.lineTo(X(0.88), Y(0.1)); ctx.stroke();
-      ctx.fillStyle = '#e8925a'; ctx.beginPath(); ctx.moveTo(X(0.88), Y(0.1)); ctx.lineTo(X(0.96), Y(0.14)); ctx.lineTo(X(0.88), Y(0.18)); ctx.fill();
-      // the pot, sitting on the first ledge
-      const px = X(0.2), by = Y(0.83), r = h * 0.1;
-      ctx.fillStyle = '#b8603f';
-      ctx.beginPath(); ctx.moveTo(px - r * 1.05, by - r * 1.5); ctx.lineTo(px + r * 1.05, by - r * 1.5); ctx.lineTo(px + r * 0.75, by); ctx.lineTo(px - r * 0.75, by); ctx.closePath(); ctx.fill();
-      ctx.fillStyle = '#d27650'; ctx.fillRect(px - r * 1.15, by - r * 1.75, r * 2.3, r * 0.4);
-      // the hammer: shaft from the pot rim, head hooked over the second ledge
-      const hx0 = px + r * 0.9, hy0 = by - r * 1.5, hx1 = X(0.42), hy1 = Y(0.6), ang = Math.atan2(hy1 - hy0, hx1 - hx0);
-      ctx.strokeStyle = '#2b2722'; ctx.lineWidth = 3.4; ctx.lineCap = 'round';
-      ctx.beginPath(); ctx.moveTo(hx0, hy0); ctx.lineTo(hx1, hy1); ctx.stroke();
-      ctx.fillStyle = '#2b2722'; ctx.save(); ctx.translate(hx1, hy1); ctx.rotate(ang + Math.PI / 2); D.roundRect(ctx, -h * 0.05, -h * 0.025, h * 0.1, h * 0.05, 3); ctx.fill(); ctx.restore();
+      // dusk sky over a rocky slope: a climber in an iron cauldron swings a big hammer, and floating rocks rise
+      // away into the stars (the way the climb ends). Fixed colours: the cover reads the same in light and dark.
+      const X = v => w * v, Y = v => h * v, u = Math.min(w / 221, h / 78);
+      const sky = ctx.createLinearGradient(0, 0, 0, h);
+      sky.addColorStop(0, '#18204a'); sky.addColorStop(0.55, '#3d4f93'); sky.addColorStop(1, '#e49a72');
+      ctx.fillStyle = sky; ctx.fillRect(0, 0, w, h);
+      // small stars, thicker towards the top
+      ctx.fillStyle = '#fff6e8';
+      for (let i = 0; i < 26; i++) {
+        const sx = ((i * 97.13) % 1) * w, sy = ((i * 0.6180339 * 7) % 1) * h * 0.62;
+        ctx.globalAlpha = 0.35 + 0.65 * (1 - sy / (h * 0.62)) * ((i * 37) % 10) / 10;
+        ctx.beginPath(); ctx.arc(sx, sy, (0.5 + (i % 3) * 0.35) * u, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+      // a far range, soft against the glow
+      ctx.fillStyle = 'rgba(40,36,70,0.35)';
+      ctx.beginPath(); ctx.moveTo(0, h); [[0, 0.78], [0.18, 0.62], [0.3, 0.72], [0.46, 0.56], [0.6, 0.7], [0.76, 0.6], [0.9, 0.72], [1, 0.66]].forEach(([x, y]) => ctx.lineTo(X(x), Y(y))); ctx.lineTo(w, h); ctx.fill();
+      // floating rocks rising up and to the right
+      const rock = (cx, top, rw) => {
+        const a = rw / 2, th = rw * 0.5;
+        ctx.fillStyle = '#8b7868';
+        ctx.beginPath(); ctx.moveTo(cx - a, top); ctx.lineTo(cx + a, top); ctx.lineTo(cx + a * 0.6, top + th * 0.6); ctx.lineTo(cx + a * 0.1, top + th); ctx.lineTo(cx - a * 0.4, top + th * 0.75); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#cbb8a4';
+        ctx.beginPath(); ctx.moveTo(cx - a, top); ctx.lineTo(cx + a, top); ctx.lineTo(cx + a * 0.78, top + th * 0.32); ctx.lineTo(cx - a * 0.8, top + th * 0.3); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#86b874'; D.roundRect(ctx, cx - a, top - 1.6 * u, rw, 3.2 * u, 1.6 * u); ctx.fill();
+      };
+      rock(X(0.53), Y(0.6), 30 * u); rock(X(0.7), Y(0.4), 26 * u); rock(X(0.85), Y(0.2), 22 * u);
+      // the rocky slope in front, with a boulder at the top
+      ctx.fillStyle = '#6a5446';
+      ctx.beginPath(); ctx.moveTo(-2, Y(0.58)); ctx.lineTo(X(0.12), Y(0.62)); ctx.lineTo(X(0.26), Y(0.74)); ctx.lineTo(X(0.36), Y(0.8)); ctx.lineTo(X(0.46), Y(0.98)); ctx.lineTo(X(0.48), h + 2); ctx.lineTo(-2, h + 2); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = '#9a7c66'; ctx.lineWidth = 1.6 * u; ctx.lineJoin = 'round';
+      ctx.beginPath(); ctx.moveTo(-2, Y(0.58)); ctx.lineTo(X(0.12), Y(0.62)); ctx.lineTo(X(0.26), Y(0.74)); ctx.lineTo(X(0.36), Y(0.8)); ctx.lineTo(X(0.46), Y(0.98)); ctx.stroke();
+      ctx.fillStyle = '#7d6455'; ctx.beginPath(); ctx.ellipse(X(0.06), Y(0.6), 10 * u, 6 * u, -0.2, Math.PI, 0); ctx.fill();
+      // the climber in the cauldron, sitting on the slope
+      const cx = X(0.22), cy = Y(0.66), r = 9 * u;
+      // body: an orange top, a head and dark hair, looking up the climb
+      ctx.fillStyle = '#e8794a'; D.roundRect(ctx, cx - 4.2 * u, cy - r - 9 * u, 8.4 * u, 10 * u, 3 * u); ctx.fill();
+      ctx.fillStyle = '#f2c9a0'; ctx.beginPath(); ctx.arc(cx + 0.6 * u, cy - r - 12.5 * u, 3.6 * u, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#2a211c'; ctx.beginPath(); ctx.arc(cx + 0.2 * u, cy - r - 13.6 * u, 3.7 * u, Math.PI * 1.02, Math.PI * 1.98); ctx.fill();
+      // the hammer: long handle from the hands to a head hooked on the first floating rock
+      const hx = cx + 3 * u, hy = cy - r - 5 * u, tx = X(0.53) - 13 * u, ty = Y(0.6) - 3 * u;
+      ctx.strokeStyle = '#c99a62'; ctx.lineWidth = 2 * u; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(tx, ty); ctx.stroke();
+      ctx.strokeStyle = '#e8794a'; ctx.lineWidth = 2.4 * u; ctx.beginPath(); ctx.moveTo(cx + 1 * u, cy - r - 6 * u); ctx.lineTo(hx + 2 * u, hy - 0.6 * u); ctx.stroke();
+      const ang = Math.atan2(ty - hy, tx - hx);
+      ctx.save(); ctx.translate(tx, ty); ctx.rotate(ang + Math.PI / 2);
+      ctx.fillStyle = '#d7dde4'; D.roundRect(ctx, -5.2 * u, -2.6 * u, 10.4 * u, 5.2 * u, 1.4 * u); ctx.fill();
+      ctx.fillStyle = '#8e99a5'; ctx.fillRect(-5.2 * u, 0.9 * u, 10.4 * u, 1.7 * u);
+      ctx.restore();
+      // the cauldron: round iron pot with a bright rim
+      ctx.fillStyle = '#23232b'; ctx.beginPath(); ctx.arc(cx, cy - r * 0.55, r, 0.05, Math.PI - 0.05); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(cx - r, cy - r * 0.55); ctx.lineTo(cx + r, cy - r * 0.55); ctx.lineTo(cx + r * 0.9, cy - r * 0.2); ctx.lineTo(cx - r * 0.9, cy - r * 0.2); ctx.fill();
+      ctx.fillStyle = '#80869a'; D.roundRect(ctx, cx - r * 1.12, cy - r * 0.78, r * 2.24, r * 0.34, r * 0.17); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.18)'; ctx.beginPath(); ctx.ellipse(cx - r * 0.45, cy + r * 0.05, r * 0.22, r * 0.12, -0.5, 0, Math.PI * 2); ctx.fill();
     },
     create(stage, api) {
       const view = api.canvas(() => {});
       const { ctx, canvas } = view;
       canvas.style.cursor = 'crosshair'; canvas.style.touchAction = 'none';   // a touch screen or pen drives the hammer too, never scrolls
-      let world, s, maxH, maxP, time, state = 'menu', cam = { x: 0, y: 0 }, winLift = 0, acc = 0, aim, mouse = null, keysDown = {}, clock = 0, winAt = 0;
+      let world, s, maxH, maxP, time, state = 'play', cam = { x: 0, y: 0 }, winLift = 0, liftV = 0, acc = 0, aim, mouse = null, keysDown = {}, clock = 0, winAt = 0;
       let fallFrom = 0, fallNote = null, lastTap = 0, wasHc = false, falls = 0, reached = 1, sectionNote = null, back = null;
       let sensI = SENS.indexOf(+Ludus.state.climbSens); if (sensI < 0) sensI = 2;
-      let pick = DIFFS.findIndex(d => d.key === Ludus.state.climbDiff); if (pick < 0) pick = [0, 1, 2][api.level] ?? 1;
-      let hover = -1;
+      // the old difficulty levels are gone: forget the saved pick
+      if (Ludus.state.climbDiff !== undefined) { delete Ludus.state.climbDiff; try { Ludus.save(); } catch (e) {} }
 
       const fin = v => typeof v === 'number' && isFinite(v);
       const pt = q => q && fin(q.x) && fin(q.y);
-      function setWorld(di) {
-        world = makeWorld(di);
-        // the mountain mass behind the route, so hanging parts read as one mountain (decor only)
-        back = world.route.map(([x, y]) => [x, y - 40]).concat([[world.route[world.route.length - 1][0], 0], [world.route[0][0], 0]]);
+      function setWorld() {
+        world = makeWorld();
+        // the mountain mass behind the route, so hanging parts read as one mountain (decor only; it stops where the sky starts)
+        const rb = world.route.slice(0, world.deco.backN > 0 ? world.deco.backN : world.route.length);
+        back = rb.map(([x, y]) => [x, y - 40]).concat([[rb[rb.length - 1][0], 0], [rb[0][0], 0]]);
       }
       function restore(o) {
-        if (!o || o.v2 !== 3 || !fin(o.di) || !DIFFS[o.di] || !pt(o.p) || !pt(o.v) || !pt(o.o) || !pt(o.h)) return false;
-        setWorld(o.di);
+        // v2 4 = the one mountain with the sky ending; a v2 3 save from the old middle level ("Normal") is the same mountain
+        // up to the ice, so it carries over; saves from the other old levels start fresh
+        if (!o || !(o.v2 === 4 || (o.v2 === 3 && o.di === 1)) || !pt(o.p) || !pt(o.v) || !pt(o.o) || !pt(o.h)) return false;
+        setWorld();
         if (o.p.x < XMIN || o.p.x > world.XMAX || o.p.y < -100 || o.p.y > world.YTOP || Math.hypot(o.o.x, o.o.y) > HL + 1) return false;
         s = { p: { x: o.p.x, y: o.p.y }, v: { x: o.v.x, y: o.v.y }, o: { x: o.o.x, y: o.o.y }, h: { x: o.h.x, y: o.h.y }, hc: !!o.hc,
           hn: pt(o.hn) ? { x: o.hn.x, y: o.hn.y } : { x: 0, y: 1 }, ground: !!o.ground, air: 0 };
         maxH = fin(o.maxH) ? Math.max(0, o.maxH) : 0; time = fin(o.time) ? o.time : 0; falls = fin(o.falls) ? o.falls : 0;
         maxP = fin(o.maxP) ? Math.max(0, o.maxP) : 0;
         if (o.aim && fin(o.aim.a) && fin(o.aim.l)) aim = { a: o.aim.a, l: o.aim.l };
-        pick = o.di; state = 'play';
+        state = 'play';
         return true;
       }
-      function begin(di) {
-        pick = di; Ludus.state.climbDiff = DIFFS[di].key; Ludus.save();
-        setWorld(di); s = newState(); maxH = 0; maxP = 0; time = 0; falls = 0; aim = null; acc = 0;
+      function begin() {
+        setWorld(); s = newState(); maxH = 0; maxP = 0; time = 0; falls = 0; aim = null; acc = 0;
         aim = { a: Math.atan2(s.o.y, s.o.x), l: Math.hypot(s.o.x, s.o.y) };
         cam.x = s.p.x; cam.y = s.p.y; fallFrom = s.p.y; reached = 1; state = 'play';
-        sectionNote = { text: DIFFS[di].name, t: clock }; api.sfx('tap'); api.score(0);
+        sectionNote = null; api.score(0);
       }
-      if (!restore(api.saved)) { setWorld(pick); s = newState(); maxH = 0; maxP = 0; time = 0; aim = null; state = 'menu'; }
+      if (!restore(api.saved)) begin();
       if (!aim) aim = { a: Math.atan2(s.o.y, s.o.x), l: Math.hypot(s.o.x, s.o.y) };
       cam.x = s.p.x; cam.y = s.p.y; fallFrom = s.p.y;
       const countReached = () => { let n = 0; world.marks.forEach(m => { if (m.at <= maxP + 30) n++; }); return Math.max(1, n); };
@@ -386,11 +433,6 @@
       const toScreen = (x, y) => { const k = scale(), a = anchor(); return { x: a.x + (x - cam.x) * k, y: a.y - (y - cam.y) * k }; };
       const sensBox = () => ({ x: view.w - 62, y: 8, w: 54, h: 30 });
       const inBox = (b, p) => p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h;
-      function menuLayout() {
-        const w = view.w, h = view.h, cw = Math.min(w - 32, 340), ch = Math.max(46, Math.min(58, (h - 170) / 4 - 10));
-        const total = 64 + DIFFS.length * (ch + 10) + 26, top = Math.max(12, (h - total) / 2);
-        return { title: top + 18, sub: top + 44, cards: DIFFS.map((d, i) => ({ x: (w - cw) / 2, y: top + 64 + i * (ch + 10), w: cw, h: ch })), foot: top + 64 + DIFFS.length * (ch + 10) + 12 };
-      }
       const local = e => { const r = canvas.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
       function setSens(i) {
         sensI = Math.max(0, Math.min(SENS.length - 1, i)); Ludus.state.climbSens = SENS[sensI]; Ludus.save();
@@ -398,24 +440,14 @@
       }
       api.on(canvas, 'pointermove', e => {
         const p = local(e);
-        if (state === 'menu') { hover = menuLayout().cards.findIndex(c => inBox(c, p)); canvas.style.cursor = hover >= 0 ? 'pointer' : 'default'; return; }
         mouse = p;
       });
       api.on(canvas, 'pointerdown', e => {
         const p = local(e);
-        if (state === 'menu') { const i = menuLayout().cards.findIndex(c => inBox(c, p)); if (i >= 0) { canvas.style.cursor = 'crosshair'; begin(i); } return; }
         if (state === 'play' && inBox(sensBox(), p)) { setSens((sensI + 1) % SENS.length); api.sfx('tick'); return; }
         mouse = p;
       });
       api.keys(e => {
-        if (state === 'menu') {
-          if (e.key === 'ArrowUp') pick = (pick + DIFFS.length - 1) % DIFFS.length;
-          else if (e.key === 'ArrowDown') pick = (pick + 1) % DIFFS.length;
-          else if (e.key === 'Enter' || e.key === ' ') begin(pick);
-          else if (/^[1-4]$/.test(e.key)) begin(+e.key - 1);
-          if (e.key.startsWith('Arrow')) { setWorld(pick); api.sfx('tick'); }
-          return;
-        }
         if (e.key === '-' || e.key === '_') { setSens(sensI - 1); return; }
         if (e.key === '=' || e.key === '+') { setSens(sensI + 1); return; }
         keysDown[e.key] = true; if (e.key.startsWith('Arrow')) mouse = null;
@@ -454,14 +486,14 @@
           fallFrom = s.p.y;
         } else fallFrom = Math.max(fallFrom, s.p.y);
         const sm = world.summit;
-        if (s.p.y > sm.y && s.ground && s.p.x > sm.x0 && s.p.x < sm.x1) win();
+        if (s.p.y > sm.y && s.p.y < sm.y + 60 && (s.ground || s.hc) && s.p.x > sm.x0 && s.p.x < sm.x1) win();
       }
       function win() {
         state = 'won'; winAt = clock; maxP = world.total; reached = world.marks.length;
-        const score = Math.floor(world.total / 10) + Math.max(0, Math.round(2400 - time)) * (world.di + 1);
+        const score = Math.floor(world.total / 10) + Math.max(0, Math.round(2400 - time)) * 2;
         api.score(score); api.sfx('win');
         const mm = Math.floor(time / 60), ss = String(Math.floor(time % 60)).padStart(2, '0');
-        api.timeout(() => api.over({ score, title: 'Summit', won: true, message: `${DIFFS[world.di].name} mountain in ${mm}:${ss}, ${falls} big fall${falls === 1 ? '' : 's'}` }), 2200);
+        api.timeout(() => api.over({ score, title: 'Into space', won: true, message: `To the stars in ${mm}:${ss}, ${falls} big fall${falls === 1 ? '' : 's'}` }), 3400);
       }
 
       // ---------- render ----------
@@ -510,9 +542,10 @@
       function render() {
         const col = api.colors(), pal = palette(col.dark), d = col.dark;
         const { w, h } = view, k = scale();
-        if (state === 'won') winLift += (700 - winLift) * (api.reduceMotion ? 1 : 0.02);   // lift off into space
-        if (state === 'menu') { cam.x = 260 + Math.sin(clock * 0.15) * 120; cam.y = 200; }
-        else { cam.x = s.p.x; cam.y = s.p.y + winLift; }
+        // the final push: the pot launches straight up off the summit rock and the camera rides with it into space
+        if (state === 'won') { const dt = Math.min(0.05, clock - (render.t || clock)); liftV = Math.min(2600, liftV + 1500 * dt); winLift += liftV * dt; }
+        render.t = clock;
+        cam.x = s.p.x; cam.y = s.p.y + winLift;
         ctx.clearRect(0, 0, w, h);
         ctx.save(); D.roundRect(ctx, 0, 0, w, h, 14); ctx.clip();
         sky(col, w, h, k);
@@ -559,12 +592,12 @@
           ctx.fillStyle = col.accent; ctx.beginPath(); ctx.moveTo(fp.x, fp.y - 56 * k); ctx.lineTo(fp.x + 24 * k, fp.y - 48 * k + Math.sin(clock * 3) * 2); ctx.lineTo(fp.x, fp.y - 40 * k); ctx.fill();
           D.spark(ctx, fp.x, fp.y - 64 * k, 8 * k, col.accent, clock * 0.8);
         }
-        if (state !== 'menu') drawClimber(col, k);
+        drawClimber(col, k);
         if (fallNote && clock - fallNote.t < 1.6 && state === 'play') {
           const p = toScreen(fallNote.x, fallNote.y), a = 1 - (clock - fallNote.t) / 1.6;
           ctx.globalAlpha = a; D.text(ctx, fallNote.text, p.x, p.y - 38 - (1 - a) * 16, 13, col.bad, 750); ctx.globalAlpha = 1;
         }
-        if (state === 'menu') menu(col, w, h); else hud(col, w, h);
+        hud(col, w, h);
         ctx.restore();
       }
       function details(col, k) {
@@ -593,8 +626,30 @@
           for (let x = x1 - 16; x > x0 + 14; x -= 22) { const p = toScreen(x, y); ctx.lineTo(p.x, p.y + (5 + (Math.round(x) % 3) * 2) * k); }
           ctx.closePath(); ctx.fill();
         });
-        const sm = world.summit, pk = toScreen(sm.x0 + 20, sm.y - 30), pk2 = toScreen(sm.x1 - 10, sm.y - 30);
-        if (on(pk, 200)) { ctx.beginPath(); ctx.moveTo(pk.x, pk.y); ctx.quadraticCurveTo((pk.x + pk2.x) / 2, pk.y - 60 * k, pk2.x, pk2.y); ctx.lineTo((pk.x + pk2.x) / 2, pk.y - 14 * k); ctx.fill(); }
+        // the sea of clouds: soft puffs along its top
+        const [cx0, cx1, cy] = world.deco.clouds;
+        ctx.fillStyle = d ? '#4a4f5e' : '#ffffff';
+        for (let x = cx0 + 24; x < cx1; x += 38) {
+          const p = toScreen(x, cy); if (!on(p, 60)) continue;
+          const r = (20 + (Math.round(x) % 3) * 4) * k; ctx.beginPath(); ctx.arc(p.x, p.y + r * 0.62, r, Math.PI, 0); ctx.fill();
+        }
+        // and a soft fade where the cloud sea meets the rock under it
+        const cb = toScreen(cx0, cy - 420);
+        if (cb.y > -40 && cb.y < view.h + 200) {
+          const gr = ctx.createLinearGradient(0, cb.y - 120 * k, 0, cb.y);
+          gr.addColorStop(0, d ? 'rgba(74,79,94,0)' : 'rgba(255,255,255,0)'); gr.addColorStop(1, d ? 'rgba(74,79,94,0.9)' : 'rgba(255,255,255,0.9)');
+          const c1 = toScreen(cx1, cy); ctx.fillStyle = gr; ctx.fillRect(cb.x, cb.y - 120 * k, c1.x - cb.x, 140 * k);
+        }
+        // grassy tops and a few hanging roots on the floating rocks
+        world.deco.floats.forEach(([fx, ft, fw]) => {
+          const a = toScreen(fx - fw / 2 + 8, ft), b = toScreen(fx + fw / 2 - 8, ft); if (!on(a, 300)) return;
+          ctx.fillStyle = d ? '#4f7a52' : '#9cc38f'; D.roundRect(ctx, a.x, a.y - 2 * k, b.x - a.x, 6 * k, 3 * k); ctx.fill();
+          ctx.strokeStyle = d ? 'rgba(160,190,150,0.45)' : 'rgba(110,150,95,0.6)'; ctx.lineWidth = 1.4;
+          for (let i = 0; i < 3; i++) {
+            const r0 = toScreen(fx - fw * 0.25 + i * fw * 0.22, ft - 34 - i * 4);
+            ctx.beginPath(); ctx.moveTo(r0.x, r0.y); ctx.quadraticCurveTo(r0.x + 5 * k, r0.y + 12 * k, r0.x - 2 * k, r0.y + (20 + i * 6) * k); ctx.stroke();
+          }
+        });
         ctx.fillStyle = d ? '#7f8d98' : '#8c9daa';
         world.deco.joints.forEach(([x, y]) => { const p = toScreen(x, y); if (on(p, 30)) { D.roundRect(ctx, p.x - 15 * k, p.y - 15 * k, 30 * k, 30 * k, 5 * k); ctx.fill(); } });
         const bh = toScreen(world.deco.bucket[0], world.deco.bucket[1]);
@@ -607,7 +662,7 @@
         const d = col.dark, pct = Math.min(100, Math.floor(maxP / world.total * 100));
         const pw = Math.min(170, w - 150), px = w / 2 - pw / 2;
         pill(px, 8, pw, 30, d);
-        D.fitText(ctx, `${Math.max(0, Math.floor((s.p.y - PR) / 10))} m`, px + pw * 0.3, 23, pw * 0.42, 14, col.ink, 780);
+        D.fitText(ctx, `${Math.max(0, Math.floor((s.p.y + (state === 'won' ? winLift : 0) - PR) / 10))} m`, px + pw * 0.3, 23, pw * 0.42, 14, col.ink, 780);
         D.fitText(ctx, `best ${pct}%`, px + pw * 0.72, 23, pw * 0.44, 11, col.ink2, 650);
         // part of the mountain, and progress dots
         const nM = world.marks.length, sec = world.marks[Math.max(0, reached - 1)].name;
@@ -618,17 +673,16 @@
         }
         const sb = sensBox(); pill(sb.x, sb.y, sb.w, sb.h, d);
         D.fitText(ctx, `${SENS[sensI]}×`, sb.x + sb.w / 2, sb.y + 15, sb.w - 12, 11, col.ink2, 700);
-        pill(8, 8, 62, 30, d); D.fitText(ctx, DIFFS[world.di].name, 39, 23, 50, 10.5, col.ink2, 700, 8);
-        if (sectionNote && clock - sectionNote.t < 2) {
+        if (sectionNote && clock - sectionNote.t < 2 && state !== 'won') {
           const a = Math.min(1, (2 - (clock - sectionNote.t)) * 2);
           ctx.globalAlpha = a; D.fitText(ctx, sectionNote.text, w / 2, h * 0.22, w - 40, 17, col.ink, 780); ctx.globalAlpha = 1;
         }
         if (state === 'won') {
           const a = Math.min(1, (clock - winAt) / 0.6);
-          ctx.globalAlpha = a; D.fitText(ctx, 'You made it to the top', w / 2, h * 0.2, w - 40, 17, col.good, 780);
-          D.fitText(ctx, `${DIFFS[world.di].name} mountain · ${falls} big fall${falls === 1 ? '' : 's'}`, w / 2, h * 0.2 + 24, w - 40, 12, col.ink2, 650); ctx.globalAlpha = 1;
+          ctx.globalAlpha = a; D.fitText(ctx, 'Launched into space', w / 2, h * 0.2, w - 40, 17, col.good, 780);
+          D.fitText(ctx, `${falls} big fall${falls === 1 ? '' : 's'} on the way`, w / 2, h * 0.2 + 24, w - 40, 12, 'rgba(240,236,250,0.85)', 650); ctx.globalAlpha = 1;
           for (let i = 0; i < 8; i++) {
-            const t = clock - winAt + i * 0.3, r = 10 + (t * 60) % 110, p = toScreen(s.p.x, s.p.y);
+            const t = clock - winAt + i * 0.3, r = 10 + (t * 60) % 110, p = toScreen(s.p.x, s.p.y + winLift);
             ctx.globalAlpha = Math.max(0, 1 - r / 120); D.spark(ctx, p.x + Math.cos(i * 0.8) * r, p.y - Math.abs(Math.sin(i * 1.7)) * r * 0.7 - 20, 6, col.accent, t);
           }
           ctx.globalAlpha = 1;
@@ -638,29 +692,15 @@
           ctx.globalAlpha = 1;
         }
       }
-      function menu(col, w, h) {
-        const d = col.dark, m = menuLayout();
-        ctx.fillStyle = d ? 'rgba(20,18,16,0.55)' : 'rgba(250,246,240,0.55)'; ctx.fillRect(0, 0, w, h);
-        D.fitText(ctx, 'Hammer Climb', w / 2, m.title, w - 40, 20, col.ink, 800);
-        D.fitText(ctx, 'Pick your mountain', w / 2, m.sub, w - 40, 12, col.ink2, 650);
-        m.cards.forEach((c, i) => {
-          const sel = i === pick, hov = i === hover;
-          ctx.fillStyle = d ? (hov ? 'rgba(60,54,48,0.96)' : 'rgba(42,38,33,0.94)') : (hov ? 'rgba(255,255,255,1)' : 'rgba(255,252,247,0.95)');
-          D.roundRect(ctx, c.x, c.y, c.w, c.h, 14); ctx.fill();
-          if (sel) { ctx.strokeStyle = col.accent; ctx.lineWidth = 2; D.roundRect(ctx, c.x + 1, c.y + 1, c.w - 2, c.h - 2, 13); ctx.stroke(); }
-          // difficulty pips on the left, text centred in the rest
-          for (let j = 0; j < 4; j++) {
-            ctx.fillStyle = j <= i ? col.accent : (d ? 'rgba(255,245,230,0.16)' : 'rgba(90,74,58,0.16)');
-            ctx.beginPath(); ctx.arc(c.x + 18, c.y + c.h / 2 + (j - 1.5) * 8, 2.6, 0, Math.PI * 2); ctx.fill();
-          }
-          const tx = c.x + 30 + (c.w - 40) / 2, tw = c.w - 52;
-          D.fitText(ctx, DIFFS[i].name, tx, c.y + c.h / 2 - 9, tw, 15, col.ink, 760, 11);
-          D.fitText(ctx, DIFFS[i].sub, tx, c.y + c.h / 2 + 10, tw, 11, col.ink2, 600, 9);
-        });
-        D.fitText(ctx, 'Click a mountain to start · ↑ ↓ and Enter work too', w / 2, m.foot, w - 40, 10.5, col.ink3, 650, 9);
-      }
       function drawClimber(col, k) {
-        const pc = toScreen(s.p.x, s.p.y), hc = toScreen(s.h.x, s.h.y);
+        const lift = state === 'won' ? winLift : 0, pc = toScreen(s.p.x, s.p.y + lift), hc = toScreen(s.h.x, s.h.y + lift);
+        if (lift > 1) {                          // the launch trail: sparks streaming out under the pot
+          for (let i = 0; i < 9; i++) {
+            const f = ((clock * 3 + i / 9) % 1), y = pc.y + PR * k + f * Math.min(160, lift * 0.4) * k;
+            ctx.globalAlpha = (1 - f) * 0.9; D.spark(ctx, pc.x + Math.sin(i * 2.3 + clock * 9) * 6 * k, y, (7 - f * 5) * k, col.accent, clock * 5 + i);
+          }
+          ctx.globalAlpha = 1;
+        }
         const ang = Math.atan2(hc.y - pc.y, hc.x - pc.x), r = PR * k;
         const sx = pc.x + Math.cos(ang) * r * 0.25, sy = pc.y - r * 0.8;
         ctx.strokeStyle = col.dark ? '#cbbfae' : '#5a4a3a'; ctx.lineWidth = 3.2 * Math.min(1.3, k); ctx.lineCap = 'round';
@@ -683,13 +723,13 @@
       }
 
       api.loop(dt => { clock += dt; update(dt); render(); });
-      if (window.ludusDebug) Ludus.games.find(x => x.id === 'climb')._peek = () => ({ s, maxH, maxP, state, aim, cam, time, reached, falls, toScreen, scale, anchor, sens: SENS[sensI], world, pick, menuLayout,
+      if (window.ludusDebug) Ludus.games.find(x => x.id === 'climb')._peek = () => ({ s, maxH, maxP, state, aim, cam, time, reached, falls, toScreen, scale, anchor, sens: SENS[sensI], world, win,
         teleport(x, y) { Object.assign(s, newState({ x, y })); fallFrom = y; } });
       return {
         save() {
           if (state !== 'play' || time < 1) return null;
           const c = q => ({ x: q.x, y: q.y });
-          return { v2: 3, di: world.di, p: c(s.p), v: c(s.v), o: c(s.o), h: c(s.h), hc: s.hc, hn: c(s.hn), ground: s.ground, maxH, maxP, time, falls, aim: { a: aim.a, l: aim.l } };
+          return { v2: 4, p: c(s.p), v: c(s.v), o: c(s.o), h: c(s.h), hc: s.hc, hn: c(s.hn), ground: s.ground, maxH, maxP, time, falls, aim: { a: aim.a, l: aim.l } };
         },
         resume() { acc = 0; }
       };

@@ -35,7 +35,7 @@
     style.layers.push({ id: 'geolines', type: 'line', source: 'geolines', layout: { 'line-cap': 'round' },
       paint: { 'line-color': '#141414', 'line-width': 3, 'line-opacity': 0.9, 'line-dasharray': [0.01, 2.4] } });
     const map = new ml.Map({
-      container: el, style, center: [o.lon, o.lat], zoom: o.zoom - 1, minZoom: 0, maxZoom: 17, maxPitch: 0,
+      container: el, style, center: [o.lon, o.lat], zoom: o.zoom - 1, minZoom: 0, maxZoom: 19, maxPitch: 0,
       attributionControl: false, dragRotate: false, pitchWithRotate: false, doubleClickZoom: true, boxZoom: false, keyboard: false,
       fadeDuration: 120, renderWorldCopies: true
     });
@@ -110,12 +110,13 @@
     let m = null;
     if (!o.flat && canGL()) { try { m = createGL(el, credit, o); } catch (e) { el.innerHTML = ''; } }
     if (!m) m = createFlat(el, credit, o);
-    zoomUI(el, m);
+    zoomUI(el, m, o.buttons !== false);
     return m;
   }
   // Zoom that is obvious: + and - buttons on every map, the mouse wheel, double-click, a trackpad pinch (Chrome/WebView2
   // send it as ctrl+wheel, which both map libraries read; Safari/WKWebView sends gesture events, handled here).
-  function zoomUI(el, m) {
+  // o.buttons false: the game has its own zoom buttons on this map (Mosaic Hunt), so only one set ever shows.
+  function zoomUI(el, m, buttons) {
     if (!document.getElementById('geo-zoom-css')) {
       const st = document.createElement('style'); st.id = 'geo-zoom-css';
       st.textContent = '.geo-zoom{position:absolute;left:8px;bottom:8px;z-index:640;width:28px;display:flex;flex-direction:column;border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.25)}' +
@@ -123,6 +124,10 @@
         '.geo-zoom button+button{border-top:1px solid rgba(255,255,255,.18)}.geo-zoom button:hover{background:rgba(16,16,18,.92)}.geo-zoom button:active{background:rgba(16,16,18,1)}';
       document.head.appendChild(st);
     }
+    if (buttons) addButtons(el, m);
+    pinch(el, m);
+  }
+  function addButtons(el, m) {
     const box = document.createElement('div'); box.className = 'geo-zoom';
     [['+', 'Zoom in', 1], ['\u2212', 'Zoom out', -1]].forEach(([t, label, d]) => {
       const b = document.createElement('button'); b.type = 'button'; b.textContent = t; b.setAttribute('aria-label', label); b.title = label;
@@ -135,9 +140,13 @@
     // a collapsed mini map is too small for buttons: they come back as soon as it opens up
     const fit = () => box.classList.toggle('tiny', el.clientWidth < 120 || el.clientHeight < 110);
     fit(); try { new ResizeObserver(fit).observe(el); } catch (e) { /* old engines: always shown */ }
+  }
+  // Pinch zooms the map, never the page. Safari / the Mac app send gesture events; Chrome / WebView2 (Windows) send a
+  // trackpad pinch as ctrl+wheel, which both map libraries zoom on; touch screens pinch through the libraries' touch handling.
+  function pinch(el, m) {
     let z0 = 0;
     el.addEventListener('gesturestart', e => { e.preventDefault(); z0 = m.getZoom(); });
-    el.addEventListener('gesturechange', e => { e.preventDefault(); if (e.scale > 0) m.setZoom(Math.max(1, Math.min(18, z0 + Math.log2(e.scale)))); });
+    el.addEventListener('gesturechange', e => { e.preventDefault(); if (e.scale > 0) m.setZoom(Math.max(1, Math.min(20, z0 + Math.log2(e.scale)))); });
     el.addEventListener('gestureend', e => e.preventDefault());
   }
   window.__GEO_MAP__ = { create, canGL };
