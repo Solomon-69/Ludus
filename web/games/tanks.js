@@ -76,6 +76,7 @@
 
   Ludus.register({
     id: 'tanks', name: 'Tank Arena', aka: 'Tank Duel', tag: '2 Player', wide: true, tint: '#c98a3a', versus: true, defaultVs: 'friend',
+    waitForMove: true,   // stands still until the first move (see engine.js)
     hint: '<kbd>↑</kbd><kbd>↓</kbd> drive, <kbd>←</kbd><kbd>→</kbd> turn (or <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>), <kbd>Space</kbd> fires · vs Friend: <b>P1</b> WASD + Space, <b>P2</b> arrows + Enter',
     _rules: { makeMaze, wallRects, MC: PMC, MRW: PMRW },
     art(ctx, w, h) {

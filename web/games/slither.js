@@ -58,6 +58,7 @@
 
   Ludus.register({
     id: 'slither', name: 'Worm Arena', aka: 'snake worm arena', tag: 'Arcade', versus: true, tint: '#7c6bb5', online: { min: 2, max: 4 },
+    waitForMove: true,   // stands still until the first move (see engine.js)
     onlineHint: '<b>Online</b> 2 to 4 players plus bots · pointer or <kbd>A</kbd><kbd>D</kbd> / arrows steer, hold click or <kbd>Space</kbd> to boost · last worm standing wins',
     hint: 'Pointer steers, hold click or <kbd>Space</kbd> to boost · <kbd>←</kbd><kbd>→</kbd> turn · vs Friend: <b>P1</b> A D + Space, <b>P2</b> ← → + /',
     art(ctx, w, h, colors) {

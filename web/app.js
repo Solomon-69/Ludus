@@ -757,6 +757,7 @@
       onScore: setScore,
       onOver: res => finish(g, res),
       toast,
+      onWait: (on, text, still) => waitHint(on, text, still),
       onCrash: (e, kind) => gameCrashed(g, run, e, kind)
     }, onlineApi);
     current = { game: g, run, instance: null, online: !!onlineApi };
@@ -767,6 +768,34 @@
       current.instance = {}; run.crash(e, 'start');
     }
     if (!onlineApi && current.instance && current.instance.save) current.saver = setInterval(() => { if (!run.api.paused) persist(); }, SAVE_EVERY_MS);
+  }
+  // "Move to start" / "Tap to start": a small pill above the controls line while a game waits for the first move.
+  // It keeps its space after the start (only fades), so the stage never changes size as play begins.
+  function waitHint(on, text, still) {
+    const foot = $('hint');
+    let pill = foot.querySelector('.wait-start');
+    if (on) {
+      if (!pill) {
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex;justify-content:center;margin:0 0 5px';
+        pill = document.createElement('span'); pill.className = 'wait-start'; pill.setAttribute('role', 'status');
+        pill.style.cssText = 'display:inline-flex;align-items:center;gap:6px;padding:3px 10px 3px 8px;border-radius:999px;font-size:11.5px;font-weight:650;line-height:16px;color:var(--ink);background:var(--surface-2);border:1px solid var(--line);pointer-events:none';
+        const dot = document.createElement('i');
+        dot.style.cssText = 'width:6px;height:6px;border-radius:50%;background:var(--accent);flex:none';
+        pill.append(dot, document.createElement('b'));
+        pill.lastChild.style.fontWeight = '650';
+        row.appendChild(pill); foot.prepend(row);
+        if (!still && dot.animate) dot.animate([{ opacity: 1, transform: 'scale(1)' }, { opacity: 0.35, transform: 'scale(0.7)' }], { duration: 900, iterations: Infinity, direction: 'alternate', easing: 'ease-in-out' });
+      }
+      pill.lastChild.textContent = text;
+      pill.style.visibility = ''; pill.style.opacity = '1';
+      return;
+    }
+    if (!pill) return;
+    pill.style.opacity = '0';
+    const gone = () => { pill.style.visibility = 'hidden'; pill.getAnimations && pill.getAnimations({ subtree: true }).forEach(a => a.cancel()); };
+    if (still || !pill.animate) gone();
+    else pill.animate([{ opacity: 1, transform: 'translateY(0)' }, { opacity: 0, transform: 'translateY(-3px)' }], { duration: 220, easing: 'ease-out' }).onfinish = gone;
   }
   // ---------- crash failsafe: a game that throws, freezes or loses its graphics gets a calm recovery card ----------
   function logError(id, kind, e) {
@@ -1290,7 +1319,7 @@
   };
   window.ludusToast = text => toast(String(text || ''));   // test helper
   window.ludusTestOver = score => { if (current) current.run.api.over({ score }); };
-  window.ludusState = () => JSON.stringify({ view, game: current && current.game.id, score: $('scoreNow').textContent, paused: !$('pauseSheet').hidden, over: overShown(), revealing: revealing(), games: L.games.length, theme: root.dataset.theme, saved: Object.keys(S.saves) });
+  window.ludusState = () => JSON.stringify({ view, game: current && current.game.id, waiting: !!(current && current.run.waiting), sim: current ? Math.round(current.run.simTime * 100) / 100 : 0, score: $('scoreNow').textContent, paused: !$('pauseSheet').hidden, over: overShown(), revealing: revealing(), games: L.games.length, theme: root.dataset.theme, saved: Object.keys(S.saves) });
 
   // ---------- boot ----------
   if (window.__LUDUS_TEST_FAIL__) throw new Error('Injected startup failure (test)');   // set only by test builds, to check the app shell's failsafe screen

@@ -27,6 +27,7 @@
 
   Ludus.register({
     id: 'finalpush', name: 'Sword Duel', aka: 'Right of Way', tag: 'Duel', tint: RUST, versus: true,
+    waitForMove: true,   // stands still until the first move (see engine.js)
     hint: '<kbd>←</kbd><kbd>→</kbd> walk · <kbd>↑</kbd><kbd>↓</kbd> spear high / middle / low · <kbd>Space</kbd> thrust (or the buttons). Same height blocks. Kill the bot, then run right to your gate. vs Friend: P1 <kbd>A</kbd><kbd>D</kbd> walk, <kbd>W</kbd><kbd>S</kbd> spear, <kbd>F</kbd> thrust; P2 arrows and <kbd>/</kbd> or <kbd>Enter</kbd>',
     art(ctx, w, h) {
       const f = h * 0.84;

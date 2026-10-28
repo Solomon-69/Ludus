@@ -324,6 +324,7 @@
 
   Ludus.register({
     id: 'climb', name: 'Hammer Climb', tag: 'Arcade', tint: '#3d4f93', resetOnQuit: true,
+    waitForMove: true,   // stands still until the first move (see engine.js)
     hint: 'The mouse moves the hammer head. Plant it, keep moving to lever yourself · <kbd>←</kbd><kbd>→</kbd> swing <kbd>↑</kbd><kbd>↓</kbd> reach · <kbd>-</kbd><kbd>+</kbd> sensitivity',
     _rules: { build, makeWorld, step, newState, clampArm, probe, SKY, START, HL, HMIN, PR, HR, STEP, VIEW },
     art(ctx, w, h) {

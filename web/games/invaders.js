@@ -87,6 +87,7 @@
 
   Ludus.register({
     id: 'skyraiders', name: 'Sky Raiders', aka: 'alien shooter', tag: 'Arcade', tint: '#5b6ee1',
+    waitForMove: true,   // stands still until the first move (see engine.js)
     hint: '<kbd>←</kbd><kbd>→</kbd> or <kbd>A</kbd><kbd>D</kbd> move · <kbd>Space</kbd> fire',
     art(ctx, w, h, col) {
       // the real play screen, cropped: the same pixel raiders in their row colours (squid, crab, octo), the bunkers,

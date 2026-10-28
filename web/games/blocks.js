@@ -91,6 +91,7 @@
 
   Ludus.register({
     id: 'blocks', name: 'Blocks', aka: 'falling blocks', tag: 'Arcade', tint: '#5b8def',
+    waitForMove: true,   // stands still until the first move (see engine.js)
     hint: '<kbd>←</kbd><kbd>→</kbd> move <kbd>↑</kbd> rotate <kbd>Z</kbd> rotate back <kbd>↓</kbd> soft drop <kbd>Space</kbd> hard drop <kbd>C</kbd> hold · click: rotate or move, swipe down: drop',
     _test: { rotateMatrix, cellsOf, fits, tryRotate, fullRows, clearRows, makeBag, gravity, emptyBoard, tSpinKind, clearPoints, LINE_SCORE, COLS, H, LOCK_DELAY, MAX_RESETS },
     art(ctx, w, h) {

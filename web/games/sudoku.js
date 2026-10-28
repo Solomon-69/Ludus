@@ -73,6 +73,7 @@
 
   Ludus.register({
     id: 'sudoku', name: 'Sudoku', tag: 'Puzzle', tint: '#4b6fae',
+    waitForMove: true,   // stands still until the first move (see engine.js)
     hint: 'Click or <kbd>←↑→↓</kbd> · <kbd>1</kbd>-<kbd>9</kbd> fill · <kbd>N</kbd> notes · <kbd>⌫</kbd> erase · <kbd>Z</kbd> undo',
     _rules: { generate, countSolutions, isValidSolution, PEERS },
     art(ctx, w, h) {

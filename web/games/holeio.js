@@ -179,6 +179,7 @@
 
   Ludus.register({
     id: 'holeio', name: 'City Swallow', aka: 'black hole city swallow', tag: 'Arcade', tint: '#5f8f94', versus: true, online: { min: 2, max: 4 },
+    waitForMove: true,   // stands still until the first move (see engine.js)
     onlineHint: '<b>Online</b> 2 to 4 players plus bots · drag, <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or the arrows to move · biggest hole when time is up wins',
     hint: 'Drag, <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> to move · swallow what fits, grow, eat smaller holes · vs Friend: <b>P1</b> WASD, <b>P2</b> arrows',
     art(ctx, w, h) {
@@ -648,7 +649,7 @@
 
       function update(dt) {
         clock += dt;
-        if (phase === 'count') { phaseT -= dt; const n3 = Math.ceil(phaseT / (COUNT / 3)); if (n3 > 0 && n3 !== countBeep) { countBeep = n3; api.sfx('count'); } if (phaseT <= 0) { phase = 'play'; countBeep = 0; api.sfx('go'); } }
+        if (phase === 'count' && !api.waiting) { phaseT -= dt; const n3 = Math.ceil(phaseT / (COUNT / 3)); if (n3 > 0 && n3 !== countBeep) { countBeep = n3; api.sfx('count'); } if (phaseT <= 0) { phase = 'play'; countBeep = 0; api.sfx('go'); } }
         else if (phase === 'play') {
           timeLeft -= dt;
           if (timeLeft <= 10 && Math.ceil(timeLeft) !== lastTick && timeLeft > 0) { lastTick = Math.ceil(timeLeft); api.sfx('tick'); }
