@@ -3,6 +3,11 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.27 (28 Oct 2026)
+
+- Online: the Single game / Tournament switch now slides like the other switches: the dark pill glides to the new choice with a small spring and the text colours cross-fade. Reduce motion moves it at once.
+- Dark mode: the Panel size, Appearance and Difficulty switches in Settings no longer have a light line under them; their lower edge is now dark, like every other control.
+
 ## 1.12.26 (28 Oct 2026)
 
 - Rejoin works on networks where only the backup message service gets through (Mac and Windows): Rejoin now shows its progress at once, skips the blocked connection instead of waiting on it, and always ends either back in your room or on a Try again card.

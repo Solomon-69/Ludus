@@ -43,6 +43,46 @@
     return node;
   };
   const calmMotion = () => { const r = document.documentElement.classList; return r.contains('reduce') || r.contains('instant') || (matchMedia('(prefers-reduced-motion: reduce)').matches && !r.contains('motion-ok')); };
+  // Single game / Tournament: one pill slides (with a spring) from the old tab to the new one and the text colours cross-fade,
+  // like the other segmented controls. The sheet is rebuilt on every change, so the last pick per toggle is remembered here
+  // and the new tabs start drawn as the old pick, then move on the next frame. Reduced motion: placed at once.
+  const lastModeTab = {};   // key -> { tabs, x, w, lit }: the toggle drawn last time, where its pill went and which tab was lit
+  function modeTabs(key, items, current, pick) {
+    const tabs = el('div', 'mode-tabs has-pill'); tabs.setAttribute('role', 'tablist');
+    const pill = el('span', 'tab-pill mode-pill'); pill.setAttribute('aria-hidden', 'true');
+    // where the old pill is right now (also mid-slide), and which text was lit, so a rebuild carries on from there
+    // (the sheet is usually cleared before it is rebuilt, so the old pill is remembered as numbers, or measured if still shown)
+    const old = lastModeTab[key], me = { tabs, x: null, w: null, lit: current, slide: null }; lastModeTab[key] = me;
+    let start = null, litBefore = current;
+    if (old && old.lit === current && old.slide && performance.now() - old.slide.at < 150) {
+      // rebuilt again straight away (the room echoes the change): keep the same slide going
+      start = old.slide.start; litBefore = old.slide.lit; me.slide = old.slide;
+    } else if (old && old.lit !== current && !calmMotion() && items.some(([m]) => m === old.lit)) {
+      litBefore = old.lit;
+      const op = old.tabs.isConnected && old.tabs.querySelector('.mode-pill');
+      if (op) { const r = op.getBoundingClientRect(), tr = old.tabs.getBoundingClientRect(); start = { x: r.left - tr.left - old.tabs.clientLeft, w: r.width }; }
+      else if (old.x !== null) start = { x: old.x, w: old.w };
+      if (start) me.slide = { start, lit: litBefore, at: performance.now() };
+    }
+    const btns = items.map(([m, t]) => {
+      const tb = el('button', 'mode-tab' + (litBefore === m ? ' is-on' : ''), t); tb.type = 'button'; tb.setAttribute('role', 'tab');
+      tb.setAttribute('aria-selected', String(current === m)); tb.dataset.mode = m;
+      tb.onclick = () => { if (current !== m) pick(m); };
+      tabs.appendChild(tb); return tb;
+    });
+    tabs.appendChild(pill);   // last, so the tabs stay the first children (tests pick them by position)
+    const place = (x, y, w, h) => { me.x = x; me.w = w; pill.style.transform = `translate(${x}px, ${y}px)`; pill.style.width = w + 'px'; pill.style.height = h + 'px'; pill.style.opacity = '1'; };
+    requestAnimationFrame(() => {
+      if (!tabs.isConnected) return;
+      const b = btns[items.findIndex(([m]) => m === current)];
+      pill.classList.add('no-slide');
+      if (start) place(start.x, b.offsetTop, start.w, b.offsetHeight); else place(b.offsetLeft, b.offsetTop, b.offsetWidth, b.offsetHeight);
+      void pill.offsetWidth; pill.classList.remove('no-slide');
+      btns.forEach(x => x.classList.toggle('is-on', x === b));   // the text colours cross-fade (CSS transition)
+      place(b.offsetLeft, b.offsetTop, b.offsetWidth, b.offsetHeight);
+    });
+    return tabs;
+  }
 
   // ---------- pieces ----------
   function connChip(state) {
@@ -156,13 +196,7 @@
       else session.setPlan(plan.g, plan.n === 1 || plan.n === 0 ? 3 : plan.n);
       render();
     };
-    const tabs = el('div', 'mode-tabs'); tabs.setAttribute('role', 'tablist');
-    [['single', 'Single game'], ['tournament', 'Tournament']].forEach(([m, t]) => {
-      const tb = el('button', 'mode-tab' + (mode === m ? ' is-on' : ''), t); tb.type = 'button'; tb.setAttribute('role', 'tab'); tb.setAttribute('aria-selected', String(mode === m));
-      tb.onclick = () => { if (mode !== m) { L.sfx('click'); setMode(m); } };
-      tabs.appendChild(tb);
-    });
-    box.appendChild(tabs);
+    box.appendChild(modeTabs('host', [['single', 'Single game'], ['tournament', 'Tournament']], mode, m => { L.sfx('click'); setMode(m); }));
     const rn = plan.n === 0 ? 3 : plan.n;
     box.appendChild(el('div', 'mode-note', mode === 'single' ? (rn === 1 ? 'One game, one round' : 'One game, best of ' + rn) : 'Several games, 1 point per game won'));
     box.appendChild(el('div', 'field-label', mode === 'single' ? 'Pick a game' : 'Pick 2 or more games'));
@@ -220,13 +254,7 @@
     // The same picker the host has: your idea is the orange selection (it starts as the host's pick); a small "Host" tag marks
     // what the host has chosen right now. Pick single or tournament, the games and the rounds, then send it.
     box.appendChild(el('div', 'field-label', 'Suggest a game or a tournament'));
-    const tabs = el('div', 'mode-tabs'); tabs.setAttribute('role', 'tablist');
-    [['s', 'Single game'], ['t', 'Tournament']].forEach(([m, t]) => {
-      const tb = el('button', 'mode-tab' + (draft.m === m ? ' is-on' : ''), t); tb.type = 'button'; tb.setAttribute('role', 'tab'); tb.setAttribute('aria-selected', String(draft.m === m)); tb.dataset.mode = m;
-      tb.onclick = () => { if (draft.m !== m) { L.sfx('click'); touch(() => { draft.m = m; if (m === 's') draft.g = draft.g.slice(0, 1); }); } };
-      tabs.appendChild(tb);
-    });
-    box.appendChild(tabs);
+    box.appendChild(modeTabs('suggest', [['s', 'Single game'], ['t', 'Tournament']], draft.m, m => { L.sfx('click'); touch(() => { draft.m = m; if (m === 's') draft.g = draft.g.slice(0, 1); }); }));
     box.appendChild(el('div', 'field-label', draft.m === 't' ? 'Games (pick 2 or more)' : 'Game'));
     const chips = el('div', 'pick-chips game-grid');
     L.games.filter(g => g.online && g.online.max >= n && g.online.min <= session.max).forEach(g => {

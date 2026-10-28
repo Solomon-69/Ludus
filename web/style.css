@@ -964,7 +964,7 @@ svg { display: block; }
 :root[data-theme="dark"] .lobby-card, :root[data-theme="dark"] .sheet-card, :root[data-theme="dark"] .rename-card, :root[data-theme="dark"] .over-bar,
 :root[data-theme="dark"] .sug-card, :root[data-theme="dark"] .seat, :root[data-theme="dark"] .search, :root[data-theme="dark"] .mode-tabs,
 :root[data-theme="dark"] .vs-toggle, :root[data-theme="dark"] .ui-tip { --slab-c: color-mix(in srgb, var(--slab-face) 8%, #000); }
-:root[data-theme="dark"] .seg { --slab-c: color-mix(in srgb, var(--ink) 16%, transparent); }
+:root[data-theme="dark"] .seg { --slab-c: color-mix(in srgb, var(--slab-face) 8%, #000); }   /* 1.12.27: was a light (ink) edge in dark mode */
 :root[data-theme="dark"] .toast, :root[data-theme="dark"] .over-peek { --slab-c: color-mix(in srgb, var(--ink) 55%, #000); }
 
 /* 1.12.23: the party room sheet is rounded by its card's corner plus the 6px gap around it (20 + 6), so the room card's
@@ -976,3 +976,10 @@ svg { display: block; }
   background: var(--face); box-shadow: 0 3px 0 var(--edge-c); }
 :root .filters.has-pill .chip.is-on { background: transparent; box-shadow: none; }
 :root[data-theme="dark"] .filters .chip { --edge-c: color-mix(in srgb, var(--face) 8%, #000); }
+
+/* 1.12.27: Single game / Tournament slides like the other segmented controls: one pill (the selected tab's face and edge)
+   moves with a spring, the tab text cross-fades over it. */
+.mode-tabs.has-pill { position: relative; }
+.mode-tabs.has-pill .mode-tab { position: relative; z-index: 1; transition: color 0.28s var(--ease-out), transform 0.2s var(--spring); }
+:root .mode-tabs.has-pill .mode-tab.is-on { background: transparent; box-shadow: none; }
+.mode-pill { border-radius: 9px; transition: transform 0.42s var(--spring), width 0.42s var(--spring); }
