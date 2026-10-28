@@ -3,6 +3,12 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.24 (28 Oct 2026)
+- Hammer Climb no longer loses the hammer when the mouse leaves the panel (Mac and Windows): a click locks the mouse to the climb (Esc lets it go), and dragging in any game keeps working outside the panel until you let go of the button.
+- Hammer Climb: no more tall wall at the foot of the mountain; the slide now runs into a gentle ramp.
+- Hammer Climb is longer: two more pipes, more mountain steps, a longer and steeper ice slope (with one more rough stone), and two more floating rocks in the sky with wider gaps between them. Every jump is still possible, just harder.
+- Hammer Climb: no section names floating in the world; the name at the top still says where you are.
+
 ## 1.12.23 (28 Oct 2026)
 - Create room works on networks that only allow ordinary web traffic: Ludus remembers the relay that worked last time and tries it first, and waits a little longer for a room before giving up.
 - If making a room fails, you go back to the Online page instead of being left on a stray card.
@@ -10,7 +16,6 @@ All notable changes to Ludus. Versions follow the app's version number (`Info.pl
 - New "Load names file" button in Settings > More settings (Mac and Windows): pick your original-names.json and Original names turns on straight away. The file is copied into Ludus's own folder, so it keeps working. Without a file, the switch says it needs one.
 - Dark mode: every raised edge is now a dark shadow under its button or card (it was lighter than the card before). The category tabs (All, Arcade...) are raised pills with a real lower edge.
 - The party room card's corners now run parallel to the panel around it.
-- Hammer Climb no longer loses the hammer when the mouse leaves the panel (Mac and Windows): a click locks the mouse to the climb (Esc lets it go), and dragging in any game keeps working outside the panel until you let go of the button.
 - Blocks has a new game-over: the stack flashes as it locks, each row flashes and folds away from the top down while the board dims, then the Game over card comes up. Reduce motion skips straight to the end.
 
 ## 1.12.22 (28 Oct 2026)
