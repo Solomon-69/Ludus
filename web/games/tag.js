@@ -793,9 +793,9 @@
         if (phase === 'count') {
           phaseT -= dt;
           const n = Math.ceil(phaseT / (COUNT / 3));
-          if (n !== lastTick && n > 0) { lastTick = n; api.sfx('tick'); }
+          if (n !== lastTick && n > 0) { lastTick = n; api.sfx('count'); }
           players.forEach(p => step(p, false, dt));
-          if (phaseT <= 0) { phase = 'play'; api.sfx('score'); lastTick = -1; floaters.push({ text: 'Go', x: W / 2, y: H / 2, t: 0, color: null, big: true }); }
+          if (phaseT <= 0) { phase = 'play'; api.sfx('go'); lastTick = -1; floaters.push({ text: 'Go', x: W / 2, y: H / 2, t: 0, color: null, big: true }); }
         } else if (phase === 'play') {
           timer -= dt; tagCool = Math.max(0, tagCool - dt); itTime[it] = (itTime[it] || 0) + dt;
           const s = Math.ceil(timer);
@@ -1163,7 +1163,7 @@
           });
         }
         phase = d.ph;
-        if (was.ph === 'count' && phase === 'play') { api.sfx('score'); floaters.push({ text: 'Go', x: W / 2, y: H / 2, t: 0, color: null, big: true }); }
+        if (was.ph === 'count' && phase === 'play') { api.sfx('go'); floaters.push({ text: 'Go', x: W / 2, y: H / 2, t: 0, color: null, big: true }); }
         if (phase === 'play' && was.ph === 'play' && was.it !== it) { const b = P(it); api.sfx('hit'); flash = 1; if (!api.reduceMotion) shake = 0.5; floaters.push({ text: itText(it), x: b.x + b.w / 2, y: b.y - 14, t: 0, color: null }); }
         if ((phase === 'end' || phase === 'over') && was.ph === 'play') { api.sfx('boom'); if (!api.reduceMotion) shake = 1; }
         if (phase === 'count' && was.ph !== 'count') lastTick = -1;
@@ -1205,7 +1205,7 @@
           const g = predictMine(dt), real = players.find(q => q.id === myId);
           if (g && real && g !== real) { real.x = g.x; real.y = g.y; real.face = g.face; real.sq = g.sq; real.vx = g.vx; real.vy = g.vy; real.ground = g.ground; }
         }
-        if (phase === 'count') { const n = Math.ceil(phaseT / (COUNT / 3)); if (n !== lastTick && n > 0) { lastTick = n; api.sfx('tick'); } }
+        if (phase === 'count') { const n = Math.ceil(phaseT / (COUNT / 3)); if (n !== lastTick && n > 0) { lastTick = n; api.sfx('count'); } }
         else if (phase === 'play') { const sc = Math.ceil(timer); if (sc <= 10 && sc !== lastTick && sc > 0) { lastTick = sc; api.sfx('tick'); } }
         items.forEach(i => { i.t += dt; }); floaters.forEach(f => { f.t += dt; }); floaters = floaters.filter(f => f.t < 1.1);
         parts.forEach(q => { q.x += q.vx * dt; q.y += q.vy * dt; q.vy += 500 * dt; q.life -= dt * 1.6; }); parts = parts.filter(q => q.life > 0);

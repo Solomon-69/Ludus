@@ -83,6 +83,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
         content.addUserScript(WKUserScript(source: bootScript(), injectionTime: .atDocumentStart, forMainFrameOnly: true))
         config.userContentController = content
         config.preferences.setValue(true, forKey: "allowFileAccessFromFileURLs")
+        // Game and interface sounds (WebAudio) may play without waiting for a click inside the page first.
+        config.mediaTypesRequiringUserActionForPlayback = []
         webView = WKWebView(frame: NSRect(origin: .zero, size: currentSize()), configuration: config)
         webView.setValue(false, forKey: "drawsBackground")
         webView.allowsMagnification = false

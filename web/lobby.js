@@ -32,7 +32,17 @@
     });
   }
   function unhook() { offs.forEach(f => f()); offs = []; clearTimeout(autoStart); }
-  function discard() { unhook(); if (session) { try { session.leave(); } catch (e) {} } session = null; }
+  function discard() { unhook(); if (session) { try { session.leave(); } catch (e) {} } session = null; popped.clear(); }
+  // The room redraws on every roster or plan change: seats and code boxes pop in once, when they first show, never again
+  // on a redraw (that read as a flash of the whole card each time somebody joined or the host picked a game).
+  // (a redraw right after the first one, while the pop is still playing, carries it on from where it was)
+  const popped = new Map();
+  const popOnce = (node, key) => {
+    const t = popped.get(key), now = performance.now();
+    if (t === undefined) popped.set(key, now); else if (now - t < 500) node.style.animationDelay = (t - now) + 'ms'; else node.classList.add('still');
+    return node;
+  };
+  const calmMotion = () => { const r = document.documentElement.classList; return r.contains('reduce') || r.contains('instant') || (matchMedia('(prefers-reduced-motion: reduce)').matches && !r.contains('motion-ok')); };
 
   // ---------- pieces ----------
   function connChip(state) {
@@ -46,7 +56,7 @@
     const mine = session ? session.seat : -1;
     for (let i = 0; i < max; i++) {
       const p = session && session.roster.get(i);
-      const s = el('div', 'seat' + (p ? ' on' : ''));
+      const s = el('div', 'seat' + (p ? ' on' : '')); if (p) popOnce(s, 'seat' + i + ':' + p.name);
       const dot = el('div', 'seat-dot', p ? Array.from(p.name)[0].toUpperCase() : '');
       if (p) dot.style.background = SEAT_COLORS[i % SEAT_COLORS.length];
       s.appendChild(dot);
@@ -86,11 +96,11 @@
   function codeBoxes(code) {
     const row = el('div', 'code-row');
     row.setAttribute('aria-label', 'Room code ' + code.split('').join(' '));
-    code.split('').forEach(ch => row.appendChild(el('div', 'code-ch', ch)));
+    code.split('').forEach((ch, i) => row.appendChild(popOnce(el('div', 'code-ch', ch), 'code' + code + i)));
     return row;
   }
   function copyCode(code, label) {
-    const done = () => { copied = true; label.textContent = 'Copied'; clearTimeout(copyTimer); copyTimer = setTimeout(() => { copied = false; label.textContent = 'Copy invite'; }, 1500); };
+    const done = () => { copied = true; L.sfx('copy'); label.textContent = 'Copied'; clearTimeout(copyTimer); copyTimer = setTimeout(() => { copied = false; label.textContent = 'Copy invite'; }, 1500); };
     const fallback = () => {
       try {
         const t = document.createElement('textarea'); t.value = code; t.style.cssText = 'position:fixed;opacity:0;user-select:text;-webkit-user-select:text';
@@ -310,8 +320,25 @@
   }
 
   // ---------- screens ----------
+  // A redraw that changes the card's height (Opening a room -> the room, a seat filling...) eases the card to its new
+  // height instead of snapping, with one curve; a new screen also fades its content in. Instant with reduced motion.
+  let rendering = false, screenAt = -1e9;
   function render() {
-    ensure();
+    if (rendering) return renderBody();
+    ensure(); rendering = true;
+    const h0 = !sheet.hidden && card.firstChild ? card.getBoundingClientRect().height : 0, s0 = card.dataset.screen, now = performance.now();
+    try { renderBody(); } finally { rendering = false; }
+    // not while the sheet itself is still coming in (it was hidden: the old height belongs to an earlier room)
+    const opening = sheet.hidden || card.getAnimations().some(x => x.animationName === 'sheetIn' && (x.currentTime || 0) < 300);
+    if (!h0 || opening || calmMotion()) return;
+    const h1 = card.getBoundingClientRect().height;
+    if (Math.abs(h1 - h0) >= 2) card.animate([{ height: h0 + 'px' }, { height: h1 + 'px' }], { duration: 300, easing: 'cubic-bezier(0.3, 1.1, 0.45, 1)' });
+    // a new screen fades its content in; a redraw a moment later (the roster arriving) carries the same fade on
+    if (s0 !== screen) screenAt = now;
+    const since = now - screenAt;
+    if (since < 260) [...card.children].forEach(c => c.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 200, delay: 60 - since, easing: 'ease-out', fill: 'backwards' }));
+  }
+  function renderBody() {
     card.innerHTML = '';
     card.dataset.screen = screen;
     const on = game && game.online;
@@ -368,7 +395,7 @@
       const row = el('div', 'lobby-row');
       const cl = el('span', '', copied ? 'Copied' : 'Copy invite');
       const cb = el('button', 'btn small', ''); cb.type = 'button'; cb.appendChild(cl);
-      cb.onclick = () => { L.sfx('click'); copyCode(L.net.inviteText(game ? (L.displayName ? L.displayName(game) : game.name) : 'games', session.code), cl); };
+      cb.onclick = () => { copyCode(L.net.inviteText(game ? (L.displayName ? L.displayName(game) : game.name) : 'games', session.code), cl); };
       row.appendChild(cb); row.appendChild(connChip(session.conn));
       card.appendChild(row);
       const n = session.count(), mx = session.max;
@@ -418,11 +445,14 @@
   function hookSession(s) {
     session = s;
     offs.push(s.on('conn', () => { if (screen === 'room' || screen === 'creating' || screen === 'joining') render(); }));
-    offs.push(s.on('ready', () => { screen = 'room'; L.sfx('tap'); render(); }));
+    offs.push(s.on('ready', () => { screen = 'room'; L.sfx('room'); render(); }));
     offs.push(s.on('yield', () => { screen = 'joining'; render(); }));   // somebody else already hosts this code: we join their room
+    let seen = s.count ? s.count() : 1;
     offs.push(s.on('roster', () => {
+      const n = s.count(), more = n > Math.max(1, seen); seen = n;   // more than just me, and more than before
       if (screen === 'room') {
         render();
+        if (more) L.sfx('friend');   // somebody joined the room: a soft chime
         // the room is full: start by itself
         if (s.role === 'host' && s.count() >= s.max) { clearTimeout(autoStart); autoStart = setTimeout(() => { if (session === s && !s.over) s.start(); }, 700); }
       }
@@ -443,7 +473,7 @@
   }
   const uidOf = () => (typeof L.state.onlineId === 'string' ? L.state.onlineId : '');
   function createRoom(code, uid) {
-    screen = 'creating'; render();
+    screen = 'creating'; render(); L.sfx('room');
     if (game) hookSession(L.net.createRoom({ gameId: game.id, min: game.online.min, max: game.online.max, name: nameValue() }));
     else {   // from the Online page: a room for up to 4 whose games the host picks in the lobby
       const first = L.games.find(g => g.id === L.state.last && g.online && g.online.min <= 2) || L.games.find(g => g.online && g.online.min <= 2 && g.online.max >= 2);
@@ -451,7 +481,7 @@
     }
   }
   function joinRoom(code) {
-    screen = 'joining'; render();
+    screen = 'joining'; render(); L.sfx('room');
     hookSession(L.net.joinRoom(code, { gameId: game.id, name: nameValue(), uid: uidOf() }));
     session.code = code;
     render();
@@ -488,7 +518,7 @@
     // A room made from the Online page: no game yet, the host picks games in the lobby.
     openRoom(o, code, uid) { ensure(); discard(); game = null; ops = o; error = ''; sheet.hidden = false; createRoom(code, uid); return session; },
     // Scoreboard between rounds ('board') or the final standings ('final') for a session that is playing a tournament.
-    series(s, kind, o) { ensure(); unhook(); session = s; ops = o || ops; screen = kind; sheet.hidden = false; render(); },
+    series(s, kind, o) { ensure(); unhook(); session = s; ops = o || ops; screen = kind; sheet.hidden = false; render(); L.sfx(kind === 'final' ? 'best' : 'result'); },
     // Back to the waiting room (after a tournament, "Back to lobby").
     resume(s, o) { ensure(); unhook(); session = s; ops = o || ops; hookSession(s); screen = 'room'; sheet.hidden = false; render(); },
     // [title, text] for a room closing reason

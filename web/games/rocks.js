@@ -77,7 +77,7 @@
         if (state !== 'play' || respawnAt >= 0 || fireCd > 0 || shots.length >= cfg.shots) return;
         const c = Math.cos(ship.a), s = Math.sin(ship.a);
         shots.push({ x: ship.x + c * 14, y: ship.y + s * 14, vx: c * SHOT_SPEED + ship.vx, vy: s * SHOT_SPEED + ship.vy, life: SHOT_LIFE });
-        fireCd = 0.14; api.sfx('tap');
+        fireCd = 0.14; api.sfx('shoot');
       }
       function splitRock(i, shotVx, shotVy) {
         const r = rocks[i]; rocks.splice(i, 1);

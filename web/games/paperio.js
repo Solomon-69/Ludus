@@ -245,7 +245,7 @@
         }
         if (owner[i] === p.id) { if (p.trail.length) claim(p); }
         else if (!tOwner[i]) {
-          if (!p.trail.length) p.pts = [{ x: p.lx, y: p.ly }];
+          if (!p.trail.length) { p.pts = [{ x: p.lx, y: p.ly }]; if (p.human && (!on || p === meP())) api.sfx('whoosh'); }   // left home: a soft rush as the trail starts
           tOwner[i] = p.id; tSeq[i] = ++p.seq; p.trail.push(i);
         }
         return true;

@@ -97,14 +97,14 @@
             snake.reverse();
             snake.forEach(s => { s.px = s.x; s.py = s.y; });
           }
-          started = true; acc = 0; queue = [];
+          started = true; acc = 0; queue = []; api.sfx('go');
           if (d !== dir) { dir = d; }
           return;
         }
         const last = queue.length ? queue[queue.length - 1] : dir;
         if (d.x === -last.x && d.y === -last.y) return;
         if (d.x === last.x && d.y === last.y) return;
-        if (queue.length < 2) queue.push(d);
+        if (queue.length < 2) { queue.push(d); api.sfx('move'); }
       }
 
       function tick() {
@@ -124,7 +124,7 @@
         if (ate) {
           const t = old[old.length - 1];
           snake.push({ x: t.x, y: t.y, px: t.x, py: t.y });
-          eaten++; score += 10; api.score(score); api.sfx('eat'); headPop = performance.now();
+          eaten++; score += 10; api.score(score); api.sfx(eaten % 10 === 0 ? 'score' : 'eat'); headPop = performance.now();
           burst(food.x, food.y);
           spawnFood();
           if (!food) win();

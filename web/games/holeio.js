@@ -341,7 +341,7 @@
       }
 
       // ---------- holes ----------
-      let phase = 'count', phaseT = COUNT, timeLeft = ROUND, clock = 0, lastTick = -1, overCalled = false, result = null;
+      let phase = 'count', phaseT = COUNT, timeLeft = ROUND, clock = 0, lastTick = -1, overCalled = false, result = null, countBeep = 0;
       function nameFor(h) { return on && h.human ? Ludus.rt.seatName(api, h.human - 1) : h.human === 1 ? (friend ? 'P1' : 'You') : h.human === 2 ? 'P2' : h.name; }
       // this screen's own hole(s): online only the seat's hole; on one keyboard every human hole
       const isMine = h => (on ? h.human === on.seat + 1 : !!h.human);
@@ -648,7 +648,7 @@
 
       function update(dt) {
         clock += dt;
-        if (phase === 'count') { phaseT -= dt; if (phaseT <= 0) { phase = 'play'; api.sfx('score'); } }
+        if (phase === 'count') { phaseT -= dt; const n3 = Math.ceil(phaseT / (COUNT / 3)); if (n3 > 0 && n3 !== countBeep) { countBeep = n3; api.sfx('count'); } if (phaseT <= 0) { phase = 'play'; countBeep = 0; api.sfx('go'); } }
         else if (phase === 'play') {
           timeLeft -= dt;
           if (timeLeft <= 10 && Math.ceil(timeLeft) !== lastTick && timeLeft > 0) { lastTick = Math.ceil(timeLeft); api.sfx('tick'); }
@@ -994,7 +994,7 @@
           holes = d.hl.map((q, k) => { const x = newHole(k, Number.isInteger(q[0]) && q[0] >= 0 && q[0] <= 4 ? q[0] : 0); x.name = String(q[1] || 'Bot').slice(0, 12); x.color = AI_COLORS[q[2]] || AI_COLORS[k % AI_COLORS.length]; return x; });
           cam.snap = true;
         }
-        if (['count', 'play', 'end'].includes(d.ph)) { if (phase === 'count' && d.ph === 'play') api.sfx('score'); if (d.ph === 'end' && phase !== 'end') api.sfx('win'); phase = d.ph; }
+        if (['count', 'play', 'end'].includes(d.ph)) { if (phase === 'count' && d.ph === 'play') api.sfx('go'); if (d.ph === 'end' && phase !== 'end') api.sfx('win'); phase = d.ph; }
         if (num(d.tl)) timeLeft = d.tl; if (num(d.pt)) phaseT = d.pt;
         d.h.forEach((q, k) => {
           const x = holes[k]; if (!Array.isArray(q) || !q.slice(0, 3).every(num)) return;
@@ -1048,6 +1048,7 @@
           for (let i = x.falling.length - 1; i >= 0; i--) { const o = x.falling[i]; o.fall.t += dt; if (o.fall.t >= o.fall.dur) x.falling.splice(i, 1); }
           if (x.dying) { x.dying.t += dt; if (x.dying.t >= 0.4) x.dying = null; }
         });
+        if (phase === 'count') { const n3 = Math.ceil(phaseT / (COUNT / 3)); if (n3 > 0 && n3 <= 3 && n3 !== countBeep) { countBeep = n3; api.sfx('count'); } } else countBeep = 0;
         if (phase === 'play' && timeLeft <= 10 && Math.ceil(timeLeft) !== lastTick && timeLeft > 0) { lastTick = Math.ceil(timeLeft); api.sfx('tick'); }
         const me = myHole(); if (me) api.score(me.mass);
         for (let i = parts.length - 1; i >= 0; i--) { const p = parts[i]; p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt; p.vz -= 120 * dt; p.life -= dt; if (p.life <= 0) parts.splice(i, 1); }

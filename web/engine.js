@@ -51,6 +51,8 @@
   }
 
   // ---------- sound: tiny WebAudio synth, no files ----------
+  // Each sound is a list of notes [frequency, seconds, wave, glide-to frequency]. Game sounds play at full level;
+  // the app's own interface sounds (QUIET) are softer and shorter so they sit under the games.
   let actx = null;
   const tones = {
     tap: [[660, 0.04, 'sine']], click: [[520, 0.03, 'triangle']], move: [[300, 0.03, 'triangle']],
@@ -60,27 +62,75 @@
     hit: [[160, 0.09, 'sawtooth', 90]], boom: [[120, 0.25, 'sawtooth', 40]], power: [[300, 0.18, 'square', 900]],
     win: [[523, 0.09, 'sine'], [659, 0.09, 'sine'], [784, 0.09, 'sine'], [1046, 0.18, 'sine']],
     lose: [[392, 0.12, 'triangle'], [330, 0.12, 'triangle'], [262, 0.22, 'triangle']],
-    over: [[330, 0.12, 'triangle'], [247, 0.24, 'triangle']], tick: [[1200, 0.015, 'square']]
+    over: [[330, 0.12, 'triangle'], [247, 0.24, 'triangle']], tick: [[1200, 0.015, 'square']],
+    // game moments added in 1.12.20
+    flip: [[900, 0.035, 'triangle', 620]], place: [[260, 0.05, 'triangle', 190]], bounce: [[520, 0.045, 'sine', 380]],
+    correct: [[700, 0.05, 'sine'], [1050, 0.08, 'sine']], wrong: [[220, 0.1, 'triangle', 170], [196, 0.12, 'triangle']],
+    shoot: [[900, 0.05, 'square', 320]], coin: [[988, 0.04, 'square'], [1319, 0.08, 'square']],
+    whoosh: [[220, 0.12, 'sine', 640]], deal: [[1400, 0.02, 'triangle', 900]],
+    // interface sounds (all soft, see QUIET)
+    tab: [[740, 0.035, 'sine', 880]], open: [[523, 0.045, 'sine', 784], [988, 0.05, 'sine']], back: [[660, 0.05, 'sine', 440]],
+    on: [[660, 0.03, 'sine'], [990, 0.045, 'sine']], off: [[700, 0.03, 'sine'], [470, 0.045, 'sine']],
+    sheet: [[440, 0.07, 'sine', 660]], unsheet: [[620, 0.07, 'sine', 420]],
+    panel: [[392, 0.05, 'sine', 587], [784, 0.06, 'sine']], panelOff: [[587, 0.06, 'sine', 392]],
+    toast: [[1046, 0.035, 'sine'], [1318, 0.055, 'sine']], copy: [[1200, 0.03, 'triangle'], [1600, 0.045, 'sine']],
+    save: [[700, 0.04, 'sine'], [1050, 0.06, 'sine']], room: [[523, 0.06, 'triangle'], [784, 0.08, 'triangle']],
+    friend: [[784, 0.07, 'sine'], [1046, 0.07, 'sine'], [1568, 0.13, 'sine']],
+    count: [[880, 0.05, 'sine']], go: [[880, 0.04, 'sine'], [1320, 0.14, 'sine']],
+    best: [[659, 0.07, 'sine'], [784, 0.07, 'sine'], [1046, 0.07, 'sine'], [1318, 0.09, 'sine'], [1568, 0.2, 'sine']],
+    result: [[587, 0.08, 'triangle'], [740, 0.08, 'triangle'], [880, 0.16, 'triangle']]
   };
+  const QUIET = { tab: 0.45, open: 0.5, back: 0.45, on: 0.45, off: 0.45, sheet: 0.4, unsheet: 0.4, panel: 0.35, panelOff: 0.3,
+    toast: 0.35, copy: 0.4, save: 0.5, room: 0.55, friend: 0.55, count: 0.6, go: 0.7, result: 0.65, shoot: 0.45, coin: 0.6,
+    deal: 0.5, wrong: 0.7, whoosh: 0.5, click: 0.8 };
+  // The same sound never stacks up: a repeat sooner than this (ms) is dropped. Busy games (a hit every frame,
+  // online snapshots arriving in bursts) stay calm, and at most MAX_BURST sounds start in any 120 ms.
+  const GAP = { toast: 400, panel: 500, panelOff: 500, friend: 600, tick: 60, move: 45, eat: 45, hit: 60, flip: 40, deal: 30 };
+  const MAX_BURST = 6, lastAt = {}, recent = [];
+  function ctx() {
+    if (!actx) { const C = window.AudioContext || window.webkitAudioContext; if (!C) return null; actx = new C(); }
+    // WebKit can leave a context 'interrupted' (Mac panel hidden, sleep): any state but running is resumed
+    if (actx.state !== 'running' && actx.state !== 'closed') { try { const p = actx.resume(); if (p && p.catch) p.catch(() => {}); } catch (e) {} }
+    return actx;
+  }
   function sfx(name) {
-    if (!state.sound || window.__ludusTestMuted) return;   // test runs (test hook "mute") stay silent
-    const seq = tones[name] || tones.tap;
+    if (!state.sound) return;
+    if (!tones[name]) name = 'tap';
+    const now = performance.now();
+    if (now - (lastAt[name] || -1e9) < (GAP[name] || 35)) return;
+    while (recent.length && now - recent[0] > 120) recent.shift();
+    if (recent.length >= MAX_BURST && !/^(win|over|best|result)$/.test(name)) return;   // the burst cap never eats an end-of-game sound
+    lastAt[name] = now; recent.push(now);
+    if (window.__ludusSfxSpy) { try { window.__ludusSfxSpy(name); } catch (e) {} }   // headless sound tests
+    if (window.__ludusTestMuted) return;   // test runs (test hook "mute") stay silent
     try {
-      actx = actx || new (window.AudioContext || window.webkitAudioContext)();
-      if (actx.state === 'suspended') actx.resume();
-      let t = actx.currentTime;
-      seq.forEach(([f, d, type, toF]) => {
-        const o = actx.createOscillator(), g = actx.createGain();
+      const a = ctx(); if (!a) return;
+      let t = a.currentTime + 0.005;
+      const level = 0.12 * Math.max(0, Math.min(1, +state.volume || 0)) * (QUIET[name] || 1);
+      if (level <= 0.0002) return;
+      tones[name].forEach(([f, d, type, toF]) => {
+        const o = a.createOscillator(), g = a.createGain();
         o.type = type; o.frequency.setValueAtTime(f, t);
         if (toF) o.frequency.exponentialRampToValueAtTime(toF, t + d);
-        const v = 0.12 * state.volume;
-        g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(v, t + 0.008);
+        g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(level, t + 0.008);
         g.gain.exponentialRampToValueAtTime(0.0001, t + d);
-        o.connect(g).connect(actx.destination); o.start(t); o.stop(t + d + 0.02);
+        o.connect(g).connect(a.destination); o.start(t); o.stop(t + d + 0.02);
         t += d * 0.85;
       });
     } catch (e) {}
   }
+  // Browsers only let a page make sound after the person has clicked or pressed a key. The first tap or key press
+  // (and any later one after the Mac or Windows panel was hidden and the audio paused) wakes the audio up, with one
+  // silent sample so WebKit (Mac) and WebView2 (Windows) both count it as started. Nothing happens with Sound off.
+  function unlockAudio() {
+    if (!state.sound || window.__ludusTestMuted) return;
+    if (actx && actx.state === 'running') return;
+    try {
+      const a = ctx(); if (!a) return;
+      const src = a.createBufferSource(); src.buffer = a.createBuffer(1, 1, 22050); src.connect(a.destination); src.start(0);
+    } catch (e) {}
+  }
+  ['pointerdown', 'touchend', 'keydown', 'mousedown'].forEach(t => window.addEventListener(t, unlockAudio, { capture: true, passive: true }));
 
   // ---------- colours from CSS tokens ----------
   function colors() {

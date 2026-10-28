@@ -529,6 +529,7 @@ svg { display: block; }
   .seat { padding: 4px 10px; }
 }
 @media (prefers-reduced-motion: reduce) { .online-chip .dot, .conn-chip i, .code-ch, .seat.on { animation: none !important; } }
+.code-ch.still, .seat.on.still { animation: none; }   /* already shown: a room redraw does not pop them again */
 
 /* Online page and tournament lobby */
 .online-page { grid-column: 1 / -1; display: flex; flex-direction: column; justify-content: space-between; gap: 12px; max-width: 360px; width: 100%; margin: 0 auto; padding: 4px 0 2px; text-align: center; }
@@ -730,10 +731,13 @@ svg { display: block; }
 /* 1.12.17: the Online page always fits the panel, no scrolling, with or without the Last party card */
 .op-col { display: contents; }
 .party-card { overflow: hidden; }
-.party-card.op-enter { animation: op-card-in 0.42s var(--spring) both; }
-@keyframes op-card-in { from { opacity: 0; max-height: 0; padding-top: 0; padding-bottom: 0; transform: scale(0.97); } to { opacity: 1; max-height: 160px; } }
-.party-card.op-leave { transition: height 0.34s var(--ease-out), opacity 0.2s ease, padding 0.34s var(--ease-out), margin 0.34s var(--ease-out), transform 0.34s var(--ease-out); opacity: 0; padding-top: 0; padding-bottom: 0; margin-bottom: -12px; transform: scale(0.97); }
-@media (prefers-reduced-motion: reduce) { .party-card.op-enter { animation: none; } .party-card.op-leave { transition: none; } }
+/* 1.12.20: the Online page redraws with FLIP (app.js glideOnline): a block that went away (the Last party card) stays whole on a
+   layer behind the others while it fades; a tab switch fades the old content out on a layer over the grid */
+.online-page { position: relative; }
+.online-page > .op-ghost { position: absolute; margin: 0; z-index: 0; pointer-events: none; transform-origin: 50% 0; box-sizing: border-box; }
+.grid-ghost { position: absolute; z-index: 3; pointer-events: none; overflow: hidden; }
+.grid-ghost > .grid { width: 100%; height: 100%; overflow: hidden; }
+.grid-ghost * { animation: none !important; }
 @media (max-height: 680px) {
   /* the info card keeps its title and three steps with or without the Last party card: everything else is a touch tighter */
   .online-page { gap: 8px; padding-top: 2px; --op-r: 18px; --op-pad: 9px; }
@@ -757,6 +761,27 @@ svg { display: block; }
 .online-page { --op-r: 20px; --op-pad: 11px; --op-in: calc(var(--op-r) - var(--op-pad)); }
 .online-page .op-head, .online-page .party-card, .online-page .op-card { border-radius: var(--op-r); padding: var(--op-pad); }
 .online-page .op-card input, .online-page .op-card .btn, .online-page .party-card .btn, .online-page .code-tile { border-radius: var(--op-in); }
+
+/* 1.12.20: concentric corners everywhere (QA/harness/corners.js checks them). A box sitting in the corner of a rounded box
+   is rounded by the outer corner minus the inset between them, so the two curves run parallel (light and dark alike). */
+.card { --card-r: 20px; --card-pad: 10px; border-radius: var(--card-r); }
+.card .art { border-radius: calc(var(--card-r) - var(--card-pad)); }               /* game covers: 20 - 10 */
+.seg { --seg-r: 10px; border-radius: var(--seg-r); }
+.seg-thumb { border-radius: calc(var(--seg-r) - 2px); }                              /* the thumb sits 2px inside */
+/* settings groups: rows keep their controls about 10-12px from the group's edge, so the group corner is the toggle's
+   corner (11px) plus that gap, and the square-ish controls in a corner take the corner minus the gap */
+.group { --group-r: 22px; border-radius: var(--group-r); }
+.group .seg { --seg-r: calc(var(--group-r) - 10px); }
+.group .small-btn { border-radius: calc(var(--group-r) - 12px); }
+.more-ico { border-radius: calc(var(--group-r, var(--r-lg)) - 12px); }
+.party-tag { padding: 4px 8px; }                                                     /* a pill 2 x (20 - 11) tall in the card corner */
+.seat, .seats.many .seat { --seat-in: 7px; padding: var(--seat-in) 10px var(--seat-in) var(--seat-in); border-radius: calc(14px + var(--seat-in)); }
+/* the round initial (28px, as tall as a name with its Host badge) sits in the seat's corner with the same gap on both sides */
+.seat-dot { width: 28px; height: 28px; align-self: flex-start; }
+@media (max-height: 520px) { .seat, .seats.many .seat { --seat-in: 5px; } }
+.lobby-card { --lobby-pad: 12px; }
+.pick-chips .chip.gcard { border-radius: calc(20px - var(--lobby-pad)); }           /* picker tiles: lobby card corner 20 - 12 */
+
 
 /* ===================================================================================================================
    RAISED BUTTONS (Ludus Raised test build). Every button-like control has a solid face and a solid darker bottom edge

@@ -408,7 +408,7 @@
         chosen = ci; phase = 'reveal';
         const right = ci === q.c;
         if (right) { streak++; rightN++; bestStreak = Math.max(bestStreak, streak); const pts = pointsFor(streak, typed); score += pts; api.score(score); api.sfx(streak % 5 === 0 ? 'win' : 'score'); autoNext = performance.now() + 1100; }
-        else { streak = 0; lives--; api.sfx('over'); }
+        else { streak = 0; lives--; api.sfx('wrong'); }
         renderOptions(q, true); ta.disabled = true;
         if (typed && !right) optsBox.hidden = false;   // show the right answer among four after a typed miss
         if (right && typed) { optsBox.hidden = true; }
@@ -445,7 +445,7 @@
         phase = 'reveal'; left = Math.min(left, RACE_T);
         const mine = answers[r] && answers[r][mySeat];
         const right = !!mine && q.o[mine.o] === q.c;
-        api.sfx(right ? 'score' : 'over');
+        api.sfx(right ? 'score' : 'wrong');
         renderOptions(q, true); revealCard(right, mine ? q.o[mine.o] : -1);
         api.score(totals()[mySeat] || 0); hud();
         if (r >= RACE_N - 1) { later(finishRace, 2600); return; }

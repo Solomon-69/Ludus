@@ -3,6 +3,11 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.20 (2026-10-28)
+- Sound everywhere: every game has fuller sounds, and the app itself now has soft sounds for tabs, opening games, Back, switches, panels, messages, results, new bests, rooms, friends joining and copying an invite. All follow the Sound switch and volume.
+- Smoother Online page: Forgetting a party fades the card out whole while the cards below glide up, the Last party card eases in, switching tabs and opening a room no longer jump.
+- Rounded corners now match everywhere a rounded box sits inside another (game cards, lobby seats, settings, tags).
+
 ## 1.12.19 (2026-10-28)
 - Air Hockey: the bot no longer pins the puck in a corner, in the vertical layout either.
 - Rejoin works however old the party is: it joins the live party, or reopens the same code if nobody is there, and the Last party card is never lost.
