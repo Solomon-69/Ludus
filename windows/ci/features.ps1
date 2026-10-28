@@ -58,6 +58,7 @@ function Diff-Png([string]$a, [string]$b) {
   finally { $x.Dispose(); $y.Dispose() }
   return $n
 }
+Clear-State @()   # no saved climb, so no "Welcome back" sheet covers the game
 $jsonD = Join-Path $Out 'drag-selftest.json'
 $p = Start-Process $Exe -ArgumentList '--test-open', '--test-game=climb', "--selftest=$jsonD" -PassThru
 [void](Wait-File $jsonD 120); Start-Sleep -Seconds 3
