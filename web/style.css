@@ -782,3 +782,168 @@ svg { display: block; }
 .lobby-card { --lobby-pad: 12px; }
 .pick-chips .chip.gcard { border-radius: calc(20px - var(--lobby-pad)); }           /* picker tiles: lobby card corner 20 - 12 */
 
+
+/* 1.12.22: the Online page grows with the panel. Every size on it is a multiple of one unit (--u): 1px on the compact panel
+   (400 x 600), and the panel's own ratio on bigger ones (Large 520 x 740, the wide sizes), so cards, text, fields, buttons,
+   code tiles and step circles all scale together, corners stay concentric and nothing scrolls. Blocks sit on one even rhythm
+   (no spreading out); room left over is split above the first block and below the footer hint, which stays last. */
+/* the page's room is the panel minus the header (141px) and the grid's padding: 372 x 443 on the compact panel */
+.online-page { --u: clamp(0.85px, min(calc((100vw - 28px) / 372), calc((100vh - 157px) / 443)), 1.5px); }
+@media (min-width: 640px) and (max-height: 680px) { .online-page { --u: clamp(0.85px, min(calc((100vw - 28px) / 704), calc((100vh - 157px) / 300)), 1.5px); } }
+#grid > .online-page { justify-content: flex-start; gap: calc(10 * var(--u)); max-width: calc(360 * var(--u)); padding: calc(2 * var(--u)) 0;
+  --op-r: calc(20 * var(--u)); --op-pad: calc(11 * var(--u)); }
+#grid > .online-page:not(:has(.party-card:not(.op-ghost))) { gap: min(calc(15 * var(--u)), 20px); }
+#grid > .online-page > .op-col > .op-head, #grid > .online-page > .op-head { margin-top: auto; }
+#grid > .online-page .lobby-note[data-k] { margin-bottom: auto; }
+#grid .online-page .op-head { gap: calc(7 * var(--u)); }
+#grid .online-page .op-steps { gap: calc(6 * var(--u)); }
+#grid .online-page .op-steps li { font-size: calc(12 * var(--u)); gap: calc(4 * var(--u)); }
+#grid .online-page .op-dot { width: calc(16 * var(--u)); height: calc(16 * var(--u)); font-size: calc(10 * var(--u)); line-height: calc(16 * var(--u)); }
+#grid .online-page .op-title { font-size: calc(18 * var(--u)); }
+#grid .online-page .op-offline-note { font-size: calc(12 * var(--u)); }
+#grid .online-page .op-card { gap: calc(8 * var(--u)); }
+#grid .online-page .op-card .field { gap: calc(6 * var(--u)); }
+#grid .online-page .op-card .field-label { font-size: calc(11 * var(--u)); }
+#grid .online-page .op-card input { height: calc(36 * var(--u)); font-size: calc(14 * var(--u)); padding: 0 calc(12 * var(--u)); }
+#grid .online-page .op-card #opCreate { height: calc(40 * var(--u)); min-height: calc(40 * var(--u)); font-size: calc(13 * var(--u)); }
+#grid .online-page .join-row { gap: calc(8 * var(--u)); }
+#grid .online-page .op-card .code-wrap { height: calc(40 * var(--u)); }
+#grid .online-page .code-tiles { gap: calc(6 * var(--u)); }
+#grid .online-page .code-tile { font-size: calc(22 * var(--u)); }
+#grid .online-page .op-card .join-row .btn { height: calc(40 * var(--u)); font-size: calc(14 * var(--u)); padding: 0 calc(22 * var(--u)); }
+#grid .online-page .op-or { font-size: calc(11.5 * var(--u)); gap: calc(10 * var(--u)); }
+#grid .online-page .lobby-note { font-size: calc(11 * var(--u)); }
+#grid .online-page .lobby-error { font-size: calc(12 * var(--u)); }
+#grid .online-page .party-card { gap: calc(6 * var(--u)); }
+#grid .online-page .party-tag { font-size: calc(10.5 * var(--u)); padding: calc(4 * var(--u)) calc(8 * var(--u)); }
+#grid .online-page .party-row { gap: calc(8 * var(--u)); }
+#grid .online-page .party-people { gap: calc(4 * var(--u)); }
+#grid .online-page .party-chip { font-size: calc(11.5 * var(--u)); gap: calc(5 * var(--u)); padding: calc(2 * var(--u)) calc(8 * var(--u)) calc(2 * var(--u)) calc(2 * var(--u)); }
+#grid .online-page .party-av { width: calc(16 * var(--u)); height: calc(16 * var(--u)); font-size: calc(9.5 * var(--u)); }
+#grid .online-page .party-acts { gap: calc(4 * var(--u)); }
+#grid .online-page .party-acts .btn { font-size: calc(12 * var(--u)); height: calc(30 * var(--u)); padding: 0 calc(12 * var(--u)); }
+/* wide panels: two columns, the whole page centred in the panel's height (no band at the bottom) */
+@media (min-width: 640px) and (max-height: 680px) {
+  #grid > .online-page { align-self: center; height: auto; align-items: flex-start; max-width: calc(700 * var(--u)); gap: calc(14 * var(--u)); }
+  #grid > .online-page .op-col { gap: calc(10 * var(--u)); }
+  #grid > .online-page > .op-col > .op-head, #grid > .online-page .lobby-note[data-k] { margin-top: 0; margin-bottom: 0; }
+}
+
+/* ===================================================================================================================
+   RAISED BUTTONS. Every button-like control has a solid face and a solid darker bottom edge
+   (a box-shadow, so nothing moves in the layout). Hover lifts it 1px, a press sinks the face onto the edge and it springs
+   back on release. Disabled controls are flat. Edges are mixed from each control's own colour, so light and dark both
+   work and accent changes carry through. Switches, swatches and sliders stay as they are.
+   =================================================================================================================== */
+:root { --edge: 4px; --edge-mix: 24%; --raise-ease: cubic-bezier(0.34, 1.56, 0.64, 1); }
+:root[data-theme="dark"] { --edge-mix: 55%; }
+:root .btn:not(.ghost), :root .small-btn, :root .icon-btn, :root .card, :root .mode-tab.is-on, :root .seg-thumb, :root .tab-pill,
+:root .vs-toggle button.is-on, :root .pick-chips .chip, :root .lk-btn, :root .lk-chip, :root .lk-opt, :root .ih-guess {
+  --face: var(--surface-2);
+  --edge-c: color-mix(in srgb, var(--face) calc(100% - var(--edge-mix)), #000);
+  --edge-now: var(--edge);
+  --lift: 0px;
+}
+/* faces: each control's own colour */
+:root .icon-btn, :root .card, :root .seg-thumb, :root .vs-toggle button.is-on, :root .lk-btn, :root .lk-opt { --face: var(--surface); }
+:root .btn.primary, :root .mode-tab.is-on, :root .tab-pill, :root .pick-chips .chip.is-on, :root .lk-chip.on { --face: var(--ink); }
+:root .small-btn.warm { --face: #E8833A; }
+:root .ih-guess { --face: #6cb928; }
+:root .lk-primary { --face: var(--accent); }
+:root .lk-opt.right { --face: var(--good); }
+:root .lk-opt.wrong { --face: var(--bad); }
+:root .sug-actions .sug-decline { --edge-c: color-mix(in srgb, var(--ink) 20%, transparent); }
+/* thin edges for thumbs that ride inside a track (the track's own padding holds the edge) */
+:root .seg-thumb, :root .vs-toggle button.is-on { --edge: 2px; }
+:root .mode-tab.is-on, :root .tab-pill, :root .pick-chips .chip, :root .lk-chip { --edge: 3px; }
+:root .icon-btn.small { --edge: 3px; }
+
+/* the raised look */
+:root .btn:not(.ghost), :root .small-btn, :root .mode-tab.is-on, :root .seg-thumb, :root .tab-pill,
+:root .vs-toggle button.is-on, :root .pick-chips .chip, :root .lk-chip, :root .lk-btn, :root .lk-opt, :root .ih-guess {
+  box-shadow: 0 calc(var(--edge-now) + var(--lift)) 0 var(--edge-c);
+}
+:root .icon-btn, :root .card { box-shadow: 0 calc(var(--edge-now) + var(--lift)) 0 var(--edge-c), var(--shadow); }
+:root .btn.primary:hover { box-shadow: 0 calc(var(--edge-now) + var(--lift)) 0 var(--edge-c); }
+:root .lk-btn, :root .lk-opt { border-bottom-color: transparent; }
+/* slightly bolder labels */
+:root .btn { font-weight: 700; }
+:root .small-btn { font-weight: 680; }
+:root .chip { font-weight: 640; }
+:root .seg button { font-weight: 660; }
+:root .vs-toggle button { font-weight: 680; }
+
+/* motion: hover lifts 1px, press sinks onto the edge, release springs back */
+:root .btn:not(.ghost), :root .small-btn, :root .icon-btn, :root .card, :root .pick-chips .chip, :root .lk-chip, :root .lk-btn, :root .lk-opt,
+:root .ih-guess, :root .mode-tab, :root .vs-toggle button {
+  transition: transform 0.26s var(--raise-ease), box-shadow 0.26s var(--raise-ease), background-color 0.15s, color 0.15s, border-color 0.15s;
+}
+@media (hover: hover) {
+  :root .btn:not(.ghost):not(:disabled):hover, :root .small-btn:not(:disabled):hover, :root .icon-btn:hover, :root .card:hover,
+  :root .pick-chips .chip:hover, :root .lk-chip:not(:disabled):hover, :root .lk-btn:not(:disabled):hover, :root .lk-opt:not(:disabled):hover,
+  :root .ih-guess:not(:disabled):hover { --lift: 1px; transform: translateY(-1px); }
+}
+:root .btn:not(.ghost):not(:disabled):active, :root .small-btn:not(:disabled):active, :root .icon-btn:active, :root .card:active,
+:root .pick-chips .chip:active, :root .lk-chip:not(:disabled):active, :root .lk-btn:not(:disabled):active, :root .lk-opt:not(:disabled):active,
+:root .ih-guess:not(:disabled):active, :root .mode-tab.is-on:active, :root .vs-toggle button.is-on:active {
+  --edge-now: 0px; --lift: 0px; transform: translateY(var(--edge)); transition-duration: 0.07s;
+}
+/* tabs that are not on yet: a small sink, no edge */
+:root .mode-tab:not(.is-on):active, :root .vs-toggle button:not(.is-on):active, :root .chip:not(.is-on):active { transform: translateY(2px); transition-duration: 0.07s; }
+/* the category pill and segmented thumb keep their own slide; they only gain the edge */
+:root .tab-pill { transition: transform 0.36s cubic-bezier(0.22, 1, 0.36, 1), width 0.36s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.2s; }
+:root .tab-pill.no-slide { transition: none; }
+:root .seg { padding-bottom: 4px; }
+:root .seg-thumb { bottom: 4px; box-shadow: 0 var(--edge) 0 var(--edge-c); }
+:root .seg button.is-on { color: var(--ink); }
+/* ghost buttons stay flat; a press still answers */
+:root .btn.ghost:hover { transform: none; }
+:root .btn.ghost:active { transform: translateY(2px); }
+/* disabled: flat, no edge, no movement */
+:root .btn:disabled, :root .small-btn:disabled, :root .lk-btn:disabled, :root .lk-chip:disabled, :root .lk-opt:disabled, :root .ih-guess:disabled {
+  box-shadow: none; transform: none;
+}
+:root .lk-opt.dim { box-shadow: none; }
+/* card that flashes when found keeps its glow animation over the edge */
+:root .card.found { box-shadow: 0 var(--edge) 0 var(--edge-c), var(--shadow); }
+
+/* the cards' pop-in holds its last frame (fill both), which would pin their transform and stop the hover lift and the
+   press sink; once the pop-in is over the card hands its transform back to the raised rules above */
+:root .card, :root .card.found { animation-fill-mode: backwards; }
+
+/* reduced motion: same looks and states, no movement in between */
+:root.reduce .btn, :root.reduce .small-btn, :root.reduce .icon-btn, :root.reduce .card, :root.reduce .chip, :root.reduce .mode-tab,
+:root.reduce .vs-toggle button, :root.reduce .lk-btn, :root.reduce .lk-chip, :root.reduce .lk-opt, :root.reduce .ih-guess { transition: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  :root .btn, :root .small-btn, :root .icon-btn, :root .card, :root .chip, :root .mode-tab, :root .vs-toggle button,
+  :root .lk-btn, :root .lk-chip, :root .lk-opt, :root .ih-guess { transition: none !important; }
+}
+
+
+/* Big surfaces get the same solid darker bottom edge, a little thicker and softer for their size: settings groups, the
+   Online page cards, the Last party card, lobby cards and seats, sheets (pause, result, rename), the result bar, the
+   suggestion card, the search field, the segmented and tab tracks, toasts and the tooltip. Only the edge: they are not
+   buttons, so nothing lifts or sinks (game cards and picker tiles are tappable and keep the lift and press above). The edge
+   is a box-shadow, so sizes, paddings and corners are unchanged. */
+:root { --slab: 4px; --slab-mix: 14%; }
+:root[data-theme="dark"] { --slab-mix: 26%; }   /* a dark card sits on a darker page: the edge stays between the two so it reads */
+:root .group, :root .op-head, :root .op-card, :root .party-card, :root .lobby-card, :root .sheet-card, :root .rename-card, :root .over-bar,
+:root .sug-card, :root .seat, :root .search, :root .seg, :root .mode-tabs, :root .vs-toggle, :root .toast, :root .over-peek, :root .ui-tip {
+  --slab-face: var(--surface);
+  --slab-c: color-mix(in srgb, var(--slab-face) calc(100% - var(--slab-mix)), #000);
+}
+:root .op-head, :root .op-card, :root .party-card { --slab-face: var(--box); }
+:root .seat, :root .mode-tabs, :root .vs-toggle { --slab-face: var(--surface-2); }
+:root .sug-card { --slab-face: color-mix(in srgb, var(--accent) 7%, var(--box)); }
+:root .toast, :root .over-peek { --slab-face: var(--ink); }
+:root .seg { --slab-c: color-mix(in srgb, var(--ink) 14%, transparent); }
+:root .seat, :root .search, :root .seg, :root .mode-tabs, :root .vs-toggle, :root .toast, :root .over-peek { --slab: 3px; }
+:root .ui-tip { --slab: 2px; }
+:root .group, :root .search { box-shadow: 0 var(--slab) 0 var(--slab-c), var(--shadow); }
+:root .search:focus-within { box-shadow: 0 var(--slab) 0 var(--slab-c), var(--shadow), 0 0 0 2px color-mix(in srgb, var(--accent) 55%, transparent); }
+:root .op-head, :root .op-card, :root .party-card { box-shadow: inset 0 0 0 1px var(--box-line), 0 var(--slab) 0 var(--slab-c); }
+:root .sug-card { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 38%, transparent), 0 var(--slab) 0 var(--slab-c); }
+:root .lobby-card, :root .sheet-card, :root .rename-card, :root .over-bar, :root .toast, :root .over-peek { box-shadow: 0 var(--slab) 0 var(--slab-c), var(--shadow-lift); }
+:root .seat, :root .seg, :root .mode-tabs, :root .vs-toggle { box-shadow: 0 var(--slab) 0 var(--slab-c); }
+:root .seat.lead { box-shadow: inset 0 0 0 2px var(--accent), 0 var(--slab) 0 var(--slab-c); }
+:root .ui-tip { box-shadow: 0 var(--slab) 0 var(--slab-c), var(--shadow), 0 0 0 1px var(--line); }
