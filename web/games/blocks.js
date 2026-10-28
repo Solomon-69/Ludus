@@ -118,7 +118,10 @@
       let lastWasRot = false, lastKick = 0, b2b = false;
       let clearing = null, particles = [], shake = 0, pops = [], landFx = null, lastRot = 0;
       const held = { left: false, right: false, down: false }; let das = 0, arr = 0, dasDir = 0;
-      let layout = null, deadAt = 0;
+      let layout = null, deadAt = 0, deadTop = 0;
+      // Stacked out: the whole stack flashes as it locks (DEAD_LOCK), then row by row from the top each row flashes and folds
+      // into a faint grey ghost (DEAD_ROW apart, DEAD_FOLD long) while the board dims; the Game over card follows.
+      const DEAD_LOCK = 180, DEAD_ROW = 45, DEAD_FLASH = 110, DEAD_FOLD = 260;
 
       function nextType() {
         while (queue.length < 5) { if (!bag.length) bag = makeBag(Math.random); queue.push(bag.shift()); }
@@ -138,8 +141,11 @@
       function noteRow() { if (cur && cur.y > lowestY) { lowestY = cur.y; lockResets = 0; lockT = 0; } }
       function gameOver() {
         if (dead) return; dead = true; deadAt = performance.now(); api.sfx('over');
+        deadTop = H; for (let y = HIDDEN; y < H && deadTop === H; y++) if (board[y].some(Boolean)) deadTop = y;
         if (!api.reduceMotion) shake = 6;
-        api.timeout(() => api.over({ score, title: 'Stacked out', message: 'Level ' + level + ', ' + lines + ' lines' }), 650);
+        // the Game over card comes up once the last row has folded away (at once with Reduce motion)
+        const rows = Math.max(1, H - deadTop), ms = api.reduceMotion ? 300 : DEAD_LOCK + rows * DEAD_ROW + DEAD_FOLD + 120;
+        api.timeout(() => api.over({ score, title: 'Stacked out', message: 'Level ' + level + ', ' + lines + ' lines' }), ms);
       }
       // Move reset: a successful move or rotation while grounded restarts the lock timer, at most MAX_RESETS times.
       function moved(q) {
@@ -258,11 +264,16 @@
         ctx.globalAlpha = 1;
         if (spark) D.spark(ctx, x + s / 2, y + s / 2, s * 0.3, 'rgba(255,255,255,0.9)', spark);
       }
-      // Stacked out: the stack turns grey row by row from the top, the piece that did not fit stays red-outlined.
-      function deadGrey(col, y) {
-        const k = api.reduceMotion ? 1 : (performance.now() - deadAt) / 500 - (y - HIDDEN) / ROWS * 0.6;
-        if (k <= 0) return null;
-        return col.dark ? '#4a443d' : '#cfc6b8';
+      // Stacked out, one row: { f: white flash 0..1, s: scale, a: alpha, grey } at this moment (the piece that did not fit
+      // stays red-outlined on top). Reduce motion: straight to the folded ghost.
+      function deadRow(y, now) {
+        if (api.reduceMotion) return { f: 0, s: 0.82, a: 0.45, grey: true };
+        const t0 = now - deadAt, t = t0 - DEAD_LOCK - (y - deadTop) * DEAD_ROW;
+        const lock = t0 < DEAD_LOCK ? 1 - t0 / DEAD_LOCK : 0;   // the whole stack flashes once as it locks
+        if (t < 0) return { f: lock * 0.6, s: 1, a: 1, grey: false };
+        if (t < DEAD_FLASH) return { f: 1 - t / DEAD_FLASH * 0.4, s: 1, a: 1, grey: false };
+        const k = D.ease.outCubic(Math.min(1, (t - DEAD_FLASH) / DEAD_FOLD));
+        return { f: 0.6 * (1 - k), s: 1 - 0.18 * k, a: 1 - 0.55 * k, grey: true };
       }
       function mini(type, cx, cy, s, alpha) {
         const m = SHAPES[type], cells = [];
@@ -298,7 +309,19 @@
             ctx.save(); ctx.translate(px + c / 2, py + c / 2); ctx.scale(s, s);
             block(-c / 2, -c / 2, c, flashK < 0.35 ? '#fffaf2' : COLORS[t]);
             ctx.restore();
-          } else block(px, py, c, (dead && deadGrey(col, y)) || COLORS[t]);
+          } else if (dead) {
+            const r = deadRow(y, now);
+            ctx.save(); ctx.translate(px + c / 2, py + c / 2); ctx.scale(r.s, r.s);
+            block(-c / 2, -c / 2, c, r.grey ? (col.dark ? '#4a443d' : '#cfc6b8') : COLORS[t], r.a);
+            if (r.f > 0) { ctx.globalAlpha = r.f * r.a; ctx.fillStyle = '#fffaf2'; D.roundRect(ctx, -c / 2 + 1, -c / 2 + 1, c - 2, c - 2, c * 0.22); ctx.fill(); ctx.globalAlpha = 1; }
+            ctx.restore();
+          } else block(px, py, c, COLORS[t]);
+        }
+        // stacked out: the board dims while the rows fold away
+        if (dead) {
+          const k = api.reduceMotion ? 1 : Math.min(1, Math.max(0, (now - deadAt - DEAD_LOCK) / (DEAD_ROW * Math.max(1, H - deadTop) + DEAD_FOLD)));
+          ctx.globalAlpha = 0.28 * k; ctx.fillStyle = col.dark ? '#000' : '#3a3128';
+          D.roundRect(ctx, L.ox - 5, L.oy - 5, L.bw + 10, L.bh + 10, 12); ctx.fill(); ctx.globalAlpha = 1;
         }
         // landing glow
         if (landFx && now - landFx.t < 220 && !api.reduceMotion) {

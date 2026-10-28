@@ -10,6 +10,7 @@ All notable changes to Ludus. Versions follow the app's version number (`Info.pl
 - New "Load names file" button in Settings > More settings (Mac and Windows): pick your original-names.json and Original names turns on straight away. The file is copied into Ludus's own folder, so it keeps working. Without a file, the switch says it needs one.
 - Dark mode: every raised edge is now a dark shadow under its button or card (it was lighter than the card before). The category tabs (All, Arcade...) are raised pills with a real lower edge.
 - The party room card's corners now run parallel to the panel around it.
+- Blocks has a new game-over: the stack flashes as it locks, each row flashes and folds away from the top down while the board dims, then the Game over card comes up. Reduce motion skips straight to the end.
 
 ## 1.12.22 (28 Oct 2026)
 - New raised buttons: every button, tab and game card now has a solid edge underneath, lifts a little when you point at it, sinks when you press it and springs back. Disabled buttons stay flat, and Reduce motion keeps the look without the movement.
