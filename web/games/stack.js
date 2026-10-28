@@ -123,7 +123,7 @@
   Ludus.register({
     id: 'stack', name: 'Stack', tag: 'Arcade', tint: '#3f8fb3',
     waitForMove: 'tap',   // stands still until the first move (see engine.js)
-    hint: '<kbd>Space</kbd> <kbd>↓</kbd> or click / tap to drop · line it up exactly for a perfect · <kbd>B</kbd> or the top-left button: Brain rot skin',
+    hint: '<kbd>Space</kbd> <kbd>↓</kbd> or click / tap to drop · line it up exactly for a perfect',
     _rules: { cut, hueFromColor, layerHue },
     art(ctx, w, h, colors) {
       const base = hueFromColor((colors && colors.accent) || '#d97757'), dark = !!(colors && colors.dark);
@@ -137,7 +137,7 @@
     },
     create(stage, api) {
       const lv = api.level, rm = api.reduceMotion;
-      let rot = Ludus.state.stackSkin === 'rot';   // the Brain rot skin, remembered between games
+      let rot = false;   // 1.12.32: the Brain rot skin is retired (no button, no B key); the plain slabs always show
       let captions = [];                           // floating sound captions (Brain rot skin)
       const view = api.canvas(() => camera(0, true));
       const { ctx, canvas } = view;
@@ -247,9 +247,8 @@
       function caption(b, n, text) { if (rot) captions.push({ b, y: n * H, t: clock, text }); }
       function toggleSkin() { rot = !rot; Ludus.state.stackSkin = rot ? 'rot' : ''; Ludus.save(); captions = []; api.sfx('click'); }
       const SKIN = { x: 10, y: 10, w: 92, h: 26 };
-      const onSkin = (x, y) => state === 'play' && x >= SKIN.x && x <= SKIN.x + SKIN.w && y >= SKIN.y && y <= SKIN.y + SKIN.h;
+      const onSkin = (x, y) => false && x >= SKIN.x && x <= SKIN.x + SKIN.w && y >= SKIN.y && y <= SKIN.y + SKIN.h;
       api.keys(e => {
-        if (e.key === 'b' || e.key === 'B') { e.preventDefault(); if (state === 'play') toggleSkin(); return; }
         if (e.key === ' ' || e.key === 'Enter' || e.key === 'ArrowDown') { e.preventDefault(); drop(); }
       });
       api.on(canvas, 'pointerdown', e => {
@@ -398,10 +397,6 @@
           const cw = Math.min(w - 24, 260); D.roundRect(ctx, (w - cw) / 2, h - 40, cw, 28, 14); ctx.fill(); ctx.restore();
           D.fitText(ctx, rotName(n + 1), w / 2, h - 26, cw - 20, 13, col.ink, 780, 10);
         }
-        // skin switch, top left
-        ctx.save(); ctx.fillStyle = rot ? col.accent : (col.dark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.65)');
-        D.roundRect(ctx, SKIN.x, SKIN.y, SKIN.w, SKIN.h, 13); ctx.fill(); ctx.restore();
-        D.fitText(ctx, rot ? 'Brain rot on' : 'Brain rot', SKIN.x + SKIN.w / 2, SKIN.y + SKIN.h / 2 + 0.5, SKIN.w - 14, 11.5, rot ? '#fffaf3' : col.ink2, 720, 9);
       }
 
       api.loop(dt => { clock += dt; update(dt); render(); });

@@ -995,3 +995,13 @@ svg { display: block; }
 .mode-pill { z-index: 0; overflow: visible; border-radius: 9px; transition: transform 0.42s var(--spring), width 0.42s var(--spring); }
 
 :root:not(.flat) .tab-pill-lab { font-weight: 640; }
+
+/* 1.12.32: cleaner player seats. The avatar sits centred, and the line under the name is one quiet style for everyone:
+   "Host" as plain accent text (no tinted tag) and "Make leader" as a borderless text button of the same size, so the
+   two cards line up. The confirm step (Yes / No) keeps its filled button. */
+.seat-dot { align-self: center; }
+.seat-text { gap: 3px; }
+.seat-badge { background: none; padding: 0; font: 650 10.5px/1.2 var(--font-round); letter-spacing: 0; text-transform: none; }
+.seat-acts { margin-top: 0; }
+.seat-act:not(.is-yes) { border: 0; padding: 0; background: none; font: 650 10.5px/1.2 var(--font-round); }
+.seat-act:not(.is-yes):hover:not(:disabled) { background: none; text-decoration: underline; text-underline-offset: 2px; }

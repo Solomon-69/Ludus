@@ -957,7 +957,9 @@
     hideCrash(); leaveOnline(); if (reset) forget(current.game.id); else persist(); stop(); hideOver(); $('pauseSheet').hidden = true;
     const fromSearch = !!searchReturn; leaveSearch();
     show('home'); renderCards();
-    if (fromSearch) { const gr = $('grid'); if (gr) gr.scrollTop = 0; }
+    // back from a game: the list starts at the top of its tab (All, Arcade, ...), never halfway down where it was left
+    { const gr = $('grid'); if (gr) { gr.scrollTop = 0; requestAnimationFrame(() => { gr.scrollTop = 0; }); } }
+    void fromSearch;
     L.native('playing', { id: null }); L.native('wide', { on: false });
   }
 

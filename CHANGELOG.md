@@ -3,6 +3,12 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.32 (28 Oct 2026)
+
+- Online room: cleaner player cards. The avatar sits centred and the line under each name is one quiet style: "Host" as plain text, "Make leader" as a plain text button of the same size.
+- Stack: the "Brain rot" button in the top left is gone, with its B key and hint. Stack always uses its normal slabs.
+- Leaving a game always brings you back to the top of the tab you were on, instead of halfway down the list.
+
 ## 1.12.31 (28 Oct 2026)
 
 - Online room: the Single game / Tournament words show on the chosen tab again (1.12.29 put the sliding pill on top of them).
