@@ -19,7 +19,7 @@
   const STORE_KEY = 'ludus.v1';
   const defaults = {
     theme: 'system', accent: '#d97757', sound: true, volume: 0.6, difficulty: 'normal',
-    reduceMotion: false, hints: true, size: 'compact', hidden: [], best: {}, plays: {}, last: null,
+    reduceMotion: false, raised: true, hints: true, size: 'compact', hidden: [], best: {}, plays: {}, last: null,
     filter: 'All', saves: {}, introDone: false, onlineName: '', party: null, stackSkin: '', renameGames: false, originalNames: false, names: {}
   };
 

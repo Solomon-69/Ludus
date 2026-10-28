@@ -128,7 +128,7 @@ svg { display: block; }
 .filters.has-pill .chip { position: relative; z-index: 1; transition: color 0.3s var(--ease-out), transform 0.25s var(--spring); }
 .filters.has-pill .chip.is-on { background: transparent; }
 .tab-pill { position: absolute; left: 0; top: 0; z-index: 0; display: block; border-radius: 999px; background: var(--ink); pointer-events: none; opacity: 0;
-  transition: transform 0.36s cubic-bezier(0.22, 1, 0.36, 1), width 0.36s cubic-bezier(0.22, 1, 0.36, 1); will-change: transform, width; }   /* ease-out, never past the target */
+  transition: transform 0.42s cubic-bezier(0.32, 0.72, 0, 1), width 0.42s cubic-bezier(0.32, 0.72, 0, 1); will-change: transform, width; }   /* ease-out, never past the target */
 .tab-pill.no-slide { transition: none; }
 /* 1.12.29: the pill sits above the tabs (it carries the chosen label) so it glides over each one, not under it */
 .tab-pill { z-index: 2; overflow: hidden; }
@@ -289,6 +289,9 @@ svg { display: block; }
 .group-label:first-child { margin-top: 14px; }
 /* every gap between setting cards is the same 22px: a label gap is 5 + 13 + 4 */
 .group + .group-label { margin-top: 5px; }
+/* 1.12.31: a little more air between a settings card and the next section's name (PLAY, APP ...) */
+.settings .group + .group-label, .group + .group-label { margin-top: 16px; }
+.group-label { margin-bottom: 7px; }
 .group { background: var(--surface); border-radius: var(--r-lg); box-shadow: var(--shadow); overflow: hidden; }
 .row { display: flex; align-items: center; gap: 10px; min-height: 46px; padding: 8px 12px; }
 .row + .row { border-top: 1px solid var(--line); }
@@ -843,87 +846,87 @@ svg { display: block; }
    work and accent changes carry through. Switches, swatches and sliders stay as they are.
    =================================================================================================================== */
 :root { --edge: 4px; --edge-mix: 30%; --raise-ease: cubic-bezier(0.34, 1.56, 0.64, 1); }
-:root[data-theme="dark"] { --edge-mix: 55%; }
-:root .btn:not(.ghost), :root .small-btn, :root .icon-btn, :root .card, :root .mode-tab.is-on, :root .seg-thumb, :root .tab-pill,
-:root .vs-toggle button.is-on, :root .pick-chips .chip, :root .lk-btn, :root .lk-chip, :root .lk-opt, :root .ih-guess {
+:root:not(.flat)[data-theme="dark"] { --edge-mix: 55%; }
+:root:not(.flat) .btn:not(.ghost), :root:not(.flat) .small-btn, :root:not(.flat) .icon-btn, :root:not(.flat) .card, :root:not(.flat) .mode-tab.is-on, :root:not(.flat) .seg-thumb, :root:not(.flat) .tab-pill,
+:root:not(.flat) .vs-toggle button.is-on, :root:not(.flat) .pick-chips .chip, :root:not(.flat) .lk-btn, :root:not(.flat) .lk-chip, :root:not(.flat) .lk-opt, :root:not(.flat) .ih-guess {
   --face: var(--surface-2);
   --edge-c: color-mix(in srgb, var(--face) calc(100% - var(--edge-mix)), #000);
   --edge-now: var(--edge);
   --lift: 0px;
 }
 /* faces: each control's own colour */
-:root .icon-btn, :root .card, :root .seg-thumb, :root .vs-toggle button.is-on, :root .lk-btn, :root .lk-opt { --face: var(--surface); }
-:root .btn.primary, :root .mode-tab.is-on, :root .tab-pill, :root .pick-chips .chip.is-on, :root .lk-chip.on { --face: var(--ink); }
-:root .small-btn.warm { --face: #E8833A; }
-:root .ih-guess { --face: #6cb928; }
-:root .lk-primary { --face: var(--accent); }
-:root .lk-opt.right { --face: var(--good); }
-:root .lk-opt.wrong { --face: var(--bad); }
-:root .sug-actions .sug-decline { --edge-c: color-mix(in srgb, var(--ink) 20%, transparent); }
+:root:not(.flat) .icon-btn, :root:not(.flat) .card, :root:not(.flat) .seg-thumb, :root:not(.flat) .vs-toggle button.is-on, :root:not(.flat) .lk-btn, :root:not(.flat) .lk-opt { --face: var(--surface); }
+:root:not(.flat) .btn.primary, :root:not(.flat) .mode-tab.is-on, :root:not(.flat) .tab-pill, :root:not(.flat) .pick-chips .chip.is-on, :root:not(.flat) .lk-chip.on { --face: var(--ink); }
+:root:not(.flat) .small-btn.warm { --face: #E8833A; }
+:root:not(.flat) .ih-guess { --face: #6cb928; }
+:root:not(.flat) .lk-primary { --face: var(--accent); }
+:root:not(.flat) .lk-opt.right { --face: var(--good); }
+:root:not(.flat) .lk-opt.wrong { --face: var(--bad); }
+:root:not(.flat) .sug-actions .sug-decline { --edge-c: color-mix(in srgb, var(--ink) 20%, transparent); }
 /* thin edges for thumbs that ride inside a track (the track's own padding holds the edge) */
-:root .seg-thumb, :root .vs-toggle button.is-on { --edge: 2px; }
-:root .mode-tab.is-on, :root .tab-pill, :root .pick-chips .chip, :root .lk-chip { --edge: 3px; }
-:root .icon-btn.small { --edge: 3px; }
+:root:not(.flat) .seg-thumb, :root:not(.flat) .vs-toggle button.is-on { --edge: 2px; }
+:root:not(.flat) .mode-tab.is-on, :root:not(.flat) .tab-pill, :root:not(.flat) .pick-chips .chip, :root:not(.flat) .lk-chip { --edge: 3px; }
+:root:not(.flat) .icon-btn.small { --edge: 3px; }
 
 /* the raised look */
-:root .btn:not(.ghost), :root .small-btn, :root .mode-tab.is-on, :root .seg-thumb, :root .tab-pill,
-:root .vs-toggle button.is-on, :root .pick-chips .chip, :root .lk-chip, :root .lk-btn, :root .lk-opt, :root .ih-guess {
+:root:not(.flat) .btn:not(.ghost), :root:not(.flat) .small-btn, :root:not(.flat) .mode-tab.is-on, :root:not(.flat) .seg-thumb, :root:not(.flat) .tab-pill,
+:root:not(.flat) .vs-toggle button.is-on, :root:not(.flat) .pick-chips .chip, :root:not(.flat) .lk-chip, :root:not(.flat) .lk-btn, :root:not(.flat) .lk-opt, :root:not(.flat) .ih-guess {
   box-shadow: 0 calc(var(--edge-now) + var(--lift)) 0 var(--edge-c);
 }
-:root .icon-btn, :root .card { box-shadow: 0 calc(var(--edge-now) + var(--lift)) 0 var(--edge-c), var(--shadow); }
-:root .btn.primary:hover { box-shadow: 0 calc(var(--edge-now) + var(--lift)) 0 var(--edge-c); }
-:root .lk-btn, :root .lk-opt { border-bottom-color: transparent; }
+:root:not(.flat) .icon-btn, :root:not(.flat) .card { box-shadow: 0 calc(var(--edge-now) + var(--lift)) 0 var(--edge-c), var(--shadow); }
+:root:not(.flat) .btn.primary:hover { box-shadow: 0 calc(var(--edge-now) + var(--lift)) 0 var(--edge-c); }
+:root:not(.flat) .lk-btn, :root:not(.flat) .lk-opt { border-bottom-color: transparent; }
 /* slightly bolder labels */
-:root .btn { font-weight: 700; }
-:root .small-btn { font-weight: 680; }
-:root .chip { font-weight: 640; }
-:root .seg button { font-weight: 660; }
-:root .vs-toggle button { font-weight: 680; }
+:root:not(.flat) .btn { font-weight: 700; }
+:root:not(.flat) .small-btn { font-weight: 680; }
+:root:not(.flat) .chip { font-weight: 640; }
+:root:not(.flat) .seg button { font-weight: 660; }
+:root:not(.flat) .vs-toggle button { font-weight: 680; }
 
 /* motion: hover lifts 1px, press sinks onto the edge, release springs back */
-:root .btn:not(.ghost), :root .small-btn, :root .icon-btn, :root .card, :root .pick-chips .chip, :root .lk-chip, :root .lk-btn, :root .lk-opt,
-:root .ih-guess, :root .mode-tab, :root .vs-toggle button {
+:root:not(.flat) .btn:not(.ghost), :root:not(.flat) .small-btn, :root:not(.flat) .icon-btn, :root:not(.flat) .card, :root:not(.flat) .pick-chips .chip, :root:not(.flat) .lk-chip, :root:not(.flat) .lk-btn, :root:not(.flat) .lk-opt,
+:root:not(.flat) .ih-guess, :root:not(.flat) .mode-tab, :root:not(.flat) .vs-toggle button {
   transition: transform 0.26s var(--raise-ease), box-shadow 0.26s var(--raise-ease), background-color 0.15s, color 0.15s, border-color 0.15s;
 }
 @media (hover: hover) {
-  :root .btn:not(.ghost):not(:disabled):hover, :root .small-btn:not(:disabled):hover, :root .icon-btn:hover, :root .card:hover,
-  :root .pick-chips .chip:hover, :root .lk-chip:not(:disabled):hover, :root .lk-btn:not(:disabled):hover, :root .lk-opt:not(:disabled):hover,
-  :root .ih-guess:not(:disabled):hover { --lift: 1px; transform: translateY(-1px); }
+  :root:not(.flat) .btn:not(.ghost):not(:disabled):hover, :root:not(.flat) .small-btn:not(:disabled):hover, :root:not(.flat) .icon-btn:hover, :root:not(.flat) .card:hover,
+  :root:not(.flat) .pick-chips .chip:hover, :root:not(.flat) .lk-chip:not(:disabled):hover, :root:not(.flat) .lk-btn:not(:disabled):hover, :root:not(.flat) .lk-opt:not(:disabled):hover,
+  :root:not(.flat) .ih-guess:not(:disabled):hover { --lift: 1px; transform: translateY(-1px); }
 }
-:root .btn:not(.ghost):not(:disabled):active, :root .small-btn:not(:disabled):active, :root .icon-btn:active, :root .card:active,
-:root .pick-chips .chip:active, :root .lk-chip:not(:disabled):active, :root .lk-btn:not(:disabled):active, :root .lk-opt:not(:disabled):active,
-:root .ih-guess:not(:disabled):active, :root .mode-tab.is-on:active, :root .vs-toggle button.is-on:active {
+:root:not(.flat) .btn:not(.ghost):not(:disabled):active, :root:not(.flat) .small-btn:not(:disabled):active, :root:not(.flat) .icon-btn:active, :root:not(.flat) .card:active,
+:root:not(.flat) .pick-chips .chip:active, :root:not(.flat) .lk-chip:not(:disabled):active, :root:not(.flat) .lk-btn:not(:disabled):active, :root:not(.flat) .lk-opt:not(:disabled):active,
+:root:not(.flat) .ih-guess:not(:disabled):active, :root:not(.flat) .mode-tab.is-on:active, :root:not(.flat) .vs-toggle button.is-on:active {
   --edge-now: 0px; --lift: 0px; transform: translateY(var(--edge)); transition-duration: 0.07s;
 }
 /* tabs that are not on yet: a small sink, no edge */
-:root .mode-tab:not(.is-on):active, :root .vs-toggle button:not(.is-on):active, :root .chip:not(.is-on):active { transform: translateY(2px); transition-duration: 0.07s; }
+:root:not(.flat) .mode-tab:not(.is-on):active, :root:not(.flat) .vs-toggle button:not(.is-on):active, :root:not(.flat) .chip:not(.is-on):active { transform: translateY(2px); transition-duration: 0.07s; }
 /* the category pill and segmented thumb keep their own slide; they only gain the edge */
-:root .tab-pill { transition: transform 0.42s cubic-bezier(0.32, 0.72, 0, 1), width 0.42s cubic-bezier(0.32, 0.72, 0, 1), box-shadow 0.2s; }
-:root .tab-pill.no-slide { transition: none; }
-:root .seg { padding-bottom: 4px; }
-:root .seg-thumb { bottom: 4px; box-shadow: 0 var(--edge) 0 var(--edge-c); }
-:root .seg button.is-on { color: var(--ink); }
+:root:not(.flat) .tab-pill { transition: transform 0.42s cubic-bezier(0.32, 0.72, 0, 1), width 0.42s cubic-bezier(0.32, 0.72, 0, 1), box-shadow 0.2s; }
+:root:not(.flat) .tab-pill.no-slide { transition: none; }
+:root:not(.flat) .seg { padding-bottom: 4px; }
+:root:not(.flat) .seg-thumb { bottom: 4px; box-shadow: 0 var(--edge) 0 var(--edge-c); }
+:root:not(.flat) .seg button.is-on { color: var(--ink); }
 /* ghost buttons stay flat; a press still answers */
-:root .btn.ghost:hover { transform: none; }
-:root .btn.ghost:active { transform: translateY(2px); }
+:root:not(.flat) .btn.ghost:hover { transform: none; }
+:root:not(.flat) .btn.ghost:active { transform: translateY(2px); }
 /* disabled: flat, no edge, no movement */
-:root .btn:disabled, :root .small-btn:disabled, :root .lk-btn:disabled, :root .lk-chip:disabled, :root .lk-opt:disabled, :root .ih-guess:disabled {
+:root:not(.flat) .btn:disabled, :root:not(.flat) .small-btn:disabled, :root:not(.flat) .lk-btn:disabled, :root:not(.flat) .lk-chip:disabled, :root:not(.flat) .lk-opt:disabled, :root:not(.flat) .ih-guess:disabled {
   box-shadow: none; transform: none;
 }
-:root .lk-opt.dim { box-shadow: none; }
+:root:not(.flat) .lk-opt.dim { box-shadow: none; }
 /* card that flashes when found keeps its glow animation over the edge */
-:root .card.found { box-shadow: 0 var(--edge) 0 var(--edge-c), var(--shadow); }
+:root:not(.flat) .card.found { box-shadow: 0 var(--edge) 0 var(--edge-c), var(--shadow); }
 
 /* the cards' pop-in holds its last frame (fill both), which would pin their transform and stop the hover lift and the
    press sink; once the pop-in is over the card hands its transform back to the raised rules above */
-:root .card, :root .card.found { animation-fill-mode: backwards; }
+:root:not(.flat) .card, :root:not(.flat) .card.found { animation-fill-mode: backwards; }
 
 /* reduced motion: same looks and states, no movement in between */
-:root.reduce .btn, :root.reduce .small-btn, :root.reduce .icon-btn, :root.reduce .card, :root.reduce .chip, :root.reduce .mode-tab,
-:root.reduce .vs-toggle button, :root.reduce .lk-btn, :root.reduce .lk-chip, :root.reduce .lk-opt, :root.reduce .ih-guess { transition: none !important; }
+:root:not(.flat).reduce .btn, :root:not(.flat).reduce .small-btn, :root:not(.flat).reduce .icon-btn, :root:not(.flat).reduce .card, :root:not(.flat).reduce .chip, :root:not(.flat).reduce .mode-tab,
+:root:not(.flat).reduce .vs-toggle button, :root:not(.flat).reduce .lk-btn, :root:not(.flat).reduce .lk-chip, :root:not(.flat).reduce .lk-opt, :root:not(.flat).reduce .ih-guess { transition: none !important; }
 @media (prefers-reduced-motion: reduce) {
-  :root .btn, :root .small-btn, :root .icon-btn, :root .card, :root .chip, :root .mode-tab, :root .vs-toggle button,
-  :root .lk-btn, :root .lk-chip, :root .lk-opt, :root .ih-guess { transition: none !important; }
+  :root:not(.flat) .btn, :root:not(.flat) .small-btn, :root:not(.flat) .icon-btn, :root:not(.flat) .card, :root:not(.flat) .chip, :root:not(.flat) .mode-tab, :root:not(.flat) .vs-toggle button,
+  :root:not(.flat) .lk-btn, :root:not(.flat) .lk-chip, :root:not(.flat) .lk-opt, :root:not(.flat) .ih-guess { transition: none !important; }
 }
 
 
@@ -932,63 +935,63 @@ svg { display: block; }
    suggestion card, the search field, the segmented and tab tracks, toasts and the tooltip. Only the edge: they are not
    buttons, so nothing lifts or sinks (game cards and picker tiles are tappable and keep the lift and press above). The edge
    is a box-shadow, so sizes, paddings and corners are unchanged. */
-:root { --slab: 4px; --slab-mix: 24%; }
-:root .group, :root .op-head, :root .op-card, :root .party-card, :root .lobby-card, :root .sheet-card, :root .rename-card, :root .over-bar,
-:root .sug-card, :root .seat, :root .search, :root .seg, :root .mode-tabs, :root .vs-toggle, :root .toast, :root .over-peek, :root .ui-tip {
+:root:not(.flat) { --slab: 4px; --slab-mix: 24%; }
+:root:not(.flat) .group, :root:not(.flat) .op-head, :root:not(.flat) .op-card, :root:not(.flat) .party-card, :root:not(.flat) .lobby-card, :root:not(.flat) .sheet-card, :root:not(.flat) .rename-card, :root:not(.flat) .over-bar,
+:root:not(.flat) .sug-card, :root:not(.flat) .seat, :root:not(.flat) .search, :root:not(.flat) .seg, :root:not(.flat) .mode-tabs, :root:not(.flat) .vs-toggle, :root:not(.flat) .toast, :root:not(.flat) .over-peek, :root:not(.flat) .ui-tip {
   --slab-face: var(--surface);
   --slab-c: color-mix(in srgb, var(--slab-face) calc(100% - var(--slab-mix)), #000);
 }
-:root .op-head, :root .op-card, :root .party-card { --slab-face: var(--box); }
-:root .seat, :root .mode-tabs, :root .vs-toggle { --slab-face: var(--surface-2); }
-:root .sug-card { --slab-face: color-mix(in srgb, var(--accent) 7%, var(--box)); }
-:root .toast, :root .over-peek { --slab-face: var(--ink); }
-:root .seg { --slab-c: color-mix(in srgb, var(--ink) 14%, transparent); }
-:root .seat, :root .search, :root .seg, :root .mode-tabs, :root .vs-toggle, :root .toast, :root .over-peek { --slab: 3px; }
-:root .ui-tip { --slab: 2px; }
-:root .group, :root .lobby-card, :root .sheet-card, :root .rename-card, :root .over-bar { --slab: 5px; }
-:root .group, :root .search { box-shadow: 0 var(--slab) 0 var(--slab-c), var(--shadow); }
-:root .search:focus-within { box-shadow: 0 var(--slab) 0 var(--slab-c), var(--shadow), 0 0 0 2px color-mix(in srgb, var(--accent) 55%, transparent); }
-:root .op-head, :root .op-card, :root .party-card { box-shadow: inset 0 0 0 1px var(--box-line), 0 var(--slab) 0 var(--slab-c); }
-:root .sug-card { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 38%, transparent), 0 var(--slab) 0 var(--slab-c); }
-:root .lobby-card, :root .sheet-card, :root .rename-card, :root .over-bar, :root .toast, :root .over-peek { box-shadow: 0 var(--slab) 0 var(--slab-c), var(--shadow-lift); }
-:root .seat, :root .seg, :root .mode-tabs, :root .vs-toggle { box-shadow: 0 var(--slab) 0 var(--slab-c); }
-:root .seat.lead { box-shadow: inset 0 0 0 2px var(--accent), 0 var(--slab) 0 var(--slab-c); }
-:root .ui-tip { box-shadow: 0 var(--slab) 0 var(--slab-c), var(--shadow), 0 0 0 1px var(--line); }
+:root:not(.flat) .op-head, :root:not(.flat) .op-card, :root:not(.flat) .party-card { --slab-face: var(--box); }
+:root:not(.flat) .seat, :root:not(.flat) .mode-tabs, :root:not(.flat) .vs-toggle { --slab-face: var(--surface-2); }
+:root:not(.flat) .sug-card { --slab-face: color-mix(in srgb, var(--accent) 7%, var(--box)); }
+:root:not(.flat) .toast, :root:not(.flat) .over-peek { --slab-face: var(--ink); }
+:root:not(.flat) .seg { --slab-c: color-mix(in srgb, var(--ink) 14%, transparent); }
+:root:not(.flat) .seat, :root:not(.flat) .search, :root:not(.flat) .seg, :root:not(.flat) .mode-tabs, :root:not(.flat) .vs-toggle, :root:not(.flat) .toast, :root:not(.flat) .over-peek { --slab: 3px; }
+:root:not(.flat) .ui-tip { --slab: 2px; }
+:root:not(.flat) .group, :root:not(.flat) .lobby-card, :root:not(.flat) .sheet-card, :root:not(.flat) .rename-card, :root:not(.flat) .over-bar { --slab: 5px; }
+:root:not(.flat) .group, :root:not(.flat) .search { box-shadow: 0 var(--slab) 0 var(--slab-c), var(--shadow); }
+:root:not(.flat) .search:focus-within { box-shadow: 0 var(--slab) 0 var(--slab-c), var(--shadow), 0 0 0 2px color-mix(in srgb, var(--accent) 55%, transparent); }
+:root:not(.flat) .op-head, :root:not(.flat) .op-card, :root:not(.flat) .party-card { box-shadow: inset 0 0 0 1px var(--box-line), 0 var(--slab) 0 var(--slab-c); }
+:root:not(.flat) .sug-card { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 38%, transparent), 0 var(--slab) 0 var(--slab-c); }
+:root:not(.flat) .lobby-card, :root:not(.flat) .sheet-card, :root:not(.flat) .rename-card, :root:not(.flat) .over-bar, :root:not(.flat) .toast, :root:not(.flat) .over-peek { box-shadow: 0 var(--slab) 0 var(--slab-c), var(--shadow-lift); }
+:root:not(.flat) .seat, :root:not(.flat) .seg, :root:not(.flat) .mode-tabs, :root:not(.flat) .vs-toggle { box-shadow: 0 var(--slab) 0 var(--slab-c); }
+:root:not(.flat) .seat.lead { box-shadow: inset 0 0 0 2px var(--accent), 0 var(--slab) 0 var(--slab-c); }
+:root:not(.flat) .ui-tip { box-shadow: 0 var(--slab) 0 var(--slab-c), var(--shadow), 0 0 0 1px var(--line); }
 
 /* Edges that read (light and dark). Light: near-black controls (primary buttons, the selected tab pill, chosen chips) are a
    charcoal face on a near-black edge, so the edge shows against the cream page. Dark: every edge is darker than its face too;
    dark faces sit on a near-black strip, well below both the face and the page. */
-:root { --ink-face: color-mix(in srgb, var(--ink) 80%, #fff); }
-:root:not([data-theme="dark"]) .btn.primary, :root:not([data-theme="dark"]) .tab-pill, :root:not([data-theme="dark"]) .mode-tab.is-on,
-:root:not([data-theme="dark"]) .pick-chips .chip.is-on, :root:not([data-theme="dark"]) .lk-chip.on {
+:root:not(.flat) { --ink-face: color-mix(in srgb, var(--ink) 80%, #fff); }
+:root:not(.flat):not([data-theme="dark"]) .btn.primary, :root:not(.flat):not([data-theme="dark"]) .tab-pill, :root:not(.flat):not([data-theme="dark"]) .mode-tab.is-on,
+:root:not(.flat):not([data-theme="dark"]) .pick-chips .chip.is-on, :root:not(.flat):not([data-theme="dark"]) .lk-chip.on {
   background: var(--ink-face); --face: var(--ink-face); --edge-c: var(--ink);
 }
-:root[data-theme="dark"] .btn:not(.primary):not(.ghost), :root[data-theme="dark"] .small-btn:not(.warm), :root[data-theme="dark"] .icon-btn,
-:root[data-theme="dark"] .card, :root[data-theme="dark"] .seg-thumb, :root[data-theme="dark"] .vs-toggle button.is-on,
-:root[data-theme="dark"] .lk-btn:not(.lk-primary), :root[data-theme="dark"] .lk-opt:not(.right):not(.wrong),
-:root[data-theme="dark"] .pick-chips .chip:not(.is-on) { --edge-c: color-mix(in srgb, var(--face) 8%, #000); }
-:root[data-theme="dark"] .group, :root[data-theme="dark"] .op-head, :root[data-theme="dark"] .op-card, :root[data-theme="dark"] .party-card,
-:root[data-theme="dark"] .lobby-card, :root[data-theme="dark"] .sheet-card, :root[data-theme="dark"] .rename-card, :root[data-theme="dark"] .over-bar,
-:root[data-theme="dark"] .sug-card, :root[data-theme="dark"] .seat, :root[data-theme="dark"] .search, :root[data-theme="dark"] .mode-tabs,
-:root[data-theme="dark"] .vs-toggle, :root[data-theme="dark"] .ui-tip { --slab-c: color-mix(in srgb, var(--slab-face) 8%, #000); }
-:root[data-theme="dark"] .seg { --slab-c: color-mix(in srgb, var(--slab-face) 8%, #000); }   /* 1.12.27: was a light (ink) edge in dark mode */
-:root[data-theme="dark"] .toast, :root[data-theme="dark"] .over-peek { --slab-c: color-mix(in srgb, var(--ink) 55%, #000); }
+:root:not(.flat)[data-theme="dark"] .btn:not(.primary):not(.ghost), :root:not(.flat)[data-theme="dark"] .small-btn:not(.warm), :root:not(.flat)[data-theme="dark"] .icon-btn,
+:root:not(.flat)[data-theme="dark"] .card, :root:not(.flat)[data-theme="dark"] .seg-thumb, :root:not(.flat)[data-theme="dark"] .vs-toggle button.is-on,
+:root:not(.flat)[data-theme="dark"] .lk-btn:not(.lk-primary), :root:not(.flat)[data-theme="dark"] .lk-opt:not(.right):not(.wrong),
+:root:not(.flat)[data-theme="dark"] .pick-chips .chip:not(.is-on) { --edge-c: color-mix(in srgb, var(--face) 8%, #000); }
+:root:not(.flat)[data-theme="dark"] .group, :root:not(.flat)[data-theme="dark"] .op-head, :root:not(.flat)[data-theme="dark"] .op-card, :root:not(.flat)[data-theme="dark"] .party-card,
+:root:not(.flat)[data-theme="dark"] .lobby-card, :root:not(.flat)[data-theme="dark"] .sheet-card, :root:not(.flat)[data-theme="dark"] .rename-card, :root:not(.flat)[data-theme="dark"] .over-bar,
+:root:not(.flat)[data-theme="dark"] .sug-card, :root:not(.flat)[data-theme="dark"] .seat, :root:not(.flat)[data-theme="dark"] .search, :root:not(.flat)[data-theme="dark"] .mode-tabs,
+:root:not(.flat)[data-theme="dark"] .vs-toggle, :root:not(.flat)[data-theme="dark"] .ui-tip { --slab-c: color-mix(in srgb, var(--slab-face) 8%, #000); }
+:root:not(.flat)[data-theme="dark"] .seg { --slab-c: color-mix(in srgb, var(--slab-face) 8%, #000); }   /* 1.12.27: was a light (ink) edge in dark mode */
+:root:not(.flat)[data-theme="dark"] .toast, :root:not(.flat)[data-theme="dark"] .over-peek { --slab-c: color-mix(in srgb, var(--ink) 55%, #000); }
 
 /* 1.12.23: the party room sheet is rounded by its card's corner plus the 6px gap around it (20 + 6), so the room card's
    corner runs parallel to the sheet's (it used to be the panel's 18px, tighter than the 20px card inside) */
 .sheet.lobby { border-radius: calc(20px + 6px); }
 /* the category tabs are raised pills too: each tab has a face and a darker lower edge; the sliding pill (the chosen tab)
    rides over it with its own edge. The tab row's 10px bottom padding leaves room, so the edges are never clipped. */
-:root .filters .chip { --face: var(--surface); --edge-c: color-mix(in srgb, var(--face) calc(100% - var(--edge-mix)), #000);
+:root:not(.flat) .filters .chip { --face: var(--surface); --edge-c: color-mix(in srgb, var(--face) calc(100% - var(--edge-mix)), #000);
   background: var(--face); box-shadow: 0 3px 0 var(--edge-c); }
 :root .filters.has-pill .chip.is-on { background: transparent; box-shadow: none; }
-:root[data-theme="dark"] .filters .chip { --edge-c: color-mix(in srgb, var(--face) 8%, #000); }
+:root:not(.flat)[data-theme="dark"] .filters .chip { --edge-c: color-mix(in srgb, var(--face) 8%, #000); }
 
 /* 1.12.27: Single game / Tournament slides like the other segmented controls: one pill (the selected tab's face and edge)
    moves with a spring, the tab text cross-fades over it. */
 .mode-tabs.has-pill { position: relative; }
 .mode-tabs.has-pill .mode-tab { position: relative; z-index: 1; transition: color 0.28s var(--ease-out), transform 0.2s var(--spring); }
 :root .mode-tabs.has-pill .mode-tab.is-on { background: transparent; box-shadow: none; }
-.mode-pill { border-radius: 9px; transition: transform 0.42s var(--spring), width 0.42s var(--spring); }
+.mode-pill { z-index: 0; overflow: visible; border-radius: 9px; transition: transform 0.42s var(--spring), width 0.42s var(--spring); }
 
-:root .tab-pill-lab { font-weight: 640; }
+:root:not(.flat) .tab-pill-lab { font-weight: 640; }

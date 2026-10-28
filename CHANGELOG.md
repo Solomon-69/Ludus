@@ -3,6 +3,13 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.31 (28 Oct 2026)
+
+- Online room: the Single game / Tournament words show on the chosen tab again (1.12.29 put the sliding pill on top of them).
+- Settings: a little more space above each section name (Play, App ...). Nothing else moves; the More settings card opens and closes as before.
+- Rejoin on the Last party card works in one press: it looks for the room faster, and if the first try cannot reach it, Ludus tries once more by itself before showing anything.
+- New in Settings, Look: Raised buttons, on by default. Turn it off for flat buttons. Only the look changes; every button, sound and game works the same.
+
 ## 1.12.30 (28 Oct 2026)
 
 - The category tabs: the pill now moves like a window over the tab row. Each name flips colour exactly where the pill's edge passes it, so there is no doubled or ghost text mid-slide, and the glide is a touch slower and smoother.

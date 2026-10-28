@@ -543,7 +543,7 @@
   Session.prototype._askJoin = function () {
     const me = this;
     me.code = me.candidate; me.tries = 0;
-    const limit = me.rejoin === 'quick' ? 5 : me.rejoin ? 12 : 8;   // quick: the maker of the code, who reopens it if nobody answers
+    const limit = me.rejoin === 'quick' ? 3 : me.rejoin ? 12 : 8;   // quick: the maker of the code, who reopens it if nobody answers (a live host answers within a second or two)
     const ask = () => {
       if (me.over || me.ready || me.conn !== 'online') return;
       if (++me.tries > limit) {

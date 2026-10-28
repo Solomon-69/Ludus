@@ -49,6 +49,7 @@
     root.style.setProperty('--accent', S.accent);
     root.style.setProperty('--accent-soft', S.accent + '26');
     root.classList.toggle('reduce', !!S.reduceMotion);
+    root.classList.toggle('flat', S.raised === false);   // Raised buttons off: the plain flat look, same controls and sounds
     L.native('theme', { mode: S.theme });
     // In the Mac app the panel's own material shows through in every look (the popover follows Light or Dark too), so the
     // arrow under the menu bar icon and the panel are one continuous surface.
@@ -622,14 +623,17 @@
   // host answers (the room emptied or expired, however long ago), the code is free, so we open it again as host with the same
   // code, games and names. If a host turns up while we claim it, we join that room as a guest instead: never two rooms.
   // A failed Rejoin never removes the Last party card.
-  function rejoinParty() {
+  // One press is enough: if the first attempt cannot reach the room (a relay blip, a slow reconnect), Ludus quietly tries once
+  // more before showing anything, which is what a second press used to do.
+  function rejoinParty(retried) {
     const p = S.party; if (!p || !L.net.validCode(p.code)) return;
-    joinFromInvite(p.code, false, { rejoin: true, fallback: () => createFlexRoom(p) });
+    joinFromInvite(p.code, false, { rejoin: true, retried: !!retried, fallback: () => createFlexRoom(p, !!retried) });
   }
   // Rejoin never ends in nothing: when no relay can be reached (or a room cannot be reopened) a card says so, with Try again.
-  function rejoinFailed(p) {
+  function rejoinFailed(p, retried) {
+    if (!retried && S.party && S.party.code === p.code) { setTimeout(() => rejoinParty(true), 400); return; }
     if (S.party && S.party.code === p.code) { S.party.live = false; L.save(); }
-    L.lobby.notice('Could not rejoin', 'Ludus could not reach the internet relay for room ' + p.code + '. Your party is kept. Check your connection and try again.', () => rejoinParty(), 'Try again', 'Close');
+    L.lobby.notice('Could not rejoin', 'Ludus could not reach the internet relay for room ' + p.code + '. Your party is kept. Check your connection and try again.', () => rejoinParty(true), 'Try again', 'Close');
   }
   function onlineId() {
     if (typeof S.onlineId !== 'string' || !/^[0-9a-f]{12}$/.test(S.onlineId)) {
@@ -638,13 +642,13 @@
     }
     return S.onlineId;
   }
-  function createFlexRoom(party) {   // from the Online page: no game yet, the host picks them in the room
+  function createFlexRoom(party, retried) {   // from the Online page: no game yet, the host picks them in the room
     showOnlineShell();
     online = { game: null, session: null, started: false };
     const s = L.lobby.openRoom(lobbyOps(null), party && party.code, onlineId());
     if (!s) return;
     trackParty(s, 'host');
-    if (party) s.on('error', () => rejoinFailed(party));   // runs after the lobby's own handling of the error
+    if (party) s.on('error', () => rejoinFailed(party, retried));   // runs after the lobby's own handling of the error
     if (party && party.games && party.games.length) s.on('ready', () => { s.setPlan(party.games.filter(id => L.games.some(g => g.id === id && g.online)), party.n); });
   }
   function lobbyOps(g) {
@@ -672,7 +676,7 @@
     const s = L.net.joinRoom(code, { gameId: '', name: L.net.cleanName(S.onlineName, ''), uid: onlineId(), rejoin: how && how.rejoin ? (how.fallback ? 'quick' : true) : false });
     online = { game: null, session: s, started: false };
     trackParty(s, 'guest');
-    s.on('error', e => { online = null; if (how && how.fallback && e.code !== 'full' && e.code !== 'started' && e.code !== 'update' && e.code !== 'offline') { how.fallback(); return; } if (how && how.rejoin && S.party && S.party.code === code) { S.party.live = false; L.save(); } if (how && how.rejoin) { if (e.code === 'offline') rejoinFailed({ code }); else L.lobby.notice(...L.lobby.why(e.code), () => {}); return; } if (e.code === 'update') L.lobby.notice(...L.lobby.why('update'), () => {}); else toast(L.lobby.why(e.code === 'no-room' || e.code === 'full' || e.code === 'started' ? e.code : 'offline')[0]); });
+    s.on('error', e => { online = null; if (how && how.fallback && e.code !== 'full' && e.code !== 'started' && e.code !== 'update' && e.code !== 'offline') { how.fallback(); return; } if (how && how.rejoin && S.party && S.party.code === code) { S.party.live = false; L.save(); } if (how && how.rejoin) { if (e.code === 'offline') rejoinFailed({ code }, how.retried); else L.lobby.notice(...L.lobby.why(e.code), () => {}); return; } if (e.code === 'update') L.lobby.notice(...L.lobby.why('update'), () => {}); else toast(L.lobby.why(e.code === 'no-room' || e.code === 'full' || e.code === 'started' ? e.code : 'offline')[0]); });
     s.on('ready', () => {
       if (s.hostPv >= 2) { showOnlineShell(); online = { game: null, session: s, started: false }; L.lobby.attach(null, s, lobbyOps(null)); return; }
       const g = L.games.find(x => x.id === s.gameId && x.online);
@@ -1141,7 +1145,9 @@
       liveRow('Panel size', v => v === 'large' ? 'Large: the games get more room' : 'Compact: a smaller panel, the games fit snugly', S.size,
         Object.assign(set => seg(SIZES, S.size, v => { set(v); S.size = v; L.save(); L.native('size', { size: v }); }), { values: SIZES.map(x => x[0]) })),
       liveRow('Reduce motion', v => v ? 'On: calmer animations everywhere' : 'Off: full animations everywhere', !!S.reduceMotion,
-        set => sw(S.reduceMotion, v => { set(v); S.reduceMotion = v; L.save(); applyTheme(); }, 'Reduce motion'))
+        set => sw(S.reduceMotion, v => { set(v); S.reduceMotion = v; L.save(); applyTheme(); }, 'Reduce motion')),
+      liveRow('Raised buttons', v => v ? 'On: buttons have a raised edge and press down' : 'Off: flat buttons', S.raised !== false,
+        set => sw(S.raised !== false, v => { set(v); S.raised = v; L.save(); applyTheme(); }, 'Raised buttons'))
     ]));
     body.appendChild(group('Play', [
       liveRow('Difficulty', v => ({ easy: 'Easy: slower games and a gentler computer', hard: 'Hard: faster games and a cleverer computer' })[v] || 'Normal: the usual speed, a fair computer', S.difficulty,
