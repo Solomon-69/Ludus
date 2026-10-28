@@ -861,6 +861,10 @@ svg { display: block; }
 /* card that flashes when found keeps its glow animation over the edge */
 :root .card.found { box-shadow: 0 var(--edge) 0 var(--edge-c), var(--shadow); }
 
+/* the cards' pop-in holds its last frame (fill both), which would pin their transform and stop the hover lift and the
+   press sink; once the pop-in is over the card hands its transform back to the raised rules above */
+:root .card, :root .card.found { animation-fill-mode: backwards; }
+
 /* reduced motion: same looks and states, no movement in between */
 :root.reduce .btn, :root.reduce .small-btn, :root.reduce .icon-btn, :root.reduce .card, :root.reduce .chip, :root.reduce .mode-tab,
 :root.reduce .vs-toggle button, :root.reduce .lk-btn, :root.reduce .lk-chip, :root.reduce .lk-opt, :root.reduce .ih-guess { transition: none !important; }
