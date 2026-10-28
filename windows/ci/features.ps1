@@ -43,7 +43,7 @@ Save-Crop (Join-Path $Out '02-climb-playing.png') $b[0] $b[1] $b[2] $b[3]
 Check ($p -and -not $p.HasExited) 'climb: app still running'
 Stop-Process $p -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 2
 $s = State
-Check ($s -and $s.climbDiff -eq 'normal') "climb: clicking Normal started the climb (climbDiff=$($s.climbDiff))"
+Check ($s -and -not $s.climbDiff) "climb: starts straight into the climb with no difficulty menu (climbDiff=$($s.climbDiff))"
 
 # ---- 2. Original names ----
 $dir = Split-Path $Exe -Parent
