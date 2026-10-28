@@ -3,6 +3,10 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.26 (28 Oct 2026)
+
+- Rejoin works on networks where only the backup message service gets through (Mac and Windows): Rejoin now shows its progress at once, skips the blocked connection instead of waiting on it, and always ends either back in your room or on a Try again card.
+
 ## 1.12.25 (28 Oct 2026)
 
 - Original names are now built into Ludus (Mac and Windows): the Original names switch in Settings > More settings works straight away on a fresh install, with no file to find or load. On: the original game names; Off: the usual names.
