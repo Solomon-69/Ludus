@@ -264,16 +264,18 @@
         ctx.globalAlpha = 1;
         if (spark) D.spark(ctx, x + s / 2, y + s / 2, s * 0.3, 'rgba(255,255,255,0.9)', spark);
       }
-      // Stacked out, one row: { f: white flash 0..1, s: scale, a: alpha, grey } at this moment (the piece that did not fit
-      // stays red-outlined on top). Reduce motion: straight to the folded ghost.
+      // Stacked out, one row: { f: white flash 0..1, s: scale, a: alpha, grey, red: red tint 0..1 } at this moment (the piece
+      // that did not fit stays red-outlined on top). The red tint (same red as the line at the top of the well) comes in with
+      // each row's fold, so it sweeps top to bottom, strongest at the top and fading lower down. Reduce motion: the end state.
+      const deadRed = y => 0.9 - 0.55 * Math.min(1, (y - deadTop) / Math.max(1, H - 1 - deadTop));
       function deadRow(y, now) {
-        if (api.reduceMotion) return { f: 0, s: 0.82, a: 0.45, grey: true };
+        if (api.reduceMotion) return { f: 0, s: 0.82, a: 0.45, grey: true, red: deadRed(y) };
         const t0 = now - deadAt, t = t0 - DEAD_LOCK - (y - deadTop) * DEAD_ROW;
         const lock = t0 < DEAD_LOCK ? 1 - t0 / DEAD_LOCK : 0;   // the whole stack flashes once as it locks
-        if (t < 0) return { f: lock * 0.6, s: 1, a: 1, grey: false };
-        if (t < DEAD_FLASH) return { f: 1 - t / DEAD_FLASH * 0.4, s: 1, a: 1, grey: false };
+        if (t < 0) return { f: lock * 0.6, s: 1, a: 1, grey: false, red: 0 };
+        if (t < DEAD_FLASH) return { f: 1 - t / DEAD_FLASH * 0.4, s: 1, a: 1, grey: false, red: 0 };
         const k = D.ease.outCubic(Math.min(1, (t - DEAD_FLASH) / DEAD_FOLD));
-        return { f: 0.6 * (1 - k), s: 1 - 0.18 * k, a: 1 - 0.55 * k, grey: true };
+        return { f: 0.6 * (1 - k), s: 1 - 0.18 * k, a: 1 - 0.55 * k, grey: true, red: k * deadRed(y) };
       }
       function mini(type, cx, cy, s, alpha) {
         const m = SHAPES[type], cells = [];
@@ -284,6 +286,7 @@
         cells.forEach(([x, y]) => block(ox + (x - minX) * s, oy + (y - minY) * s, s, COLORS[type], alpha));
       }
 
+      this._peek = () => ({ dead, deadAt });   // read-only view for automated tests (game-over frames)
       function render(dt) {
         const col = api.colors(), { w, h } = view, now = performance.now();
         layout = computeLayout(w, h);
@@ -313,6 +316,7 @@
             const r = deadRow(y, now);
             ctx.save(); ctx.translate(px + c / 2, py + c / 2); ctx.scale(r.s, r.s);
             block(-c / 2, -c / 2, c, r.grey ? (col.dark ? '#4a443d' : '#cfc6b8') : COLORS[t], r.a);
+            if (r.red > 0) { ctx.globalAlpha = r.red * r.a; ctx.fillStyle = col.bad; D.roundRect(ctx, -c / 2 + 1, -c / 2 + 1, c - 2, c - 2, c * 0.22); ctx.fill(); ctx.globalAlpha = 1; }
             if (r.f > 0) { ctx.globalAlpha = r.f * r.a; ctx.fillStyle = '#fffaf2'; D.roundRect(ctx, -c / 2 + 1, -c / 2 + 1, c - 2, c - 2, c * 0.22); ctx.fill(); ctx.globalAlpha = 1; }
             ctx.restore();
           } else block(px, py, c, COLORS[t]);
