@@ -130,6 +130,9 @@ svg { display: block; }
 .tab-pill { position: absolute; left: 0; top: 0; z-index: 0; display: block; border-radius: 999px; background: var(--ink); pointer-events: none; opacity: 0;
   transition: transform 0.36s cubic-bezier(0.22, 1, 0.36, 1), width 0.36s cubic-bezier(0.22, 1, 0.36, 1); will-change: transform, width; }   /* ease-out, never past the target */
 .tab-pill.no-slide { transition: none; }
+/* 1.12.29: the pill sits above the tabs (it carries the chosen label) so it glides over each one, not under it */
+.tab-pill { z-index: 2; font-style: normal; display: flex; align-items: center; justify-content: center; box-sizing: border-box; font-weight: 560; font-size: 12px; white-space: nowrap; color: var(--bg); overflow: hidden; }
+:root .tab-pill { font-weight: 640; }
 
 /* Game grid */
 .grid {

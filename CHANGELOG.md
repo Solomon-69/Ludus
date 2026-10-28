@@ -3,6 +3,10 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.29 (28 Oct 2026)
+
+- The category tabs (All, Arcade, Puzzle, ...): the sliding pill now glides over each tab instead of under it, carrying the chosen name with it.
+
 ## 1.12.28 (28 Oct 2026)
 
 - Ludus always opens on All games at the top. A party that is waiting (the room, the scoreboard, or still joining) stays joined behind it, and Rejoin on the Last party card goes straight back to the same room. Only a round being played opens straight into the game. Before, a party left open made Ludus open on the Online room instead.

@@ -130,6 +130,8 @@
     if (!moved && pill.style.opacity === '1') return;
     const slide = animate && pillAt && f.offsetParent !== null;
     if (!slide) pill.classList.add('no-slide');
+    // the pill rides OVER the tabs and carries the chosen tab's label, so it never slides under a name
+    if (pill.dataset.k !== on.textContent) { pill.dataset.k = on.textContent; pill.replaceChildren(...[...on.childNodes].map(n => n.cloneNode(true))); }
     pill.style.transform = `translate(${x}px, ${y}px)`; pill.style.width = w + 'px'; pill.style.height = h + 'px'; pill.style.opacity = '1';
     pillAt = { x, y, w, h };
     if (!slide) { void pill.offsetWidth; pill.classList.remove('no-slide'); }
