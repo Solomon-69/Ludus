@@ -34,6 +34,25 @@ internal static class Store
         catch { return "null"; }
     }
 
+    /// <summary>Load names file (Settings > More): checks the picked file is a flat text-to-text map and copies it to
+    /// %APPDATA%\Ludus\original-names.json, so it keeps working without the original. Returns an error to show, or null.</summary>
+    public static string? ImportOriginalNames(string path)
+    {
+        try
+        {
+            var info = new FileInfo(path);
+            if (!info.Exists || info.Length > 20000) return "That file is not a names list";
+            var text = File.ReadAllText(path);
+            var map = JsonSerializer.Deserialize<Dictionary<string, string>>(text);
+            if (map == null || map.Count == 0) return "That file is not a names list";
+            Directory.CreateDirectory(Folder);
+            File.WriteAllText(Path.Combine(Folder, "original-names.json"), JsonSerializer.Serialize(map));
+            return null;
+        }
+        catch (JsonException) { return "That file is not a names list"; }
+        catch (Exception ex) { Log($"names import failed: {ex.Message}"); return "Could not save the names file"; }
+    }
+
     // ---- Room invites (ludus://join/CODE) ----
 
     private static string PendingJoinPath => Path.Combine(Folder, "pending-join.txt");

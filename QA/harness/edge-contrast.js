@@ -1,7 +1,7 @@
 // Raised edges are visible (no network): node QA/harness/run.js QA/harness/edge-contrast.js [--size ...] [--dark]
 // Every control and surface with a raised edge (a solid bottom box-shadow) on home (All, Duel), the Online page with a Last
-// party, settings and a game with its pause sheet: the edge colour must differ from what is behind it (luminance contrast
-// >= 1.25) and from the element's own face (>= 1.15 when the face is opaque), so the edge reads in light and dark.
+// party, settings and a game with its pause sheet: the edge must be darker than the element's own face (contrast >= 1.3)
+// and differ from what is behind it (>= 1.15), so it reads as a shadow in light and dark.
 async () => {
   const wait = ms => new Promise(r => setTimeout(r, ms)), $ = id => document.getElementById(id), out = [], seen = { n: 0 };
   document.documentElement.classList.add('reduce'); const S = Ludus.state; S.reduceMotion = true; S.last = 'boxit'; S.plays = { boxit: 2 };
@@ -21,8 +21,8 @@ async () => {
     const ed = edgeOf(el); if (!ed) return; seen.n++;
     const back = behind(el), edge = over(rgba(ed.col), back), face = rgba(getComputedStyle(el).backgroundColor);
     const name = el.tagName.toLowerCase() + '.' + [...el.classList].join('.') + (el.textContent.trim() ? ' "' + el.textContent.trim().slice(0, 14) + '"' : '');
-    const rb = ratio(edge, back); if (rb < 1.25) out.push(`${tag}: ${name} edge vs behind ${rb.toFixed(2)}`);
-    if (face[3] > 0.99) { const rf = ratio(edge, face); if (rf < 1.15) out.push(`${tag}: ${name} edge vs face ${rf.toFixed(2)}`); }
+    const rb = ratio(edge, back); if (rb < 1.15) out.push(`${tag}: ${name} edge vs behind ${rb.toFixed(2)}`);
+    if (face[3] > 0.99) { const rf = ratio(edge, face); if (rf < 1.3) out.push(`${tag}: ${name} edge vs face ${rf.toFixed(2)}`); if (lum(edge) > lum(face)) out.push(`${tag}: ${name} edge lighter than its face`); }
   }); };
   const tab = async t => { [...document.querySelectorAll('#filters .chip')].find(c => c.textContent.trim() === t).click(); await wait(350); };
   await tab('All'); scan('home/All'); await tab('Duel'); scan('home/Duel');

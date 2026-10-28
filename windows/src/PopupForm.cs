@@ -413,6 +413,9 @@ internal sealed class PopupForm : Form
                         BeginInvoke((MethodInvoker)(() => StartUpdate(uz, us, un)));
                     }
                     break;
+                case "pickNames":
+                    BeginInvoke((MethodInvoker)PickNamesFile);
+                    break;
                 case "site":   // "Download from the website": only ever this one fixed address
                     try { Process.Start(new ProcessStartInfo(SiteUrl) { UseShellExecute = true }); } catch (Exception ex) { Store.Log($"open site failed: {ex.Message}"); }
                     break;
@@ -553,6 +556,29 @@ internal sealed class PopupForm : Form
         Hide();
         lastHiddenAt = Environment.TickCount64;
         RunScript("window.ludusClosed && ludusClosed()");
+    }
+
+    /// <summary>Load names file: pick an original-names.json, copy it into the app's data folder and hand the list to the
+    /// page, which turns Original names on. Tests set LUDUS_TEST_NAMES_FILE to skip the dialog.</summary>
+    private void PickNamesFile()
+    {
+        string? path = Environment.GetEnvironmentVariable("LUDUS_TEST_NAMES_FILE");
+        if (string.IsNullOrEmpty(path))
+        {
+            bool stay = StayOpen;
+            StayOpen = true;   // the dialog takes focus: keep the panel open behind it
+            try
+            {
+                using var dlg = new OpenFileDialog { Title = "Load names file", Filter = "Names list (*.json)|*.json|All files (*.*)|*.*", CheckFileExists = true, Multiselect = false };
+                if (dlg.ShowDialog(this) != DialogResult.OK) return;
+                path = dlg.FileName;
+            }
+            finally { StayOpen = stay; Activate(); }
+        }
+        var err = Store.ImportOriginalNames(path!);
+        RunScript(err == null
+            ? $"window.ludusSetOriginalNames && ludusSetOriginalNames({Store.LoadOriginalNamesJson()})"
+            : $"window.ludusSetOriginalNames && ludusSetOriginalNames(null, {JsonSerializer.Serialize(err)})");
     }
 
     protected override void OnDeactivate(EventArgs e)

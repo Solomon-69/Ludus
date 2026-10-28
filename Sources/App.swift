@@ -1,6 +1,7 @@
 import AppKit
 import QuartzCore
 import ServiceManagement
+import UniformTypeIdentifiers
 import WebKit
 
 /// Ludus: Claude mini games in the menu bar. The games and their screens are bundled web files
@@ -122,6 +123,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
               let clean = try? JSONSerialization.data(withJSONObject: [String(data: try JSONSerialization.data(withJSONObject: obj), encoding: .utf8) ?? "{}"]),
               let array = String(data: clean, encoding: .utf8) else { return "null" }
         return "JSON.parse(\(array)[0])"
+    }
+
+    /// Load names file (Settings > More): pick an original-names.json, check it is a flat text-to-text map, copy it to
+    /// ~/Library/Application Support/Ludus/original-names.json (so it keeps working without the original) and hand it to the page.
+    private func pickNamesFile() {
+        let panel = NSOpenPanel()
+        panel.title = "Load names file"
+        panel.message = "Pick your original-names.json"
+        panel.allowedContentTypes = [.json]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        NSApp.activate(ignoringOtherApps: true)
+        panel.begin { [weak self] result in
+            guard let self, result == .OK, let src = panel.url else { return }
+            guard let data = try? Data(contentsOf: src), data.count < 20_000,
+                  let obj = (try? JSONSerialization.jsonObject(with: data)) as? [String: String], !obj.isEmpty,
+                  let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+                self.webView.evaluateJavaScript("window.ludusSetOriginalNames && ludusSetOriginalNames(null, 'That file is not a names list')")
+                return
+            }
+            let dir = base.appendingPathComponent("Ludus")
+            try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            do { try data.write(to: dir.appendingPathComponent("original-names.json"), options: .atomic) } catch {
+                self.webView.evaluateJavaScript("window.ludusSetOriginalNames && ludusSetOriginalNames(null, 'Could not save the names file')")
+                return
+            }
+            if !self.popover.isShown { self.openPopover() }
+            self.webView.evaluateJavaScript("window.ludusSetOriginalNames && ludusSetOriginalNames(\(self.originalNamesLiteral()))")
+        }
     }
 
     /// The saved state as a JS expression: the JSON travels as a quoted string and is parsed by
@@ -300,6 +330,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
             ShareFriend.share(from: webView, rect: r) { [weak self] msg in
                 self?.webView.evaluateJavaScript("window.ludusShareError && ludusShareError(\(String(reflecting: msg)))")
             }
+        case "pickNames": pickNamesFile()
         case "update": startUpdate(body)
         case "site": NSWorkspace.shared.open(URL(string: "https://solomon-69.github.io/Ludus/")!)   // the website, a fixed address only
         case "ready": uiReady = true; failTimer?.invalidate()

@@ -949,8 +949,8 @@ svg { display: block; }
 :root .ui-tip { box-shadow: 0 var(--slab) 0 var(--slab-c), var(--shadow), 0 0 0 1px var(--line); }
 
 /* Edges that read (light and dark). Light: near-black controls (primary buttons, the selected tab pill, chosen chips) are a
-   charcoal face on a near-black edge, so the edge shows against the cream page. Dark: a dark card sits on a darker page, so a
-   darker strip would vanish; dark faces get a lighter lip instead (light faces keep their darker edge). */
+   charcoal face on a near-black edge, so the edge shows against the cream page. Dark: every edge is darker than its face too;
+   dark faces sit on a near-black strip, well below both the face and the page. */
 :root { --ink-face: color-mix(in srgb, var(--ink) 80%, #fff); }
 :root:not([data-theme="dark"]) .btn.primary, :root:not([data-theme="dark"]) .tab-pill, :root:not([data-theme="dark"]) .mode-tab.is-on,
 :root:not([data-theme="dark"]) .pick-chips .chip.is-on, :root:not([data-theme="dark"]) .lk-chip.on {
@@ -959,10 +959,20 @@ svg { display: block; }
 :root[data-theme="dark"] .btn:not(.primary):not(.ghost), :root[data-theme="dark"] .small-btn:not(.warm), :root[data-theme="dark"] .icon-btn,
 :root[data-theme="dark"] .card, :root[data-theme="dark"] .seg-thumb, :root[data-theme="dark"] .vs-toggle button.is-on,
 :root[data-theme="dark"] .lk-btn:not(.lk-primary), :root[data-theme="dark"] .lk-opt:not(.right):not(.wrong),
-:root[data-theme="dark"] .pick-chips .chip:not(.is-on) { --edge-c: color-mix(in srgb, var(--face) 74%, #fff); }
+:root[data-theme="dark"] .pick-chips .chip:not(.is-on) { --edge-c: color-mix(in srgb, var(--face) 8%, #000); }
 :root[data-theme="dark"] .group, :root[data-theme="dark"] .op-head, :root[data-theme="dark"] .op-card, :root[data-theme="dark"] .party-card,
 :root[data-theme="dark"] .lobby-card, :root[data-theme="dark"] .sheet-card, :root[data-theme="dark"] .rename-card, :root[data-theme="dark"] .over-bar,
 :root[data-theme="dark"] .sug-card, :root[data-theme="dark"] .seat, :root[data-theme="dark"] .search, :root[data-theme="dark"] .mode-tabs,
-:root[data-theme="dark"] .vs-toggle, :root[data-theme="dark"] .ui-tip { --slab-c: color-mix(in srgb, var(--slab-face) 76%, #fff); }
+:root[data-theme="dark"] .vs-toggle, :root[data-theme="dark"] .ui-tip { --slab-c: color-mix(in srgb, var(--slab-face) 8%, #000); }
 :root[data-theme="dark"] .seg { --slab-c: color-mix(in srgb, var(--ink) 16%, transparent); }
 :root[data-theme="dark"] .toast, :root[data-theme="dark"] .over-peek { --slab-c: color-mix(in srgb, var(--ink) 55%, #000); }
+
+/* 1.12.23: the party room sheet is rounded by its card's corner plus the 6px gap around it (20 + 6), so the room card's
+   corner runs parallel to the sheet's (it used to be the panel's 18px, tighter than the 20px card inside) */
+.sheet.lobby { border-radius: calc(20px + 6px); }
+/* the category tabs are raised pills too: each tab has a face and a darker lower edge; the sliding pill (the chosen tab)
+   rides over it with its own edge. The tab row's 10px bottom padding leaves room, so the edges are never clipped. */
+:root .filters .chip { --face: var(--surface); --edge-c: color-mix(in srgb, var(--face) calc(100% - var(--edge-mix)), #000);
+  background: var(--face); box-shadow: 0 3px 0 var(--edge-c); }
+:root .filters.has-pill .chip.is-on { background: transparent; box-shadow: none; }
+:root[data-theme="dark"] .filters .chip { --edge-c: color-mix(in srgb, var(--face) 8%, #000); }

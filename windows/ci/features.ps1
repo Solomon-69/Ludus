@@ -1,6 +1,7 @@
 # features.ps1: Windows checks for things friends reported, in the real app (WebView2), silently on the CI machine.
 #  1. Hammer Climb starts: a real mouse click on the "Normal" mountain begins the climb, and moving the mouse moves the pot.
 #  2. Original names: a list next to Ludus.exe is picked up, the Settings switch turns it on, and the game shows the new name.
+#  3. Load names file: the Settings button copies a picked list into %APPDATA%\\Ludus and turns Original names on.
 # Windows PowerShell 5.1 (UI Automation). Screenshots and logs go to $Out.
 param([string]$Exe = 'out/Ludus/Ludus.exe', [string]$Out = 'features')
 $ErrorActionPreference = 'Stop'
@@ -76,6 +77,43 @@ Save-Crop (Join-Path $Out '03-original-names.png') $b2[0] $b2[1] $b2[2] $b2[3]
 Check ($null -ne $shown) 'names: the game shows its name from the list'
 Stop-Process $p -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 1
 Remove-Item (Join-Path $dir 'original-names.json') -ErrorAction SilentlyContinue
+# ---- 3. Load names file: no list anywhere, the Settings button loads a picked file, it is copied into %APPDATA%\Ludus
+#      and the game shows the picked name at once (LUDUS_TEST_NAMES_FILE stands in for the file dialog) ----
+Remove-Item "$env:APPDATA\Ludus\original-names.json" -ErrorAction SilentlyContinue
+$pick = Join-Path $Out 'picked-names.json'
+'{ "skyraiders": "Picked Name Test" }' | Set-Content $pick
+Clear-State @('originalNames', 'originalList')
+$env:LUDUS_TEST_NAMES_FILE = $pick
+$json3 = Join-Path $Out 'pick-selftest.json'
+$p = Start-Process $Exe -ArgumentList '--test-open', "--selftest=$json3" -PassThru
+[void](Wait-File $json3 120)
+$win = Ui-Window $p.Id 30
+$gear = Ui-Wait $win 'Settings' 'Button' 30; if ($gear) { [void](Ui-Press $gear) }
+$load = $null
+for ($try = 0; $try -lt 2 -and -not $load; $try++) {
+  $more = Ui-Wait $win 'More settings*' 'Button' 15
+  if ($more) {
+    try { $more.GetCurrentPattern([System.Windows.Automation.ScrollItemPattern]::Pattern).ScrollIntoView() } catch { }
+    Start-Sleep -Milliseconds 300
+    [void](Ui-Press $more)
+  }
+  Start-Sleep -Milliseconds 1200
+  $load = Ui-Wait $win 'Load names file' 'Button' 5
+}
+if (-not $load) { Ui-Dump $win (Join-Path $Out 'uia-load.txt') }
+Check ($null -ne $load) 'load: Load names file button found'
+if ($load) { [void](Ui-Press $load) }
+Start-Sleep -Milliseconds 1200
+Check (Test-Path "$env:APPDATA\Ludus\original-names.json") 'load: the picked file is copied into %APPDATA%\Ludus'
+$back = Ui-Wait $win 'Back' 'Button' 10; if ($back) { [void](Ui-Press $back) }
+$shown3 = Ui-Wait $win '*Picked Name Test*' '' 15
+$b3 = (Get-Content $json3 -Raw | ConvertFrom-Json).panelBounds
+Save-Crop (Join-Path $Out '04-load-names.png') $b3[0] $b3[1] $b3[2] $b3[3]
+Check ($null -ne $shown3) 'load: the game shows the picked name straight away (switch turned on)'
+Stop-Process $p -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 1
+Remove-Item Env:LUDUS_TEST_NAMES_FILE -ErrorAction SilentlyContinue
+Remove-Item "$env:APPDATA\Ludus\original-names.json" -ErrorAction SilentlyContinue
+
 Copy-Item "$env:APPDATA\Ludus\*.log" $Out -ErrorAction SilentlyContinue
 if ($script:Failures.Count) { Write-Host "$($script:Failures.Count) check(s) failed"; exit 1 }
 Write-Host 'all feature checks passed'

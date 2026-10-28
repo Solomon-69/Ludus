@@ -25,7 +25,7 @@
     if (src && typeof src === 'object') for (const k of Object.keys(src)) if (typeof src[k] === 'string' && src[k].trim()) out[String(k).slice(0, 40)] = src[k].trim().slice(0, 40);
     return out;
   };
-  const FILE_NAMES = cleanList(window.__LUDUS_ORIGINAL_NAMES__);
+  let FILE_NAMES = cleanList(window.__LUDUS_ORIGINAL_NAMES__);
   const hasList = () => Object.keys(FILE_NAMES).length > 0;
   const presetName = g => (S.originalNames && (FILE_NAMES[g.id] || FILE_NAMES[g.name])) || '';
   if (S.originalList !== undefined) { delete S.originalList; }   // a list pasted in 1.12.17/18 is no longer used
@@ -1168,11 +1168,21 @@
     }
     moreRows.push(liveRow('Rename games', v => v ? 'On: click a game’s name to give it your own' : 'Off: games keep the names they came with', !!S.renameGames,
       set => sw(!!S.renameGames, v => { set(v); S.renameGames = v; L.save(); }, 'Rename games')));
-    moreRows.push(liveRow('Original names', v => !hasList() ? 'Shows your own list of original game names' : v ? 'On: showing your own list of original game names' : 'Off: the usual game names', hasList() && !!S.originalNames, set => {
+    moreRows.push(liveRow('Original names', v => !hasList() ? 'Needs a names file: tap Load names file' : v ? 'On: showing your own list of original game names' : 'Off: the usual game names', hasList() && !!S.originalNames, set => {
       const origSw = sw(hasList() && !!S.originalNames, v => { set(v); S.originalNames = v; L.save(); renderCards(); }, 'Original names');
       if (!hasList()) { origSw.onclick = null; origSw.setAttribute('aria-disabled', 'true'); origSw.style.opacity = '.5'; }   // no file: quietly does nothing
       return origSw;
     }));
+    // Load names file: the app opens a file picker, copies the chosen original-names.json into its own data folder (so it
+    // keeps working without the original), and hands the list back through ludusSetOriginalNames, which turns the switch on.
+    if (window.__LUDUS_PLATFORM__ === 'windows' || (window.webkit && window.webkit.messageHandlers)) {
+      const n = Object.keys(FILE_NAMES).length;
+      moreRows.push(liveRow('Load names file', () => n ? n + (n === 1 ? ' name' : ' names') + ' loaded' : 'Pick your original-names.json', true, () => {
+        const b = el('button', 'small-btn', 'Load'); b.type = 'button'; b.setAttribute('aria-label', 'Load names file');
+        b.onclick = () => { L.sfx('click'); L.native('pickNames', {}); };
+        return b;
+      }));
+    }
     // The More card: a settings row that says what is inside, and springs open in place.
     const moreCard = el('div', 'group more-card');
     const preview = moreRows.map(r => { const t = r.querySelector('.row-title'); return t ? t.textContent : ''; }).filter(Boolean).join(', ');
@@ -1279,6 +1289,13 @@
   }
   window.ludusInRoom = inRoom;   // test hook
   // Right-click on the menu bar / tray icon: show Settings (a game underneath is paused, as with the gear). Already there: stay.
+  // The app read a names file the player picked: use it at once and switch Original names on.
+  window.ludusSetOriginalNames = (map, err) => {
+    if (err) { toast(String(err)); return; }
+    FILE_NAMES = cleanList(map);
+    if (hasList()) { S.originalNames = true; L.save(); toast('Names file loaded'); }
+    renderCards(); if (view === 'settings') renderSettings();
+  };
   window.ludusOpenSettings = () => {
     if (view === 'settings') { settingsTop(); return 'settings'; }
     settingsFrom = view === 'game' ? 'game' : 'home';
