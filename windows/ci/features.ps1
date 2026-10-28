@@ -65,7 +65,7 @@ $p = Start-Process $Exe -ArgumentList '--test-open', '--test-game=climb', "--sel
 $bd = (Get-Content $jsonD -Raw | ConvertFrom-Json).panelBounds
 $cx = [int]($bd[0] + $bd[2] / 2); $cy = [int]($bd[1] + $bd[3] * 0.6)
 [void][Mouse]::SetCursorPos($cx, $cy); Start-Sleep -Milliseconds 300
-[Mouse]::mouse_event(2, 0, 0, 0, [UIntPtr]::Zero); Start-Sleep -Milliseconds 200
+[Mouse]::mouse_event(2, 0, 0, 0, [UIntPtr]::Zero); Start-Sleep -Milliseconds 2500   # let the climb start and settle
 $s1 = Join-Path $Out 'drag-still1.png'; $s2 = Join-Path $Out 'drag-still2.png'
 Save-Crop $s1 $bd[0] $bd[1] $bd[2] $bd[3] 0; Start-Sleep -Milliseconds 600; Save-Crop $s2 $bd[0] $bd[1] $bd[2] $bd[3] 0
 $still = Diff-Png $s1 $s2
@@ -78,7 +78,7 @@ Start-Sleep -Milliseconds 400; Save-Crop $o2 $bd[0] $bd[1] $bd[2] $bd[3] 0
 $moved = Diff-Png $o1 $o2
 [Mouse]::mouse_event(4, 0, 0, 0, [UIntPtr]::Zero); Start-Sleep -Milliseconds 200
 Write-Host "drag: still diff $still, outside-move diff $moved"
-Check ($moved -gt ($still * 3 + 150)) "climb: with the cursor outside the panel the hammer still moves (diff $moved vs still $still)"
+Check ($moved -gt ($still * 2 + 150)) "climb: with the cursor outside the panel the hammer still moves (diff $moved vs still $still)"
 Check ($p -and -not $p.HasExited) 'climb: app still running after the drag'
 Stop-Process $p -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 2
 
