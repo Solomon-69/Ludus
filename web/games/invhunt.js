@@ -575,7 +575,7 @@
         cLock = true; phase = 'result';
         const ok = c === cAns;
         if (ok) { streak++; right++; score += 100 + Math.min(streak - 1, 10) * 20; api.score(score); api.sfx(streak % 5 === 0 ? 'win' : 'score'); }
-        else { streak = 0; lives--; api.sfx('over'); }
+        else { streak = 0; lives--; api.sfx('wrong'); }
         renderCode(true, c); hud();
         api.timeout(() => {
           if (destroyed || mode !== 'code') return;

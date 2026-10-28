@@ -90,7 +90,7 @@
     return row;
   }
   function copyCode(code, label) {
-    const done = () => { copied = true; label.textContent = 'Copied'; clearTimeout(copyTimer); copyTimer = setTimeout(() => { copied = false; label.textContent = 'Copy invite'; }, 1500); };
+    const done = () => { copied = true; L.sfx('copy'); label.textContent = 'Copied'; clearTimeout(copyTimer); copyTimer = setTimeout(() => { copied = false; label.textContent = 'Copy invite'; }, 1500); };
     const fallback = () => {
       try {
         const t = document.createElement('textarea'); t.value = code; t.style.cssText = 'position:fixed;opacity:0;user-select:text;-webkit-user-select:text';
@@ -368,7 +368,7 @@
       const row = el('div', 'lobby-row');
       const cl = el('span', '', copied ? 'Copied' : 'Copy invite');
       const cb = el('button', 'btn small', ''); cb.type = 'button'; cb.appendChild(cl);
-      cb.onclick = () => { L.sfx('click'); copyCode(L.net.inviteText(game ? (L.displayName ? L.displayName(game) : game.name) : 'games', session.code), cl); };
+      cb.onclick = () => { copyCode(L.net.inviteText(game ? (L.displayName ? L.displayName(game) : game.name) : 'games', session.code), cl); };
       row.appendChild(cb); row.appendChild(connChip(session.conn));
       card.appendChild(row);
       const n = session.count(), mx = session.max;
@@ -418,11 +418,14 @@
   function hookSession(s) {
     session = s;
     offs.push(s.on('conn', () => { if (screen === 'room' || screen === 'creating' || screen === 'joining') render(); }));
-    offs.push(s.on('ready', () => { screen = 'room'; L.sfx('tap'); render(); }));
+    offs.push(s.on('ready', () => { screen = 'room'; L.sfx('room'); render(); }));
     offs.push(s.on('yield', () => { screen = 'joining'; render(); }));   // somebody else already hosts this code: we join their room
+    let seen = s.count ? s.count() : 1;
     offs.push(s.on('roster', () => {
+      const n = s.count(), more = n > Math.max(1, seen); seen = n;   // more than just me, and more than before
       if (screen === 'room') {
         render();
+        if (more) L.sfx('friend');   // somebody joined the room: a soft chime
         // the room is full: start by itself
         if (s.role === 'host' && s.count() >= s.max) { clearTimeout(autoStart); autoStart = setTimeout(() => { if (session === s && !s.over) s.start(); }, 700); }
       }
@@ -443,7 +446,7 @@
   }
   const uidOf = () => (typeof L.state.onlineId === 'string' ? L.state.onlineId : '');
   function createRoom(code, uid) {
-    screen = 'creating'; render();
+    screen = 'creating'; render(); L.sfx('room');
     if (game) hookSession(L.net.createRoom({ gameId: game.id, min: game.online.min, max: game.online.max, name: nameValue() }));
     else {   // from the Online page: a room for up to 4 whose games the host picks in the lobby
       const first = L.games.find(g => g.id === L.state.last && g.online && g.online.min <= 2) || L.games.find(g => g.online && g.online.min <= 2 && g.online.max >= 2);
@@ -451,7 +454,7 @@
     }
   }
   function joinRoom(code) {
-    screen = 'joining'; render();
+    screen = 'joining'; render(); L.sfx('room');
     hookSession(L.net.joinRoom(code, { gameId: game.id, name: nameValue(), uid: uidOf() }));
     session.code = code;
     render();
@@ -488,7 +491,7 @@
     // A room made from the Online page: no game yet, the host picks games in the lobby.
     openRoom(o, code, uid) { ensure(); discard(); game = null; ops = o; error = ''; sheet.hidden = false; createRoom(code, uid); return session; },
     // Scoreboard between rounds ('board') or the final standings ('final') for a session that is playing a tournament.
-    series(s, kind, o) { ensure(); unhook(); session = s; ops = o || ops; screen = kind; sheet.hidden = false; render(); },
+    series(s, kind, o) { ensure(); unhook(); session = s; ops = o || ops; screen = kind; sheet.hidden = false; render(); L.sfx(kind === 'final' ? 'best' : 'result'); },
     // Back to the waiting room (after a tournament, "Back to lobby").
     resume(s, o) { ensure(); unhook(); session = s; ops = o || ops; hookSession(s); screen = 'room'; sheet.hidden = false; render(); },
     // [title, text] for a room closing reason

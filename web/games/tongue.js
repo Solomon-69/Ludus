@@ -264,7 +264,7 @@
         guesses.push({ i: LANGS.indexOf(l), by: turn });
         ta.clear();
         if (l === ans) { finishRound(true, turn); return; }
-        api.sfx('move');
+        api.sfx('wrong');
         if (guesses.length >= MAX) { finishRound(false, -1); return; }
         if (pass()) turn = (turn + 1) % players;
         hints(); renderRows(); hud(); ta.focus();
@@ -275,7 +275,7 @@
         if (pass()) { if (win) scores[who] += pts; }
         else if (win) { score += pts; streak++; wins++; api.score(score); }
         else { lives--; streak = 0; }
-        api.sfx(win ? 'score' : 'over');
+        api.sfx(win ? 'score' : 'wrong');
         ta.disabled = true; guessWrap.hidden = true;
         hints(); renderRows(); hud(); showEnd(win, who, pts);
       }

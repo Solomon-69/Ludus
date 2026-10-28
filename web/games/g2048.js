@@ -72,7 +72,7 @@ Ludus.register({
           if (o.v === t.v && !merged.has(o.id)) {
             grid[r][c] = null; o.v *= 2; o.pop = performance.now(); merged.add(o.id);
             t.r = tr; t.c = tc; dead.push(t); score += o.v; moved = true;
-            if (o.v === 2048 && !won) { won = true; api.timeout(() => api.toast('2048! Keep going'), 200); }
+            if (o.v === 2048 && !won) { won = true; api.timeout(() => { api.sfx('win'); api.toast('2048! Keep going'); }, 200); }
             return;
           }
           break;
@@ -80,7 +80,8 @@ Ludus.register({
         if (nr !== r || nc !== c) { grid[r][c] = null; grid[nr][nc] = t; t.r = nr; t.c = nc; moved = true; }
       }));
       if (!moved) return;
-      api.sfx(merged.size ? 'merge' : 'move');
+      const big = tiles.some(t => merged.has(t.id) && t.v >= 128);   // a big tile made: a brighter chime
+      api.sfx(big ? 'score' : merged.size ? 'merge' : 'move');
       api.score(score);
       moving = true; const t0 = performance.now();
       api.timeout(() => {

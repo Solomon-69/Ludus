@@ -149,7 +149,7 @@
     f.scrollTo({ left: Math.max(0, to), behavior: calm ? 'auto' : 'smooth' });
   }
   function pickFilter(name, focus) {
-    S.filter = name; L.save(); L.sfx('click'); renderFilters(true); renderCards();
+    S.filter = name; L.save(); L.sfx('tab'); renderFilters(true); renderCards();
     const gr = $('grid'); if (gr) gr.scrollTop = 0;
     if (focus) { const b = [...$('filters').querySelectorAll('.chip')][FILTERS.indexOf(name)]; if (b) b.focus({ preventScroll: true }); }
   }
@@ -212,12 +212,12 @@
     opHadParty = !!(S.party && S.party.code); opRendered = true;
     colB.appendChild(start);
     const mk = el('button', 'btn primary', 'Create room'); mk.type = 'button'; mk.id = 'opCreate';
-    mk.onclick = () => { L.sfx('click'); createFlexRoom(); };
+    mk.onclick = () => { L.sfx('room'); createFlexRoom(); };
     mid.appendChild(mk);
     const code = el('input', 'code-input'); code.type = 'text'; code.maxLength = 300; code.placeholder = ''; code.id = 'opCode';
     code.autocomplete = 'off'; code.spellcheck = false; code.autocapitalize = 'characters'; code.setAttribute('aria-label', 'Room code, invite or link');
     const msg = el('div', 'lobby-error', ''); msg.setAttribute('role', 'alert');
-    const go = () => { const c = L.net.extractCode(code.value) || L.net.cleanCode(code.value); if (!L.net.validCode(c)) { msg.textContent = 'Room codes are 5 letters or digits.'; code.focus(); return; } msg.textContent = 'Joining room ' + c + '...'; L.sfx('click'); joinFromInvite(c, true); };
+    const go = () => { const c = L.net.extractCode(code.value) || L.net.cleanCode(code.value); if (!L.net.validCode(c)) { msg.textContent = 'Room codes are 5 letters or digits.'; code.focus(); return; } msg.textContent = 'Joining room ' + c + '...'; L.sfx('room'); joinFromInvite(c, true); };
     code.addEventListener('input', () => { const v = code.value, m = L.net.extractCode(v); code.value = m || L.net.cleanCode(v); msg.textContent = !m && v.replace(/\s/g, '').length > 6 ? 'No room code found in that text.' : ''; });
     code.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); go(); } });
     const jb = el('button', 'btn primary', 'Join'); jb.type = 'button'; jb.id = 'opJoin'; jb.onclick = go;
@@ -385,7 +385,7 @@
       renameSheet = document.createElement('div'); renameSheet.className = 'sheet rename-sheet'; renameSheet.setAttribute('role', 'dialog'); renameSheet.setAttribute('aria-modal', 'true'); renameSheet.setAttribute('aria-label', 'Rename game');
       document.body.appendChild(renameSheet);
     }
-    const sh = renameSheet; sh.innerHTML = ''; sh.hidden = false;
+    const sh = renameSheet; sh.innerHTML = ''; sh.hidden = false; L.sfx('sheet');
     const card = document.createElement('div'); card.className = 'lobby-card rename-card';
     const t = document.createElement('div'); t.className = 'sheet-title'; t.textContent = 'Rename game'; card.appendChild(t);
     const sub = document.createElement('p'); sub.className = 'lobby-sub'; sub.textContent = 'Original name: ' + g.name; card.appendChild(sub);
@@ -400,7 +400,7 @@
       const clean = String(v || '').replace(/\s+/g, ' ').trim().slice(0, NAME_MAX);
       S.names = Object.assign({}, S.names);
       if (!clean || clean === g.name) delete S.names[g.id]; else S.names[g.id] = clean;
-      L.save(); close(); L.sfx('click'); if (done) done();
+      L.save(); close(); L.sfx('save'); if (done) done();
     };
     const save = document.createElement('button'); save.className = 'btn primary'; save.type = 'button'; save.textContent = 'Save'; save.onclick = () => finish(input.value);
     const reset = document.createElement('button'); reset.className = 'btn'; reset.type = 'button'; reset.textContent = 'Reset to original'; reset.onclick = () => finish('');
@@ -470,7 +470,7 @@
     const inApp = L.native('wide', { on: wideFor(g) });
     renderOrient(g);
     show('game');
-    L.sfx('tap');
+    L.sfx(keepRoom ? 'go' : 'open');
     // The card that was clicked keeps keyboard focus otherwise, and Enter in a game would click it again.
     if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
     // Wait for the slide-in, and in the app for the panel to confirm its new size (ludusResized), so the
@@ -802,7 +802,7 @@
     const best = $('overBest');
     best.textContent = record && res.score > 0 ? 'New best' : (res.message || (friends ? '' : `Best ${fmt(Math.max(prev, res.score))}`));
     best.classList.toggle('record', record && res.score > 0);
-    L.sfx(res.won || record ? 'win' : 'over');
+    L.sfx(record && res.score > 0 ? 'best' : res.won ? 'win' : 'over');
     // Let the final board play out (bombs revealed, last move shown) before the result bar comes up.
     clearTimeout(revealTimer);
     const run = current && current.run;
@@ -810,7 +810,7 @@
       if (run && current && current.run === run) run.pause();
       // a tournament: tell the host who won; the scoreboard card comes up once everybody has reported
       if (online && online.session && online.session.ser && online.session.ser.st === 'play') { online.session.reportResult(!!res.won); return; }
-      $('overSheet').hidden = false; $('overPeek').hidden = true; overAt = performance.now();
+      $('overSheet').hidden = false; $('overPeek').hidden = true; overAt = performance.now(); L.sfx('result');
     }, window.ludusRevealMs ?? REVEAL_MS);
   }
   function hideOver() { clearTimeout(revealTimer); $('overSheet').hidden = true; $('overPeek').hidden = true; }
@@ -833,10 +833,11 @@
     if (online || !current || current.run.ended || !$('pauseSheet').hidden) return;
     $('pauseTitle').textContent = 'Paused'; $('pauseSheet').classList.remove('welcome');
     current.run.pause(); current.instance && current.instance.pause && current.instance.pause();
-    $('pauseSheet').hidden = false;
+    $('pauseSheet').hidden = false; L.sfx('sheet');
   }
   function resume() {
     if (!current) return;
+    if (!$('pauseSheet').hidden) L.sfx('unsheet');
     $('pauseSheet').hidden = true;
     current.run.resume(); current.instance && current.instance.resume && current.instance.resume();
   }
@@ -857,7 +858,7 @@
     L.native('playing', { id: null }); L.native('wide', { on: false });
   }
 
-  const quitHome = () => goHome('quit');
+  const quitHome = () => { L.sfx('back'); goHome('quit'); };
   $('backBtn').onclick = quitHome;
   $('leaveBtn').onclick = quitHome;
   $('quitBtn').onclick = quitHome;
@@ -866,8 +867,8 @@
   $('resumeBtn').onclick = resume;
   $('restartBtn').onclick = restart;
   $('againBtn').onclick = restart;
-  $('overHideBtn').onclick = () => { $('overSheet').hidden = true; $('overPeek').hidden = false; };
-  $('overPeek').onclick = () => { $('overPeek').hidden = true; $('overSheet').hidden = false; overAt = performance.now(); };
+  $('overHideBtn').onclick = () => { L.sfx('unsheet'); $('overSheet').hidden = true; $('overPeek').hidden = false; };
+  $('overPeek').onclick = () => { L.sfx('sheet'); $('overPeek').hidden = true; $('overSheet').hidden = false; overAt = performance.now(); };
   const search = $('search');
   search.addEventListener('input', () => { query = search.value; $('grid').scrollTop = 0; $('filters').classList.toggle('is-dim', !!norm(query)); renderCards(); });
   search.addEventListener('keydown', e => {
@@ -896,7 +897,7 @@
   function toast(text) {
     let t = document.querySelector('.toast');
     if (!t) { t = document.createElement('div'); t.className = 'toast'; $('app').appendChild(t); }
-    t.textContent = text; t.classList.add('show'); $('app').classList.add('toasting');
+    t.textContent = text; t.classList.add('show'); $('app').classList.add('toasting'); L.sfx('toast');
     clearTimeout(toast.t); toast.t = setTimeout(() => { t.classList.remove('show'); $('app').classList.remove('toasting'); }, 1600);
   }
   /* Volume: elastic slider (after React Bits' Elastic Slider). A slim bar with no knob that thickens
@@ -976,7 +977,7 @@
   function sw(on, onChange, label) {
     const b = el('button', 'switch'); b.setAttribute('role', 'switch'); b.setAttribute('aria-checked', String(!!on));
     if (label) b.setAttribute('aria-label', label);
-    b.onclick = () => { const v = b.getAttribute('aria-checked') !== 'true'; b.setAttribute('aria-checked', String(v)); L.sfx('click'); onChange(v); };
+    b.onclick = () => { const v = b.getAttribute('aria-checked') !== 'true'; b.setAttribute('aria-checked', String(v)); L.sfx(v ? 'on' : 'off'); onChange(v); };
     return b;
   }
   function seg(options, value, onChange) {
@@ -1132,17 +1133,18 @@
   function openSettings() {
     settingsFrom = view === 'game' ? 'game' : 'home';
     if (view === 'game') pause();   // a game is paused while settings are on top of it (not in an online room, which cannot pause)
-    renderSettings(); show('settings'); settingsTop(); L.sfx('tap');
+    renderSettings(); show('settings'); settingsTop(); L.sfx('sheet');
   }
   // Settings always opens at its top, never wherever it was last scrolled.
   function settingsTop() { const b = $('settingsBody'); if (!b) return; b.scrollTop = 0; requestAnimationFrame(() => { b.scrollTop = 0; }); }
-  function closeSettings() { show(settingsFrom); if (settingsFrom === 'home') renderCards(); }
+  function closeSettings() { L.sfx('back'); show(settingsFrom); if (settingsFrom === 'home') renderCards(); }
   $('openSettings').onclick = openSettings;
   $('gameSettings').onclick = openSettings;
   $('settingsBack').onclick = closeSettings;
 
   // ---------- native hooks ----------
   window.ludusOpened = () => {
+    L.sfx('panel');
     // The panel taking keyboard focus must not draw a focus ring on the first button.
     if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
     // Ludus always opens on All games, wherever it was left. A game left open is saved and waits
@@ -1170,6 +1172,7 @@
   // Go back to All games while the panel is closing, with transitions off, so the next open shows
   // the finished home screen straight away instead of the game flashing and sliding out.
   window.ludusClosed = () => {
+    L.sfx('panelOff');
     if (inRoom()) { L.save(true); return; }   // a party stays open while the panel is closed
     if (view !== 'home') {
       root.classList.add('instant');
@@ -1231,6 +1234,7 @@
     if (!sheet.hidden) { const b = $('resumeBtn'), r = b.getBoundingClientRect(), h = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); pauseOnTop = !!h && (h === b || b.contains(h)); }
     return { view, covers: view === 'home' ? window.ludusCoverCheck() : null, paused: !sheet.hidden, pauseOnTop, blurredWithoutMenu: !!document.querySelector('.geo.geo-paused') && sheet.hidden, saved: Object.keys(S.saves || {}), geoReset: S.geoReset || 0 };
   };
+  window.ludusToast = text => toast(String(text || ''));   // test helper
   window.ludusTestOver = score => { if (current) current.run.api.over({ score }); };
   window.ludusState = () => JSON.stringify({ view, game: current && current.game.id, score: $('scoreNow').textContent, paused: !$('pauseSheet').hidden, over: overShown(), revealing: revealing(), games: L.games.length, theme: root.dataset.theme, saved: Object.keys(S.saves) });
 
