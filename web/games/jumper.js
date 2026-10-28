@@ -1,5 +1,5 @@
 /* Spark Hop: the spark bounces by itself. Steer it from platform to platform and climb as high as you can. Moving and crumbly platforms show up the higher you go.
-   Two modes (the switch at the top, before the first jump and after a fall): Classic, and Monsters: little monsters float
+   Two modes, picked at the start of a climb (the Classic / Monsters choice on the board until the first platform): Classic, and Monsters: little monsters float
    between the platforms (land on top to bop them, touch one any other way and you fall) and puffy clouds that hold you once. */
 (function () {
   const D = Ludus.draw;
@@ -30,7 +30,7 @@
       const view = api.canvas(() => render());   // also draws the board while a resumed game waits on "Welcome back"
       const { ctx, canvas } = view;
       let WH = 520;
-      let p, plats, camY, topGen, height, clock, state, deadAt, squash, spin, pops, lastChainY, best, mons = [];
+      let p, plats, camY, topGen, height, clock, state, deadAt, squash, spin, pops, lastChainY, best, mons = [], onFloor = true;
       let mode = Ludus.state.hopMode === 'monsters' ? 'monsters' : 'classic';
       const MR = 14;   // monster radius
       const held = { l: false, r: false, pl: false, pr: false };
@@ -59,8 +59,8 @@
           addPlat(lastChainY, true);
           // crumbly decoys in between, higher up they get more common
           if (Math.random() < cfg.brk * (0.5 + Math.min(1, climb / 40)) * (mode === 'monsters' ? 1.4 : 1)) addPlat(lastChainY + 30 + Math.random() * 30, false);
-          // monsters: from 60 m up, never on the way to the next platform
-          if (mode === 'monsters' && climb > 6 && Math.random() < [0.1, 0.14, 0.18][api.level] * (0.6 + Math.min(1, climb / 50))) {
+          // monsters: from 30 m up, never on the way to the next platform
+          if (mode === 'monsters' && climb > 3 && Math.random() < [0.16, 0.2, 0.24][api.level] * (0.6 + Math.min(1, climb / 50))) {
             let mx = lastX + (lastX < WW / 2 ? 1 : -1) * (110 + Math.random() * 60);
             mx = Math.max(MR + 8, Math.min(WW - MR - 8, mx));
             if (Math.abs(mx - lastX) > 90) mons.push({ x: mx, y: lastChainY + 36 + Math.random() * 20, ox: mx, ph: Math.random() * 6, kind: Math.floor(Math.random() * 3), dead: -1 });
@@ -70,7 +70,7 @@
         plats = plats.filter(q => q.y < camY + WH + 60);
       }
       function reset() {
-        WH = worldH(); clock = 0; state = 'play'; deadAt = -1; squash = 0; spin = 0; pops = []; height = 0; best = 0;
+        WH = worldH(); clock = 0; state = 'play'; deadAt = -1; onFloor = true; squash = 0; spin = 0; pops = []; height = 0; best = 0;
         plats = []; mons = []; camY = -WH + 40;          // world y grows downward; the start floor sits at y = 0
         p = { x: WW / 2, y: -PH - R, vx: 0, vy: BOUNCE };
         plats.push({ x: WW / 2, y: 0, type: 'still', vx: 0, broken: -1, born: 0, wide: true });
@@ -78,6 +78,7 @@
       }
 
       function land(q) {
+        if (!q.wide) onFloor = false;       // first platform above the start floor: the mode choice goes away
         if (q.type === 'break') {
           if (q.broken < 0) { q.broken = clock; api.sfx('drop'); }
           return false;                     // crumbly platforms never bounce you
@@ -151,18 +152,24 @@
         if (k === 'ArrowLeft' || k === 'a' || k === 'A') held.l = false;
         if (k === 'ArrowRight' || k === 'd' || k === 'D') held.r = false;
       });
-      // the Classic / Monsters switch: shown at the start of a climb and after a fall
-      const switchOn = () => state === 'over' || height < 15;
-      const switchBox = () => ({ x: WW / 2 - 85, y: 6, w: 170, h: 28 });
+      // the Classic / Monsters choice: only in the start state (waiting for the first move, or still on the start floor).
+      // Not during the climb and not on the game-over screen; the last choice is remembered (Ludus.state.hopMode).
+      const switchOn = () => state === 'play' && onFloor;
+      const switchBox = () => ({ x: WW / 2 - 110, y: 44, w: 220, h: 36 });
+      const inSwitch = e => { const r = canvas.getBoundingClientRect(), k = WW / r.width, x = (e.clientX - r.left) * k, y = (e.clientY - r.top) * k, b = switchBox();
+        return x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h ? x : null; };
       function setMode(m) {
         if (m === mode) return;
         mode = m; Ludus.state.hopMode = m; Ludus.save(); api.sfx('click'); reset();
       }
-      api.on(canvas, 'pointerdown', e => {
+      // a press on the choice picks a mode and is not a move: it neither starts the climb nor steers (capture runs before the game's own listeners)
+      const onPick = e => {
         if (!switchOn()) return;
-        const r = canvas.getBoundingClientRect(), k = WW / r.width, x = (e.clientX - r.left) * k, y = (e.clientY - r.top) * k, b = switchBox();
-        if (x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h) { e.stopImmediatePropagation(); setMode(x < b.x + b.w / 2 ? 'classic' : 'monsters'); }
-      });
+        const x = inSwitch(e); if (x === null) return;
+        e.stopImmediatePropagation(); e.preventDefault();
+        if (e.type === 'pointerdown') { const b = switchBox(); setMode(x < b.x + b.w / 2 ? 'classic' : 'monsters'); }
+      };
+      canvas.addEventListener('pointerdown', onPick, true); canvas.addEventListener('pointermove', onPick, true);
       const pointerSide = e => { const r = canvas.getBoundingClientRect(); const left = e.clientX - r.left < r.width / 2; held.pl = left; held.pr = !left; };
       api.on(canvas, 'pointerdown', e => { try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* synthetic or finished pointer */ } pointerSide(e); });
       api.on(canvas, 'pointermove', e => { if (held.pl || held.pr) pointerSide(e); });
@@ -263,9 +270,11 @@
         if (switchOn()) {
           const b = switchBox(), half = b.w / 2, on = mode === 'monsters' ? 1 : 0;
           ctx.fillStyle = col.dark ? 'rgba(42,38,33,0.9)' : 'rgba(255,252,247,0.94)'; D.roundRect(ctx, b.x, b.y, b.w, b.h, b.h / 2); ctx.fill();
+          ctx.strokeStyle = col.line || 'rgba(0,0,0,0.12)'; ctx.lineWidth = 1; ctx.stroke();
+          D.text(ctx, 'Pick a mode', WW / 2, b.y - 11, 11, col.ink2, 650);
           ctx.fillStyle = col.ink; D.roundRect(ctx, b.x + 3 + on * half, b.y + 3, half - 6, b.h - 6, (b.h - 6) / 2); ctx.fill();
-          D.text(ctx, 'Classic', b.x + half / 2, b.y + b.h / 2 + 0.5, 12, on ? col.ink2 : col.surface, 700);
-          D.text(ctx, 'Monsters', b.x + half * 1.5, b.y + b.h / 2 + 0.5, 12, on ? col.surface : col.ink2, 700);
+          D.text(ctx, 'Classic', b.x + half / 2, b.y + b.h / 2 + 0.5, 13, on ? col.ink2 : col.surface, 700);
+          D.text(ctx, 'Monsters', b.x + half * 1.5, b.y + b.h / 2 + 0.5, 13, on ? col.surface : col.ink2, 700);
         }
         ctx.restore();
       }
@@ -278,7 +287,7 @@
         if (sv.mode === 'monsters' || sv.mode === 'classic') mode = sv.mode;
         reset();
         if (sv.wh >= 360 && sv.wh <= 2000) WH = sv.wh;
-        camY = +sv.camY; height = sv.height | 0; best = height; lastChainY = +sv.lastChainY; lastX = sv.lastX >= 0 && sv.lastX <= WW ? +sv.lastX : WW / 2;
+        camY = +sv.camY; height = sv.height | 0; best = height; onFloor = height <= 3; lastChainY = +sv.lastChainY; lastX = sv.lastX >= 0 && sv.lastX <= WW ? +sv.lastX : WW / 2;
         p = { x: +sv.p[0], y: +sv.p[1], vx: +sv.p[2], vy: +sv.p[3] };
         plats = sv.plats.map(q => ({ x: q[0], y: q[1], type: q[2], vx: q[3], broken: -1, born: -9, wide: !!q[4] }));
         if (Array.isArray(sv.mons)) mons = sv.mons.filter(m => Array.isArray(m) && m.length === 4 && m.every(isFinite)).map(m => ({ x: m[0], ox: m[0], y: m[1], ph: m[2], kind: m[3] % 3, dead: -1 }));

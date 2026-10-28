@@ -7,6 +7,8 @@ All notable changes to Ludus. Versions follow the app's version number (`Info.pl
 
 - Original names are now built into Ludus (Mac and Windows): the Original names switch in Settings > More settings works straight away on a fresh install, with no file to find or load. On: the original game names; Off: the usual names.
 - Removed the "Load names file" button and everything that read a names file. Your saved switch setting and game data are kept.
+- Sky Hop (Doodle Jump): the Classic / Monsters choice is now at the start of each climb, bigger and on the board ("Pick a mode"), and stays until you land on the first platform. Picking a mode no longer starts the climb by accident, and your last choice is remembered.
+- Sky Hop: Monsters mode works again (the old switch disappeared after the first bounce, and on the game-over screen it could not be pressed). Monsters now show up from 30 m and a little more often. The mode pills no longer show during play or over the game-over screen.
 
 ## 1.12.24 (28 Oct 2026)
 - Hammer Climb no longer loses the hammer when the mouse leaves the panel (Mac and Windows): a click locks the mouse to the climb (Esc lets it go), and dragging in any game keeps working outside the panel until you let go of the button.
