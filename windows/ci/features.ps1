@@ -1,8 +1,7 @@
 # features.ps1: Windows checks for things friends reported, in the real app (WebView2), silently on the CI machine.
 #  1. Hammer Climb starts: a real mouse click on the "Normal" mountain begins the climb, and moving the mouse moves the pot.
-#  2. Original names: a list next to Ludus.exe is picked up, the Settings switch turns it on, and the game shows the new name.
+#  2. Original names: built into the app, no file anywhere: the Settings switch turns the original names on, and off again.
 #  1b. Hammer Climb keeps control when the cursor leaves the panel (pointer lock, or capture while held).
-#  3. Load names file: the Settings button copies a picked list into %APPDATA%\\Ludus and turns Original names on.
 # Windows PowerShell 5.1 (UI Automation). Screenshots and logs go to $Out.
 param([string]$Exe = 'out/Ludus/Ludus.exe', [string]$Out = 'features')
 $ErrorActionPreference = 'Stop'
@@ -82,73 +81,53 @@ Check ($moved -gt ($still * 2 + 150)) "climb: with the cursor outside the panel 
 Check ($p -and -not $p.HasExited) 'climb: app still running after the drag'
 Stop-Process $p -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 2
 
-# ---- 2. Original names ----
+# ---- 2. Original names: built in, with no names file anywhere (fresh install). On shows "Space Invaders", off shows the usual name ----
 $dir = Split-Path $Exe -Parent
-'{ "skyraiders": "Alien Attack Test" }' | Set-Content (Join-Path $dir 'original-names.json')
+foreach ($f in @((Join-Path $dir 'original-names.json'), "$env:APPDATA\Ludus\original-names.json")) { Remove-Item $f -ErrorAction SilentlyContinue }
+Check (-not (Test-Path (Join-Path $dir 'original-names.json')) -and -not (Test-Path "$env:APPDATA\Ludus\original-names.json")) 'names: no names file anywhere'
 Clear-State @('originalNames', 'originalList')
 $json2 = Join-Path $Out 'names-selftest.json'
 $p = Start-Process $Exe -ArgumentList '--test-open', "--selftest=$json2" -PassThru
 [void](Wait-File $json2 120)
 $win = Ui-Window $p.Id 30
-$gear = Ui-Wait $win 'Settings' 'Button' 30; if ($gear) { [void](Ui-Press $gear) }
-$swt = $null
-for ($try = 0; $try -lt 2 -and -not $swt; $try++) {
-  $more = Ui-Wait $win 'More settings*' 'Button' 15
-  if ($more) {
-    try { $more.GetCurrentPattern([System.Windows.Automation.ScrollItemPattern]::Pattern).ScrollIntoView() } catch { }
-    Start-Sleep -Milliseconds 300
-    [void](Ui-Press $more)
+$before = Ui-Wait $win '*Space Invaders*' '' 3
+Check ($null -eq $before) 'names: off by default, the usual name shows'
+function Open-NamesSwitch {
+  $gear = Ui-Wait $win 'Settings' 'Button' 30; if ($gear) { [void](Ui-Press $gear) }
+  $found = $null
+  for ($try = 0; $try -lt 2 -and -not $found; $try++) {
+    $found = Ui-Wait $win 'Original names' 'Button' 3
+    if ($found) { break }
+    $more = Ui-Wait $win 'More settings*' 'Button' 15
+    if ($more) {
+      try { $more.GetCurrentPattern([System.Windows.Automation.ScrollItemPattern]::Pattern).ScrollIntoView() } catch { }
+      Start-Sleep -Milliseconds 300
+      [void](Ui-Press $more)
+    }
+    Start-Sleep -Milliseconds 1200
+    $found = Ui-Wait $win 'Original names' 'Button' 5
   }
-  Start-Sleep -Milliseconds 1200
-  $swt = Ui-Wait $win 'Original names' 'Button' 5
+  return $found
 }
+$swt = Open-NamesSwitch
 if (-not $swt) { Ui-Dump $win (Join-Path $Out 'uia-settings.txt') }
 Check ($null -ne $swt) 'names: Original names switch found'
 if ($swt) { [void](Ui-Press $swt) }
 Start-Sleep -Milliseconds 600
 $back = Ui-Wait $win 'Back' 'Button' 10; if ($back) { [void](Ui-Press $back) }
-$shown = Ui-Wait $win '*Alien Attack Test*' '' 15
+$shown = Ui-Wait $win '*Space Invaders*' '' 15
 $b2 = (Get-Content $json2 -Raw | ConvertFrom-Json).panelBounds
 Save-Crop (Join-Path $Out '03-original-names.png') $b2[0] $b2[1] $b2[2] $b2[3]
-Check ($null -ne $shown) 'names: the game shows its name from the list'
-Stop-Process $p -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 1
-Remove-Item (Join-Path $dir 'original-names.json') -ErrorAction SilentlyContinue
-# ---- 3. Load names file: no list anywhere, the Settings button loads a picked file, it is copied into %APPDATA%\Ludus
-#      and the game shows the picked name at once (LUDUS_TEST_NAMES_FILE stands in for the file dialog) ----
-Remove-Item "$env:APPDATA\Ludus\original-names.json" -ErrorAction SilentlyContinue
-$pick = Join-Path $Out 'picked-names.json'
-'{ "skyraiders": "Picked Name Test" }' | Set-Content $pick
-Clear-State @('originalNames', 'originalList')
-$env:LUDUS_TEST_NAMES_FILE = $pick
-$json3 = Join-Path $Out 'pick-selftest.json'
-$p = Start-Process $Exe -ArgumentList '--test-open', "--selftest=$json3" -PassThru
-[void](Wait-File $json3 120)
-$win = Ui-Window $p.Id 30
-$gear = Ui-Wait $win 'Settings' 'Button' 30; if ($gear) { [void](Ui-Press $gear) }
-$load = $null
-for ($try = 0; $try -lt 2 -and -not $load; $try++) {
-  $more = Ui-Wait $win 'More settings*' 'Button' 15
-  if ($more) {
-    try { $more.GetCurrentPattern([System.Windows.Automation.ScrollItemPattern]::Pattern).ScrollIntoView() } catch { }
-    Start-Sleep -Milliseconds 300
-    [void](Ui-Press $more)
-  }
-  Start-Sleep -Milliseconds 1200
-  $load = Ui-Wait $win 'Load names file' 'Button' 5
-}
-if (-not $load) { Ui-Dump $win (Join-Path $Out 'uia-load.txt') }
-Check ($null -ne $load) 'load: Load names file button found'
-if ($load) { [void](Ui-Press $load) }
-Start-Sleep -Milliseconds 1200
-Check (Test-Path "$env:APPDATA\Ludus\original-names.json") 'load: the picked file is copied into %APPDATA%\Ludus'
+Check ($null -ne $shown) 'names: switch on shows the built-in original name (no file)'
+$swt = Open-NamesSwitch
+if ($swt) { [void](Ui-Press $swt) }
+Start-Sleep -Milliseconds 600
 $back = Ui-Wait $win 'Back' 'Button' 10; if ($back) { [void](Ui-Press $back) }
-$shown3 = Ui-Wait $win '*Picked Name Test*' '' 15
-$b3 = (Get-Content $json3 -Raw | ConvertFrom-Json).panelBounds
-Save-Crop (Join-Path $Out '04-load-names.png') $b3[0] $b3[1] $b3[2] $b3[3]
-Check ($null -ne $shown3) 'load: the game shows the picked name straight away (switch turned on)'
+Start-Sleep -Milliseconds 800
+$after = Ui-Wait $win '*Space Invaders*' '' 3
+Save-Crop (Join-Path $Out '04-original-names-off.png') $b2[0] $b2[1] $b2[2] $b2[3]
+Check ($null -eq $after) 'names: switch off brings the usual name back'
 Stop-Process $p -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 1
-Remove-Item Env:LUDUS_TEST_NAMES_FILE -ErrorAction SilentlyContinue
-Remove-Item "$env:APPDATA\Ludus\original-names.json" -ErrorAction SilentlyContinue
 
 Copy-Item "$env:APPDATA\Ludus\*.log" $Out -ErrorAction SilentlyContinue
 if ($script:Failures.Count) { Write-Host "$($script:Failures.Count) check(s) failed"; exit 1 }

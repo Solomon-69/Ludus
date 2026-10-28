@@ -249,7 +249,6 @@ internal sealed class PopupForm : Form
                $"window.__LUDUS_LOGIN__ = {Bool(Store.LoginEnabled())};\n" +
                $"window.__LUDUS_DARK__ = {Bool(theme.SystemDark)};\n" +
                $"window.__LUDUS_INVISIBLE__ = {Bool(Store.LoadInvisible())};\n" +
-               $"window.__LUDUS_ORIGINAL_NAMES__ = {Store.LoadOriginalNamesJson()};\n" +
                $"window.__LUDUS_SKIP_INTRO__ = {Bool(SkipIntro)};\n" +
                $"window.__LUDUS_VERSION__ = '{System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0"}';\n" +
                (TestFailStart ? "window.__LUDUS_TEST_FAIL__ = true;\n" : "") +
@@ -413,9 +412,6 @@ internal sealed class PopupForm : Form
                         BeginInvoke((MethodInvoker)(() => StartUpdate(uz, us, un)));
                     }
                     break;
-                case "pickNames":
-                    BeginInvoke((MethodInvoker)PickNamesFile);
-                    break;
                 case "site":   // "Download from the website": only ever this one fixed address
                     try { Process.Start(new ProcessStartInfo(SiteUrl) { UseShellExecute = true }); } catch (Exception ex) { Store.Log($"open site failed: {ex.Message}"); }
                     break;
@@ -556,29 +552,6 @@ internal sealed class PopupForm : Form
         Hide();
         lastHiddenAt = Environment.TickCount64;
         RunScript("window.ludusClosed && ludusClosed()");
-    }
-
-    /// <summary>Load names file: pick an original-names.json, copy it into the app's data folder and hand the list to the
-    /// page, which turns Original names on. Tests set LUDUS_TEST_NAMES_FILE to skip the dialog.</summary>
-    private void PickNamesFile()
-    {
-        string? path = Environment.GetEnvironmentVariable("LUDUS_TEST_NAMES_FILE");
-        if (string.IsNullOrEmpty(path))
-        {
-            bool stay = StayOpen;
-            StayOpen = true;   // the dialog takes focus: keep the panel open behind it
-            try
-            {
-                using var dlg = new OpenFileDialog { Title = "Load names file", Filter = "Names list (*.json)|*.json|All files (*.*)|*.*", CheckFileExists = true, Multiselect = false };
-                if (dlg.ShowDialog(this) != DialogResult.OK) return;
-                path = dlg.FileName;
-            }
-            finally { StayOpen = stay; Activate(); }
-        }
-        var err = Store.ImportOriginalNames(path!);
-        RunScript(err == null
-            ? $"window.ludusSetOriginalNames && ludusSetOriginalNames({Store.LoadOriginalNamesJson()})"
-            : $"window.ludusSetOriginalNames && ludusSetOriginalNames(null, {JsonSerializer.Serialize(err)})");
     }
 
     protected override void OnDeactivate(EventArgs e)

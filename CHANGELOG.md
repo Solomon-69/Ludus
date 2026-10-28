@@ -3,6 +3,11 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.25 (28 Oct 2026)
+
+- Original names are now built into Ludus (Mac and Windows): the Original names switch in Settings > More settings works straight away on a fresh install, with no file to find or load. On: the original game names; Off: the usual names.
+- Removed the "Load names file" button and everything that read a names file. Your saved switch setting and game data are kept.
+
 ## 1.12.24 (28 Oct 2026)
 - Hammer Climb no longer loses the hammer when the mouse leaves the panel (Mac and Windows): a click locks the mouse to the climb (Esc lets it go), and dragging in any game keeps working outside the panel until you let go of the button.
 - Hammer Climb: no more tall wall at the foot of the mountain; the slide now runs into a gentle ramp.
