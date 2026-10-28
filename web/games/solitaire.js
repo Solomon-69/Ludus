@@ -55,6 +55,7 @@
 
   Ludus.register({
     id: 'patience', name: 'Solitaire', aka: 'Patience Klondike', tag: 'Puzzle', tint: '#2e7a5f',
+    waitForMove: true,   // stands still until the first move (see engine.js)
     hint: 'Click a card then its spot, or drag · double-click or <kbd>Enter</kbd>: to suit pile · <kbd>←↑→↓</kbd> <kbd>Space</kbd> pick/drop · <kbd>D</kbd> draw · <kbd>Z</kbd> undo',
     _rules: { deal, canFound, canTab },
     art(ctx, w, h) {

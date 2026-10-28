@@ -53,6 +53,7 @@
   Ludus.register({
     id: 'hockey', name: 'Air Hockey', aka: 'Air Puck', tag: '2 Player', wide: true, tint: '#e05d8b', versus: true, defaultVs: 'friend',
     online: { min: 2, max: 2 },
+    waitForMove: true,   // stands still until the first move (see engine.js)
     onlineHint: '<b>Online</b> you guard the goal on your side (left, or bottom when turned) · mouse, trackpad, <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or arrows',
     hint: '<b>vs Bot</b> <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> move · <b>vs Friend</b> P1 (left) <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> · P2 (right) <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd>',
     _rules: { strike },

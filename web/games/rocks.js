@@ -23,6 +23,7 @@
 
   Ludus.register({
     id: 'drift', name: 'Rock Blaster', aka: 'Drift', tag: 'Arcade', tint: '#6b7a8f',
+    waitForMove: true,   // stands still until the first move (see engine.js)
     hint: '<kbd>←</kbd><kbd>→</kbd> turn · <kbd>↑</kbd> thrust · <kbd>Space</kbd> fire',
     art(ctx, w, h) {
       const rock = (x, y, r, seed) => {

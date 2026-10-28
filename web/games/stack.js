@@ -122,6 +122,7 @@
 
   Ludus.register({
     id: 'stack', name: 'Stack', tag: 'Arcade', tint: '#3f8fb3',
+    waitForMove: 'tap',   // stands still until the first move (see engine.js)
     hint: '<kbd>Space</kbd> <kbd>↓</kbd> or click / tap to drop · line it up exactly for a perfect · <kbd>B</kbd> or the top-left button: Brain rot skin',
     _rules: { cut, hueFromColor, layerHue },
     art(ctx, w, h, colors) {

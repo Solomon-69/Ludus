@@ -6,6 +6,9 @@
      hint: 'Arrows or swipe',            // shown under the stage (HTML allowed, use <kbd>)
      art(ctx, w, h, colors) { ... },     // draws the card thumbnail (CSS pixels, already scaled)
      create(stage, api) { ...; return { destroy() {}, pause() {}, resume() {} } } // all optional
+     waitForMove: true | 'tap',          // optional: a game that would start running on its own waits, still,
+                                         // until the player's first key, click, tap or (pointer games) mouse move.
+                                         // 'tap' = a one-button game: that first press only starts it and says "Tap to start".
    })
 
    Everything a game registers through api.on / api.loop / api.timeout is cleaned up automatically
@@ -167,6 +170,32 @@
     let touched = false; // the player pressed a key or clicked at least once this run
     let ended = false;   // after api.over: input is ignored but drawing continues so the final board can be seen
     let score = 0;
+    // Wait for the first move: a solo (or same-screen) run of a game marked waitForMove stands still, time and all,
+    // until the player presses a key, clicks, taps or (pointer-steered games) moves the mouse. Room games never wait:
+    // they keep their shared countdown so nobody stalls the others.
+    const tapStart = game.waitForMove === 'tap';
+    let simTime = 0;   // seconds of game time handed to the loops (tests: nothing runs before the first move)
+    let waiting = !!game.waitForMove && !online, startEvent = null, moved = 0, lastMove = null;
+    const startNow = e => {
+      if (!waiting) return;
+      waiting = false; startEvent = e || null;
+      loops.forEach(l => l.reset && l.reset());
+      try { hooks.onWait && hooks.onWait(false); } catch (x) {}
+      const cbs = startCbs.splice(0); cbs.forEach(fn => { try { fn(); } catch (x) { crash(x, 'start'); } });
+    };
+    const startCbs = [];
+    const NOT_A_MOVE = new Set(['Escape', 'p', 'P', 'Shift', 'Control', 'Alt', 'Meta', 'CapsLock', 'Tab', 'Fn']);
+    const startsRun = (type, e) => {
+      if (type === 'keydown') return !NOT_A_MOVE.has(e.key) && !e.metaKey && !e.ctrlKey;
+      if (type === 'pointerdown' || type === 'mousedown' || type === 'touchstart') return true;
+      if (!tapStart && (type === 'pointermove' || type === 'mousemove')) {   // a real move of the pointer, not a nudge
+        const p = [e.clientX, e.clientY];
+        if (lastMove) moved += Math.hypot(p[0] - lastMove[0], p[1] - lastMove[1]);
+        lastMove = p;
+        return moved > 14;
+      }
+      return false;
+    };
     // The game stopped working (threw, stalled, lost its graphics): stop it and let the app show the recovery card.
     let crashed = false, lastFrame = performance.now();
     const crash = (e, kind) => {
@@ -194,6 +223,9 @@
       get ended() { return ended; },
       get touched() { return touched; },
       get paused() { return paused; },
+      // true while a waitForMove game stands still before the first move; onStart(fn) runs fn when it starts
+      get waiting() { return waiting; },
+      onStart(fn) { if (!waiting) { fn(); return; } startCbs.push(fn); },
       rand: (a, b) => (b === undefined ? Math.random() * a : a + Math.random() * (b - a)),
       randInt: (a, b) => Math.floor(a + Math.random() * (b - a + 1)),
       pick: arr => arr[Math.floor(Math.random() * arr.length)],
@@ -201,6 +233,9 @@
         const wrapped = e => {
           // keyup and blur still reach the game while paused, so a key let go during the pause is not stuck down.
           if ((paused || ended) && type !== 'resize' && type !== 'keyup' && type !== 'blur') return;
+          if (waiting && !crashed && startsRun(type, e)) startNow(e);
+          // a one-button game: the press that started it is not also a move (it would drop / jump at once)
+          if (tapStart && startEvent && e === startEvent) return;
           if (type === 'keydown' || type === 'pointerdown') touched = true;
           if (type === 'keydown' && e.key) held.set(e.key, e.code);
           if (type === 'keyup' && e.key) held.delete(e.key);
@@ -234,13 +269,13 @@
         const entry = { running: true, needsFrame: true };
         const tick = now => {
           if (!entry.running) return;
-          const dt = Math.min(0.05, (now - last) / 1000); last = now;
+          const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); last = now;   // never negative: a reset can land after this frame began
           // While paused, draw one still frame (dt 0) when asked, e.g. right after a restore or a resize.
           const step = !paused || entry.needsFrame;
           entry.needsFrame = false;
           id = requestAnimationFrame(tick);
           if (step) {
-            try { fn(paused ? 0 : dt, (now - t0) / 1000); lastFrame = now; }
+            try { const d = paused || waiting ? 0 : dt; simTime += d; fn(d, (now - t0) / 1000); lastFrame = now; }
             catch (e) { if (!entry.failed) { entry.failed = true; crash(e, 'loop'); } }
           }
         };
@@ -250,7 +285,7 @@
         cleanups.push(() => { entry.running = false; cancelAnimationFrame(id); });
         return entry;
       },
-      timeout(fn, ms) { fn = guard(fn, 'timer'); const id = setTimeout(() => { if (crashed) return; if (!paused) fn(); else api.timeout(fn, 60); }, ms); cleanups.push(() => clearTimeout(id)); return id; },
+      timeout(fn, ms) { fn = guard(fn, 'timer'); const id = setTimeout(() => { if (crashed) return; if (!paused && !waiting) fn(); else api.timeout(fn, 60); }, ms); cleanups.push(() => clearTimeout(id)); return id; },
       // Full-stage canvas sized for the screen's pixel density. onResize(w, h) fires on start and on resize.
       canvas(onResize) {
         const c = document.createElement('canvas');
@@ -289,9 +324,12 @@
       },
       toast(text) { hooks.toast(text); }
     };
+    if (waiting) { try { hooks.onWait && hooks.onWait(true, tapStart ? 'Tap to start' : 'Move to start', api.reduceMotion); } catch (x) {} }
     return {
       api,
       crash,
+      get waiting() { return waiting; },
+      get simTime() { return simTime; },
       get crashed() { return crashed; },
       // a loop that should be drawing has not finished a frame for this long (ms); 0 when nothing is expected
       stalledFor(now) { return !crashed && !paused && !ended && loops.size ? now - lastFrame : 0; },

@@ -89,6 +89,7 @@
 
   Ludus.register({
     id: 'chomp', name: 'Chomp', aka: 'maze chase', tag: 'Arcade', tint: '#2f2a24',
+    waitForMove: true,   // stands still until the first move (see engine.js)
     hint: '<kbd>←</kbd><kbd>↑</kbd><kbd>→</kbd><kbd>↓</kbd> or WASD, swipe or click a direction',
     _test: { MAP, W, H, cellAt, isWallFor, chaseTarget, chooseDir, countPellets, freshGrid, OPP, DIRS },
     art(ctx, w, h) {
@@ -326,7 +327,7 @@
           if (phaseT < 0.25) open = 0.2; else open = 0.2 + D.ease.inOut(k) * 0.8;
           if (k >= 1) return;
         }
-        if (phase === 'ready' && !api.reduceMotion) scale = D.ease.outBack(Math.min(1, phaseT / 0.4));
+        if (phase === 'ready' && !api.reduceMotion && !api.waiting) scale = D.ease.outBack(Math.min(1, phaseT / 0.4));
         const ang = { right: 0, down: Math.PI / 2, left: 0, up: -Math.PI / 2 }[pac.dir];
         ctx.save(); ctx.translate(x, y); ctx.rotate(ang); ctx.scale(pac.dir === 'left' ? -scale : scale, scale);
         ctx.fillStyle = col.accent;
@@ -428,6 +429,8 @@
       }
       if (!restore(api.saved)) { startLevel(); api.score(0); }
       render(0);
+      // the first move ends the opening "Ready" at once: the player already said go
+      api.onStart(() => { if (phase === 'ready') phaseT = 1.41; });
       api.loop(dt => { update(dt); render(dt); });
       return {
         save() {
