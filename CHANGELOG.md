@@ -3,6 +3,15 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.19 (2026-10-28)
+- Air Hockey: the bot no longer pins the puck in a corner, in the vertical layout either.
+- Rejoin works however old the party is: it joins the live party, or reopens the same code if nobody is there, and the Last party card is never lost.
+- Room codes never repeat a letter or number. Older codes still work.
+- Online page: matching rounded corners, and the Play online card keeps its size when Last party appears.
+- Hammer Climb: no difficulty levels (plays like Medium). The top is now floating rocks in the sky and a final launch into space. New cover.
+- Map Hunt and Mosaic Hunt: much more detailed maps when zoomed in (streets, buildings, districts, places). Mosaic Hunt has one set of zoom buttons. Pinch to zoom works on Windows.
+- Full game names always show (game headers, Continue card). Settings descriptions follow the switch. Symmetric name bubble and a new rename tooltip. The Edit list button is gone.
+
 ## 1.12.18 (2026-10-28)
 - Online games are smooth for the guest: every live game (Paddle Duel, Air Hockey, Tag, Worm Arena, Land Claim, City Swallow) now plays the host's moves back on an even clock a little behind, blends between them, carries motion on briefly when the line hiccups and eases back instead of jumping. Copies that arrive late, twice or out of order no longer cause stutters, and a lost copy no longer freezes the picture.
 - Air Hockey online: the guest's puck is drawn where it really is now and bounces off your own mallet straight away. Mouse and trackpad steer your mallet inside your half. The rink is wide by default; the Rotate button in the header turns it tall and remembers it. Everyone has their own goal on their side (left when wide, bottom when tall).
@@ -31,7 +40,7 @@ All notable changes to Ludus. Versions follow the app's version number (`Info.pl
 - Sky Hop: a second mode, Monsters. Little monsters float between the platforms (land on top to bop them, touch one
   any other way and you fall) and puffy clouds hold you for one bounce. Switch between Classic and Monsters at the top
   before the first jumps or after a fall (or press M).
-- Original names (Settings > More) now does something everywhere: Add list lets you paste your own names
+- Original names (Settings > More) now does something everywhere: reads your own list of names
   (one "Game = name" per line), and on Windows a list file next to Ludus.exe is found too.
 - Map Hunt and Mosaic Hunt maps: + and - zoom buttons, double-click to zoom, and a trackpad pinch works on Mac too.
 - Mosaic Hunt: the map pins and labels no longer draw on top of the "Hunt complete" card.
