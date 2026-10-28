@@ -19,8 +19,9 @@ const only = process.argv.slice(2), want = n => !only.length || only.includes(n)
         const A = await newPage(browser, br, { name: 'Ann' }), D = await newPage(browser, br, { name: 'Dup' });
         const c = await flexCreate(A);
         if (quiet) br.filter = (t, payload) => !/"t":"hq"/.test(payload);
-        const got = await D.evaluate(code => new Promise(res => { const s = Ludus.net.createRoom({ gameId: 'pong', min: 2, max: 4, name: 'Dup', code }); s.on('ready', e => { res(e.code); s.leave(); }); setTimeout(() => res('timeout'), 20000); }), c);
-        check('dup ' + tag + ': a second host of ' + c + ' gets another code', got !== c && got !== 'timeout', got);
+        const got = await D.evaluate(code => new Promise(res => { const s = Ludus.net.createRoom({ gameId: 'pong', min: 2, max: 4, name: 'Dup', code }); s.on('ready', e => { res((e && e.code || s.code) + ':' + s.role); s.leave(); }); setTimeout(() => res('timeout'), 20000); }), c);
+        // 1.12.19: reopening a code somebody really hosts joins their room as a guest (no second host, no stray new code)
+        check('dup ' + tag + ': a second claim of ' + c + ' never makes two hosts (joins as a guest)', got === c + ':guest', got);
         br.filter = null;
         // a guest joining while two players claim the same code at once: one room only
         for (const p of [A, D]) await p.context().close(); br.close();
@@ -50,11 +51,11 @@ const only = process.argv.slice(2), want = n => !only.length || only.includes(n)
       await wait(1200);
       const [sa, sb] = [await sess(A), await sess(B)];
       check('guest: Rejoin puts Bo in Ann\'s room as a guest (one room, 2 players)', sb.role === 'guest' && sa.role === 'host' && sa.n === 2 && sb.n === 2 && sb.host === 'Ann', [sa, sb]);
-      // the room is gone: Rejoin says so and Bo never hosts the code
+      // the room is gone (1.12.19): the code is free, so Bo's Rejoin opens the same code again as host
       await leaveRoom(B); await wait(300); await leaveRoom(A); await wait(500);
-      await rejoin(B); await wait(14000);
+      await rejoin(B); await waitSess(B, '(s => s.ready && s.role === "host")', 40000);
       const s3 = await sess(B);
-      check('guest: with nobody hosting, Bo\'s Rejoin does not make him host of ' + c, !s3 || s3.role !== 'host' || s3.code !== c, s3);
+      check('guest: with nobody hosting, Bo\'s Rejoin reopens ' + c + ' as host', s3 && s3.role === 'host' && s3.code === c, s3);
       check('guest: no page errors', errs([A, B]) === 0, [A.errors, B.errors]);
       for (const p of [A, B]) await p.context().close(); br.close();
     }

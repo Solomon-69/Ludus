@@ -68,7 +68,13 @@
   }
   const hex = b => Array.from(b, x => x.toString(16).padStart(2, '0')).join('');
   const bytes = t => enc.encode(t).length;   // message limits count bytes (an accented name takes more than one)
-  NET.newCode = () => Array.from(randBytes(5), x => ALPHABET[x % ALPHABET.length]).join('');
+  // A new code never repeats a character (easier to read out and type). Codes are still checked only for their letters,
+  // so older codes with a repeated character stay joinable.
+  NET.newCode = () => {
+    const pool = ALPHABET.split(''), r = randBytes(10); let out = '';
+    for (let i = 0; i < 5; i++) { const k = ((r[i * 2] << 8) | r[i * 2 + 1]) % pool.length; out += pool.splice(k, 1)[0]; }
+    return out;
+  };
   // Each relay is a separate world, so everybody in a room must use the same one. The room code decides which:
   // the host makes a code that belongs to the relay it is connected to, and joiners try that relay first.
   NET.codeBroker = (code, n) => { let t = 0; for (const ch of String(code)) t += ch.charCodeAt(0); return n > 0 ? t % n : 0; };
@@ -474,6 +480,8 @@
           me.client.unsubscribe(topic);
           // our own code may still look taken for a moment (the old room just closed): try it again a few times before giving up on it
           if (me.wantCode && me.candidate === me.wantCode && me.wantTries < 2) { me.claimWait = setTimeout(() => { if (!me.over) me._subscribeCandidate(); }, 2000); return; }
+          // Rejoin: somebody really hosts our party's code now, so we join their room as a guest (never a second room, never a new code)
+          if (me.wantCode && me.candidate === me.wantCode) { me._yieldTo(me.wantCode); return; }
           me.candidate = NET.newCode(); me._subscribeCandidate(); return;
         }
         me.code = me.candidate; me.ready = true; me.client.pin(); me.claimedAt = Date.now();
@@ -950,10 +958,15 @@
     const theirs = list.length, at = Number.isInteger(m.ca) ? m.ca : 0, mine = this.claimedAt || 0;
     const better = theirs > 1 || (at && mine ? at < mine || (at === mine && m.c < this.cid) : m.c < this.cid);
     if (!better) { this._pub(this._hbObj()); return; }
-    this.role = 'guest'; this.seat = -1; this.hostCid = ''; this.ready = false; this.flex = false; this.claimedAt = 0;
+    this._yieldTo(this.code);
+  };
+  // host -> guest of the room that already holds this code
+  Session.prototype._yieldTo = function (code) {
+    this.role = 'guest'; this.seat = -1; this.hostCid = ''; this.ready = false; this.flex = false; this.claimedAt = 0; this.wantCode = '';
     this.roster = new Map(); this.order = []; this.peerPv = {}; this.peerHx = {}; this.uids = {}; this.held = []; this.sugs = [];
-    this.candidate = this.code;
-    this._emit('yield', { code: this.code });
+    this.candidate = code; this.code = code;
+    if (!this.client.subs.has(topicOf(code))) this.client.subscribe(topicOf(code), txt => this._recv(txt));
+    this._emit('yield', { code });
     this._askJoin();
   };
   Session.prototype._onStart = function (m) {

@@ -127,33 +127,59 @@
 
       // Bot (P2, the top / right mallet): sees the puck only every so often with a little aiming error,
       // defends its goal line, and hits the puck towards P1's goal when it gets the chance.
+      // It never traps the puck: by a wall it banks the shot off that wall from the goal side, in a corner it waits on the goal
+      // side (off the puck's way out) until the corner nudge frees it, and a puck sitting slow in its half for 1.5 s makes it back off and shoot.
       const REACT = [0.2, 0.13, 0.08][api.level], ERR = [34, 20, 10][api.level], DEF_Y = 66;
-      let ai = { tx: W / 2, ty: DEF_Y, timer: 0, ex: 0, stuck: 0, back: 0 };
+      let ai = { tx: W / 2, ty: DEF_Y, timer: 0, ex: 0, slow: 0, back: 0 };
       const axisDir = (pos, v, t) => { const d = t - pos; return Math.abs(d) < 4 || (v * d > 0 && Math.abs(v) / 9 >= Math.abs(d)) ? 0 : d > 0 ? 1 : -1; };
+      const clampHalf = (x, y) => [Math.max(MR, Math.min(W - MR, x)), Math.max(MR, Math.min(H / 2 - MR - 8, y))];
+      // The line to hit the puck along: towards P1's goal, or banked off the wall the bot cannot get behind. corner = no clean line.
+      function shotLine(px, py) {
+        const R = MR + PR + 12;
+        let dx = W / 2 + ai.ex - px, dy = H - py; const l = Math.hypot(dx, dy) || 1; dx /= l; dy /= l;
+        const fx = px - dx * R < MR + 2 || px - dx * R > W - MR - 2, fy = py - dy * R < MR + 2;
+        if (fx && fy) return { corner: true };
+        if (fx || fy) {
+          // strike into the wall at a good angle so it comes off towards the open rink and misses the mallet on the way out
+          if (fx) { dx = px < W / 2 ? -0.62 : 0.62; dy = 0.78; }   // side wall: into it and down, mallet above (goal side)
+          else { dx = px < W / 2 ? 0.66 : -0.66; dy = -0.75; }      // back wall: up into it, comes off towards the middle
+        }
+        return { dx, dy, corner: false };
+      }
+      // A spot on the goal side of the puck, along the bot's back wall towards its goal, well clear of the puck's way out.
+      const goalSide = (px, py, gap) => clampHalf(px + (px < W / 2 ? gap : -gap), Math.max(MR, py - gap * 0.5));
       function botAxes(dt) {
         const m = mallets.p2;
         ai.timer -= dt;
-        // Unstick: the puck slow by a wall or in a corner with the bot on top of it for over 0.6 s (it was pinning it there and the
-        // game stalled). The bot backs off towards the middle of its half, then comes in again and strikes it out at an angle.
-        const slow = Math.hypot(puck.vx, puck.vy) < 80, byWall = puck.x < PR + 34 || puck.x > W - PR - 34 || puck.y < PR + 34;
-        const close = Math.hypot(puck.x - m.x, puck.y - m.y) < MR + PR + 24;
-        if (phase === 'play' && slow && byWall && close && puck.y < H / 2) ai.stuck += dt; else ai.stuck = Math.max(0, ai.stuck - dt * 2);
-        if (ai.stuck > 0.6) { ai.stuck = 0; ai.back = 0.45; }
+        const speed = Math.hypot(puck.vx, puck.vy), mineHalf = puck.y < H / 2 - PR;
+        // Stall timer: the puck slow in the bot's half for 1.5 s means the bot is not getting it out; back off, then shoot.
+        if (phase === 'play' && mineHalf && speed < 80) ai.slow += dt; else ai.slow = 0;
+        if (ai.slow > 1.5) { ai.slow = 0; ai.back = 0.5; }
         if (ai.back > 0) {
           ai.back -= dt;
-          ai.tx = W / 2 + (puck.x < W / 2 ? 40 : -40); ai.ty = Math.min(H / 2 - MR - 10, puck.y + 70);
+          [ai.tx, ai.ty] = goalSide(puck.x, puck.y, 80);
           if (ai.back <= 0) ai.timer = 0;   // then attack straight away
           return [axisDir(m.x, m.vx, ai.tx), axisDir(m.y, m.vy, ai.ty)];
         }
         if (ai.timer <= 0) {
           ai.timer = REACT; ai.ex = api.rand(-ERR, ERR);
-          const px = puck.x + ai.ex * 0.4, py = puck.y, speed = Math.hypot(puck.vx, puck.vy);
-          const mine = py < H / 2 - PR;
-          if (mine && (speed < 90 || puck.vy > 0 || py < m.y + 4)) {
-            // attack: line up behind the puck (away from P1's goal), then drive through it at the goal
-            const gx = W / 2 - px, gy = H - py, gl = Math.hypot(gx, gy) || 1, ux = gx / gl, uy = gy / gl;
-            if (m.y < py - 2 && Math.abs(m.x - px) < MR + PR) { ai.tx = px + ux * 26; ai.ty = py + uy * 26; }
-            else { ai.tx = px - ux * (MR + PR + 12); ai.ty = Math.max(MR, py - uy * (MR + PR + 12)); }
+          const px = puck.x, py = puck.y;
+          if (mineHalf && (speed < 90 || puck.vy > 0 || py < m.y + 4)) {
+            const L = shotLine(px, py);
+            if (L.corner) {
+              // a puck in the corner cannot be hit out cleanly (it comes straight back off both walls): wait on the goal side
+              [ai.tx, ai.ty] = goalSide(px, py, 76);
+            } else {
+              // attack: line up behind the puck on the shot line, then drive through it
+              const R = MR + PR + 12, bx = px - L.dx * R, by = py - L.dy * R;
+              const along = (m.x - px) * -L.dx + (m.y - py) * -L.dy, off = Math.abs((m.x - px) * -L.dy + (m.y - py) * L.dx);
+              if (along > 0 && off < (MR + PR) * 0.6) [ai.tx, ai.ty] = clampHalf(px + L.dx * 30, py + L.dy * 30);
+              else [ai.tx, ai.ty] = clampHalf(bx, by);
+              // going round the puck to get behind it: never cut across it (that pins it on the wall)
+              if (!(along > 0 && off < (MR + PR) * 0.6) && Math.hypot(m.x - px, m.y - py) < MR + PR + 16 && along < 0) {
+                [ai.tx, ai.ty] = clampHalf(m.x + (m.x - px), m.y + (m.y - py));
+              }
+            }
           } else if (puck.vy < -20) {
             // incoming: predict where it crosses the defence line (bounces off the side walls folded in)
             let x = puck.x + puck.vx * ((DEF_Y - puck.y) / puck.vy);
@@ -235,7 +261,7 @@
 
       // A puck almost still against a wall gets a small push towards the middle (after 1 s); if nothing has moved it for 3 s
       // (a mallet parked on it, both players waiting), the puck is faced off again on the side it was stuck on.
-      let still = 0, wallStill = 0;
+      let still = 0, wallStill = 0, cornerStill = 0;
       function unstall(dt) {
         const sp = Math.hypot(puck.vx, puck.vy);
         const byWall = puck.x < PR + 6 || puck.x > W - PR - 6 || (!inMouth(puck.x) && (puck.y < PR + 6 || puck.y > H - PR - 6));
@@ -248,9 +274,18 @@
           const dx = W / 2 - puck.x, dy = H / 2 - puck.y, d = Math.hypot(dx, dy) || 1;
           puck.vx += dx / d * 70; puck.vy += dy / d * 70;
         }
+        // A slow puck in a corner (two walls) cannot be hit out cleanly by anyone, so it is eased out towards the middle after 0.5 s.
+        const nearX = puck.x < PR + 40 || puck.x > W - PR - 40, nearY = (puck.y < PR + 40 || puck.y > H - PR - 40) && !inMouth(puck.x);
+        cornerStill = nearX && nearY && sp < 60 ? cornerStill + dt : 0;
+        if (cornerStill > 0.5) {
+          cornerStill = 0;
+          const dx = W / 2 - puck.x, dy = H / 2 - puck.y, d = Math.hypot(dx, dy) || 1;
+          puck.vx = dx / d * 170; puck.vy = dy / d * 170;
+        }
         if (still > 3) { still = 0; faceoff(puck.y < H / 2 ? 'p2' : 'p1'); }
       }
-      if (window.ludusDebug) window.ludusDebug.hockeySet = (x, y, vx, vy) => { puck.x = x; puck.y = y; puck.vx = vx || 0; puck.vy = vy || 0; phase = 'play'; };
+      if (window.ludusDebug) window.ludusDebug.hockeySet = (x, y, vx, vy) => { puck.x = x; puck.y = y; puck.vx = vx || 0; puck.vy = vy || 0; phase = 'play'; still = wallStill = cornerStill = 0; ai.slow = ai.back = ai.timer = 0; };
+      if (window.ludusDebug) window.ludusDebug.hockeyBot = (x, y) => { Object.assign(mallets.p2, { x, y, vx: 0, vy: 0 }); };
       function goal(who) {
         score[who]++; lastGoal = { who, x: Math.max(W / 2 - GOAL / 2, Math.min(W / 2 + GOAL / 2, puck.x)), y: who === 'p1' ? 0 : H, t: clock };
         api.score(Math.max(score.p1, score.p2));

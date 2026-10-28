@@ -139,7 +139,11 @@
     tp: n => { const d = D().pong(); D().pongSet({ x: d.W - 8, y: n % 2 ? d.H - 8 : 8, vx: -0.05, vy: n % 2 ? -0.05 : 0.05 }); } });
   // Air Hockey: the puck dropped still into the bot's corners (the bot used to pin it there and the game stalled)
   games.push({ id: 'hockey', kind: 'rt', secs: 60, stall: 3.5, minChanges: 20,
-    progress: () => { const d = D().hockey(); return [d.score.p1, d.score.p2, d.puck.x, d.puck.y]; }, eps: 0.5,
+    progress: () => {
+      const d = D().hockey();
+      // the person's half is the person's job: a still puck waiting there (after a bot goal) gets a tap up the rink, like a player would
+      if (d.phase === 'play' && d.puck.y > d.H / 2 && Math.hypot(d.puck.vx, d.puck.vy) < 5) D().hockeySet(d.puck.x, d.puck.y, (Math.random() - 0.5) * 200, -380);
+      return [d.score.p1, d.score.p2, d.puck.x, d.puck.y]; }, eps: 0.5,
     tp: n => { const d = D().hockey(); D().hockeySet(n % 2 ? 14 : d.W - 14, 14, 0, 0); } });
   games.push({ id: 'tag', kind: 'rt', secs: 60, stall: 3.5, win: 10, minExt: 30,
     start: async () => { const d = D().tag(); if (d.phase === 'menu' && d.menu && d.menu[0]) { const t = d.menu[0]; canvasClick(t[0] + t[2] / 2, t[1] + t[3] / 2); advance(0.2); canvasClick(t[0] + t[2] / 2, t[1] + t[3] / 2); advance(2.5); } },

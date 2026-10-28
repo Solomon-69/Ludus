@@ -561,7 +561,10 @@
       if (!s.ready) return;
       // mine: this player made the code (only then may Rejoin open it again when nobody hosts it). live: still in the room.
       const was = S.party && S.party.code === s.code ? S.party : null;
-      S.party = { role: s.role || role, code: s.code, mine: was ? !!was.mine : role === 'host' && !s.yielded, live: true, name: L.net.cleanName(S.onlineName, ''), names: s.rosterList().map(p => p.name), games: s.plan.g.slice(), n: s.plan.n, at: Date.now() };
+      // a party opened again (Rejoin, nobody else there yet) keeps the names of the people who were in it
+      let names = s.rosterList().map(p => p.name);
+      if (was && names.length === 1 && Array.isArray(was.names)) names = names.concat(was.names.filter(n => n && n !== names[0]));
+      S.party = { role: s.role || role, code: s.code, mine: (was && !!was.mine) || (s.role === 'host' && role === 'host' && !s.yielded), live: true, name: L.net.cleanName(S.onlineName, ''), names, games: s.plan.g.slice(), n: s.plan.n, at: Date.now() };
       L.save();
     };
     ['ready', 'roster', 'plan', 'host'].forEach(ev => s.on(ev, save));
@@ -569,11 +572,13 @@
     // leader hand-over: everybody hears who runs the room now; an open scoreboard card redraws with the right buttons
     s.on('host', ev => { toast(ev.me ? 'You are now the leader' : (ev.name || 'A player') + ' is now the leader'); L.lobby.refresh(s); });
   }
-  // Rejoin always joins the party as a guest, whoever ran it before (a leader may have changed while we were away). Only the
-  // player who made the code opens it again as host, and only when nobody is hosting it any more.
+  // Rejoin first joins the party as a guest, whoever ran it before (a leader may have changed while we were away). When no
+  // host answers (the room emptied or expired, however long ago), the code is free, so we open it again as host with the same
+  // code, games and names. If a host turns up while we claim it, we join that room as a guest instead: never two rooms.
+  // A failed Rejoin never removes the Last party card.
   function rejoinParty() {
     const p = S.party; if (!p || !L.net.validCode(p.code)) return;
-    joinFromInvite(p.code, false, { rejoin: true, fallback: p.mine ? () => createFlexRoom(p) : null });
+    joinFromInvite(p.code, false, { rejoin: true, fallback: () => createFlexRoom(p) });
   }
   function onlineId() {
     if (typeof S.onlineId !== 'string' || !/^[0-9a-f]{12}$/.test(S.onlineId)) {
