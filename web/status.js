@@ -26,8 +26,13 @@
   if (!raw()) setTimeout(sync, 0);
   window.ludusNetState = () => conn.shown;
 
+  // ---------- build variant ----------
+  // The side-by-side test build ("Ludus Raised") says so here. It never checks for or installs updates.
+  L.VARIANT = String(window.__LUDUS_VARIANT__ || '');
+  if (L.VARIANT) root.dataset.variant = L.VARIANT;
+
   // ---------- updater ----------
-  const U = { state: 'idle', pct: 0, latest: '', listeners: [] };
+  const U = { state: L.VARIANT ? 'variant' : 'idle', pct: 0, latest: '', listeners: [] };
   const version = () => String(window.__LUDUS_VERSION__ || L.VERSION);
   const apiUrl = () => String(window.__LUDUS_UPDATE_API__ || L.UPDATE_API);
   const isWin = () => window.__LUDUS_PLATFORM__ === 'windows';
@@ -37,6 +42,7 @@
   U.version = version;
   let idleTimer = 0;
   U.check = async function () {
+    if (L.VARIANT) return;   // test build: no updates, ever
     if (U.state === 'checking' || U.state === 'progress') return;
     clearTimeout(idleTimer);
     if (!conn.shown) return set('offline');
@@ -62,7 +68,7 @@
   let silentTimer = 0;
   const NO_PROGRESS_MS = 45000;
   U.install = () => {
-    if (U.state !== 'confirm') return;
+    if (L.VARIANT || U.state !== 'confirm') return;
     set('progress', { pct: 0 });
     clearTimeout(silentTimer);
     silentTimer = setTimeout(() => { if (U.state === 'progress' && U.pct <= 0) set('error'); }, NO_PROGRESS_MS);
@@ -75,6 +81,6 @@
     if (kind === 'progress') set('progress', { pct: Math.max(0, Math.min(100, +v || 0)) });
     else if (kind === 'error') { clearTimeout(silentTimer); set('error'); }
   };
-  conn.on(up => { if (!up && (U.state === 'idle' || U.state === 'cantcheck' || U.state === 'uptodate')) set('offline'); else if (up && U.state === 'offline') set('idle'); });
+  conn.on(up => { if (L.VARIANT) return; if (!up && (U.state === 'idle' || U.state === 'cantcheck' || U.state === 'uptodate')) set('offline'); else if (up && U.state === 'offline') set('idle'); });
   L.update = U;
 })();

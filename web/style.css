@@ -757,3 +757,96 @@ svg { display: block; }
 .online-page { --op-r: 20px; --op-pad: 11px; --op-in: calc(var(--op-r) - var(--op-pad)); }
 .online-page .op-head, .online-page .party-card, .online-page .op-card { border-radius: var(--op-r); padding: var(--op-pad); }
 .online-page .op-card input, .online-page .op-card .btn, .online-page .party-card .btn, .online-page .code-tile { border-radius: var(--op-in); }
+
+/* ===================================================================================================================
+   RAISED BUTTONS (Ludus Raised test build). Every button-like control has a solid face and a solid darker bottom edge
+   (a box-shadow, so nothing moves in the layout). Hover lifts it 1px, a press sinks the face onto the edge and it springs
+   back on release. Disabled controls are flat. Edges are mixed from each control's own colour, so light and dark both
+   work and accent changes carry through. Switches, swatches and sliders stay as they are.
+   =================================================================================================================== */
+:root { --edge: 4px; --edge-mix: 24%; --raise-ease: cubic-bezier(0.34, 1.56, 0.64, 1); }
+:root[data-theme="dark"] { --edge-mix: 55%; }
+:root .btn:not(.ghost), :root .small-btn, :root .icon-btn, :root .card, :root .mode-tab.is-on, :root .seg-thumb, :root .tab-pill,
+:root .vs-toggle button.is-on, :root .pick-chips .chip, :root .lk-btn, :root .lk-chip, :root .lk-opt, :root .ih-guess {
+  --face: var(--surface-2);
+  --edge-c: color-mix(in srgb, var(--face) calc(100% - var(--edge-mix)), #000);
+  --edge-now: var(--edge);
+  --lift: 0px;
+}
+/* faces: each control's own colour */
+:root .icon-btn, :root .card, :root .seg-thumb, :root .vs-toggle button.is-on, :root .lk-btn, :root .lk-opt { --face: var(--surface); }
+:root .btn.primary, :root .mode-tab.is-on, :root .tab-pill, :root .pick-chips .chip.is-on, :root .lk-chip.on { --face: var(--ink); }
+:root .small-btn.warm { --face: #E8833A; }
+:root .ih-guess { --face: #6cb928; }
+:root .lk-primary { --face: var(--accent); }
+:root .lk-opt.right { --face: var(--good); }
+:root .lk-opt.wrong { --face: var(--bad); }
+:root .sug-actions .sug-decline { --edge-c: color-mix(in srgb, var(--ink) 20%, transparent); }
+/* thin edges for thumbs that ride inside a track (the track's own padding holds the edge) */
+:root .seg-thumb, :root .vs-toggle button.is-on { --edge: 2px; }
+:root .mode-tab.is-on, :root .tab-pill, :root .pick-chips .chip, :root .lk-chip { --edge: 3px; }
+:root .icon-btn.small { --edge: 3px; }
+
+/* the raised look */
+:root .btn:not(.ghost), :root .small-btn, :root .mode-tab.is-on, :root .seg-thumb, :root .tab-pill,
+:root .vs-toggle button.is-on, :root .pick-chips .chip, :root .lk-chip, :root .lk-btn, :root .lk-opt, :root .ih-guess {
+  box-shadow: 0 calc(var(--edge-now) + var(--lift)) 0 var(--edge-c);
+}
+:root .icon-btn, :root .card { box-shadow: 0 calc(var(--edge-now) + var(--lift)) 0 var(--edge-c), var(--shadow); }
+:root .btn.primary:hover { box-shadow: 0 calc(var(--edge-now) + var(--lift)) 0 var(--edge-c); }
+:root .lk-btn, :root .lk-opt { border-bottom-color: transparent; }
+/* slightly bolder labels */
+:root .btn { font-weight: 700; }
+:root .small-btn { font-weight: 680; }
+:root .chip { font-weight: 640; }
+:root .seg button { font-weight: 660; }
+:root .vs-toggle button { font-weight: 680; }
+
+/* motion: hover lifts 1px, press sinks onto the edge, release springs back */
+:root .btn:not(.ghost), :root .small-btn, :root .icon-btn, :root .card, :root .pick-chips .chip, :root .lk-chip, :root .lk-btn, :root .lk-opt,
+:root .ih-guess, :root .mode-tab, :root .vs-toggle button {
+  transition: transform 0.26s var(--raise-ease), box-shadow 0.26s var(--raise-ease), background-color 0.15s, color 0.15s, border-color 0.15s;
+}
+@media (hover: hover) {
+  :root .btn:not(.ghost):not(:disabled):hover, :root .small-btn:not(:disabled):hover, :root .icon-btn:hover, :root .card:hover,
+  :root .pick-chips .chip:hover, :root .lk-chip:not(:disabled):hover, :root .lk-btn:not(:disabled):hover, :root .lk-opt:not(:disabled):hover,
+  :root .ih-guess:not(:disabled):hover { --lift: 1px; transform: translateY(-1px); }
+}
+:root .btn:not(.ghost):not(:disabled):active, :root .small-btn:not(:disabled):active, :root .icon-btn:active, :root .card:active,
+:root .pick-chips .chip:active, :root .lk-chip:not(:disabled):active, :root .lk-btn:not(:disabled):active, :root .lk-opt:not(:disabled):active,
+:root .ih-guess:not(:disabled):active, :root .mode-tab.is-on:active, :root .vs-toggle button.is-on:active {
+  --edge-now: 0px; --lift: 0px; transform: translateY(var(--edge)); transition-duration: 0.07s;
+}
+/* tabs that are not on yet: a small sink, no edge */
+:root .mode-tab:not(.is-on):active, :root .vs-toggle button:not(.is-on):active, :root .chip:not(.is-on):active { transform: translateY(2px); transition-duration: 0.07s; }
+/* the category pill and segmented thumb keep their own slide; they only gain the edge */
+:root .tab-pill { transition: transform 0.36s cubic-bezier(0.22, 1, 0.36, 1), width 0.36s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.2s; }
+:root .tab-pill.no-slide { transition: none; }
+:root .seg { padding-bottom: 4px; }
+:root .seg-thumb { bottom: 4px; box-shadow: 0 var(--edge) 0 var(--edge-c); }
+:root .seg button.is-on { color: var(--ink); }
+/* ghost buttons stay flat; a press still answers */
+:root .btn.ghost:hover { transform: none; }
+:root .btn.ghost:active { transform: translateY(2px); }
+/* disabled: flat, no edge, no movement */
+:root .btn:disabled, :root .small-btn:disabled, :root .lk-btn:disabled, :root .lk-chip:disabled, :root .lk-opt:disabled, :root .ih-guess:disabled {
+  box-shadow: none; transform: none;
+}
+:root .lk-opt.dim { box-shadow: none; }
+/* card that flashes when found keeps its glow animation over the edge */
+:root .card.found { box-shadow: 0 var(--edge) 0 var(--edge-c), var(--shadow); }
+
+/* reduced motion: same looks and states, no movement in between */
+:root.reduce .btn, :root.reduce .small-btn, :root.reduce .icon-btn, :root.reduce .card, :root.reduce .chip, :root.reduce .mode-tab,
+:root.reduce .vs-toggle button, :root.reduce .lk-btn, :root.reduce .lk-chip, :root.reduce .lk-opt, :root.reduce .ih-guess { transition: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  :root .btn, :root .small-btn, :root .icon-btn, :root .card, :root .chip, :root .mode-tab, :root .vs-toggle button,
+  :root .lk-btn, :root .lk-chip, :root .lk-opt, :root .ih-guess { transition: none !important; }
+}
+
+/* Ludus Raised: a small "Raised" tag beside the name, so the two apps are easy to tell apart */
+:root[data-variant="raised"] .view-home .brand-name::after {
+  content: 'Raised'; display: inline-block; vertical-align: 2px; margin-left: 6px; padding: 2px 6px; border-radius: 6px;
+  font: 700 9.5px/1 var(--font-round); letter-spacing: 0.04em; text-transform: uppercase; color: var(--accent-ink); background: var(--accent);
+  box-shadow: 0 2px 0 color-mix(in srgb, var(--accent) 70%, #000);
+}

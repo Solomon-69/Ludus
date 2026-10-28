@@ -29,9 +29,9 @@ internal sealed record LaunchOptions(bool TestOpen, bool Quit, string? SelfTestP
 
 internal static class Program
 {
-    private const string MutexName = @"Local\Ludus.SingleInstance";
-    private const string OpenEventName = @"Local\Ludus.Open";
-    private const string QuitEventName = @"Local\Ludus.Quit";
+    private const string MutexName = @"Local\" + Variant.Slug + ".SingleInstance";
+    private const string OpenEventName = @"Local\" + Variant.Slug + ".Open";
+    private const string QuitEventName = @"Local\" + Variant.Slug + ".Quit";
     // Microsoft's Evergreen WebView2 Runtime bootstrapper (needed on some Windows 10 PCs).
     private const string WebView2Download = "https://go.microsoft.com/fwlink/p/?LinkId=2124703";
 

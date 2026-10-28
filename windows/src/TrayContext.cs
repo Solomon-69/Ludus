@@ -37,7 +37,7 @@ internal sealed class TrayContext : ApplicationContext
         popup.InvisibleChanged += hide => tray!.Visible = !hide;
         popup.PageReady += OnPageReady;
 
-        tray = new NotifyIcon { Text = "Ludus" };
+        tray = new NotifyIcon { Text = Variant.Name };
         DrawTrayIcon();
         tray.Visible = !Store.LoadInvisible();
         tray.MouseClick += (_, e) =>
@@ -104,6 +104,13 @@ internal sealed class TrayContext : ApplicationContext
             g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
             g.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.HighQuality;
             Glyph.Controller(g, px, theme.TaskbarDark ? Color.White : Color.FromArgb(0x1A, 0x1A, 0x1A));
+            if (Variant.IsVariant)
+            {
+                // Ludus Raised: a small terracotta dot in the corner, so the two tray icons are easy to tell apart
+                var d = Math.Max(5, px * 0.38f);
+                using var dot = new SolidBrush(Color.FromArgb(0xD9, 0x77, 0x57));
+                g.FillEllipse(dot, px - d, px - d, d, d);
+            }
         }
         var handle = bmp.GetHicon();
         var next = (Icon)Icon.FromHandle(handle).Clone();

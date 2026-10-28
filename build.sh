@@ -1,10 +1,17 @@
 #!/usr/bin/env bash
 # Builds Ludus.app with swiftc only (no Xcode project) and installs it to ~/Applications.
 # Usage: ./build.sh [--no-install]
+# LUDUS_VARIANT=raised (the default on the raised-buttons branch) builds the side-by-side test app "Ludus Raised":
+#   own name, bundle id com.solomon.ludus.raised, executable LudusRaised, no ludus:// links, no in-app updates.
+#   LUDUS_VARIANT=classic builds the normal Ludus. LUDUS_NO_OPEN=1 installs without opening the app.
 set -euo pipefail
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-OUT="${LUDUS_OUT:-/private/tmp/ludus-build}"   # override with LUDUS_OUT=/some/dir
-APP="$OUT/Ludus.app"
+VARIANT="${LUDUS_VARIANT:-raised}"; [ "$VARIANT" = "classic" ] && VARIANT=""
+if [ "$VARIANT" = "raised" ]; then NAME="Ludus Raised"; EXE="LudusRaised"; BUNDLE_ID="com.solomon.ludus.raised"
+elif [ -z "$VARIANT" ]; then NAME="Ludus"; EXE="Ludus"; BUNDLE_ID="com.solomon.Ludus"
+else echo "Unknown LUDUS_VARIANT: $VARIANT" >&2; exit 1; fi
+OUT="${LUDUS_OUT:-/private/tmp/ludus-build${VARIANT:+-$VARIANT}}"   # override with LUDUS_OUT=/some/dir
+APP="$OUT/$NAME.app"
 # Ad-hoc signature by default. Set SIGN_ID to your own identity (e.g. "Developer ID Application: ...") to sign properly.
 # Optional personal identity kept out of git: a file named .signing holding SIGN_ID="...".
 [ -f "$REPO/.signing" ] && . "$REPO/.signing"
@@ -39,11 +46,16 @@ TEST_FLAG="-DLUDUS_TEST"; [ "${RELEASE:-0}" = "1" ] && TEST_FLAG=""
 # shellcheck disable=SC2086  # empty TEST_FLAG must expand to nothing (bash 3.2 safe)
 swiftc -O -parse-as-library $TEST_FLAG -target arm64-apple-macos14.0 \
   -framework AppKit -framework WebKit -framework ServiceManagement \
-  "$REPO"/Sources/*.swift -o "$OUT/Ludus"
+  "$REPO"/Sources/*.swift -o "$OUT/$EXE"
 
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$REPO/Info.plist" "$APP/Contents/Info.plist"
-cp "$OUT/Ludus" "$APP/Contents/MacOS/Ludus"
+if [ -n "$VARIANT" ]; then
+  PB=/usr/libexec/PlistBuddy; PL="$APP/Contents/Info.plist"
+  "$PB" -c "Set :CFBundleIdentifier $BUNDLE_ID" -c "Set :CFBundleName $NAME" -c "Set :CFBundleDisplayName $NAME" \
+        -c "Set :CFBundleExecutable $EXE" -c "Add :LudusVariant string $VARIANT" -c "Delete :CFBundleURLTypes" "$PL"
+fi
+cp "$OUT/$EXE" "$APP/Contents/MacOS/$EXE"
 cp "$REPO/assets/Ludus.icns" "$APP/Contents/Resources/Ludus.icns"
 [ "$HAVE_CAR" = "1" ] && cp "$OUT/car/Assets.car" "$APP/Contents/Resources/Assets.car"
 rsync -a --exclude '.DS_Store' --exclude '.harness-*' "$REPO/web/" "$APP/Contents/Resources/web/"
@@ -52,10 +64,10 @@ codesign --force --deep --sign "$SIGN_ID" "$APP" 2>/dev/null || codesign --force
 echo "Built $APP"
 
 if [ "${1:-}" != "--no-install" ]; then
-  pkill -x Ludus 2>/dev/null || true
-  rm -rf "$HOME/Applications/Ludus.app"
-  ditto "$APP" "$HOME/Applications/Ludus.app"
-  open -g "$HOME/Applications/Ludus.app"
+  pkill -x "$EXE" 2>/dev/null || true
+  rm -rf "$HOME/Applications/$NAME.app"
+  ditto "$APP" "$HOME/Applications/$NAME.app"
+  [ "${LUDUS_NO_OPEN:-0}" = "1" ] || open -g "$HOME/Applications/$NAME.app"
   rm -rf "$APP"   # no second copy left behind for Spotlight to show
-  echo "Installed ~/Applications/Ludus.app"
+  echo "Installed ~/Applications/$NAME.app"
 fi

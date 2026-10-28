@@ -78,7 +78,7 @@ internal sealed class PopupForm : Form
         this.onQuit = onQuit;
         size = Store.LoadSize();
 
-        Text = "Ludus";
+        Text = Variant.Name;
         FormBorderStyle = FormBorderStyle.None;
         ShowInTaskbar = false;
         StartPosition = FormStartPosition.Manual;
@@ -138,7 +138,7 @@ internal sealed class PopupForm : Form
             _ = web.Handle;
 
             var userData = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Ludus", "WebView2");
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), Variant.Name, "WebView2");
             var env = await CoreWebView2Environment.CreateAsync(null, userData);
             await web.EnsureCoreWebView2Async(env);
             var core = web.CoreWebView2;
@@ -251,6 +251,7 @@ internal sealed class PopupForm : Form
                $"window.__LUDUS_INVISIBLE__ = {Bool(Store.LoadInvisible())};\n" +
                $"window.__LUDUS_ORIGINAL_NAMES__ = {Store.LoadOriginalNamesJson()};\n" +
                $"window.__LUDUS_SKIP_INTRO__ = {Bool(SkipIntro)};\n" +
+               $"window.__LUDUS_VARIANT__ = '{Variant.Id}';\n" +
                $"window.__LUDUS_VERSION__ = '{System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0"}';\n" +
                (TestFailStart ? "window.__LUDUS_TEST_FAIL__ = true;\n" : "") +
                (TestUpdateApi != null ? $"window.__LUDUS_UPDATE_API__ = '{TestUpdateApi}';\n" : "");
@@ -316,6 +317,7 @@ internal sealed class PopupForm : Form
 
     private async void StartUpdate(string? zip, string? sums, string? name)
     {
+        if (Variant.IsVariant) return;   // the test build never updates itself (and never from the classic releases)
         if (updating || zip == null || sums == null || name == null) return;
         if (!Uri.TryCreate(zip, UriKind.Absolute, out var zipUri) || !Uri.TryCreate(sums, UriKind.Absolute, out var sumsUri)) return;
         updating = true;

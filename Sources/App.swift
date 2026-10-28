@@ -23,7 +23,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
     private let dockKey = "ludusShowInDock"
     // One status item under one name for both modes, so macOS keeps a single remembered position and
     // the panel opens in the same place whether the icon is drawn or not.
-    private let itemName = "Ludus"
+    private let itemName = Variant.name
+    private let testNotification = Notification.Name((Bundle.main.bundleIdentifier ?? "com.solomon.Ludus") + ".test")
     private var invisible: Bool { UserDefaults.standard.bool(forKey: invisibleKey) }
     private static let compact = NSSize(width: 400, height: 600)
     private static let large = NSSize(width: 520, height: 740)
@@ -33,7 +34,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
     private static let wideLarge = NSSize(width: 900, height: 600)
     private var wide = false
     private var openCount = 0   // per-open counter, so a late reveal from an earlier open does nothing
-    private let testNotification = Notification.Name("com.solomon.Ludus.test")
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Keep "open at login" valid after the app is moved or renamed.
@@ -105,6 +105,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
         window.__LUDUS_DOCK__ = \(UserDefaults.standard.bool(forKey: dockKey));
         window.__LUDUS_DARK__ = \(isDark());
         window.__LUDUS_ORIGINAL_NAMES__ = \(originalNamesLiteral());
+        window.__LUDUS_VARIANT__ = \(String(reflecting: Variant.id));
         window.__LUDUS_VERSION__ = \(String(reflecting: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"));
         \(testBoot())
         """
@@ -146,6 +147,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
 
     private var updating = false
     private func startUpdate(_ body: [String: Any]) {
+        guard !Variant.isVariant else { return }   // the side-by-side test build never updates itself
         guard !updating, let z = (body["zip"] as? String).flatMap(URL.init(string:)), let s = (body["sums"] as? String).flatMap(URL.init(string:)),
               let name = body["name"] as? String else { return }
         updating = true
@@ -170,7 +172,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
     }
 
     private func appendErrorLog(_ line: String) {
-        let dir = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/Ludus")
+        let dir = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/\(Variant.name)")
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let url = dir.appendingPathComponent("errors.log"), data = Data((line + "\n").utf8)
         if let h = try? FileHandle(forWritingTo: url) { h.seekToEndOfFile(); h.write(data); try? h.close() } else { try? data.write(to: url) }
@@ -665,8 +667,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
     /// Menu bar icon: the Ludus mark, a solid controller with the d-pad and a diamond of four face buttons cut out
     /// (same silhouette as the app icon; template, so it adapts to the menu bar).
     private static func menuBarIcon() -> NSImage {
-        let image = NSImage(size: NSSize(width: 20, height: 16), flipped: true) { _ in
+        let badge = Variant.isVariant
+        let image = NSImage(size: NSSize(width: badge ? 24 : 20, height: 16), flipped: true) { _ in
             guard let ctx = NSGraphicsContext.current?.cgContext else { return false }
+            // Ludus Raised: a small round badge top right, so the two menu bar icons are easy to tell apart
+            if badge { ctx.addEllipse(in: CGRect(x: 19, y: 0, width: 5, height: 5)) }
             // The mark is drawn in a 100-unit design space (y down), scaled into 20 x 16 points.
             var t = CGAffineTransform(translationX: 10, y: 8).scaledBy(x: 0.222, y: 0.222).translatedBy(x: -50, y: -54)
             guard let body = controllerBody().copy(using: &t), let holes = controllerCutouts().copy(using: &t) else { return false }
@@ -676,15 +681,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
             return true
         }
         image.isTemplate = true
-        image.accessibilityDescription = "Ludus"
+        image.accessibilityDescription = Variant.name
         return image
     }
 
     /// Invisible mode: same size as the real icon, nothing drawn.
     private static func emptyIcon() -> NSImage {
-        let image = NSImage(size: NSSize(width: 20, height: 16))
+        let image = NSImage(size: NSSize(width: Variant.isVariant ? 24 : 20, height: 16))
         image.isTemplate = true
-        image.accessibilityDescription = "Ludus"
+        image.accessibilityDescription = Variant.name
         return image
     }
 

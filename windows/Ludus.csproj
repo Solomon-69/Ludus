@@ -33,6 +33,13 @@
     <DebugType>embedded</DebugType>
   </PropertyGroup>
 
+  <!-- Side-by-side test build: dotnet publish windows/Ludus.csproj -p:LudusVariant=raised  ->  LudusRaised.exe (see src/Variant.cs) -->
+  <PropertyGroup Condition="'$(LudusVariant)' == 'raised'">
+    <AssemblyName>LudusRaised</AssemblyName>
+    <Product>Ludus Raised</Product>
+    <DefineConstants>$(DefineConstants);LUDUS_RAISED</DefineConstants>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3912.50" />
   </ItemGroup>

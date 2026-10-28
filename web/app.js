@@ -1005,9 +1005,10 @@
     function draw() {
       const st = !L.conn.shown && ['idle', 'cantcheck', 'uptodate', 'offline'].includes(U.state) ? 'offline' : U.state;
       r.dataset.state = st; ctl.innerHTML = ''; sub.className = 'row-sub';
-      title.textContent = 'Ludus ' + U.version();
+      title.textContent = (L.VARIANT ? 'Ludus Raised ' : 'Ludus ') + U.version();
       const say = (text, cls) => { sub.textContent = text; if (cls) sub.classList.add(cls); };
-      if (st === 'idle') { say('Check for updates'); ctl.append(btn('Check', '', U.check)); }
+      if (L.VARIANT) say('Test build: updates are off');
+      else if (st === 'idle') { say('Check for updates'); ctl.append(btn('Check', '', U.check)); }
       else if (st === 'checking') { say('Checking…'); ctl.appendChild(el('i', 'spin')); }
       else if (st === 'uptodate') say('✓ Up to date', 'good');
       else if (st === 'available') { say('A new version is ready'); ctl.append(btn('Update to ' + U.latest, 'warm', U.askInstall)); }

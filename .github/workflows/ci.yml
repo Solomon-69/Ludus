@@ -28,19 +28,21 @@ jobs:
         with:
           xcode-version: latest-stable
 
-      - name: Build Ludus.app (ad-hoc signed, CI has no certificate)
+      # raised-buttons branch: CI builds the side-by-side "Ludus Raised" test app (its own name, bundle id, no updates)
+      - name: Build Ludus Raised.app (ad-hoc signed, CI has no certificate)
         env:
           SIGN_ID: '-'
           LUDUS_OUT: ${{ runner.temp }}/ludus-build
+          LUDUS_VARIANT: raised
         run: RELEASE=1 ./build.sh --no-install
 
       - name: Zip
-        run: ditto -c -k --keepParent "$RUNNER_TEMP/ludus-build/Ludus.app" Ludus-mac.zip
+        run: ditto -c -k --keepParent "$RUNNER_TEMP/ludus-build/Ludus Raised.app" LudusRaised-mac.zip
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Ludus-mac
-          path: Ludus-mac.zip
+          name: LudusRaised-mac
+          path: LudusRaised-mac.zip
           retention-days: 7
 
   windows:
@@ -53,23 +55,23 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
-      - name: Publish Ludus.exe
+      - name: Publish LudusRaised.exe (side-by-side test build)
         shell: pwsh
-        run: dotnet publish windows/Ludus.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o out/Ludus
+        run: dotnet publish windows/Ludus.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:LudusVariant=raised -o "out/Ludus Raised"
 
       - name: Check the game files came along
         shell: pwsh
         run: |
-          if (-not (Test-Path out/Ludus/Ludus.exe)) { throw "Ludus.exe missing" }
-          if (-not (Test-Path out/Ludus/web/index.html)) { throw "web/index.html missing" }
-          Get-ChildItem out/Ludus | Format-Table Name, Length
+          if (-not (Test-Path "out/Ludus Raised/LudusRaised.exe")) { throw "LudusRaised.exe missing" }
+          if (-not (Test-Path "out/Ludus Raised/web/index.html")) { throw "web/index.html missing" }
+          Get-ChildItem "out/Ludus Raised" | Format-Table Name, Length
 
       - name: Zip
         shell: pwsh
-        run: Compress-Archive -Path out/Ludus -DestinationPath Ludus-windows.zip
+        run: Compress-Archive -Path "out/Ludus Raised" -DestinationPath LudusRaised-windows.zip
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Ludus-windows
-          path: Ludus-windows.zip
+          name: LudusRaised-windows
+          path: LudusRaised-windows.zip
           retention-days: 7

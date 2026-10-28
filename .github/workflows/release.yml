@@ -77,7 +77,7 @@ jobs:
             echo "No signing secrets: building an ad-hoc signed app."
             export SIGN_ID='-'
           fi
-          RELEASE=1 ./build.sh --no-install
+          RELEASE=1 LUDUS_VARIANT=classic ./build.sh --no-install   # releases are always the classic Ludus
 
       # build.sh signs with --deep. Developer ID builds also need the hardened runtime and a
       # secure timestamp before Apple will notarise them, so re-sign here.

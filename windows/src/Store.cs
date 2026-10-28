@@ -11,12 +11,12 @@ namespace Ludus;
 internal static class Store
 {
     public static readonly string Folder =
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Ludus");
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), Variant.Name);
     private static readonly string StatePath = Path.Combine(Folder, "state.json");
     private static readonly string WindowPath = Path.Combine(Folder, "window.json");
 
     private const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
-    private const string RunValue = "Ludus";
+    private const string RunValue = Variant.Name;
 
     /// <summary>Your own list of names from %APPDATA%\Ludus\original-names.json (never shipped). Only a flat text-to-text map; otherwise "null".</summary>
     public static string LoadOriginalNamesJson()
@@ -41,6 +41,7 @@ internal static class Store
     /// <summary>Makes ludus:// links open this Ludus (per user, HKCU, no admin needed). Safe to run on every start.</summary>
     public static void RegisterUrlScheme()
     {
+        if (Variant.IsVariant) return;   // the side-by-side test build leaves invite links to the classic Ludus
         try
         {
             var exe = Environment.ProcessPath;
@@ -148,7 +149,7 @@ internal static class Store
         try
         {
             var folder = Environment.GetFolderPath(Environment.SpecialFolder.Programs);
-            var link = Path.Combine(folder, "Ludus.lnk");
+            var link = Path.Combine(folder, Variant.Name + ".lnk");
             var shellType = Type.GetTypeFromProgID("WScript.Shell");
             if (shellType == null) return;
             dynamic shell = Activator.CreateInstance(shellType)!;
@@ -159,7 +160,7 @@ internal static class Store
                 shortcut.TargetPath = ExePath();
                 shortcut.WorkingDirectory = AppContext.BaseDirectory;
                 shortcut.IconLocation = ExePath() + ",0";
-                shortcut.Description = "Ludus: 33 little games";
+                shortcut.Description = Variant.Name + ": little games";
                 shortcut.Save();
             }
             finally
