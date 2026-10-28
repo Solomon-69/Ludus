@@ -439,15 +439,28 @@
         sensI = Math.max(0, Math.min(SENS.length - 1, i)); Ludus.state.climbSens = SENS[sensI]; Ludus.save();
         sectionNote = { text: `Sensitivity ${SENS[sensI]}×`, t: clock };
       }
-      api.on(canvas, 'pointermove', e => {
-        const p = local(e);
-        mouse = p;
+      // The mouse never slips out of the game. A click locks the pointer to the climb (the cursor cannot leave the panel;
+      // Esc lets it go), and the hammer follows the mouse's movement. Where the app view refuses a lock, the pointer is
+      // captured while a button is held, so a drag that leaves the window keeps steering until the button is released.
+      // Moves are heard on the whole window, so passing over the header or the hint does not drop control either.
+      let locked = false;
+      const clampIn = q => { const r = canvas.getBoundingClientRect(); return { x: Math.max(0, Math.min(r.width, q.x)), y: Math.max(0, Math.min(r.height, q.y)) }; };
+      api.on(document, 'pointerlockchange', () => { locked = document.pointerLockElement === canvas; });
+      api.on(window, 'pointermove', e => {
+        if (locked) { const m = mouse || clampIn({ x: 1e9, y: 1e9 }); mouse = clampIn({ x: m.x + (e.movementX || 0), y: m.y + (e.movementY || 0) }); return; }
+        mouse = local(e);
       });
       api.on(canvas, 'pointerdown', e => {
-        const p = local(e);
+        const p = locked && mouse ? mouse : local(e);
+        try { canvas.setPointerCapture(e.pointerId); } catch (x) {}
         if (state === 'play' && inBox(sensBox(), p)) { setSens((sensI + 1) % SENS.length); api.sfx('tick'); return; }
         mouse = p;
+        if (state === 'play' && !locked && e.pointerType === 'mouse' && canvas.requestPointerLock && !window.__LUDUS_NO_LOCK__) {
+          try { const r = canvas.requestPointerLock(); if (r && r.catch) r.catch(() => {}); } catch (x) {}
+        }
       });
+      api.on(canvas, 'pointerup', e => { try { canvas.releasePointerCapture(e.pointerId); } catch (x) {} });
+      (window.Ludus.debug = window.Ludus.debug || {}).climbMouse = () => mouse && { x: mouse.x, y: mouse.y };   // tests read where the hammer aims
       api.keys(e => {
         if (e.key === '-' || e.key === '_') { setSens(sensI - 1); return; }
         if (e.key === '=' || e.key === '+') { setSens(sensI + 1); return; }
@@ -732,7 +745,9 @@
           const c = q => ({ x: q.x, y: q.y });
           return { v2: 4, p: c(s.p), v: c(s.v), o: c(s.o), h: c(s.h), hc: s.hc, hn: c(s.hn), ground: s.ground, maxH, maxP, time, falls, aim: { a: aim.a, l: aim.l } };
         },
-        resume() { acc = 0; }
+        resume() { acc = 0; },
+        pause() { if (document.pointerLockElement === canvas) document.exitPointerLock(); },
+        destroy() { if (document.pointerLockElement === canvas) document.exitPointerLock(); }
       };
     }
   });

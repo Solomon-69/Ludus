@@ -240,6 +240,9 @@
           if (type === 'keydown' && e.key) held.set(e.key, e.code);
           if (type === 'keyup' && e.key) held.delete(e.key);
           if (crashed) return;
+          // A press on a game's canvas keeps the pointer: a drag that leaves the panel (Mac or Windows) keeps reaching the
+          // game until the button is let go, so steering never stops at the window edge.
+          if (type === 'pointerdown' && target instanceof HTMLCanvasElement && e.pointerType !== 'touch') { try { target.setPointerCapture(e.pointerId); } catch (x) {} }
           try { fn(e); } catch (x) { crash(x, 'input'); }
         };
         target.addEventListener(type, wrapped, opts);

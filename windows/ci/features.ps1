@@ -1,6 +1,7 @@
 # features.ps1: Windows checks for things friends reported, in the real app (WebView2), silently on the CI machine.
 #  1. Hammer Climb starts: a real mouse click on the "Normal" mountain begins the climb, and moving the mouse moves the pot.
 #  2. Original names: a list next to Ludus.exe is picked up, the Settings switch turns it on, and the game shows the new name.
+#  1b. Hammer Climb keeps control when the cursor leaves the panel (pointer lock, or capture while held).
 #  3. Load names file: the Settings button copies a picked list into %APPDATA%\\Ludus and turns Original names on.
 # Windows PowerShell 5.1 (UI Automation). Screenshots and logs go to $Out.
 param([string]$Exe = 'out/Ludus/Ludus.exe', [string]$Out = 'features')
@@ -45,6 +46,40 @@ Check ($p -and -not $p.HasExited) 'climb: app still running'
 Stop-Process $p -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 2
 $s = State
 Check ($s -and -not $s.climbDiff) "climb: starts straight into the climb with no difficulty menu (climbDiff=$($s.climbDiff))"
+
+# ---- 1b. Hammer Climb keeps control when the mouse leaves the panel ----
+# Press inside the climb, then move the cursor well outside the panel: the hammer must keep moving (the pointer is locked
+# to the game, or captured while the button is held), compared with the board standing still on its own.
+function Diff-Png([string]$a, [string]$b) {
+  $x = [System.Drawing.Bitmap]::FromFile($a); $y = [System.Drawing.Bitmap]::FromFile($b); $n = 0
+  try { for ($i = 0; $i -lt [Math]::Min($x.Width, $y.Width); $i += 3) { for ($j = 0; $j -lt [Math]::Min($x.Height, $y.Height); $j += 3) {
+    $p = $x.GetPixel($i, $j); $q = $y.GetPixel($i, $j)
+    if ([Math]::Abs($p.R - $q.R) + [Math]::Abs($p.G - $q.G) + [Math]::Abs($p.B - $q.B) -gt 40) { $n++ } } } }
+  finally { $x.Dispose(); $y.Dispose() }
+  return $n
+}
+$jsonD = Join-Path $Out 'drag-selftest.json'
+$p = Start-Process $Exe -ArgumentList '--test-open', '--test-game=climb', "--selftest=$jsonD" -PassThru
+[void](Wait-File $jsonD 120); Start-Sleep -Seconds 3
+$bd = (Get-Content $jsonD -Raw | ConvertFrom-Json).panelBounds
+$cx = [int]($bd[0] + $bd[2] / 2); $cy = [int]($bd[1] + $bd[3] * 0.6)
+[void][Mouse]::SetCursorPos($cx, $cy); Start-Sleep -Milliseconds 300
+[Mouse]::mouse_event(2, 0, 0, 0, [UIntPtr]::Zero); Start-Sleep -Milliseconds 200
+$s1 = Join-Path $Out 'drag-still1.png'; $s2 = Join-Path $Out 'drag-still2.png'
+Save-Crop $s1 $bd[0] $bd[1] $bd[2] $bd[3] 0; Start-Sleep -Milliseconds 600; Save-Crop $s2 $bd[0] $bd[1] $bd[2] $bd[3] 0
+$still = Diff-Png $s1 $s2
+$ox = [int]($bd[0] - 140); if ($ox -lt 5) { $ox = [int]($bd[0] + $bd[2] + 140) }
+for ($i = 0; $i -le 12; $i++) { [void][Mouse]::SetCursorPos([int]($cx + ($ox - $cx) * $i / 12), $cy); Start-Sleep -Milliseconds 30 }
+$o1 = Join-Path $Out 'drag-out1.png'; $o2 = Join-Path $Out 'drag-out2.png'
+Start-Sleep -Milliseconds 400; Save-Crop $o1 $bd[0] $bd[1] $bd[2] $bd[3] 0
+for ($i = 1; $i -le 12; $i++) { [void][Mouse]::SetCursorPos($ox, [int]($cy - 260 * $i / 12)); Start-Sleep -Milliseconds 30 }
+Start-Sleep -Milliseconds 400; Save-Crop $o2 $bd[0] $bd[1] $bd[2] $bd[3] 0
+$moved = Diff-Png $o1 $o2
+[Mouse]::mouse_event(4, 0, 0, 0, [UIntPtr]::Zero); Start-Sleep -Milliseconds 200
+Write-Host "drag: still diff $still, outside-move diff $moved"
+Check ($moved -gt ($still * 3 + 150)) "climb: with the cursor outside the panel the hammer still moves (diff $moved vs still $still)"
+Check ($p -and -not $p.HasExited) 'climb: app still running after the drag'
+Stop-Process $p -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 2
 
 # ---- 2. Original names ----
 $dir = Split-Path $Exe -Parent
