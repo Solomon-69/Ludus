@@ -78,6 +78,19 @@
   // Each relay is a separate world, so everybody in a room must use the same one. The room code decides which:
   // the host makes a code that belongs to the relay it is connected to, and joiners try that relay first.
   NET.codeBroker = (code, n) => { let t = 0; for (const ch of String(code)) t += ch.charCodeAt(0); return n > 0 ? t % n : 0; };
+  // Where to look for a room code: its own relay first, then one fallback that everybody can reach (ntfy.sh, on the ordinary
+  // HTTPS port). A network that blocks the MQTT relays (only ports 80/443 open) can still reach a room reopened there.
+  // Relays that failed to connect in the last few minutes are skipped (as long as one is left).
+  const RELAY_DEAD_MS = 180000;
+  NET.relayDown = {};               // url -> time it last failed to connect
+  NET.codeRelays = (code, urls) => {
+    const n = urls.length, home = NET.codeBroker(code, n);
+    let alt = urls.findIndex((u, i) => i !== home && String(u).indexOf('ntfy:') === 0);
+    if (alt < 0 && n > 1) alt = (home + 1) % n;
+    const all = alt < 0 ? [home] : [home, alt], now = Date.now();
+    const live = all.filter(i => !(now - (NET.relayDown[urls[i]] || 0) < RELAY_DEAD_MS));
+    return live.length ? live : all;
+  };
   NET.codeFor = (idx, n) => { for (let i = 0; i < 500; i++) { const c = NET.newCode(); if (NET.codeBroker(c, n) === idx % n) return c; } return NET.newCode(); };
   // A seeded random stream (mulberry32): the same seed gives every player the same numbers.
   NET.prng = function (seed) {
@@ -160,6 +173,7 @@
     me.subs = new Map(); me.outbox = []; me.listeners = []; me.attempt = 0; me.pid = 1;
     me.closed = false; me.ws = null; me.everOnline = false; me.url = '';
     me.idx = o.start || 0; me.curIdx = me.idx % me.urls.length; me.pinned = !!o.pinned;   // pinned: a room code's own relay, never another one
+    me.onFail = o.onFail || null;   // a room still looking for its code: may move to the next relay when this one cannot be reached
     me.connect();
   }
   Mqtt.prototype.pin = function () { this.pinned = true; this.idx = this.curIdx; };
@@ -190,7 +204,7 @@
           const type = first >> 4;
           if (type === 2) {   // CONNACK
             if (body.length >= 2 && body[1] === 0) {
-              acked = true; me.attempt = 0; me.everOnline = true; me.curIdx = me.idx % me.urls.length; me.lastRx = Date.now();
+              acked = true; me.attempt = 0; me.everOnline = true; me.curIdx = me.idx % me.urls.length; me.lastRx = Date.now(); delete NET.relayDown[url];
               me._startPing(ws);
               me.subs.forEach((fn, topic) => me._raw(P.subscribe(me.pid++ & 0xFFFF || 1, topic)));
               const q = me.outbox; me.outbox = [];
@@ -204,7 +218,8 @@
             if (qos > 0) { pid = (body[at] << 8) | body[at + 1]; at += 2; }
             if (qos === 1) me._raw(P.puback(pid));
             const fn = me.subs.get(topic);
-            if (fn) { try { fn(dec.decode(body.subarray(at))); } catch (e) { /* ignore a handler error */ } }
+            // retain flag: an old message the relay kept, not something sent just now
+            if (fn) { try { fn(dec.decode(body.subarray(at)), (first & 1) === 1); } catch (e) { /* ignore a handler error */ } }
           }
           // SUBACK, PINGRESP and the rest need no action: lastRx above is what keeps the link alive
         });
@@ -230,6 +245,8 @@
   Mqtt.prototype._lost = function (wasOnline) {
     const me = this;
     if (me.closed) return;
+    if (!wasOnline) NET.relayDown[me.url] = Date.now();
+    if (!me.everOnline && me.onFail && me.onFail()) { me.closed = true; return; }   // the room moves on to its next relay
     if (!me.pinned) me.idx++;   // a room stays on its relay: only a connection still looking for one moves on
     me.attempt++;
     // Never reached a relay after trying them all twice: say offline. Otherwise a drop is "offline" until it recovers.
@@ -285,7 +302,7 @@
       me.lastRx = Date.now();
       let m; try { m = JSON.parse(ev.data); } catch (e) { return; }
       if (m && m.event === 'open' && !acked) {
-        acked = true; me.attempt = 0; me.everOnline = true; me.curIdx = me.idx % me.urls.length; me.lastRx = Date.now();
+        acked = true; me.attempt = 0; me.everOnline = true; me.curIdx = me.idx % me.urls.length; me.lastRx = Date.now(); delete NET.relayDown[me.url];
         me.subs.forEach((fn, t) => me._ntfyOpen(t));
         me._ntfyFlush();
         me._set('online');
@@ -310,9 +327,11 @@
     ws.onmessage = ev => {
       ws.lastRx = Date.now();
       let m; try { m = JSON.parse(ev.data); } catch (e) { return; }
+      // ntfy sends "open" first, then the messages of the last few seconds again (since=8s): those are marked old
+      if (m && m.event === 'open') { ws.openAt = m.time; return; }
       if (!m || m.event !== 'message' || typeof m.message !== 'string') return;
       const fn = me.subs.get(topic);
-      if (fn) { try { fn(m.message); } catch (e) { /* ignore a handler error */ } }
+      if (fn) { try { fn(m.message, !!ws.openAt && m.time < ws.openAt); } catch (e) { /* ignore a handler error */ } }
     };
     ws.onclose = () => {   // a dropped listener comes back while the room still wants it
       if (me.nsock && me.nsock.get(topic) === ws) { me.nsock.delete(topic); if (!me.closed && me.subs.has(topic) && me.state === 'online') setTimeout(() => me._ntfyOpen(topic), 800); }
@@ -408,19 +427,37 @@
     me.peerHx = {};             // host: cid -> 1 when that player's Ludus understands a hand-over
     me.order = [];              // host: player ids in the order they joined (the longest-present player takes over when the host leaves)
     me.ready = false;           // host: code claimed; guest: accepted into the room
-    const urls = NET.brokers();
+    const urls = me.urls = NET.brokers();
     me.wantCode = role === 'host' && opts.code ? NET.extractCode(opts.code) : '';   // a host coming back to the same room code (Rejoin)
-    me.wantTries = 0;
-    // a guest (and a host coming back to its own code) stays on the relay the code belongs to: the room is only there
-    const pinned = role === 'guest' || !!me.wantCode;
-    me.client = new Mqtt({ urls, clientId: 'ludus_' + hex(randBytes(8)), pinned, start: role === 'guest' ? NET.codeBroker(opts.code, urls.length) : me.wantCode ? NET.codeBroker(me.wantCode, urls.length) : 0 });
-    me.client.onState(s => me._conn(s));
+    me.wantTries = 0; me.flex0 = me.flex;
+    // A guest (and a host coming back to its own code) stays on the relays the code belongs to: its own relay, then the one
+    // fallback (see NET.codeRelays). A relay that cannot be reached, or where nobody answers, moves the room to the next one.
+    me.route = role === 'guest' ? NET.codeRelays(opts.code, urls) : me.wantCode ? NET.codeRelays(me.wantCode, urls) : null;
+    me.hop = 0;
+    me._dial(me.route ? me.route[0] : 0, !!me.route);
     me.lastHost = Date.now(); me.lastHb = 0;
     me.tick = setInterval(() => me._tick(), 1000);
-    me.guard = setTimeout(() => { if (!me.ready && !me.over && me.conn !== 'online') me._fail('offline'); }, pinned ? 32000 : 14000);
     me.candidate = role === 'host' ? '' : opts.code;
     me._begin();
   }
+  Session.prototype._dial = function (idx, pinned) {
+    const me = this;
+    const c = me.client = new Mqtt({ urls: me.urls, clientId: 'ludus_' + hex(randBytes(8)), pinned, start: idx, onFail: pinned ? () => { if (!me._canHop()) return false; setTimeout(() => me._hop(), 0); return true; } : null });
+    c.onState(s => { if (me.client === c) me._conn(s); });
+    clearTimeout(me.guard);
+    me.guard = setTimeout(() => { if (!me.ready && !me.over && me.conn !== 'online' && me.client === c && !me._hop()) me._fail('offline'); }, pinned ? 32000 : 14000);
+  };
+  Session.prototype._canHop = function () { return !!this.route && !this.noHop && !this.ready && !this.over && this.hop + 1 < this.route.length; };
+  // the next relay of the code's route: nobody there could be reached, or nobody answered
+  Session.prototype._hop = function () {
+    if (!this._canHop()) return false;
+    clearInterval(this.joinTimer); clearTimeout(this.claimWait); clearInterval(this.claimTimer);
+    const old = this.client; old.listeners = []; old.close();
+    this.hop++; this.subscribed = false; this.conn = 'connecting';
+    this._dial(this.route[this.hop], true);
+    this._begin();
+    return true;
+  };
   Session.prototype._hbEvery = function () { return this.client.isNtfy ? NTFY_HEARTBEAT : HEARTBEAT; };
   Session.prototype._peerTimeout = function () { return this.client.isNtfy ? NTFY_TIMEOUT : PEER_TIMEOUT; };
   Session.prototype.on = function (ev, fn) {
@@ -462,11 +499,12 @@
     const me = this;
     if (me.role === 'host') {
       const n = me.client.urls.length;
-      if (me.wantCode && me.wantTries < 2 && NET.codeBroker(me.wantCode, n) === me.client.curIdx % n) { me.wantTries++; me.candidate = me.wantCode; }
+      // Rejoin always reopens its own code (on whichever relay of the code's route answered), never a new one
+      if (me.wantCode) { me.wantTries++; me.candidate = me.wantCode; }
       else me.candidate = NET.codeFor(me.client.curIdx, n);
     }
     const topic = topicOf(me.candidate);
-    me.client.subscribe(topic, txt => me._recv(txt));
+    me.client.subscribe(topic, (txt, old) => me._recv(txt, old));
     if (me.role === 'host') {
       // Listen for a moment and ask "is anybody hosting this code?" (hq): if somebody is, pick another. A code used before
       // listens longer than one heartbeat, so even an older Ludus (which does not answer hq) is heard.
@@ -498,7 +536,11 @@
     const limit = me.rejoin === 'quick' ? 5 : me.rejoin ? 12 : 8;   // quick: the maker of the code, who reopens it if nobody answers
     const ask = () => {
       if (me.over || me.ready || me.conn !== 'online') return;
-      if (++me.tries > limit) { me._fail('no-room'); return; }
+      if (++me.tries > limit) {
+        if (me._hop()) return;                                   // not on this relay: look on the code's fallback relay
+        if (me.yieldCode && (me.yields || 0) < 3) { me._reclaim(); return; }   // the host we gave way to has gone: open the code again
+        me._fail('no-room'); return;
+      }
       const j = { t: 'join', n: me.baseName, g: me.gameId, pv: PV, hx: 1 };
       if (me.uid) j.u = me.uid;
       me._pub(j);
@@ -568,7 +610,8 @@
     if (this.role === 'host' && this.ser) this._afterLeave();
   };
 
-  Session.prototype._recv = function (txt) {
+  // old: a message the relay kept or sent again (MQTT retained, ntfy's last seconds); it never proves that somebody is here now
+  Session.prototype._recv = function (txt, old) {
     if (this.over || typeof txt !== 'string' || txt.length > MAX_PACKET + 600 || bytes(txt) > MAX_PACKET + 600) return;
     let m;
     try { m = JSON.parse(txt); } catch (e) { return; }
@@ -576,11 +619,11 @@
     this.seen[m.c] = Date.now();
     if (m.c === this.hostCid) this.lastHost = Date.now();
     switch (m.t) {
-      case 'join': return this.role === 'host' ? this._onJoin(m) : undefined;
-      case 'hq': if (this.role === 'host' && this.ready && Date.now() - (this.hqAt || 0) > 500) { this.hqAt = Date.now(); this._pub(this._hbObj()); } return;
+      case 'join': return this.role === 'host' && !old ? this._onJoin(m) : undefined;
+      case 'hq': if (this.role === 'host' && !old && this.ready && Date.now() - (this.hqAt || 0) > 500) { this.hqAt = Date.now(); this._pub(this._hbObj()); } return;
       case 'welcome': return this._onWelcome(m);
       case 'rej': if (m.to === this.cid && !this.ready) { this._fail(m.why === 'full' || m.why === 'started' || m.why === 'game' || m.why === 'update' ? m.why : 'no-room'); } return;
-      case 'hb': return this._onHb(m);
+      case 'hb': return this._onHb(m, old);
       case 'bye': return this._onBye(m);
       case 'start': return this._onStart(m);
       case 'nack': return this._onNack(m);
@@ -919,11 +962,12 @@
     list.forEach(p => { if (!this.seen[p.cid]) this.seen[p.cid] = Date.now(); if (p.cid === this.cid && this.role !== 'host') this.seat = p.seat; });
     this._emit('roster', this.rosterList());
   };
-  Session.prototype._onHb = function (m) {
+  Session.prototype._onHb = function (m, old) {
     const seat = this._seatOf(m.c);
-    // someone else is hosting the code we wanted: pick another
-    if (this.role === 'host' && !this.ready && Array.isArray(m.p)) { this.collision = true; return; }
-    if (this.role === 'host' && this.ready && Array.isArray(m.p) && seat < 0) { this._otherHost(m); return; }
+    // someone else is hosting the code we wanted: pick another. A kept or replayed heartbeat (a host that has gone) does not count:
+    // a live host answers our "hq" at once.
+    if (this.role === 'host' && !this.ready && Array.isArray(m.p)) { if (!old) this.collision = true; return; }
+    if (this.role === 'host' && this.ready && Array.isArray(m.p) && seat < 0) { if (!old) this._otherHost(m); return; }
     // a player of ours says it is in somebody else's room (two hosts answered its join): let it go
     if (this.role === 'host' && seat > 0 && typeof m.h === 'string' && m.h && m.h !== this.cid && (Number.isInteger(m.he) ? m.he : 0) >= this.he) { this._removeSeat(seat, 'moved'); return; }
     if (typeof m.q === 'number' && seat >= 0) this._maybeNack(m.c, m.q);
@@ -965,9 +1009,18 @@
     this.role = 'guest'; this.seat = -1; this.hostCid = ''; this.ready = false; this.flex = false; this.claimedAt = 0; this.wantCode = '';
     this.roster = new Map(); this.order = []; this.peerPv = {}; this.peerHx = {}; this.uids = {}; this.held = []; this.sugs = [];
     this.candidate = code; this.code = code;
-    if (!this.client.subs.has(topicOf(code))) this.client.subscribe(topicOf(code), txt => this._recv(txt));
+    this.yieldCode = code; this.yields = (this.yields || 0) + 1; this.noHop = true;   // the live host is on this relay
+    if (!this.client.subs.has(topicOf(code))) this.client.subscribe(topicOf(code), (txt, old) => this._recv(txt, old));
     this._emit('yield', { code });
     this._askJoin();
+  };
+  // we gave way to a host that then stopped answering: open the code again ourselves (never a dead end, never a new code)
+  Session.prototype._reclaim = function () {
+    const code = this.yieldCode; this.yieldCode = '';
+    clearInterval(this.joinTimer);
+    this.role = 'host'; this.seat = 0; this.hostCid = this.cid; this.flex = this.flex0; this.wantCode = code; this.wantTries = 0;
+    this.roster = new Map();
+    this._subscribeCandidate();
   };
   Session.prototype._onStart = function (m) {
     if (this.role === 'host' || m.c !== this.hostCid || !Number.isInteger(m.gen) || !Number.isInteger(m.sd)) return;

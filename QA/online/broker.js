@@ -3,7 +3,9 @@
 const http = require('http'), crypto = require('crypto');
 function start(port = 0) {
   const conns = new Set();
-  const api = { conns, filter: null, published: 0, latency: null };
+  const api = { conns, filter: null, published: 0, latency: null, retained: new Map(), replayMs: 0, recent: [] };
+  // a message the relay keeps for later subscribers, as a client publishing with the retain flag would leave it
+  api.retain = (topic, text) => { if (text) api.retained.set(topic, text); else api.retained.delete(topic); };
   const server = http.createServer((q, r) => { r.statusCode = 404; r.end(); });
   server.on('upgrade', (req, sock) => {
     const accept = crypto.createHash('sha1').update(req.headers['sec-websocket-key'] + '258EAFA5-E914-47DA-95CA-C5AB0DC85B11').digest('base64');
@@ -16,14 +18,21 @@ function start(port = 0) {
       sock.write(Buffer.concat([h, buf]));
     };
     const rl = n => { const o = []; do { let b = n % 128; n = Math.floor(n / 128); if (n > 0) b |= 128; o.push(b); } while (n > 0); return o; };
-    api.rawFrame = (topic, text) => { const t = Buffer.from(topic), body = Buffer.concat([Buffer.from([t.length >> 8, t.length & 255]), t, Buffer.from(text)]); return Buffer.concat([Buffer.from([0x30, ...rl(body.length)]), body]); };
+    api.rawFrame = (topic, text, retain) => { const t = Buffer.from(topic), body = Buffer.concat([Buffer.from([t.length >> 8, t.length & 255]), t, Buffer.from(text)]); return Buffer.concat([Buffer.from([retain ? 0x31 : 0x30, ...rl(body.length)]), body]); };
     const onMqtt = (first, body) => {
       const type = first >> 4;
       if (type === 1) c.send(Buffer.from([0x20, 2, 0, 0]));
       else if (type === 8) {
         const pid = body.subarray(0, 2); let at = 2;
-        while (at < body.length) { const l = body.readUInt16BE(at); c.subs.add(body.subarray(at + 2, at + 2 + l).toString()); at += 2 + l + 1; }
+        const added = [];
+        while (at < body.length) { const l = body.readUInt16BE(at); const t = body.subarray(at + 2, at + 2 + l).toString(); c.subs.add(t); added.push(t); at += 2 + l + 1; }
         c.send(Buffer.concat([Buffer.from([0x90, 3]), pid, Buffer.from([0])]));
+        // like a real relay: a new subscriber first gets the topic's retained message (retain flag set), and with
+        // api.replayMs (like ntfy.sh's since=8s) the messages of the last few seconds again, also flagged as old
+        added.forEach(t => {
+          if (api.replayMs) api.recent.filter(r => r.topic === t && Date.now() - r.at < api.replayMs).forEach(r => c.send(api.rawFrame(t, r.text, true)));
+          if (api.retained.has(t)) c.send(api.rawFrame(t, api.retained.get(t), true));
+        });
       } else if (type === 10) {
         const pid = body.subarray(0, 2); let at = 2;
         while (at < body.length) { const l = body.readUInt16BE(at); c.subs.delete(body.subarray(at + 2, at + 2 + l).toString()); at += 2 + l; }
@@ -32,7 +41,9 @@ function start(port = 0) {
         const tl = body.readUInt16BE(0), topic = body.subarray(2, 2 + tl).toString(), payload = body.subarray(2 + tl).toString();
         api.published++;
         if (api.filter && api.filter(topic, payload, c) === false) return;
-        const raw = Buffer.concat([Buffer.from([0x30, ...rl(body.length)]), body]);
+        if (first & 1) { if (payload) api.retained.set(topic, payload); else api.retained.delete(topic); }   // retain flag (empty clears it)
+        if (api.replayMs) { api.recent.push({ topic, text: payload, at: Date.now() }); if (api.recent.length > 500) api.recent.shift(); }
+        const raw = Buffer.concat([Buffer.from([0x30, ...rl(body.length)]), body]);   // live copies go out without the retain flag
         conns.forEach(o => {
           if (!o.subs.has(topic)) return;
           if (!api.latency) return o.send(raw);

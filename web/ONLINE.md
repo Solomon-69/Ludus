@@ -170,7 +170,13 @@ about 0.1 s late; if the host leaves the room closes.
   before, longer than one heartbeat, so a Ludus that does not answer `hq` is heard too). Two hosts that still end up on one code: the one
   alone gives way to the other room and joins it. Guests say whose room they are in (`h` in their heartbeat), so a host that seated them
   by mistake lets go. Rejoin always joins as a guest; only the player who made the code opens it again, and only when nobody hosts it.
-* A guest (and a host reopening its own code) stays on the code's relay and waits up to 10 s for it to connect. The host's heartbeat carries the
+* A code's route (`NET.codeRelays`): its own relay, then one fallback everybody can reach (ntfy.sh on port 443; the next relay when there is no
+  ntfy). A guest asks on each relay of the route in turn (a relay that cannot be reached, or where nobody answers, moves it on); a host
+  reopening its own code claims it on the first relay of the route that connects, so a network that blocks the MQTT ports (only 80/443
+  open) still gets its party back on ntfy, and friends find it there. Relays that failed to connect in the last 3 minutes are skipped.
+  Old messages (MQTT retained, ntfy's replayed last 8 s, both marked "old") never count as a live host or a join: a live host answers `hq`.
+  Rejoin never picks a new code; a reopening host that gave way to a live host that then vanishes opens the code again itself.
+* A guest (and a host reopening its own code) waits up to 10 s for each relay of the route to connect. The host's heartbeat carries the
   roster and the current round so a missed message heals itself. If the host leaves, the room is handed to
   another player when everybody can follow (see "Leader hand-over"), otherwise it closes. A connection that drops reconnects by itself (state `connecting` / `online` / `offline`).
 * Room codes are 5 characters from `ABCDEFGHJKMNPQRSTUVWXYZ23456789` (no `I L O 0 1`).

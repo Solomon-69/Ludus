@@ -3,6 +3,11 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.21 (28 Oct 2026)
+- Rejoin now works for old parties on any network. On networks that only allow ordinary web traffic (where the main relays cannot be reached), Rejoin used to wait forever on the party's own relay; it now moves to the backup relay and reopens the same code there, and friends joining by code find it.
+- Rejoin is no longer fooled by old messages a relay keeps or replays from a host who has gone, so it never ends on "No such room". If the host it gave way to disappears, it reopens the code itself.
+- Rejoin always keeps the party's own code (it never switches to a new one), and the Last party card stays until you press Forget.
+
 ## 1.12.20 (2026-10-28)
 - Sound everywhere: every game has fuller sounds, and the app itself now has soft sounds for tabs, opening games, Back, switches, panels, messages, results, new bests, rooms, friends joining and copying an invite. All follow the Sound switch and volume.
 - Smoother Online page: Forgetting a party fades the card out whole while the cards below glide up, the Last party card eases in, switching tabs and opening a room no longer jump.
