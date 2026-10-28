@@ -3,6 +3,10 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.23 (28 Oct 2026)
+- Create room works on networks that only allow ordinary web traffic: Ludus remembers the relay that worked last time and tries it first, and waits a little longer for a room before giving up.
+- If making a room fails, you go back to the Online page instead of being left on a stray card.
+
 ## 1.12.22 (28 Oct 2026)
 - New raised buttons: every button, tab and game card now has a solid edge underneath, lifts a little when you point at it, sinks when you press it and springs back. Disabled buttons stay flat, and Reduce motion keeps the look without the movement.
 - Settings groups, the Online page cards, the Last party card, the party room and its seats, the pause and result panels, the search field and the tab bars get the same raised edge, so the whole app matches. The edges show clearly in light and dark.
