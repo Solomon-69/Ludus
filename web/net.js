@@ -88,12 +88,17 @@
   // Relays that failed to connect in the last few minutes are skipped (as long as one is left).
   const RELAY_DEAD_MS = 180000;
   NET.relayDown = {};               // url -> time it last failed to connect
-  NET.codeRelays = (code, urls) => {
+  NET.codeRelays = (code, urls, rejoin) => {
     const n = urls.length, home = NET.codeBroker(code, n);
     let alt = urls.findIndex((u, i) => i !== home && String(u).indexOf('ntfy:') === 0);
     if (alt < 0 && n > 1) alt = (home + 1) % n;
     const all = alt < 0 ? [home] : [home, alt], now = Date.now();
     const live = all.filter(i => !(now - (NET.relayDown[urls[i]] || 0) < RELAY_DEAD_MS));
+    // Rejoin (the app was closed, so nothing is known about the relays yet): the relay that answered last time is the only one
+    // worth asking. On a network that blocks the MQTT ports that is ntfy.sh, and waiting 10 s for a blocked relay first made
+    // Rejoin look dead. When it is the code's own relay, its fallback still follows.
+    const good = rejoin ? urls.indexOf(NET.goodRelay()) : -1;
+    if (good >= 0 && all.includes(good) && good !== home) return [good];
     return live.length ? live : all;
   };
   NET.codeFor = (idx, n) => { for (let i = 0; i < 500; i++) { const c = NET.newCode(); if (NET.codeBroker(c, n) === idx % n) return c; } return NET.newCode(); };
@@ -437,7 +442,7 @@
     me.wantTries = 0; me.flex0 = me.flex;
     // A guest (and a host coming back to its own code) stays on the relays the code belongs to: its own relay, then the one
     // fallback (see NET.codeRelays). A relay that cannot be reached, or where nobody answers, moves the room to the next one.
-    me.route = role === 'guest' ? NET.codeRelays(opts.code, urls) : me.wantCode ? NET.codeRelays(me.wantCode, urls) : null;
+    me.route = role === 'guest' ? NET.codeRelays(opts.code, urls, !!opts.rejoin) : me.wantCode ? NET.codeRelays(me.wantCode, urls, true) : null;
     me.hop = 0;
     me._dial(me.route ? me.route[0] : NET.startRelay(urls), !!me.route);
     me.lastHost = Date.now(); me.lastHb = 0;

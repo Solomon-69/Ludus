@@ -620,6 +620,11 @@
     const p = S.party; if (!p || !L.net.validCode(p.code)) return;
     joinFromInvite(p.code, false, { rejoin: true, fallback: () => createFlexRoom(p) });
   }
+  // Rejoin never ends in nothing: when no relay can be reached (or a room cannot be reopened) a card says so, with Try again.
+  function rejoinFailed(p) {
+    if (S.party && S.party.code === p.code) { S.party.live = false; L.save(); }
+    L.lobby.notice('Could not rejoin', 'Ludus could not reach the internet relay for room ' + p.code + '. Your party is kept. Check your connection and try again.', () => rejoinParty(), 'Try again', 'Close');
+  }
   function onlineId() {
     if (typeof S.onlineId !== 'string' || !/^[0-9a-f]{12}$/.test(S.onlineId)) {
       const a = new Uint8Array(6); try { crypto.getRandomValues(a); } catch (e) { for (let i = 0; i < 6; i++) a[i] = Math.floor(Math.random() * 256); }
@@ -633,6 +638,7 @@
     const s = L.lobby.openRoom(lobbyOps(null), party && party.code, onlineId());
     if (!s) return;
     trackParty(s, 'host');
+    if (party) s.on('error', () => rejoinFailed(party));   // runs after the lobby's own handling of the error
     if (party && party.games && party.games.length) s.on('ready', () => { s.setPlan(party.games.filter(id => L.games.some(g => g.id === id && g.online)), party.n); });
   }
   function lobbyOps(g) {
@@ -655,11 +661,12 @@
     const code = L.net.extractCode(text);
     if (!code) { toast('No room code found'); return false; }
     leaveOnline(); stop(); hideOver(); $('pauseSheet').hidden = true;
-    if (!quiet) toast((how && how.rejoin ? 'Rejoining room ' : 'Joining room ') + code);
+    if (how && how.rejoin) L.lobby.progress(code, { toast, goHome, onCancel: () => { leaveOnline(); } });   // visible at once, with Cancel
+    else if (!quiet) toast('Joining room ' + code);
     const s = L.net.joinRoom(code, { gameId: '', name: L.net.cleanName(S.onlineName, ''), uid: onlineId(), rejoin: how && how.rejoin ? (how.fallback ? 'quick' : true) : false });
     online = { game: null, session: s, started: false };
     trackParty(s, 'guest');
-    s.on('error', e => { online = null; if (e.code === 'no-room' && how && how.fallback) { how.fallback(); return; } if (how && how.rejoin && S.party && S.party.code === code) { S.party.live = false; L.save(); } if (e.code === 'update') L.lobby.notice(...L.lobby.why('update'), () => {}); else toast(L.lobby.why(e.code === 'no-room' || e.code === 'full' || e.code === 'started' ? e.code : 'offline')[0]); });
+    s.on('error', e => { online = null; if (how && how.fallback && e.code !== 'full' && e.code !== 'started' && e.code !== 'update' && e.code !== 'offline') { how.fallback(); return; } if (how && how.rejoin && S.party && S.party.code === code) { S.party.live = false; L.save(); } if (how && how.rejoin) { if (e.code === 'offline') rejoinFailed({ code }); else L.lobby.notice(...L.lobby.why(e.code), () => {}); return; } if (e.code === 'update') L.lobby.notice(...L.lobby.why('update'), () => {}); else toast(L.lobby.why(e.code === 'no-room' || e.code === 'full' || e.code === 'started' ? e.code : 'offline')[0]); });
     s.on('ready', () => {
       if (s.hostPv >= 2) { showOnlineShell(); online = { game: null, session: s, started: false }; L.lobby.attach(null, s, lobbyOps(null)); return; }
       const g = L.games.find(x => x.id === s.gameId && x.online);
