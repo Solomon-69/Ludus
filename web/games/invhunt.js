@@ -408,7 +408,7 @@
         if (TS.code === 'WORLD') gm.fit([[-50, -165], [70, 175]], { top: 6, left: 6, right: 6, bottom: 6 }, 3);
         else gm.fit(fitPts(TS), { top: 10, left: 10, right: 10, bottom: 10 }, 16);
       }
-      function zoomBy(dz) { if (!gm) return; const c = gm.getCenter(); gm.setView(c.lat, c.lng, Math.max(1, Math.min(18, gm.getZoom() + dz))); }
+      function zoomBy(dz) { if (!gm) return; const c = gm.getCenter(); gm.setView(c.lat, c.lng, Math.max(1, Math.min(20, gm.getZoom() + dz))); }
       function goOffline() {
         if (offline) return; offline = true;
         [gm, rm].forEach(m => { if (m) { layTiles(m, SETS.world); if (TS && TS.code !== 'WORLD') layTiles(m, TS); } });
@@ -418,7 +418,7 @@
       function ensureGuessMap() {
         if (gm || mapErr || !window.__GEO_MAP__) return;
         sizeMini();
-        gm = window.__GEO_MAP__.create(gmapEl, gcredit, { lat: 25, lon: 10, zoom: 1, flat: offline || navigator.onLine === false });
+        gm = window.__GEO_MAP__.create(gmapEl, gcredit, { lat: 25, lon: 10, zoom: 1, buttons: false, flat: offline || navigator.onLine === false });   // its own + / - / whole-map buttons sit top right
         credit(gcredit);
         watchTiles(gm, goOffline);
         if (offline) goOffline();

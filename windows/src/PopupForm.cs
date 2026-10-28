@@ -145,7 +145,10 @@ internal sealed class PopupForm : Form
 
             core.Settings.AreDefaultContextMenusEnabled = false;
             core.Settings.IsZoomControlEnabled = false;
-            core.Settings.IsPinchZoomEnabled = false;   // trackpad pinch: nothing
+            // Pinch must reach the page: Chromium hands a trackpad pinch to the page as ctrl+wheel only while pinch zoom is on,
+            // and the map games zoom their map on it. The page itself never zooms: app.js cancels every ctrl+wheel the games
+            // do not use, and style.css (touch-action) stops a touch-screen pinch from scaling the page.
+            core.Settings.IsPinchZoomEnabled = true;
             // Whatever gets through (Ctrl+wheel, Ctrl +/-/0) is put straight back to the fit-to-screen zoom: users never zoom.
             web.ZoomFactorChanged += (_, _) => { if (Math.Abs(web.ZoomFactor - fitZoom) > 0.001) web.ZoomFactor = fitZoom; };
             core.Settings.IsStatusBarEnabled = false;

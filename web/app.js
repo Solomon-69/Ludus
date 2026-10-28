@@ -4,6 +4,9 @@
   const S = L.state;
   const $ = id => document.getElementById(id);
   const root = document.documentElement;
+  // A trackpad pinch arrives as ctrl+wheel (Chrome, WebView2 on Windows). The map games zoom their map on it; anywhere
+  // else it is cancelled here so the page itself never zooms. (Listeners on the window are passive unless told not to be.)
+  window.addEventListener('wheel', e => { if (e.ctrlKey) e.preventDefault(); }, { passive: false });
   const ACCENTS = ['#d97757', '#5b8def', '#4f9d69', '#9b6dd6', '#e0a526', '#e05d8b', '#3aa6a6'];
   const FILTERS = ['All', 'Arcade', 'Puzzle', 'Duel', '2 Player', 'Online'];   // 2, 3 and 4 player online play all live under Online
   const ONLINE = 'Online';                 // the tab that opens the Online page instead of a list of games
@@ -17,16 +20,15 @@
   const customName = g => (S.renameGames && S.names && typeof S.names[g.id] === 'string' && S.names[g.id].trim()) || '';
   // "Original names" (Settings > More): shows your own list of names, read from original-names.json in the Ludus app folder
   // (the app hands it over as window.__LUDUS_ORIGINAL_NAMES__). Nothing is built in or shipped. Only changes what is shown.
-  // The list can also be pasted in Settings (kept in Ludus's own saved state), so it works without finding the app folder.
   const cleanList = src => {
     const out = {};
     if (src && typeof src === 'object') for (const k of Object.keys(src)) if (typeof src[k] === 'string' && src[k].trim()) out[String(k).slice(0, 40)] = src[k].trim().slice(0, 40);
     return out;
   };
   const FILE_NAMES = cleanList(window.__LUDUS_ORIGINAL_NAMES__);
-  const origList = () => Object.assign({}, FILE_NAMES, cleanList(S.originalList));
-  const hasList = () => Object.keys(origList()).length > 0;
-  const presetName = g => { if (!S.originalNames) return ''; const m = origList(); return m[g.id] || m[g.name] || ''; };
+  const hasList = () => Object.keys(FILE_NAMES).length > 0;
+  const presetName = g => (S.originalNames && (FILE_NAMES[g.id] || FILE_NAMES[g.name])) || '';
+  if (S.originalList !== undefined) { delete S.originalList; }   // a list pasted in 1.12.17/18 is no longer used
   const dispName = g => customName(g) || presetName(g) || g.name;
   L.displayName = dispName;
   const REVEAL_MS = 1200;   // how long the final board stays on screen before the result bar slides up
@@ -347,52 +349,36 @@
     if (!S.renameGames) { el.textContent = dispName(g); return; }
     const n = document.createElement('span');
     n.className = 'rename-name'; n.textContent = dispName(g); n.setAttribute('role', 'button'); n.tabIndex = 0;
-    n.title = customName(g) ? g.name + ' \u00b7 click to rename' : 'Click to rename';
+    nameTip(n, () => customName(g) ? g.name + ' \u00b7 click to rename' : 'Click to rename');
     n.setAttribute('aria-label', 'Rename ' + dispName(g));
-    const open = e => { e.preventDefault(); e.stopPropagation(); openRename(g, done); };
+    const open = e => { e.preventDefault(); e.stopPropagation(); hideTip(); openRename(g, done); };
     n.addEventListener('click', open);
     n.addEventListener('pointerdown', e => e.stopPropagation());
     n.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') open(e); });
     el.appendChild(n);
   }
-  // Paste your own list: one "Game = Original name" per line (or the same JSON as original-names.json).
-  function parseNamesList(text) {
-    const t = String(text || '').trim(); if (!t) return {};
-    try { const j = JSON.parse(t); if (j && typeof j === 'object' && !Array.isArray(j)) return cleanList(j); } catch (e) { /* not JSON: lines */ }
-    const out = {};
-    t.split(/\r?\n/).forEach(line => {
-      const m = line.match(/^\s*(.+?)\s*(?:=|:|\t|->)\s*(.+?)\s*$/); if (!m) return;
-      const key = m[1].toLowerCase(), g = L.games.find(x => x.id === m[1] || x.name.toLowerCase() === key || (customName(x) || '').toLowerCase() === key);
-      if (g) out[g.id] = m[2].slice(0, 40);
-    });
-    return out;
-  }
-  function openNamesList(done) {
-    if (!renameSheet) {
-      renameSheet = document.createElement('div'); renameSheet.className = 'sheet rename-sheet'; renameSheet.setAttribute('role', 'dialog'); renameSheet.setAttribute('aria-modal', 'true');
-      document.body.appendChild(renameSheet);
-    }
-    const sh = renameSheet; sh.innerHTML = ''; sh.hidden = false; sh.setAttribute('aria-label', 'Original names');
-    const card = el('div', 'lobby-card rename-card');
-    card.append(el('div', 'sheet-title', 'Original names'), el('p', 'lobby-sub', 'One game per line, like “Sky Raiders = your name”. Only changes what is shown.'));
-    const ta = document.createElement('textarea'); ta.className = 'names-list'; ta.rows = 6; ta.spellcheck = false; ta.setAttribute('aria-label', 'Your list of names');
-    const cur = cleanList(S.originalList); ta.value = Object.keys(cur).map(id => { const g = L.games.find(x => x.id === id); return (g ? g.name : id) + ' = ' + cur[id]; }).join('\n');
-    const note = el('div', 'rename-count', ''); card.append(ta, note);
-    const close = () => { sh.hidden = true; sh.innerHTML = ''; document.removeEventListener('keydown', esc, true); if (done) done(); };
-    const save = el('button', 'btn primary', 'Save'); save.type = 'button';
-    save.onclick = () => {
-      const list = parseNamesList(ta.value), n = Object.keys(list).length;
-      if (ta.value.trim() && !n) { note.textContent = 'No game names found. Use “Game = name”.'; return; }
-      S.originalList = list; S.originalNames = n > 0 || Object.keys(FILE_NAMES).length > 0; L.save(); L.sfx('click'); close();
+  // A small tooltip in the app's own style (not the browser's grey one): shows just under the name after a short hover,
+  // centred on it and kept inside the panel; gone on click, on leaving, or when anything scrolls.
+  let tipEl = null, tipTimer = 0;
+  function hideTip() { clearTimeout(tipTimer); if (tipEl) tipEl.classList.remove('on'); }
+  function nameTip(n, text) {
+    const show = () => {
+      if (!n.isConnected) return;
+      if (!tipEl) { tipEl = el('div', 'ui-tip'); tipEl.setAttribute('role', 'tooltip'); document.body.appendChild(tipEl); }
+      tipEl.textContent = text(); tipEl.classList.remove('on');
+      const r = n.getBoundingClientRect(), tw = tipEl.offsetWidth, th = tipEl.offsetHeight, vw = document.documentElement.clientWidth, vh = document.documentElement.clientHeight;
+      const x = Math.max(6, Math.min(vw - tw - 6, r.left + r.width / 2 - tw / 2));
+      const below = r.bottom + 6, y = below + th > vh - 6 ? r.top - th - 6 : below;
+      tipEl.style.left = x + 'px'; tipEl.style.top = y + 'px';
+      requestAnimationFrame(() => tipEl.classList.add('on'));
     };
-    const cancel = el('button', 'btn ghost', 'Cancel'); cancel.type = 'button'; cancel.onclick = close;
-    card.append(save, cancel);
-    function esc(e) { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); } }
-    document.addEventListener('keydown', esc, true);
-    sh.onclick = e => { if (e.target === sh) close(); };
-    sh.appendChild(card);
-    setTimeout(() => { try { ta.focus({ preventScroll: true }); } catch (e) {} }, 30);
+    n.addEventListener('pointerenter', e => { if (e.pointerType === 'touch') return; clearTimeout(tipTimer); tipTimer = setTimeout(show, 450); });
+    n.addEventListener('pointerleave', hideTip);
+    n.addEventListener('pointerdown', hideTip);
+    n.addEventListener('focus', () => { clearTimeout(tipTimer); tipTimer = setTimeout(show, 450); });
+    n.addEventListener('blur', hideTip);
   }
+  document.addEventListener('scroll', hideTip, true);
   let renameSheet = null;
   function openRename(g, done) {
     if (!renameSheet) {
@@ -967,6 +953,21 @@
     r.appendChild(t); if (control) r.appendChild(control);
     return r;
   }
+  // A row whose description always says what the CURRENT setting does: say(value) gives the text, and it is swapped the
+  // moment the switch or segment is pressed (same line, so nothing jumps). Returns [row, set(value)].
+  function liveRow(title, say, value, makeCtl, extra) {
+    const r = row(title, say(value) || ' ', null, extra), sub = r.querySelector('.row-sub');
+    let cur = value;
+    const set = v => { cur = v; const t = say(v); if (sub.textContent !== t) sub.textContent = t; };
+    r.appendChild(makeCtl(set));
+    // reserve the height of the longest of its texts, so switching never makes the row grow or shrink
+    const values = typeof value === 'boolean' ? [false, true] : [value].concat((makeCtl.values || []));
+    const fit = () => { if (!sub.isConnected || !sub.clientWidth) return; sub.style.minHeight = ''; let mh = 0;
+      values.forEach(v => { sub.textContent = say(v); mh = Math.max(mh, sub.offsetHeight); }); sub.textContent = say(cur); sub.style.minHeight = mh + 'px'; };
+    requestAnimationFrame(() => requestAnimationFrame(fit));
+    try { new ResizeObserver(() => { const w = sub.clientWidth; if (w && w !== fit.w) { fit.w = w; fit(); } }).observe(sub); } catch (e) {}
+    return r;
+  }
   function sw(on, onChange, label) {
     const b = el('button', 'switch'); b.setAttribute('role', 'switch'); b.setAttribute('aria-checked', String(!!on));
     if (label) b.setAttribute('aria-label', label);
@@ -1032,20 +1033,24 @@
     body.appendChild(group('Look', [
       row('Appearance', null, seg(THEMES, S.theme, v => { S.theme = v; L.save(); applyTheme(); })),
       row('Accent colour', null, sw8),
-      row('Panel size', 'Large gives the games more room', seg(SIZES, S.size, v => { S.size = v; L.save(); L.native('size', { size: v }); })),
-      row('Reduce motion', 'Calmer animations everywhere', sw(S.reduceMotion, v => { S.reduceMotion = v; L.save(); applyTheme(); }, 'Reduce motion'))
+      liveRow('Panel size', v => v === 'large' ? 'Large: the games get more room' : 'Compact: a smaller panel, the games fit snugly', S.size,
+        Object.assign(set => seg(SIZES, S.size, v => { set(v); S.size = v; L.save(); L.native('size', { size: v }); }), { values: SIZES.map(x => x[0]) })),
+      liveRow('Reduce motion', v => v ? 'On: calmer animations everywhere' : 'Off: full animations everywhere', !!S.reduceMotion,
+        set => sw(S.reduceMotion, v => { set(v); S.reduceMotion = v; L.save(); applyTheme(); }, 'Reduce motion'))
     ]));
     body.appendChild(group('Play', [
-      row('Difficulty', 'Speed and how clever the computer is', seg(DIFFS, S.difficulty, v => { S.difficulty = v; L.save(); })),
+      liveRow('Difficulty', v => ({ easy: 'Easy: slower games and a gentler computer', hard: 'Hard: faster games and a cleverer computer' })[v] || 'Normal: the usual speed, a fair computer', S.difficulty,
+        Object.assign(set => seg(DIFFS, S.difficulty, v => { set(v); S.difficulty = v; L.save(); }), { values: DIFFS.map(x => x[0]) })),
       row('Sound & volume', null, sv, 'sv-row'),
     ]));
     const native = !!window.__LUDUS_NATIVE__;
     const appRows = [];
     if (native) appRows.push(updateRow());
     if (native) {
-      appRows.push(row('Open at login', null, sw(!!window.__LUDUS_LOGIN__, v => { window.__LUDUS_LOGIN__ = v; L.native('login', { on: v }); }, 'Open at login')));
-      if (typeof window.__LUDUS_DOCK__ === 'boolean') appRows.push(row('Show in Dock', 'Off: Ludus stays in the menu bar only',
-        sw(!!window.__LUDUS_DOCK__, v => { window.__LUDUS_DOCK__ = v; L.native('dock', { on: v }); }, 'Show in Dock')));
+      appRows.push(liveRow('Open at login', v => v ? 'On: Ludus opens when you log in' : 'Off: open Ludus yourself when you want it', !!window.__LUDUS_LOGIN__,
+        set => sw(!!window.__LUDUS_LOGIN__, v => { set(v); window.__LUDUS_LOGIN__ = v; L.native('login', { on: v }); }, 'Open at login')));
+      if (typeof window.__LUDUS_DOCK__ === 'boolean') appRows.push(liveRow('Show in Dock', v => v ? 'On: Ludus also shows in the Dock' : 'Off: Ludus stays in the menu bar only', !!window.__LUDUS_DOCK__,
+        set => sw(!!window.__LUDUS_DOCK__, v => { set(v); window.__LUDUS_DOCK__ = v; L.native('dock', { on: v }); }, 'Show in Dock')));
     }
     if (native && window.__LUDUS_PLATFORM__ !== 'windows') {
       const sh = el('button', 'small-btn', 'Share'); sh.id = 'shareFriend';
@@ -1065,21 +1070,20 @@
     const moreRows = [];
     if (native && typeof window.__LUDUS_INVISIBLE__ === 'boolean') {
       // The app hands over __LUDUS_INVISIBLE__. Mac: an empty menu bar slot. Windows: no tray icon, Ctrl+Alt+G or the Start menu.
-      const invisibleHelp = window.__LUDUS_PLATFORM__ === 'windows'
-        ? 'Hides the tray icon. Open Ludus with Ctrl+Alt+G, or from the Start menu'
-        : 'Hidden in the menu bar. Click the empty space at the far left of your menu bar icons to open';
-      moreRows.push(row('Invisible icon', invisibleHelp, sw(!!window.__LUDUS_INVISIBLE__, v => { window.__LUDUS_INVISIBLE__ = v; L.native('invisible', { on: v }); }, 'Invisible icon')));
+      const win = window.__LUDUS_PLATFORM__ === 'windows';
+      const invisibleHelp = v => v
+        ? (win ? 'On: no tray icon. Open Ludus with Ctrl+Alt+G, or from the Start menu' : 'On: hidden in the menu bar. Click the empty space at the far left of your menu bar icons to open')
+        : (win ? 'Off: the Ludus icon shows in the tray' : 'Off: the Ludus icon shows in the menu bar');
+      moreRows.push(liveRow('Invisible icon', invisibleHelp, !!window.__LUDUS_INVISIBLE__,
+        set => sw(!!window.__LUDUS_INVISIBLE__, v => { set(v); window.__LUDUS_INVISIBLE__ = v; L.native('invisible', { on: v }); }, 'Invisible icon')));
     }
-    moreRows.push(row('Rename games', 'Click a game’s name to give it your own', sw(!!S.renameGames, v => { S.renameGames = v; L.save(); }, 'Rename games')));
-    const origSw = sw(hasList() && !!S.originalNames, v => {
-      if (v && !hasList()) { origSw.setAttribute('aria-checked', 'false'); openNamesList(() => { origSw.setAttribute('aria-checked', String(!!S.originalNames)); renderCards(); }); return; }
-      S.originalNames = v; L.save(); renderCards();
-    }, 'Original names');
-    const origCtl = el('div', 'upd-ctl');
-    const editB = el('button', 'small-btn', hasList() ? 'Edit list' : 'Add list'); editB.type = 'button';
-    editB.onclick = () => { L.sfx('click'); openNamesList(() => { editB.textContent = hasList() ? 'Edit list' : 'Add list'; origSw.setAttribute('aria-checked', String(hasList() && !!S.originalNames)); renderCards(); }); };
-    origCtl.append(editB, origSw);
-    moreRows.push(row('Original names', 'Show your own list of original game names', origCtl));
+    moreRows.push(liveRow('Rename games', v => v ? 'On: click a game’s name to give it your own' : 'Off: games keep the names they came with', !!S.renameGames,
+      set => sw(!!S.renameGames, v => { set(v); S.renameGames = v; L.save(); }, 'Rename games')));
+    moreRows.push(liveRow('Original names', v => !hasList() ? 'Shows your own list of original game names' : v ? 'On: showing your own list of original game names' : 'Off: the usual game names', hasList() && !!S.originalNames, set => {
+      const origSw = sw(hasList() && !!S.originalNames, v => { set(v); S.originalNames = v; L.save(); renderCards(); }, 'Original names');
+      if (!hasList()) { origSw.onclick = null; origSw.setAttribute('aria-disabled', 'true'); origSw.style.opacity = '.5'; }   // no file: quietly does nothing
+      return origSw;
+    }));
     // The More card: a settings row that says what is inside, and springs open in place.
     const moreCard = el('div', 'group more-card');
     const preview = moreRows.map(r => { const t = r.querySelector('.row-title'); return t ? t.textContent : ''; }).filter(Boolean).join(', ');
