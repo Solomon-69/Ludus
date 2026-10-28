@@ -3,6 +3,13 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.22 (28 Oct 2026)
+- New raised buttons: every button, tab and game card now has a solid edge underneath, lifts a little when you point at it, sinks when you press it and springs back. Disabled buttons stay flat, and Reduce motion keeps the look without the movement.
+- Settings groups, the Online page cards, the Last party card, the party room and its seats, the pause and result panels, the search field and the tab bars get the same raised edge, so the whole app matches. The edges show clearly in light and dark.
+- The selected tab and the main buttons are a softer charcoal in light mode, so their edge stands out.
+- The Online page grows with the panel: on Large (and the wide sizes) the cards, text, fields, buttons, code boxes and step circles are all bigger, so the page fills the panel instead of leaving wide gaps. Nothing scrolls.
+- On the compact panel without a Last party, the gaps between the Online blocks are small and even (they used to spread far apart), with the spare room shared above and below.
+
 ## 1.12.21 (28 Oct 2026)
 - Rejoin now works for old parties on any network. On networks that only allow ordinary web traffic (where the main relays cannot be reached), Rejoin used to wait forever on the party's own relay; it now moves to the backup relay and reopens the same code there, and friends joining by code find it.
 - Rejoin is no longer fooled by old messages a relay keeps or replays from a host who has gone, so it never ends on "No such room". If the host it gave way to disappears, it reopens the code itself.
