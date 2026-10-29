@@ -3,6 +3,11 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.37 (29 Oct 2026)
+- Mac download: the app is now a universal build (Apple silicon and Intel). Before, it only ran on Apple silicon, so a friend on an Intel Mac could not open it at all.
+- New one-line Mac installer (`install.sh`): downloads with curl, so macOS adds no "cannot be verified" block, checks the checksum, installs to `~/Applications` and opens it.
+- Clear "cannot be verified" steps (Open Anyway) on the Ludus page and in the README.
+
 ## 1.12.36 (29 Oct 2026)
 
 - Sword Duel (Nidhogg): the tall layout is tidied. The arena now fills the height (zoomed on the duel, the camera follows the fighters) instead of a small strip, the five buttons sit in three zones (walk left/right, Raise over Lower, a big Thrust), and the help line is one short line. New Rotate button (like Tag and Air Hockey) turns the panel wide: arena in the middle, walk buttons on its left, spear and thrust on its right. The choice is remembered. Works vs Bot and vs Friend (Sword Duel has no online mode).

@@ -285,7 +285,7 @@
       <div class="downloads">
         <a class="btn" id="dl-mac" data-os="mac" href="https://github.com/Solomon-69/Ludus/releases/latest/download/Ludus.dmg" target="_blank" rel="noopener" data-repo>
           <svg class="os" aria-hidden="true"><use href="#apple"/></svg>
-          <span>Download for Mac<small>macOS 14 or later, Apple silicon</small></span>
+          <span>Download for Mac<small>macOS 14 or later, any Mac</small></span>
           <svg class="arrow" aria-hidden="true"><use href="#arrow"/></svg>
         </a>
         <a class="btn" id="dl-win" data-os="windows" href="https://github.com/Solomon-69/Ludus/releases/latest/download/Ludus-windows.zip" target="_blank" rel="noopener" data-repo>
@@ -344,7 +344,7 @@
 
   <section id="new112">
     <div class="wrap">
-      <p class="kicker reveal">Version 1.12.36</p>
+      <p class="kicker reveal">Version 1.12.37</p>
       <h2 class="reveal">Chess, Mosaic Hunt and more</h2>
       <p class="intro reveal">44 little games now. Here is what is new.</p>
       <div class="points">
@@ -561,11 +561,11 @@
       <div class="install">
         <div class="card mac reveal">
           <h3><svg aria-hidden="true"><use href="#apple"/></svg>Mac<span class="yours">Your computer</span></h3>
-          <p class="req">macOS 14 Sonoma or later, Apple silicon (M1 or newer)</p>
+          <p class="req">macOS 14 Sonoma or later, any Mac (Apple silicon or Intel)</p>
           <ol>
-            <li><b>Download</b> Ludus.dmg and open it.</li>
-            <li><b>Drag Ludus into Applications</b>, then open it from there.</li>
-            <li>If macOS asks the first time: in Applications, <b>right-click Ludus and choose Open</b>, then Open again. On newer macOS versions, if you see no Open button, go to System Settings, Privacy &amp; Security, and click <b>Open Anyway</b>.</li>
+            <li><b>Easiest, no warning:</b> open the <b>Terminal</b> app, paste this line and press Return. It downloads Ludus and opens it. <code id="mac-cmd" style="display:block;margin:6px 0;padding:8px 10px;border-radius:10px;background:rgba(127,127,127,.15);font-size:.85em;word-break:break-all">curl -fsSL https://raw.githubusercontent.com/Solomon-69/Ludus/main/install.sh | bash</code> <button type="button" onclick="navigator.clipboard&amp;&amp;navigator.clipboard.writeText(document.getElementById('mac-cmd').textContent);this.textContent='Copied'">Copy</button></li>
+            <li><b>Or download Ludus.dmg</b>, open it and drag Ludus into Applications.</li>
+            <li>If macOS says it cannot be verified: open <b>System Settings, Privacy &amp; Security</b>, scroll down and click <b>Open Anyway</b> next to Ludus. On older macOS you can right-click Ludus and choose Open instead.</li>
             <li>Look for the <b>controller icon</b> in the menu bar and click it.</li>
           </ol>
           <p class="why">Why the extra step: builds that are not notarised by Apple need you to confirm once. A notarised build opens straight away. Homebrew install is coming soon.</p>

@@ -10,7 +10,7 @@
 <p><b>44 little games in your menu bar. Take a little break.</b></p>
 
 <p>
-  <a href="https://github.com/Solomon-69/Ludus/releases/latest"><img alt="Version 1.12.36" src="https://img.shields.io/badge/version-1.12.36-d97757?style=flat-square"></a>
+  <a href="https://github.com/Solomon-69/Ludus/releases/latest"><img alt="Version 1.12.37" src="https://img.shields.io/badge/version-1.12.37-d97757?style=flat-square"></a>
   <img alt="macOS 14 or later" src="https://img.shields.io/badge/macOS-14%2B-1f1d1a?style=flat-square&logo=apple&logoColor=white">
   <img alt="Windows 10 or 11" src="https://img.shields.io/badge/Windows-10%20%7C%2011-1f1d1a?style=flat-square">
 </p>
@@ -161,17 +161,24 @@ and the games inside are plain HTML, CSS and JavaScript.
 
 ### Mac
 
-1. Download **[Ludus.dmg](https://github.com/Solomon-69/Ludus/releases/latest/download/Ludus.dmg)** from the [latest release](https://github.com/Solomon-69/Ludus/releases/latest). A plain `Ludus-mac.zip` is there too if you prefer.
+**Easiest, no warning (any Mac, Apple silicon or Intel):** open **Terminal**, paste this line and press Return. It downloads Ludus with `curl`, checks the checksum, installs it to `~/Applications` and opens it.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Solomon-69/Ludus/main/install.sh | bash
+```
+
+**Or by hand:**
+
+1. Download **[Ludus.dmg](https://github.com/Solomon-69/Ludus/releases/latest/download/Ludus.dmg)** from the [latest release](https://github.com/Solomon-69/Ludus/releases/latest). A plain `Ludus-mac.zip` is there too.
 2. Open it and drag **Ludus** into **Applications**.
 3. Open Ludus from Applications. A controller appears in your menu bar. Click it to play.
 
-**First run on an unsigned build.** If a release is not notarised by Apple, macOS asks before
-opening it the first time:
+**If macOS says it "cannot be verified" or "cannot be opened".** Ludus is not notarised by Apple, and browser downloads get a block. Pick one:
 
-- Right-click Ludus in Applications and choose **Open**, then **Open** again.
-- If there is no Open button, go to **System Settings > Privacy & Security**, scroll down and click **Open Anyway** next to Ludus.
+- Go to **System Settings > Privacy & Security**, scroll down and click **Open Anyway** next to Ludus (on older macOS: right-click Ludus, choose **Open**, then **Open** again).
+- Or run this once in Terminal: `xattr -dr com.apple.quarantine /Applications/Ludus.app`
 
-You only need to do this once. Releases that are signed and notarised open straight away.
+You only need to do this once.
 
 ### Windows
 
@@ -240,7 +247,7 @@ sandboxed web view that only shows the app's own pages; pictures and map tiles a
 
 ## Requirements
 
-- **Mac:** macOS 14 Sonoma or later, Apple silicon. On macOS 26 the app icon also has a dark version.
+- **Mac:** macOS 14 Sonoma or later, Apple silicon or Intel. On macOS 26 the app icon also has a dark version.
 - **Windows:** Windows 10 or 11, 64-bit, with the .NET 8 Desktop Runtime and WebView2.
 - About 5 MB of disk space.
 

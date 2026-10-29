@@ -36,10 +36,14 @@ fi
 
 # Local builds include the UI test hook; release builds (RELEASE=1, used by CI) leave it out.
 TEST_FLAG="-DLUDUS_TEST"; [ "${RELEASE:-0}" = "1" ] && TEST_FLAG=""
+# Universal binary (Apple silicon + Intel) so friends on any Mac can open it.
 # shellcheck disable=SC2086  # empty TEST_FLAG must expand to nothing (bash 3.2 safe)
-swiftc -O -parse-as-library $TEST_FLAG -target arm64-apple-macos14.0 \
-  -framework AppKit -framework WebKit -framework ServiceManagement \
-  "$REPO"/Sources/*.swift -o "$OUT/Ludus"
+for ARCH in arm64 x86_64; do
+  swiftc -O -parse-as-library $TEST_FLAG -target "$ARCH-apple-macos14.0" \
+    -framework AppKit -framework WebKit -framework ServiceManagement \
+    "$REPO"/Sources/*.swift -o "$OUT/Ludus-$ARCH"
+done
+lipo -create "$OUT/Ludus-arm64" "$OUT/Ludus-x86_64" -output "$OUT/Ludus"
 
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$REPO/Info.plist" "$APP/Contents/Info.plist"
