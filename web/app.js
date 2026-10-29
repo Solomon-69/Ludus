@@ -74,8 +74,9 @@
   // ---------- wide or tall ----------
   // The .io games work in either shape; the button next to Pause flips the panel and remembers the choice.
   // Air Hockey too (1.12.17): wide (side-on rink) by default, tall when turned; the choice is remembered per game.
+  // Sword Duel too (1.12.36): tall by default, the button turns it wide with the arena in the middle and the buttons on its sides.
   // Tag too (1.12.33): wide by default, and the button brings the wide panel back if it ever opens tall.
-  const ORIENT = new Set(['slither', 'holeio', 'paperio', 'hockey', 'tag']), ORIENT_WIDE = new Set(['hockey', 'tag']);
+  const ORIENT = new Set(['slither', 'holeio', 'paperio', 'hockey', 'tag', 'finalpush']), ORIENT_WIDE = new Set(['hockey', 'tag']);
   function wideFor(g) { return ORIENT.has(g.id) ? (S.orient && typeof S.orient[g.id] === 'boolean' ? S.orient[g.id] : ORIENT_WIDE.has(g.id) && !!g.wide) : !!g.wide; }
   function renderOrient(g) {
     const b = $('orientBtn'); b.hidden = !ORIENT.has(g.id);

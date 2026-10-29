@@ -28,7 +28,7 @@
   Ludus.register({
     id: 'finalpush', name: 'Sword Duel', aka: 'Right of Way', tag: 'Duel', tint: RUST, versus: true,
     waitForMove: true,   // stands still until the first move (see engine.js)
-    hint: '<kbd>←</kbd><kbd>→</kbd> walk · <kbd>↑</kbd><kbd>↓</kbd> spear high / middle / low · <kbd>Space</kbd> thrust (or the buttons). Same height blocks. Kill the bot, then run right to your gate. vs Friend: P1 <kbd>A</kbd><kbd>D</kbd> walk, <kbd>W</kbd><kbd>S</kbd> spear, <kbd>F</kbd> thrust; P2 arrows and <kbd>/</kbd> or <kbd>Enter</kbd>',
+    hint: '<kbd>←</kbd><kbd>→</kbd> walk · <kbd>↑</kbd><kbd>↓</kbd> spear · <kbd>Space</kbd> thrust · friend: P1 <kbd>A</kbd><kbd>D</kbd><kbd>W</kbd><kbd>S</kbd><kbd>F</kbd>',
     art(ctx, w, h) {
       const f = h * 0.84;
       ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.fillRect(0, f, w, h - f);
@@ -255,14 +255,31 @@
       }
 
       // ---------- layout ----------
+      // Tall: the arena fills the height under the cards (zoomed on the action, the camera follows the duel) and the five buttons sit in three
+      // zones under it: walk left / right, spear Raise over Lower, and a big Thrust. Wide (the Rotate button): the arena in the middle, walk on its left, spear and thrust on its right.
+      let camX = null;
       function layout() {
-        const w = view.w, h = view.h, top = 62, padH = Math.min(64, Math.max(50, h * 0.11)), strip = 26;
-        const avail = h - top - padH - strip - 12;
-        const s = Math.max(0.2, Math.min((w - 16) / W, avail / H));
-        const ww = W * s, wh = H * s, wx = (w - ww) / 2, wy = top + Math.max(0, (avail - wh) / 2);
-        const gap = 8, py = h - padH - 6, unit = (w - 16 - gap * 4) / 6;
-        const pads = PADS.map((p, i) => Object.assign({ x: 8 + i * (unit + gap), y: py, w: i === 4 ? unit * 2 : unit, h: padH }, p));
-        return { w, h, s, wx, wy, ww, wh, pads, stripY: wy + wh + 16 };
+        const w = view.w, h = view.h, top = 58, strip = 26, gapB = 8, wide = w >= 560 && w >= h * 1.25;
+        let pads = [], ww, wx, avail, wy;
+        if (wide) {
+          const zw = Math.max(112, Math.min(190, w * 0.2));
+          ww = w - 2 * (zw + 12); wx = zw + 12; avail = h - top - strip - 12; wy = top;
+          const r = Math.max(30, Math.min(52, (avail - 16) / 3.5)), rh = r * 3.5 + 16, ry = top + (avail - rh) / 2, lh = Math.min(avail, Math.max(90, r * 2.6)), ly = top + (avail - lh) / 2;
+          const half = (zw - gapB) / 2, rx = w - zw - 8;
+          pads = [{ a: 'left', x: 8, y: ly, w: half, h: lh }, { a: 'right', x: 8 + half + gapB, y: ly, w: half, h: lh },
+            { a: 'up', x: rx, y: ry, w: zw, h: r }, { a: 'down', x: rx, y: ry + r + gapB, w: zw, h: r }, { a: 'atk', l: 'Thrust', x: rx, y: ry + 2 * r + 2 * gapB, w: zw, h: r * 1.5 }];
+        } else {
+          const padH = Math.min(128, Math.max(92, h * 0.19));
+          ww = w - 16; wx = 8; avail = h - top - padH - strip - 20; wy = top;
+          const py = h - padH - 8, tw = w - 16 - 2 * 12, a = tw * 0.4, m = tw * 0.22, t = tw * 0.38, half = (a - gapB) / 2, sh = (padH - gapB) / 2;
+          pads = [{ a: 'left', x: 8, y: py, w: half, h: padH }, { a: 'right', x: 8 + half + gapB, y: py, w: half, h: padH },
+            { a: 'up', x: 8 + a + 12, y: py, w: m, h: sh }, { a: 'down', x: 8 + a + 12, y: py + sh + gapB, w: m, h: sh },
+            { a: 'atk', l: 'Thrust', x: 8 + a + m + 24, y: py, w: t, h: padH }];
+        }
+        const sFit = Math.min(ww / W, avail / H), s = Math.max(0.2, Math.min(avail / H, sFit * 1.7)), vw = Math.min(W, ww / s);
+        const wh = H * s, awW = vw * s;
+        wy = top + Math.max(0, (avail - wh) / 2);
+        return { w, h, s, wx: wx + (ww - awW) / 2, wy, ww: awW, wh, vw, pads, wide, stripY: wy + wh + 16 };
       }
       function local(e) { const r = view.canvas.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
       const padAt = (x, y) => layout().pads.find(p => x >= p.x && x <= p.x + p.w && y >= p.y && y <= p.y + p.h);
@@ -363,7 +380,9 @@
         // world
         ctx.save();
         D.roundRect(ctx, L.wx, L.wy, L.ww, L.wh, 12); ctx.clip();
-        ctx.translate(L.wx, L.wy); ctx.scale(L.s, L.s);
+        { const mid = (P.r.x + P.y.x) / 2, far = Math.abs(P.r.x - P.y.x) > L.vw - 120, want = Math.max(0, Math.min(W - L.vw, (far ? P.r.x + (P.y.x > P.r.x ? 1 : -1) * L.vw * 0.2 : mid) - L.vw / 2));
+          camX = camX === null || api.reduceMotion ? want : camX + (want - camX) * 0.14; }
+        ctx.translate(L.wx - camX * L.s, L.wy); ctx.scale(L.s, L.s);
         if (shake > 0) ctx.translate((Math.random() - 0.5) * 10 * shake, (Math.random() - 0.5) * 10 * shake);
         drawWorld();
         ctx.restore();
@@ -397,8 +416,8 @@
           const tri = (dx, dy) => { ctx.beginPath(); ctx.moveTo(dx * 9, dy * 9); ctx.lineTo(-dx * 7 - dy * 9, -dy * 7 - dx * 9); ctx.lineTo(-dx * 7 + dy * 9, -dy * 7 + dx * 9); ctx.closePath(); ctx.fill(); };
           if (p.a === 'left') tri(-1, 0); else if (p.a === 'right') tri(1, 0);
           else if (p.a === 'up' || p.a === 'down') {
-            ctx.save(); ctx.translate(0, -6); ctx.scale(0.8, 0.8); tri(0, p.a === 'up' ? -1 : 1); ctx.restore();
-            D.text(ctx, p.a === 'up' ? 'Raise' : 'Lower', 0, p.h / 2 - 11, 10, ic, 650);
+            if (p.h < 64) { ctx.save(); ctx.translate(-p.w * 0.24, 0); ctx.scale(0.8, 0.8); tri(0, p.a === 'up' ? -1 : 1); ctx.restore(); D.text(ctx, p.a === 'up' ? 'Raise' : 'Lower', p.w * 0.1, 1, 11.5, ic, 700); }
+            else { ctx.save(); ctx.translate(0, -6); ctx.scale(0.8, 0.8); tri(0, p.a === 'up' ? -1 : 1); ctx.restore(); D.text(ctx, p.a === 'up' ? 'Raise' : 'Lower', 0, p.h / 2 - 11, 10, ic, 650); }
           }
           else { D.text(ctx, 'Thrust', 0, -4, 14, ic, 750); D.text(ctx, 'Space', 0, 12, 9.5, ic, 600); }
           ctx.restore();
@@ -448,6 +467,7 @@
         shake = Math.max(0, shake - dt);
         render();
       });
+      if (window.ludusDebug) window.ludusDebug.finalpush = () => { const L = layout(); return { wide: L.wide, w: L.w, h: L.h, s: L.s, arena: [L.wx, L.wy, L.ww, L.wh], pads: L.pads.map(p => ({ a: p.a, x: p.x, y: p.y, w: p.w, h: p.h })) }; };
       if (window.ludusDebug) window.ludusDebug.botTest = {   // test hook: positions of both fighters, and a teleport for the bot
         state: () => ({ phase, sig: [rounds.r, rounds.y, P.r.x, P.y.x, P.r.h, P.y.h, P.r.alive ? 1 : 0, P.y.alive ? 1 : 0, zone, P.y.st === 'idle' ? 0 : 1, P.y.t], bot: [P.y.x, 0] }),
         tp: (x) => { P.y.x = x; }

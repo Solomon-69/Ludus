@@ -134,12 +134,13 @@
     if (t.pushes < pushesWanted * loose) return null;   // mostly loops: easier than its target says
     return { m: rows, sol: t.sol, pushes: pulls, eff: t.pushes, boxes: k, area: free.length, diff: pulls + 3 * k + free.length / 4 };
   }
-  // The ramp (documented in the changelog): crates and a target difficulty D = pushes + 3 * crates + floor cells / 4 rise level by level.
-  //   set of 10: crates 1,1,1,2,2,3,3,3,4,4   D = 20 + 7 * level  (20 .. 83)
-  //   set of 15: crates 2,2,2,3,3,3,4,4,4,5,5,5,5,5,5   D = 75 + 4 * level  (75 .. 131), so it opens above where the first set ended its middle
-  // Each level is made to land on its D (the back-play stops at exactly the pushes needed), so D never drops from one level to the next.
-  const crateCount = (b, i) => (b % 2 ? Math.min(5, 2 + Math.floor(i / 3)) : 1 + Math.floor(i / 2.5));
-  const targetD = (b, i) => (b % 2 ? 75 + 4 * i : 20 + 7 * i);
+  // The ramp (documented in the changelog): crates and a target difficulty D = pushes + 3 * crates + floor cells / 4 rise level by level
+  // across the WHOLE run of 25 levels, including the step from the set of 10 into the set of 15.
+  //   set of 10: crates 1,1,1,2,2,3,3,3,4,4        D = 20 + 7 * level   (20 .. 83)
+  //   set of 15: crates 4,4,4,4,4,5,5,5,5,6,6,6,6,6,6   D = 86 + 4 * level  (86 .. 142): it opens at the crates and the score the first set ended on
+  // Each level is made to land on its D (the back-play stops at exactly the pushes needed), so neither number ever drops from one level to the next.
+  const crateCount = (b, i) => (b % 2 ? Math.min(6, 4 + Math.floor(i / 4.5)) : 1 + Math.floor(i / 2.5));
+  const targetD = (b, i) => (b % 2 ? 86 + 4 * i : 20 + 7 * i);
   const levelCache = new Map();
   // level i of block b in the run with this seed (the same everywhere for the same seed)
   function makeLevel(seed, b, i) {
@@ -147,7 +148,7 @@
     const n = blockLen(b), t = n > 1 ? i / (n - 1) : 0, d = Math.min(1, 0.05 + t * 0.8 + (b % 2) * 0.15);
     const rnd = mulberry(mix(seed, b, i, 7)); let out = null;
     for (let a = 0; a < 1000 && !out; a++) {
-      const k = crateCount(b, i), W = 6 + Math.round(d * 3) + (k >= 4 ? 1 : 0) + Math.floor(rnd() * 3), H = 5 + Math.round(d * 2.5) + (k >= 4 ? 1 : 0) + Math.floor(rnd() * 3);
+      const k = crateCount(b, i), W = 6 + Math.round(d * 3) + (k >= 4 ? 1 : 0) + (k >= 6 ? 1 : 0) + Math.floor(rnd() * 3), H = 5 + Math.round(d * 2.5) + (k >= 4 ? 1 : 0) + (k >= 6 ? 1 : 0) + Math.floor(rnd() * 3);
       const obst = Math.floor((W - 2) * (H - 2) * (0.06 + d * 0.1)) + 1 + Math.floor(rnd() * 2);
       const r = makeOnce(rnd, W, H, k, obst, targetD(b, i), a < 500 ? 0.5 : a < 800 ? 0.3 : 0);
       if (r && replay(r.m, r.sol)) { const best = bestMoves(r.m, 30000); out = { m: r.m, sol: r.sol, par: best > 0 ? best : Math.max(1, Math.floor(r.sol.length * 0.6)), pushes: r.pushes, eff: r.eff, boxes: r.boxes, area: r.area, diff: r.diff }; }

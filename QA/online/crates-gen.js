@@ -30,17 +30,18 @@ const KEY = { U: 'ArrowUp', D: 'ArrowDown', L: 'ArrowLeft', R: 'ArrowRight' };
     // the ramp: over 400 seeds, crates never drop and the difficulty score (pushes + 3 * crates + floor cells / 4) never drops, level by level
     const ramp = await A.evaluate(() => {
       const g = Ludus.games.find(x => x.id === 'crates'), o = { runs: 0, boxOk: 0, dOk: 0, falls: 0, harder: 0, stairs: 0, lines: [] }, per = {};
-      for (let s = 0; s < 400; s++) for (let b = 0; b < 2; b++) {
-        const n = g._blockLen(b); let prev = null, bo = true, dd = true, first = null, last = null, steps = new Set();
+      const carry = {}; for (let s = 0; s < 400; s++) for (let b = 0; b < 2; b++) {
+        const n = g._blockLen(b); let prev = b ? carry[s] : null, bo = true, dd = true, first = null, last = null, steps = new Set();
         for (let i = 0; i < n; i++) { const l = g._make(31 + s * 104729, b, i); if (!l.sol) o.falls++; steps.add(l.boxes); const p = per[b + ':' + i] = per[b + ':' + i] || []; p.push(l.diff); if (prev) { if (l.boxes < prev.boxes) bo = false; if (l.diff < prev.diff) dd = false; } if (i === 0) first = l; last = l; prev = l; }
-        o.runs++; if (bo) o.boxOk++; if (dd) o.dOk++; if (last.diff >= first.diff + 40 && last.boxes >= first.boxes + 3) o.harder++; if (steps.size >= (b ? 4 : 4)) o.stairs++;
+        carry[s] = prev;
+        o.runs++; if (bo) o.boxOk++; if (dd) o.dOk++; if (last.diff >= first.diff + 40 && last.boxes >= first.boxes + (b ? 2 : 3)) o.harder++; if (steps.size >= (b ? 3 : 4)) o.stairs++;
       }
       o.lines = Object.entries(per).map(([k, v]) => k + ' D ' + Math.min(...v) + '/' + (v.reduce((x, y) => x + y, 0) / v.length).toFixed(1) + '/' + Math.max(...v));
       return o;
     });
-    check('ramp over 400 seeds: crates never drop (' + ramp.boxOk + '/' + ramp.runs + ')', ramp.runs === 800 && ramp.boxOk === 800);
+    check('ramp over 400 seeds, across the 10 to 15 boundary too: crates never drop (' + ramp.boxOk + '/' + ramp.runs + ')', ramp.runs === 800 && ramp.boxOk === 800);
     check('ramp over 400 seeds: difficulty score never drops (' + ramp.dOk + '/' + ramp.runs + ')', ramp.dOk === 800);
-    check('every block ends clearly harder (+40 score, +3 crates) and climbs through 4+ crate counts', ramp.harder === 800 && ramp.stairs === 800, [ramp.harder, ramp.stairs]);
+    check('every block ends clearly harder (+40 score, +2/+3 crates) and climbs in steps', ramp.harder === 800 && ramp.stairs === 800, [ramp.harder, ramp.stairs]);
     check('no level fell back to a hand-made one', ramp.falls === 0, ramp.falls);
     const uniq = new Set(lv.map(l => l.m.join('/'))).size;
     check('300 levels are all different (' + uniq + ')', uniq === 300);

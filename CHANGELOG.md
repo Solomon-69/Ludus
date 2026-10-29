@@ -5,6 +5,10 @@ All notable changes to Ludus. Versions follow the app's version number (`Info.pl
 
 ## 1.12.36 (29 Oct 2026)
 
+- Sword Duel (Nidhogg): the tall layout is tidied. The arena now fills the height (zoomed on the duel, the camera follows the fighters) instead of a small strip, the five buttons sit in three zones (walk left/right, Raise over Lower, a big Thrust), and the help line is one short line. New Rotate button (like Tag and Air Hockey) turns the panel wide: arena in the middle, walk buttons on its left, spear and thrust on its right. The choice is remembered. Works vs Bot and vs Friend (Sword Duel has no online mode).
+- Crate Push: crates and difficulty never drop anywhere in a run of 25 levels, including when the set of 10 ends and the set of 15 begins. The set of 15 now opens at 4 crates (where the first set ended) and climbs to 6, difficulty 86 to 142.
+- Calmer opening: games, cards and the Welcome back / pause / finished panels no longer grow when they open, only a short fade and a tiny rise (under 0.2 s). Sky Hop platforms no longer expand at the start.
+- Sky Hop: after Restart from "Welcome back" the board stands still behind the Classic / Monsters picker. Moving the mouse over it no longer starts the run; a key press or a tap does, and picking a mode does not start it.
 - Chess: the Bot level and Clock rows under the board are roomier. Every choice is its own pill with a clear gap, the pills are taller and all the same width, the row labels line up, and the selected pill has an accent ring. Checked on compact, tall, narrow and wide panels in light and dark. Long player names in the cards now end with an ellipsis instead of being cut off.
 
 ## 1.12.35 (29 Oct 2026)

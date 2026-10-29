@@ -15,7 +15,7 @@
 
   Ludus.register({
     id: 'sparkhop', name: 'Sky Hop', aka: 'Spark Hop', tag: 'Arcade', tint: '#e08a3c',
-    waitForMove: true,   // stands still until the first move (see engine.js)
+    waitForMove: 'tap',   // stands still until a key press or a press on the board: moving the mouse over it must not start it (after Restart it did)
     hint: '<kbd>←</kbd><kbd>→</kbd> steer, or press and hold either side of the board',
     art(ctx, w, h) {
       const plat = (x, y, pw) => { ctx.fillStyle = 'rgba(255,255,255,0.85)'; D.roundRect(ctx, x - pw / 2, y, pw, 6, 3); ctx.fill(); };
@@ -200,7 +200,7 @@
         plats.forEach(q => {
           if (q.y < camY - 20 || q.y > camY + WH + 20) return;
           const w = q.wide ? WW - 40 : PW;
-          const born = api.reduceMotion ? 1 : Math.min(1, (clock - q.born) / 0.25 + 0.4);
+          const born = 1;   // platforms do not grow in when a run starts
           ctx.save(); ctx.translate(q.x, q.y + PH / 2);
           if (q.broken >= 0) { ctx.rotate((clock - q.broken) * 0.8); ctx.globalAlpha = Math.max(0, 1 - (clock - q.broken) * 1.6); }
           ctx.scale(born, 1);
