@@ -3,6 +3,10 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.36 (29 Oct 2026)
+
+- Chess: the Bot level and Clock rows under the board are roomier. Every choice is its own pill with a clear gap, the pills are taller and all the same width, the row labels line up, and the selected pill has an accent ring. Checked on compact, tall, narrow and wide panels in light and dark. Long player names in the cards now end with an ellipsis instead of being cut off.
+
 ## 1.12.35 (29 Oct 2026)
 
 - Crate Push gets harder in a clear staircase, level after level. Every level is now made to land on a target difficulty (pushes needed + 3 for each crate + floor size / 4), so the difficulty never drops from one level to the next, and the number of crates rises every 2 or 3 levels. The set of 10 goes 1, 1, 1, 2, 2, 3, 3, 3, 4, 4 crates (difficulty 20 to 83); the set of 15 starts higher at 2 crates and climbs to 5 (difficulty 75 to 131). Levels still all can be solved, and a new run, the dots and Play again work as before.

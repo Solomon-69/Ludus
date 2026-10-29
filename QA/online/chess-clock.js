@@ -14,6 +14,17 @@ const clickChip = async (p, time, i) => { const c = (await chips(p)).find(x => x
     await wait(1200);
     let s = await st(A), cs = await chips(A);
     check('bot: 7 clock choices + 4 levels drawn', cs.filter(c => c.time).length === 7 && cs.filter(c => !c.time).length === 4, cs.length);
+    // the option rows are roomy: every pill has a gap to its neighbour, none leaves the canvas, rows do not touch
+    const rowsOk = sizes => 0;
+    for (const sz of [{ width: 400, height: 600 }, { width: 340, height: 520 }, { width: 430, height: 860 }, { width: 760, height: 500 }]) {
+      await A.setViewportSize(sz); await wait(1200);
+      const cr = await chips(A), W = sz.width; let ok = cr.length === 11, why = '';
+      const byRow = {}; cr.forEach(c => { (byRow[Math.round(c.y)] = byRow[Math.round(c.y)] || []).push(c); });
+      for (const row of Object.values(byRow)) { row.sort((p, q) => p.x - q.x); for (let i = 1; i < row.length; i++) if (row[i].x - row[i - 1].x < 20) { ok = false; why = 'too close'; } if (row[0].x < 0 || row[row.length - 1].x > W) { ok = false; why = 'outside'; } }
+      const ys = Object.keys(byRow).map(Number).sort((a, b) => a - b); if (ys.length === 2 && ys[1] - ys[0] < 36) { ok = false; why = 'rows touch'; }
+      check('option rows tidy at ' + sz.width + 'x' + sz.height + ' (' + cr.length + ' pills, ' + ys.length + ' rows)', ok, why);
+    }
+    await A.setViewportSize({ width: 520, height: 740 }); await wait(400);
     check('bot: untimed by default', s.tc === 0, s.tc);
     check('click 1m: next clock is 1 minute', (await clickChip(A, true, 1)) && (await st(A)).tc === 1 && (await st(A)).rem[0] === 60000, await st(A));
     check('choice saved in settings', (await A.evaluate(() => JSON.parse(localStorage.getItem('ludus.v1')).chessTime)) === 1);

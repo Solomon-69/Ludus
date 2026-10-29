@@ -802,16 +802,16 @@
       // ---------- layout ----------
       function layout() {
         const { w, h } = view;
-        const top = 56, capT = 28, capB = 28, pad = 12, panelW = 224, gap = 22;
+        const top = 56, capT = 28, capB = 28, pad = 12, panelW = 252, gap = 22;
         // a wide, short panel: the options stand in a column beside the board; otherwise they sit in rows under it
-        const sideBy = w >= 560 && w >= h * 1.3, rowsH = on ? 40 : 78;
+        const sideBy = w >= 560 && w >= h * 1.3, rowsH = on ? 50 : 100;
         const fitS = Math.max(12, Math.floor(Math.min(w - pad * 2 - panelW - gap, h - top - capT - capB - pad) / 8));
         const fitU = Math.max(12, Math.floor(Math.min(w - pad * 2, h - top - capT - capB - rowsH - pad) / 8));
         const side = sideBy && fitS >= fitU * 0.9, s = side ? fitS : fitU, bs = s * 8, chipH = side ? 0 : rowsH;
         const block = capT + capB + bs + chipH;
         const y0 = top + Math.max(0, (h - top - pad - block) / 2), by = Math.round(y0 + capT);
         const bx = Math.round(side ? (w - bs - gap - panelW) / 2 : (w - bs) / 2);
-        geo = { s, bs, bx, by, capTop: y0 + capT / 2 - 1, capBot: by + bs + capB / 2 + 2, chipY: by + bs + capB + 4, chipH, side, px: bx + bs + gap, pw: panelW, py: Math.round(by + bs / 2 - (on ? 16 : 40)) };
+        geo = { s, bs, bx, by, capTop: y0 + capT / 2 - 1, capBot: by + bs + capB / 2 + 2, chipY: by + bs + capB + 4, chipH, side, px: bx + bs + gap, pw: panelW, py: Math.round(by + bs / 2 - (on ? 19 : 46)) };
         return geo;
       }
       function sqXY(sq) {
@@ -888,33 +888,35 @@
       const knobs = {};   // key -> glide position of the highlighted segment (-1 = none)
       function drawSeg(col, key, y, label, labels, cur, time) {
         const { bx, bs, side, px, pw } = geo, flat = document.documentElement.classList.contains('flat');
-        const pad = 3, sh = 26, lab = side ? 0 : bs >= 240 ? 44 : 0, x0 = side ? px : bx + lab, tw = side ? pw : bs - lab, sw = (tw - pad * 2) / labels.length;
+        const pad = 4, gap = 5, sh = 30, lab = side ? 0 : bs >= 240 ? 54 : 0, x0 = side ? px : bx + lab, tw = side ? pw : bs - lab, sw = (tw - pad * 2 - gap * (labels.length - 1)) / labels.length, stp = sw + gap;
         const nowK = performance.now(), dt = Math.min(0.05, (nowK - (knobs[key + 't'] || nowK)) / 1000); knobs[key + 't'] = nowK;
         if (side) D.text(ctx, label, x0 + 4, y - 9, 11.5, col.ink2, 650, 'left');
-        else if (lab) D.text(ctx, label, bx + 2, y + sh / 2 + pad, 11.5, col.ink2, 650, 'left');
-        D.roundRect(ctx, x0, y, tw, sh + pad * 2, 14); ctx.fillStyle = col.dark ? col.bg : col.bg2; ctx.fill();
+        else if (lab) D.text(ctx, label, bx + 4, y + sh / 2 + pad + 0.5, 12, col.ink2, 650, 'left');
+        D.roundRect(ctx, x0, y, tw, sh + pad * 2, 17); ctx.fillStyle = col.dark ? col.bg : col.bg2; ctx.fill();
         if (knobs[key] === undefined || api.reduceMotion) knobs[key] = cur; else knobs[key] += (cur - knobs[key]) * Math.min(1, (dt || 0.016) * 14);
         if (Math.abs(cur - knobs[key]) < 0.002) knobs[key] = cur;
         const kv = knobs[key];
+        for (let i = 0; i < labels.length; i++) { D.roundRect(ctx, x0 + pad + i * stp, y + pad, sw, sh, 13); ctx.fillStyle = col.dark ? 'rgba(255,255,255,0.045)' : 'rgba(255,255,255,0.5)'; ctx.fill(); }   // every choice is a pill of its own, with a gap between
         if (kv >= -0.5) {
-          const kx = x0 + pad + Math.max(0, kv) * sw;
-          if (!flat) { D.roundRect(ctx, kx, y + pad + 1.5, sw, sh, 11); ctx.fillStyle = col.dark ? 'rgba(0,0,0,0.35)' : 'rgba(32,28,23,0.1)'; ctx.fill(); }
-          D.roundRect(ctx, kx, y + pad, sw, sh, 11); ctx.fillStyle = col.dark ? col.surface2 : col.surface; ctx.fill();
+          const kx = x0 + pad + Math.max(0, kv) * stp;
+          if (!flat) { D.roundRect(ctx, kx, y + pad + 1.5, sw, sh, 13); ctx.fillStyle = col.dark ? 'rgba(0,0,0,0.35)' : 'rgba(32,28,23,0.1)'; ctx.fill(); }
+          D.roundRect(ctx, kx, y + pad, sw, sh, 13); ctx.fillStyle = col.dark ? col.surface2 : col.surface; ctx.fill();
+          ctx.strokeStyle = col.accent; ctx.lineWidth = 1.5; ctx.stroke();
         }
         // one text size for the whole row, small enough that the widest label fits its segment
-        let sz = 12.5; ctx.font = '800 ' + sz + 'px ui-rounded, system-ui, sans-serif';
+        let sz = 13; ctx.font = '800 ' + sz + 'px ui-rounded, system-ui, sans-serif';
         while (sz > 8.5 && Math.max(...labels.map(t => ctx.measureText(t).width)) > sw - 6) { sz -= 0.5; ctx.font = '800 ' + sz + 'px ui-rounded, system-ui, sans-serif'; }
         labels.forEach((t, i) => {
-          const hot = Math.abs(i - kv) < 0.5, qx = x0 + pad + i * sw;
+          const hot = Math.abs(i - kv) < 0.5, qx = x0 + pad + i * stp;
           D.text(ctx, t, qx + sw / 2, y + pad + sh / 2 + 0.5, sz, hot ? col.ink : col.ink3, hot ? 800 : 700);
           chips.push({ x: qx, y: y + pad, w: sw, h: sh, i, time });
         });
       }
       function drawChips(col) {
         chips = [];
-        const { bx, bs, chipY, side } = geo, rowH = 32, cur = TIMES.indexOf(prefTime());
+        const { bx, bs, chipY, side } = geo, rowH = 38, cur = TIMES.indexOf(prefTime());
         if (!geo.chipH && !side) return;
-        const y1 = side ? geo.py : chipY, y2 = side ? geo.py + (on ? 0 : 56) : chipY + rowH + 6;
+        const y1 = side ? geo.py : chipY + 4, y2 = side ? geo.py + (on ? 0 : 68) : chipY + 4 + rowH + 10;
         if (on) {
           if (on.isHost && !plies.length) drawSeg(col, 'clk', y1, 'Clock', TIME_LABELS, cur, true);
           else D.text(ctx, tc ? 'Clock: ' + tc + ' min each' : 'No clock', side ? geo.px + geo.pw / 2 : bx + bs / 2, y1 + rowH / 2 + 1, 12, col.ink3, 650);

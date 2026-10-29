@@ -488,7 +488,7 @@
         const labMax = pw - 46;
         ctx.font = `650 ${lsz}px ui-rounded, system-ui, sans-serif`;
         while (lsz > 9.5 && ctx.measureText(lab).width > labMax) { lsz -= 0.5; ctx.font = `650 ${lsz}px ui-rounded, system-ui, sans-serif`; }
-        while (lab.length > 1 && ctx.measureText(lab).width > labMax) { lab = lab.slice(0, -1); }
+        if (ctx.measureText(lab).width > labMax) { while (lab.length > 1 && ctx.measureText(lab + '\u2026').width > labMax) lab = lab.slice(0, -1); lab = lab.trimEnd() + '\u2026'; }
         draw.text(ctx, lab, tx, y + 13, lsz, c.ink, 650, align);
         if (o.of) {
           for (let i = 0; i < o.of; i++) {
