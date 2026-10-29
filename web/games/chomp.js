@@ -1,6 +1,6 @@
 /* Chomp: maze chase. Pellets, power sparks, four chasers with their own chase styles. */
 (function () {
-  const MAP = [
+  const BASE = [
     '###################',
     '#........#........#',
     '#o##.###.#.###.##o#',
@@ -24,6 +24,30 @@
     '###################'
   ];
   const W = 19, H = 21;
+  let MAP = BASE;   // the maze of the level being played: the classic frame with a different set of walls in the top and bottom halves every run and level
+  const mulberry = a => () => { a |= 0; a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  const mix = (...n) => { let h = 2166136261; for (const x of n) { h ^= x | 0; h = Math.imul(h, 16777619); h ^= h >>> 13; h = Math.imul(h, 2246822519); h ^= h >>> 16; } return h >>> 0; };
+  const newSeed = () => { try { const a = new Uint32Array(1); crypto.getRandomValues(a); return a[0] >>> 1; } catch (e) { return Math.floor(Math.random() * 2147483647); } };
+  // Walls are flipped in the left half of the top rows (1-5) and bottom rows (13-19) and mirrored to the right; a flip is kept only when every
+  // open cell can still be reached and no cell in those rows is a dead end, so every maze can be played (checked by chomp-maze.js).
+  function makeMap(seed, lvl) {
+    const rnd = mulberry(mix(seed, lvl, 11)), g = BASE.map(r => r.split('')), zone = y => (y >= 1 && y <= 5) || (y >= 13 && y <= 19);
+    const open = (x, y) => g[y] && g[y][((x % W) + W) % W] !== '#';
+    const valid = () => {
+      const seen = new Set(), st = [[9, 15]];
+      while (st.length) { const [x, y] = st.pop(), k = y * W + x; if (seen.has(k)) continue; seen.add(k); for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = (x + dx + W) % W, ny = y + dy; if (ny >= 0 && ny < H && g[ny][nx] !== '#' && !seen.has(ny * W + nx)) st.push([nx, ny]); } }
+      for (let y = 0; y < H; y++) if (zone(y)) for (let x = 0; x < W; x++) if (g[y][x] !== '#') { if (!seen.has(y * W + x)) return false; let n = 0; for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (open(x + dx, y + dy)) n++; if (n < 2) return false; }
+      return true;
+    };
+    for (let a = 0; a < 90; a++) {
+      const x = 1 + Math.floor(rnd() * 8), y = 1 + Math.floor(rnd() * 19);
+      if (!zone(y) || g[y][x] === 'o' || g[y][x] === 'P') continue;
+      const was = g[y][x], was2 = g[y][W - 1 - x], to = was === '#' ? '.' : '#';
+      g[y][x] = to; g[y][W - 1 - x] = to;
+      if (!valid()) { g[y][x] = was; g[y][W - 1 - x] = was2; }
+    }
+    return g.map(r => r.join(''));
+  }
   const DOOR = { x: 9, y: 8 }, OUT = { x: 9, y: 7 }, HOME = { x: 9, y: 9 };
   const DIRS = { up: [0, -1], left: [-1, 0], down: [0, 1], right: [1, 0] };
   const ORDER = ['up', 'left', 'down', 'right']; // classic tie-break order
@@ -91,7 +115,7 @@
     id: 'chomp', name: 'Chomp', aka: 'maze chase', tag: 'Arcade', tint: '#2f2a24',
     waitForMove: true,   // stands still until the first move (see engine.js)
     hint: '<kbd>←</kbd><kbd>↑</kbd><kbd>→</kbd><kbd>↓</kbd> or WASD, swipe or click a direction',
-    _test: { MAP, W, H, cellAt, isWallFor, chaseTarget, chooseDir, countPellets, freshGrid, OPP, DIRS },
+    _test: { MAP: BASE, makeMap, W, H, cellAt, isWallFor, chaseTarget, chooseDir, countPellets, freshGrid, OPP, DIRS },
     art(ctx, w, h) {
       // Pac-style chase: open-mouthed chomper, a trail of dots ending in a power dot, a ghost looking back at it.
       const cy = h * 0.52, r = Math.min(w, h) * 0.22, px = w * 0.2;
@@ -141,7 +165,8 @@
         }));
         modeIdx = 0; modeT = 0; fright = 0;
       }
-      function startLevel() { grid = freshGrid(); pelletsLeft = countPellets(grid); resetActors(); phase = 'ready'; phaseT = 0; }
+      let runSeed = newSeed();
+      function startLevel() { MAP = makeMap(runSeed, level); grid = freshGrid(); pelletsLeft = countPellets(grid); resetActors(); phase = 'ready'; phaseT = 0; }
 
       // Move an actor toward its next tile centre, calling decide() at each centre.
       function step(a, dist, decide) {
@@ -413,6 +438,7 @@
           if (!['ready', 'play', 'dying', 'clear'].includes(v.phase)) return false;
           const okA = a => Number.isFinite(a.x) && Number.isFinite(a.y) && DIRS[a.dir];
           if (!okA(v.pac) || !DIRS[v.pac.want] || !v.ghosts.every(okA)) return false;
+          if (Number.isInteger(v.seed)) { const mm = makeMap(v.seed, v.level); if (!v.grid.every((r, y) => r.split('').every((c, x) => (c === '#') === (mm[y][x] === '#')))) return false; runSeed = v.seed; MAP = mm; } else return false;
           grid = v.grid.map(r => r.split('')); pelletsLeft = countPellets(grid);
           level = v.level; lives = v.lives; score = v.score;
           resetActors();
@@ -428,6 +454,7 @@
         } catch (e) { return false; }
       }
       if (!restore(api.saved)) { startLevel(); api.score(0); }
+      if (window.ludusDebug) window.ludusDebug.chomp = () => ({ seed: runSeed, level, pellets: pelletsLeft, rows: MAP.join('/') });
       render(0);
       // the first move ends the opening "Ready" at once: the player already said go
       api.onStart(() => { if (phase === 'ready') phaseT = 1.41; });
@@ -438,7 +465,7 @@
           if (score === 0 && level === 1 && lives === 3) return null;
           const r = n => Math.round(n * 1000) / 1000;
           return {
-            grid: grid.map(row => row.join('')), level, lives, score, phase, phaseT: r(phaseT), modeIdx, modeT: r(modeT), fright: r(fright), eatChain,
+            seed: runSeed, grid: grid.map(row => row.join('')), level, lives, score, phase, phaseT: r(phaseT), modeIdx, modeT: r(modeT), fright: r(fright), eatChain,
             pac: { x: r(pac.x), y: r(pac.y), dir: pac.dir, want: pac.want, moving: pac.moving },
             ghosts: ghosts.map(g => ({ x: r(g.x), y: r(g.y), dir: g.dir, state: g.state, wait: r(g.wait), fr: g.fr }))
           };

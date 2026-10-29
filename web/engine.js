@@ -497,7 +497,11 @@
             ctx.fillStyle = i < (o.pips || 0) ? (o.who === 'bot' ? c.ink2 : (o.who === 'p2' ? draw.P2 : c.accent)) : c.line; ctx.fill();
           }
         } else if (o.score !== undefined) {
-          draw.text(ctx, String(o.score), tx, y + 28, 13, c.ink, 700, align);
+          // the second line (a score, a clock, a direction) shrinks, then is trimmed, so it never reaches the middle of the header
+          let sc = String(o.score), ssz = 13; ctx.font = `700 ${ssz}px ui-rounded, system-ui, sans-serif`;
+          while (ssz > 9 && ctx.measureText(sc).width > labMax) { ssz -= 0.5; ctx.font = `700 ${ssz}px ui-rounded, system-ui, sans-serif`; }
+          while (sc.length > 1 && ctx.measureText(sc).width > labMax) sc = sc.slice(0, -1);
+          draw.text(ctx, sc, tx, y + 28, ssz, o.scoreColor || c.ink, 700, align);
         }
         if (active && o.who === 'bot' && opts.thinking) {
           for (let i = 0; i < 3; i++) {

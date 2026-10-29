@@ -16,18 +16,51 @@
     return `rgb(${f((n >> 16) & 255)},${f((n >> 8) & 255)},${f(n & 255)})`;
   }
 
+  const mulberry = a => () => { a |= 0; a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  const mix = (...n) => { let h = 2166136261; for (const x of n) { h ^= x | 0; h = Math.imul(h, 16777619); h ^= h >>> 13; h = Math.imul(h, 2246822519); h ^= h >>> 16; } return h >>> 0; };
+  const newSeed = () => { try { const a = new Uint32Array(1); crypto.getRandomValues(a); return a[0] >>> 1; } catch (e) { return Math.floor(Math.random() * 2147483647); } };
+  // The brick shape of a level: one of ten shapes, with its own size and gaps, drawn from the run's seed. Mirrored left and right, so it is fair.
+  // Without a seed (tests) the old four shapes in turn are used.
+  const SHAPES = 10;
+  function shapeMask(seed, levelNo) {
+    const r = mulberry(mix(seed, levelNo, 3)), rows = 4 + Math.floor(r() * 5), half = COLS / 2, kind = Math.floor(r() * SHAPES), a = 2 + Math.floor(r() * 3), dens = 0.5 + r() * 0.3, flip = r() < 0.5;
+    const noise = Array.from({ length: rows }, () => Array.from({ length: half }, () => r() < dens));
+    const mask = [];
+    for (let y = 0; y < rows; y++) { mask.push([]); for (let x = 0; x < half; x++) {
+      const dx = half - 1 - x, yy = flip ? rows - 1 - y : y; let on;
+      switch (kind) {
+        case 0: on = true; break;                                  // full wall
+        case 1: on = dx <= yy * 0.8 + 0.5; break;                 // pyramid
+        case 2: on = (x + y) % 2 === 0 || y === 0; break;         // checker
+        case 3: on = noise[y][x]; break;                          // scattered
+        case 4: on = (y % a) !== a - 1; break;                    // stripes
+        case 5: on = x % 2 === 0 || y === 0; break;               // pillars
+        case 6: on = Math.abs(dx - 0.5) + Math.abs(y - (rows - 1) / 2) <= rows / 2; break;   // diamond
+        case 7: on = y === 0 || y === rows - 1 || x === 0; break; // frame
+        case 8: on = (x + y * a) % 3 !== 0; break;                // diagonal gaps
+        default: on = noise[y][x] || y === 0; break;              // scattered with a solid top row
+      }
+      mask[y].push(on);
+    } }
+    const rowsOut = mask.map(m => m.concat(m.slice().reverse()));
+    return rowsOut.some(m => m.some(Boolean)) ? rowsOut : [Array(COLS).fill(true)];
+  }
   // Brick layout for a level (1 based). Pure, so it can be tested.
-  function layout(levelNo, rnd) {
-    rnd = rnd || Math.random;
+  function layout(levelNo, rnd, seed) {
+    rnd = rnd || (seed === undefined ? Math.random : mulberry(mix(seed, levelNo, 5)));
     const out = [];
     const tough = Math.min(0.5, 0.12 + levelNo * 0.06);
     const pattern = (levelNo - 1) % 4;
-    const rows = pattern === 0 ? 5 : 7;
+    const made = seed === undefined ? null : shapeMask(seed, levelNo);
+    const rows = made ? made.length : pattern === 0 ? 5 : 7;
     for (let r = 0; r < rows; r++) for (let c = 0; c < COLS; c++) {
       let keep = true;
-      if (pattern === 1) keep = Math.abs(c - 3.5) <= r * 0.62 + 0.5;            // pyramid
-      if (pattern === 2) keep = (r + c) % 2 === 0 || r === 0;                    // checker
-      if (pattern === 3) keep = rnd() < 0.72;                                    // scattered
+      if (made) keep = made[r][c];
+      else {
+        if (pattern === 1) keep = Math.abs(c - 3.5) <= r * 0.62 + 0.5;            // pyramid
+        if (pattern === 2) keep = (r + c) % 2 === 0 || r === 0;                    // checker
+        if (pattern === 3) keep = rnd() < 0.72;                                    // scattered
+      }
       if (!keep) continue;
       const hp = r < 2 && rnd() < tough * 1.6 ? 2 : rnd() < tough * 0.5 ? 2 : 1;
       out.push({ x: BX0 + c * (BW + BGAP), y: BY0 + r * (BH + BGAP), w: BW, h: BH, hp, max: hp, row: r, col: c, hitAt: -9, born: (r * COLS + c) * 0.012 });
@@ -46,7 +79,7 @@
   Ludus.register({
     id: 'breakout', name: 'Brick Break', aka: 'bricks', tag: 'Arcade', tint: '#e05d8b',
     hint: 'Move the mouse or <kbd>←</kbd><kbd>→</kbd>, click or <kbd>Space</kbd> to launch',
-    _rules: { layout, paddleBounce },
+    _rules: { layout, paddleBounce, shapeMask },
     art(ctx, w, h) {
       const cols = 6, gap = 4, bw = (w * 0.8 - gap * (cols - 1)) / cols, bh = h * 0.1;
       const ox = w * 0.1;
@@ -63,19 +96,19 @@
       const BASE = [250, 310, 375][api.level];
       const view = api.canvas();
       const { ctx, canvas } = view;
-      let bricks, balls, drops, particles, lives, levelNo, score, clock, shake;
+      let bricks, balls, drops, particles, lives, levelNo, score, clock, shake, runSeed = newSeed();
       let px, pw, targetX, wideUntil, slowUntil, slowK, hits, squash, over, levelAt, lost = null;
       const held = { left: false, right: false };
       const lay = { s: 1, ox: 0, oy: 0 };
 
       function reset() {
-        lives = 3; levelNo = 1; score = 0; clock = 0; shake = 0; over = false;
+        runSeed = newSeed(); lives = 3; levelNo = 1; score = 0; clock = 0; shake = 0; over = false;
         px = W / 2; pw = PADDLE_W; targetX = null; wideUntil = 0; slowUntil = 0; slowK = 1; squash = 0;
         particles = []; api.score(0);
         startLevel();
       }
       function startLevel() {
-        bricks = layout(levelNo); drops = []; hits = 0; levelAt = clock;
+        bricks = layout(levelNo, null, runSeed); drops = []; hits = 0; levelAt = clock;
         bricks.forEach(b => { b.born += clock; });
         serve();
       }
@@ -349,6 +382,7 @@
           if (!(v.lives >= 1 && v.lives <= 3) || !(v.levelNo >= 1) || !Number.isFinite(v.score)) return false;
           const num = o => Object.values(o).every(n => typeof n !== 'number' || Number.isFinite(n));
           if (!v.bricks.every(num) || !v.balls.every(num)) return false;
+          if (Number.isInteger(v.seed)) runSeed = v.seed;
           lives = v.lives; levelNo = v.levelNo; score = v.score; clock = Number(v.clock) || 0; hits = v.hits | 0;
           px = Number(v.px) || W / 2; pw = PADDLE_W; wideUntil = Number(v.wideUntil) || 0; slowUntil = Number(v.slowUntil) || 0;
           slowK = clock < slowUntil ? 0.68 : 1; levelAt = clock - 1;
@@ -360,6 +394,7 @@
         } catch (e) { return false; }
       }
       reset();
+      if (window.ludusDebug) window.ludusDebug.breakout = () => ({ seed: runSeed, levelNo, rows: bricks.map(b => b.row * 8 + b.col).join(',') });
       if (api.saved && !restore(api.saved)) reset();
       render(0);
       api.loop((dt, t) => { update(dt); render(t); });
@@ -369,7 +404,7 @@
           if (score === 0 && lives === 3 && levelNo === 1 && balls.every(b => b.stuck)) return null;
           const r = n => Math.round(n * 1000) / 1000;
           return {
-            lives, levelNo, score, clock: r(clock), hits, px: r(px), wideUntil: r(wideUntil), slowUntil: r(slowUntil),
+            seed: runSeed, lives, levelNo, score, clock: r(clock), hits, px: r(px), wideUntil: r(wideUntil), slowUntil: r(slowUntil),
             bricks: bricks.map(b => ({ x: b.x, y: b.y, hp: b.hp, max: b.max, row: b.row, col: b.col })),
             balls: balls.map(b => ({ x: r(b.x), y: r(b.y), dx: r(b.dx), dy: r(b.dy), stuck: b.stuck })),
             drops: drops.map(d => ({ x: r(d.x), y: r(d.y), type: d.type }))

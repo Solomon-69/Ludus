@@ -3,6 +3,16 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.34 (29 Oct 2026)
+
+- Chess is tidier. Each player's clock now sits inside that player's own card at the top instead of two floating pills around the board. Under the board there is one small options block: Bot level (Easy to Expert) and Clock. On a wide, short panel the block stands beside the board.
+- Chess clock lengths: Off, 1, 3, 5, 10, 15 or 30 minutes for each player. The choice is remembered and applies to the next game. Online, the host picks the length before the first move and the guest sees it at once; the guest sees "Clock: 3 min each" instead of the picker. The clocks stay identical on both screens.
+- Play again after a game ended now starts the whole game over, not the last level. Crate Push (Sokoban) used to reopen on the level you had reached; now every run is new.
+- Crate Push makes its levels on the device from a random seed, by playing the puzzle backwards, so every level can be solved (the recorded solution is replayed to prove it). A run is a set of 10 levels and then a completely different set of 15, getting harder inside each set; the dots under the board show the current set and start blank for each set. Nothing is downloaded, it works offline.
+- Chomp: the maze walls in the top and bottom halves change every run and every level (mirrored, every dot reachable, no dead ends). Brick Break: the brick shapes (ten shape families, mirrored) come from a per-run seed, so two runs never share a level.
+- Shorter hint line under Chess.
+- New automated header check (QA/online/header-layout.js) that opens every game solo, against the bot, against a friend and online, in light and dark and at several panel shapes, and fails when two header items overlap or header text is cut off.
+
 ## 1.12.33 (29 Oct 2026)
 
 - Online play is smooth for guests. The host's screen kept running the game only for a moment every second when its panel was closed, covered or napping, so every guest saw the game freeze and jump. Room games now keep a steady beat while a round is on (a background worker, and on the Mac and Windows the panel is kept awake for the game), so the host keeps sending about 20 copies a second. This helps every online game: Tag, Air Hockey, Paddle Duel, Worm Arena, City Swallow, Land Claim and the rest.

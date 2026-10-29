@@ -783,6 +783,7 @@
       onWait: (on, text, still) => waitHint(on, text, still),
       onCrash: (e, kind) => gameCrashed(g, run, e, kind)
     }, onlineApi);
+    run.api.fresh = freshNext && !onlineApi; freshNext = false;
     current = { game: g, run, instance: null, online: !!onlineApi };
     try { current.instance = g.create(stage, run.api) || {}; }
     catch (e) {
@@ -922,16 +923,18 @@
   function hideOver() { clearTimeout(revealTimer); $('overSheet').hidden = true; $('overPeek').hidden = true; }
   function overShown() { return !$('overSheet').hidden || !$('overPeek').hidden; }
   function revealing() { return !!(current && current.run.ended && !overShown()); }
-  function restart() {
+  let freshNext = false;   // the next launch is a "Play again" after the game ended: games with saved progress start from the very beginning
+  function restart(fresh) {
     if (!current) return;
     if (online && online.session) {   // a rematch: the host starts it for everybody, the guest asks
       if (online.session.role === 'host') online.session.start();
       else { online.session.requestRematch(); toast('Asked the host for a rematch'); }
       return;
     }
-    const g = current.game; forget(g.id); stop();
+    const g = current.game, ended = !!current.run.ended; forget(g.id); stop();
     hideOver(); $('pauseSheet').hidden = true;
     $('scoreNow').textContent = '0';
+    freshNext = fresh === true && ended;
     launch(g);
   }
   function pause() {
@@ -974,7 +977,7 @@
   $('pauseBtn').onclick = pause;
   $('resumeBtn').onclick = resume;
   $('restartBtn').onclick = restart;
-  $('againBtn').onclick = restart;
+  $('againBtn').onclick = () => restart(true);
   $('overHideBtn').onclick = () => { L.sfx('unsheet'); $('overSheet').hidden = true; $('overPeek').hidden = false; };
   $('overPeek').onclick = () => { L.sfx('sheet'); $('overPeek').hidden = true; $('overSheet').hidden = false; overAt = performance.now(); };
   const search = $('search');
@@ -990,7 +993,7 @@
       if (overShown()) {
         const armed = performance.now() - overAt > 300;   // a key still held from the last move must not restart
         if (e.key === 'Escape') { e.preventDefault(); quitHome(); }
-        else if (armed && (e.key === 'Enter' || e.key === ' ' || e.key === 'r' || e.key === 'R')) { e.preventDefault(); restart(); }
+        else if (armed && (e.key === 'Enter' || e.key === ' ' || e.key === 'r' || e.key === 'R')) { e.preventDefault(); restart(true); }
         return;
       }
       if (e.key === 'Escape' || e.key === 'p' || e.key === 'P') {

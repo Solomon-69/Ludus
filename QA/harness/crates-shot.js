@@ -1,0 +1,1 @@
+async () => { window.ludusDebug = window.ludusDebug || {}; Ludus.state.reduceMotion = true; Ludus.state.saves = {}; window.ludusOpenGame('crates'); await new Promise(r => setTimeout(r, 900)); return window.ludusDebug.crates().n; }

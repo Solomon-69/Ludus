@@ -1,4 +1,8 @@
-/* Crates: push every crate onto a marked spot. 15 hand-made levels (each checked solvable by a solver), undo, restart, progress kept. */
+/* Crates: push every crate onto a marked spot. Every run is different: the levels are made on the page from a random seed by playing
+   the puzzle backwards (pulling crates away from their spots), so every level is solvable by construction (and checked by replaying
+   the recorded solution). A run is a block of 10 levels, then a completely different block of 15; the dots under the board show the
+   current block and start blank for each block. Play again after the end starts a new run with a new seed. Nothing is fetched: it all
+   runs offline. The 15 hand-made levels below are only the fallback if a level could ever not be made. */
 (function () {
   const D = Ludus.draw;
   // # wall, . spot, $ crate, * crate on spot, @ you, + you on spot. par = moves in a known solution.
@@ -40,10 +44,100 @@
     return { W, H, wall, goal, floor, boxes, player };
   }
 
+
+  // ---------- level maker (seeded, offline) ----------
+  const BLOCK_LENS = [10, 15];
+  const blockLen = b => BLOCK_LENS[b % 2];
+  const mulberry = a => () => { a |= 0; a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  const mix = (...n) => { let h = 2166136261; for (const x of n) { h ^= x | 0; h = Math.imul(h, 16777619); h ^= h >>> 13; h = Math.imul(h, 2246822519); h ^= h >>> 16; } return h >>> 0; };
+  const DX = [0, 0, -1, 1], DY = [-1, 1, 0, 0], DCH = 'UDLR';   // opposite of d is d ^ 1
+
+  // play the solution on a level (own rules): true when every crate ends on a spot
+  function replay(rows, sol) {
+    const m = parse(rows), W = m.W, boxes = m.boxes.slice(); let p = m.player;
+    for (const ch of sol) {
+      const d = DCH.indexOf(ch); if (d < 0) return false;
+      const delta = DY[d] * W + DX[d], to = p + delta;
+      if (m.wall[to]) return false;
+      const bi = boxes.indexOf(to);
+      if (bi >= 0) { const nb = to + delta; if (m.wall[nb] || boxes.includes(nb)) return false; boxes[bi] = nb; }
+      p = to;
+    }
+    return boxes.every(b => m.goal[b]);
+  }
+  // fewest moves, searched breadth-first up to a node cap (-1 when the cap is hit)
+  function bestMoves(rows, cap) {
+    const m = parse(rows), W = m.W, key = (p, bs) => p + ':' + bs.slice().sort((a, b) => a - b).join(',');
+    let cur = [{ p: m.player, bs: m.boxes }]; const seen = new Set([key(m.player, m.boxes)]); let n = 0;
+    for (let depth = 0; cur.length; depth++) {
+      const next = [];
+      for (const st of cur) {
+        if (st.bs.every(b => m.goal[b])) return depth;
+        for (let d = 0; d < 4; d++) {
+          const delta = DY[d] * W + DX[d], to = st.p + delta; if (m.wall[to]) continue;
+          let bs = st.bs; const bi = bs.indexOf(to);
+          if (bi >= 0) { const nb = to + delta; if (m.wall[nb] || bs.includes(nb)) continue; bs = bs.slice(); bs[bi] = nb; }
+          const k = key(to, bs); if (seen.has(k)) continue;
+          if (++n > cap) return -1;
+          seen.add(k); next.push({ p: to, bs });
+        }
+      }
+      cur = next;
+    }
+    return -1;
+  }
+  // one try: a room with a few blocks in it, crates on their spots, then random backwards play (walk, or pull a crate along)
+  function makeOnce(rnd, W, H, k, obst, minPulls) {
+    const wall = new Array(W * H).fill(true);
+    for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) wall[y * W + x] = false;
+    for (let n = 0; n < obst; n++) wall[(1 + Math.floor(rnd() * (H - 2))) * W + 1 + Math.floor(rnd() * (W - 2))] = true;
+    let start = wall.findIndex(w => !w); if (start < 0) return null;
+    const seen = new Set([start]), q = [start];
+    while (q.length) { const c = q.pop(); for (let d = 0; d < 4; d++) { const n = c + DY[d] * W + DX[d]; if (!wall[n] && !seen.has(n)) { seen.add(n); q.push(n); } } }
+    for (let i = 0; i < wall.length; i++) if (!wall[i] && !seen.has(i)) wall[i] = true;
+    const free = [...seen]; if (free.length < k * 3 + 4) return null;
+    for (let i = free.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [free[i], free[j]] = [free[j], free[i]]; }
+    const goals = free.slice(0, k), boxes = goals.slice(), occ = new Array(W * H).fill(-1);
+    boxes.forEach((b, i) => { occ[b] = i; });
+    let player = free[k], dir = Math.floor(rnd() * 4), pulls = 0; const rev = [];
+    const steps = W * H * 30;
+    for (let st = 0; st < steps && (pulls < minPulls || st < W * H * 5); st++) {
+      if (rnd() < 0.28) dir = Math.floor(rnd() * 4);
+      const delta = DY[dir] * W + DX[dir], to = player + delta, behind = player - delta;
+      if (wall[to] || occ[to] >= 0) { dir = Math.floor(rnd() * 4); continue; }
+      const pull = occ[behind] >= 0 && rnd() < 0.85;
+      if (pull) { const b = occ[behind]; occ[behind] = -1; occ[player] = b; boxes[b] = player; pulls++; }
+      player = to; rev.push(dir);
+    }
+    if (pulls < minPulls || boxes.filter((b, i) => b === goals[i]).length > 0 || new Set(boxes.map(b => (goals.includes(b) ? 1 : 0))).has(1)) return null;
+    const sol = rev.reverse().map(d => DCH[d ^ 1]).join('');
+    const rows = [];
+    for (let y = 0; y < H; y++) { let r = ''; for (let x = 0; x < W; x++) { const i = y * W + x, g = goals.includes(i), b = boxes.includes(i), pl = i === player; r += wall[i] ? '#' : b ? (g ? '*' : '$') : pl ? (g ? '+' : '@') : g ? '.' : ' '; } rows.push(r); }
+    return { m: rows, sol };
+  }
+  const levelCache = new Map();
+  // level i of block b in the run with this seed (the same everywhere for the same seed)
+  function makeLevel(seed, b, i) {
+    const ck = seed + '/' + b + '/' + i; if (levelCache.has(ck)) return levelCache.get(ck);
+    const n = blockLen(b), t = n > 1 ? i / (n - 1) : 0, d = Math.min(1, 0.05 + t * 0.8 + (b % 2) * 0.15);
+    const rnd = mulberry(mix(seed, b, i, 7)); let out = null;
+    for (let a = 0; a < 300 && !out; a++) {
+      const k = Math.max(1, 1 + Math.floor(d * 3.6) - (a > 150 ? 1 : 0)), W = 6 + Math.round(d * 3) + Math.floor(rnd() * 3), H = 5 + Math.round(d * 2.5) + Math.floor(rnd() * 3);
+      const obst = Math.floor((W - 2) * (H - 2) * (0.06 + d * 0.1)) + 1 + Math.floor(rnd() * 2), minPulls = 4 + k * 5 + Math.floor(d * 12);
+      const r = makeOnce(rnd, W, H, k, obst, minPulls);
+      if (r && replay(r.m, r.sol)) { const best = bestMoves(r.m, 30000); out = { m: r.m, sol: r.sol, par: best > 0 ? best : Math.max(1, Math.floor(r.sol.length * 0.6)) }; }
+    }
+    if (!out) { const f = LEVELS[(i + b * 7) % LEVELS.length]; out = { m: f.m, sol: '', par: f.par }; }
+    levelCache.set(ck, out); if (levelCache.size > 80) levelCache.delete(levelCache.keys().next().value);
+    return out;
+  }
+  const newSeed = () => { try { const a = new Uint32Array(1); crypto.getRandomValues(a); return a[0] >>> 1; } catch (e) { return Math.floor(Math.random() * 2147483647); } };
+
   Ludus.register({
     id: 'crates', name: 'Crate Push', aka: 'Crates', tag: 'Puzzle', tint: '#b5894f',
     hint: '<kbd>←</kbd><kbd>↑</kbd><kbd>→</kbd><kbd>↓</kbd> or click to walk and push · <kbd>Z</kbd> undo · <kbd>R</kbd> restart level · <kbd>B</kbd>/<kbd>N</kbd> previous/next level',
     _levels: LEVELS.map(l => l.m),
+    _make: makeLevel, _replay: replay, _blockLen: blockLen,
     art(ctx, w, h) {
       const s = Math.min(h * 0.28, w / 10.5), cols = 9, rows = 3;
       const ox = (w - cols * s) / 2, oy = (h - rows * s) / 2;
@@ -79,16 +173,15 @@
     create(stage, api) {
       const view = api.canvas(() => render());   // also draws the board while a resumed game waits on "Welcome back"
       const { ctx, canvas } = view;
-      const store = api.settings;
-      const progress = () => (store.cratesProgress = store.cratesProgress || { unlocked: 0 });
-      let lvl = 0, map, boxes, player, moves, pushes, hist, undos, score, solvedAt = -1, clock = 0, walkQ = [];
+      let seed = newSeed(), block = 0, solvedN = 0, cur = null, lvl = 0, map, boxes, player, moves, pushes, hist, undos, score, solvedAt = -1, clock = 0, walkQ = [];
       let anim = null, facing = 1, bump = 0, done = false;
       const lay = { cell: 32, ox: 0, oy: 0 };
       let buttons = [];
 
       function load(i, keep) {
-        lvl = Math.max(0, Math.min(LEVELS.length - 1, i));
-        map = parse(LEVELS[lvl].m);
+        lvl = Math.max(0, Math.min(blockLen(block) - 1, i));
+        cur = makeLevel(seed, block, lvl);
+        map = parse(cur.m);
         boxes = map.boxes.slice(); player = map.player;
         if (!keep) { moves = 0; pushes = 0; hist = []; undos = 0; }
         solvedAt = -1; walkQ = []; anim = null;
@@ -130,18 +223,21 @@
       }
       function restartLevel() { if (done) return; load(lvl); api.sfx('click'); }
       function goLevel(i) {
-        if (done || i < 0 || i >= LEVELS.length || i > progress().unlocked) return;
+        if (done || i < 0 || i >= blockLen(block) || i > solvedN) return;
         load(i); api.sfx('tap');
       }
       function win() {
         solvedAt = clock; walkQ = [];
-        const bonus = Math.max(0, 50 - Math.max(0, moves - LEVELS[lvl].par));
+        const bonus = Math.max(0, 50 - Math.max(0, moves - cur.par));
         score += 100 + bonus; api.score(score);
-        const p = progress(); p.unlocked = Math.max(p.unlocked, Math.min(LEVELS.length - 1, lvl + 1)); Ludus.save();
+        solvedN = Math.max(solvedN, lvl + 1);
         api.sfx('line');
-        if (lvl === LEVELS.length - 1) {
+        if (lvl === blockLen(block) - 1 && block === BLOCK_LENS.length - 1) {
           done = true;
-          api.timeout(() => api.over({ score, title: 'Every crate home', won: true, message: 'All 15 levels solved' }), 700);
+          api.timeout(() => api.over({ score, title: 'Every crate home', won: true, message: 'All ' + (BLOCK_LENS[0] + BLOCK_LENS[1]) + ' levels solved' }), 700);
+        } else if (lvl === blockLen(block) - 1) {
+          api.toast('Set complete: ' + blockLen(block) + ' levels. A new set starts');
+          api.timeout(() => { if (!done) { block++; solvedN = 0; load(0); } }, 1300);
         } else {
           api.toast(`Level ${lvl + 1} solved`);
           api.timeout(() => { if (!done) load(lvl + 1); }, 1100);
@@ -176,18 +272,19 @@
       // ---------- save ----------
       function snapshot() {
         if (done || (!restored && !api.touched)) return null;   // nothing played yet
-        return { v: 1, lvl, boxes: boxes.slice(), player, moves, pushes, undos, score, hist: hist.slice(-120) };
+        return { v: 2, seed, block, solvedN, lvl, boxes: boxes.slice(), player, moves, pushes, undos, score, hist: hist.slice(-120) };
       }
       function restore(s) {
-        if (!s || s.v !== 1 || typeof s.lvl !== 'number' || s.lvl < 0 || s.lvl >= LEVELS.length) return false;
-        const m = parse(LEVELS[s.lvl].m);
+        if (!s || s.v !== 2 || !Number.isInteger(s.seed) || !(s.block === 0 || s.block === 1) || typeof s.lvl !== 'number' || s.lvl < 0 || s.lvl >= blockLen(s.block)) return false;
+        const m = parse(makeLevel(s.seed, s.block, s.lvl).m);
         if (!Array.isArray(s.boxes) || s.boxes.length !== m.boxes.length) return false;
         if (!s.boxes.every(b => m.floor[b]) || !m.floor[s.player] || new Set(s.boxes).size !== s.boxes.length) return false;
+        seed = s.seed; block = s.block; solvedN = Math.max(0, Math.min(blockLen(block), s.solvedN | 0));
         load(s.lvl);
         boxes = s.boxes.slice(); player = s.player; moves = s.moves | 0; pushes = s.pushes | 0; undos = s.undos | 0;
         hist = Array.isArray(s.hist) ? s.hist.filter(h => h && typeof h.p === 'number') : [];
         score = s.score | 0;
-        if (solved() && s.lvl < LEVELS.length - 1) load(s.lvl + 1);
+        if (solved() && s.lvl < blockLen(block) - 1) load(s.lvl + 1);
         return true;
       }
 
@@ -247,7 +344,7 @@
 
         // header
         D.text(ctx, `Level ${lvl + 1}`, 14, 16, 15, col.ink, 750, 'left');
-        D.text(ctx, `of ${LEVELS.length}`, 14, 33, 11, col.ink3, 600, 'left');
+        D.text(ctx, `of ${blockLen(block)}`, 14, 33, 11, col.ink3, 600, 'left');
         D.text(ctx, `${moves} ${moves === 1 ? 'move' : 'moves'}`, w / 2, 16, 13, col.ink, 650);
         D.text(ctx, api.level === 2 ? `${pushes} ${pushes === 1 ? 'push' : 'pushes'} · ${Math.max(0, HARD_UNDOS - undos)} undos left` : `${pushes} ${pushes === 1 ? 'push' : 'pushes'}`, w / 2, 33, 11, col.ink3, 600);
         const ink = col.ink;
@@ -310,11 +407,11 @@
         D.spark(ctx, pp.x + s / 2 + bx, pp.y + s / 2 + bob, s * 0.3, col.accent, facing * clock * 0.6 + glow * 3);
 
         // footer: level picker
-        const fy = h - 40, n = LEVELS.length, unlocked = progress().unlocked;
+        const fy = h - 40, n = blockLen(block), unlocked = solvedN;
         iconButton(12, fy, 40, 28, '', lvl > 0 && !done, () => goLevel(lvl - 1), col, (x, y) => {
           ctx.strokeStyle = ink; ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(x + 8, y - 5); ctx.lineTo(x + 3, y); ctx.lineTo(x + 8, y + 5); ctx.stroke();
         });
-        iconButton(w - 52, fy, 40, 28, '', lvl < unlocked && !done, () => goLevel(lvl + 1), col, (x, y) => {
+        iconButton(w - 52, fy, 40, 28, '', lvl < Math.min(unlocked, n - 1) && !done, () => goLevel(lvl + 1), col, (x, y) => {
           ctx.strokeStyle = ink; ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(x + 2, y - 5); ctx.lineTo(x + 7, y); ctx.lineTo(x + 2, y + 5); ctx.stroke();
         });
         const span = Math.min(w - 130, n * 16), gap = span / n;
@@ -337,10 +434,11 @@
       score = 0;
       const restored = !!(api.saved && restore(api.saved));
       if (!restored) {
-        const p = progress();
-        load(Math.min(p.unlocked, LEVELS.length - 1));
+        seed = newSeed(); block = 0; solvedN = 0;   // a new run (first open, or Play again after the end): new seed, level 1, blank dots
+        load(0);
       }
       api.score(score);
+      if (window.ludusDebug) window.ludusDebug.crates = () => ({ lvl, score, block, n: blockLen(block), solvedN, seed, rows: cur.m.join('/'), sol: cur.sol });
       api.loop(dt => { update(dt); render(); });
       return { save: snapshot };
     }
