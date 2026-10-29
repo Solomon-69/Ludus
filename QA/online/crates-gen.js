@@ -27,12 +27,28 @@ const KEY = { U: 'ArrowUp', D: 'ArrowDown', L: 'ArrowLeft', R: 'ArrowRight' };
     const sizes = lv.map(l => l.m.join('').split('').filter(c => '$*'.includes(c)).length);
     check('difficulty ramps up inside a block (crates 1 early, 3+ late)', Math.max(...sizes) >= 3 && sizes.slice(0, 3).every(x => x <= 2), [Math.min(...sizes), Math.max(...sizes)]);
     check('par is never above the recorded solution', lv.every(l => l.par <= l.sol.length), lv.filter(l => l.par > l.sol.length).length);
+    // the ramp: over 400 seeds, crates never drop and the difficulty score (pushes + 3 * crates + floor cells / 4) never drops, level by level
+    const ramp = await A.evaluate(() => {
+      const g = Ludus.games.find(x => x.id === 'crates'), o = { runs: 0, boxOk: 0, dOk: 0, falls: 0, harder: 0, stairs: 0, lines: [] }, per = {};
+      for (let s = 0; s < 400; s++) for (let b = 0; b < 2; b++) {
+        const n = g._blockLen(b); let prev = null, bo = true, dd = true, first = null, last = null, steps = new Set();
+        for (let i = 0; i < n; i++) { const l = g._make(31 + s * 104729, b, i); if (!l.sol) o.falls++; steps.add(l.boxes); const p = per[b + ':' + i] = per[b + ':' + i] || []; p.push(l.diff); if (prev) { if (l.boxes < prev.boxes) bo = false; if (l.diff < prev.diff) dd = false; } if (i === 0) first = l; last = l; prev = l; }
+        o.runs++; if (bo) o.boxOk++; if (dd) o.dOk++; if (last.diff >= first.diff + 40 && last.boxes >= first.boxes + 3) o.harder++; if (steps.size >= (b ? 4 : 4)) o.stairs++;
+      }
+      o.lines = Object.entries(per).map(([k, v]) => k + ' D ' + Math.min(...v) + '/' + (v.reduce((x, y) => x + y, 0) / v.length).toFixed(1) + '/' + Math.max(...v));
+      return o;
+    });
+    check('ramp over 400 seeds: crates never drop (' + ramp.boxOk + '/' + ramp.runs + ')', ramp.runs === 800 && ramp.boxOk === 800);
+    check('ramp over 400 seeds: difficulty score never drops (' + ramp.dOk + '/' + ramp.runs + ')', ramp.dOk === 800);
+    check('every block ends clearly harder (+40 score, +3 crates) and climbs through 4+ crate counts', ramp.harder === 800 && ramp.stairs === 800, [ramp.harder, ramp.stairs]);
+    check('no level fell back to a hand-made one', ramp.falls === 0, ramp.falls);
     const uniq = new Set(lv.map(l => l.m.join('/'))).size;
     check('300 levels are all different (' + uniq + ')', uniq === 300);
     // two runs share no level
     const two = await A.evaluate(() => { const g = Ludus.games.find(x => x.id === 'crates'), set = sd => { const o = []; for (let b = 0; b < 2; b++) for (let i = 0; i < g._blockLen(b); i++) o.push(g._make(sd, b, i).m.join('/')); return o; }, a = set(111), b = set(222); return { n: a.length, same: a.filter(x => b.includes(x)).length }; });
     check('two runs with different seeds: ' + two.n + ' levels each, none the same', two.n === 25 && two.same === 0, two);
     // play a real run with the keyboard
+    await A.evaluate(() => { document.getElementById('backBtn').click(); Ludus.state.saves = {}; window.ludusOpenGame('crates'); }); await wait(700);   // fresh start (the long checks above idle the page)
     const dbg = () => A.evaluate(() => window.ludusDebug.crates());
     let d = await dbg();
     check('a run starts at level 1 of 10 with blank dots', d.lvl === 0 && d.n === 10 && d.solvedN === 0 && d.block === 0, d);

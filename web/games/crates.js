@@ -86,8 +86,23 @@
     }
     return -1;
   }
+  // cut every loop out of a solution (a state seen twice): same puzzle, same answer, much shorter. Returns { sol, pushes }.
+  function tighten(rows, sol) {
+    const m = parse(rows), W = m.W; let p = m.player, bx = m.boxes.slice();
+    const key = () => p + ':' + bx.slice().sort((a, b) => a - b).join(','), path = [], seen = new Map([[key(), 0]]);
+    const ps = [p], bs = [bx.slice()], pushAt = [0], ks = [key()]; let pushes = 0;
+    for (const ch of sol) {
+      const d = DCH.indexOf(ch), dl = DY[d] * W + DX[d], to = p + dl, bi = bx.indexOf(to);
+      if (bi >= 0) { bx[bi] = to + dl; pushes++; }
+      p = to; path.push(ch); ps.push(p); bs.push(bx.slice()); pushAt.push(pushes);
+      const k = key(); ks.push(k);
+      if (seen.has(k)) { const j = seen.get(k); for (let q = j + 1; q < ks.length; q++) seen.delete(ks[q]); ks.length = j + 1; path.length = j; ps.length = j + 1; bs.length = j + 1; pushAt.length = j + 1; p = ps[j]; bx = bs[j].slice(); pushes = pushAt[j]; }
+      else seen.set(k, path.length);
+    }
+    return { sol: path.join(''), pushes };
+  }
   // one try: a room with a few blocks in it, crates on their spots, then random backwards play (walk, or pull a crate along)
-  function makeOnce(rnd, W, H, k, obst, minPulls) {
+  function makeOnce(rnd, W, H, k, obst, target, loose) {
     const wall = new Array(W * H).fill(true);
     for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) wall[y * W + x] = false;
     for (let n = 0; n < obst; n++) wall[(1 + Math.floor(rnd() * (H - 2))) * W + 1 + Math.floor(rnd() * (W - 2))] = true;
@@ -96,12 +111,13 @@
     while (q.length) { const c = q.pop(); for (let d = 0; d < 4; d++) { const n = c + DY[d] * W + DX[d]; if (!wall[n] && !seen.has(n)) { seen.add(n); q.push(n); } } }
     for (let i = 0; i < wall.length; i++) if (!wall[i] && !seen.has(i)) wall[i] = true;
     const free = [...seen]; if (free.length < k * 3 + 4) return null;
+    const pushesWanted = Math.round(target - 3 * k - free.length / 4); if (pushesWanted < k * 3) return null;   // difficulty = pushes + 3 * crates + floor cells / 4
     for (let i = free.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [free[i], free[j]] = [free[j], free[i]]; }
     const goals = free.slice(0, k), boxes = goals.slice(), occ = new Array(W * H).fill(-1);
     boxes.forEach((b, i) => { occ[b] = i; });
     let player = free[k], dir = Math.floor(rnd() * 4), pulls = 0; const rev = [];
-    const steps = W * H * 30;
-    for (let st = 0; st < steps && (pulls < minPulls || st < W * H * 5); st++) {
+    const steps = W * H * 90;
+    for (let st = 0; st < steps && pulls < pushesWanted; st++) {
       if (rnd() < 0.28) dir = Math.floor(rnd() * 4);
       const delta = DY[dir] * W + DX[dir], to = player + delta, behind = player - delta;
       if (wall[to] || occ[to] >= 0) { dir = Math.floor(rnd() * 4); continue; }
@@ -109,25 +125,34 @@
       if (pull) { const b = occ[behind]; occ[behind] = -1; occ[player] = b; boxes[b] = player; pulls++; }
       player = to; rev.push(dir);
     }
-    if (pulls < minPulls || boxes.filter((b, i) => b === goals[i]).length > 0 || new Set(boxes.map(b => (goals.includes(b) ? 1 : 0))).has(1)) return null;
-    const sol = rev.reverse().map(d => DCH[d ^ 1]).join('');
+    let disp = 0; boxes.forEach((b, i) => { disp += Math.abs((b % W) - (goals[i] % W)) + Math.abs(Math.floor(b / W) - Math.floor(goals[i] / W)); });
+    if (pulls !== pushesWanted || disp < pulls * 0.12 || boxes.filter((b, i) => b === goals[i]).length > 0 || new Set(boxes.map(b => (goals.includes(b) ? 1 : 0))).has(1)) return null;
+    const sol0 = rev.reverse().map(d => DCH[d ^ 1]).join('');
     const rows = [];
     for (let y = 0; y < H; y++) { let r = ''; for (let x = 0; x < W; x++) { const i = y * W + x, g = goals.includes(i), b = boxes.includes(i), pl = i === player; r += wall[i] ? '#' : b ? (g ? '*' : '$') : pl ? (g ? '+' : '@') : g ? '.' : ' '; } rows.push(r); }
-    return { m: rows, sol };
+    const t = tighten(rows, sol0);
+    if (t.pushes < pushesWanted * loose) return null;   // mostly loops: easier than its target says
+    return { m: rows, sol: t.sol, pushes: pulls, eff: t.pushes, boxes: k, area: free.length, diff: pulls + 3 * k + free.length / 4 };
   }
+  // The ramp (documented in the changelog): crates and a target difficulty D = pushes + 3 * crates + floor cells / 4 rise level by level.
+  //   set of 10: crates 1,1,1,2,2,3,3,3,4,4   D = 20 + 7 * level  (20 .. 83)
+  //   set of 15: crates 2,2,2,3,3,3,4,4,4,5,5,5,5,5,5   D = 75 + 4 * level  (75 .. 131), so it opens above where the first set ended its middle
+  // Each level is made to land on its D (the back-play stops at exactly the pushes needed), so D never drops from one level to the next.
+  const crateCount = (b, i) => (b % 2 ? Math.min(5, 2 + Math.floor(i / 3)) : 1 + Math.floor(i / 2.5));
+  const targetD = (b, i) => (b % 2 ? 75 + 4 * i : 20 + 7 * i);
   const levelCache = new Map();
   // level i of block b in the run with this seed (the same everywhere for the same seed)
   function makeLevel(seed, b, i) {
     const ck = seed + '/' + b + '/' + i; if (levelCache.has(ck)) return levelCache.get(ck);
     const n = blockLen(b), t = n > 1 ? i / (n - 1) : 0, d = Math.min(1, 0.05 + t * 0.8 + (b % 2) * 0.15);
     const rnd = mulberry(mix(seed, b, i, 7)); let out = null;
-    for (let a = 0; a < 300 && !out; a++) {
-      const k = Math.max(1, 1 + Math.floor(d * 3.6) - (a > 150 ? 1 : 0)), W = 6 + Math.round(d * 3) + Math.floor(rnd() * 3), H = 5 + Math.round(d * 2.5) + Math.floor(rnd() * 3);
-      const obst = Math.floor((W - 2) * (H - 2) * (0.06 + d * 0.1)) + 1 + Math.floor(rnd() * 2), minPulls = 4 + k * 5 + Math.floor(d * 12);
-      const r = makeOnce(rnd, W, H, k, obst, minPulls);
-      if (r && replay(r.m, r.sol)) { const best = bestMoves(r.m, 30000); out = { m: r.m, sol: r.sol, par: best > 0 ? best : Math.max(1, Math.floor(r.sol.length * 0.6)) }; }
+    for (let a = 0; a < 1000 && !out; a++) {
+      const k = crateCount(b, i), W = 6 + Math.round(d * 3) + (k >= 4 ? 1 : 0) + Math.floor(rnd() * 3), H = 5 + Math.round(d * 2.5) + (k >= 4 ? 1 : 0) + Math.floor(rnd() * 3);
+      const obst = Math.floor((W - 2) * (H - 2) * (0.06 + d * 0.1)) + 1 + Math.floor(rnd() * 2);
+      const r = makeOnce(rnd, W, H, k, obst, targetD(b, i), a < 500 ? 0.5 : a < 800 ? 0.3 : 0);
+      if (r && replay(r.m, r.sol)) { const best = bestMoves(r.m, 30000); out = { m: r.m, sol: r.sol, par: best > 0 ? best : Math.max(1, Math.floor(r.sol.length * 0.6)), pushes: r.pushes, eff: r.eff, boxes: r.boxes, area: r.area, diff: r.diff }; }
     }
-    if (!out) { const f = LEVELS[(i + b * 7) % LEVELS.length]; out = { m: f.m, sol: '', par: f.par }; }
+    if (!out) { const f = LEVELS[(i + b * 7) % LEVELS.length]; out = { m: f.m, sol: '', par: f.par, pushes: 0, boxes: 0, area: 0, diff: 0 }; }
     levelCache.set(ck, out); if (levelCache.size > 80) levelCache.delete(levelCache.keys().next().value);
     return out;
   }
@@ -439,6 +464,7 @@
       }
       api.score(score);
       if (window.ludusDebug) window.ludusDebug.crates = () => ({ lvl, score, block, n: blockLen(block), solvedN, seed, rows: cur.m.join('/'), sol: cur.sol });
+      if (window.ludusDebug) window.ludusDebug.cratesJump = (b, i) => { block = b; solvedN = i; load(i); };   // test helper: show level i of block b
       api.loop(dt => { update(dt); render(); });
       return { save: snapshot };
     }
