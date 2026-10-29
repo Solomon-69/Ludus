@@ -3,6 +3,15 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.33 (29 Oct 2026)
+
+- Online play is smooth for guests. The host's screen kept running the game only for a moment every second when its panel was closed, covered or napping, so every guest saw the game freeze and jump. Room games now keep a steady beat while a round is on (a background worker, and on the Mac and Windows the panel is kept awake for the game), so the host keeps sending about 20 copies a second. This helps every online game: Tag, Air Hockey, Paddle Duel, Worm Arena, City Swallow, Land Claim and the rest.
+- Online: a message that arrives before an earlier missing one is kept instead of thrown away, and only the missing ones are asked for again (sooner than before), so rounds no longer stall waiting for a resend.
+- Worm Arena online: food changes go out in batches about four times a second instead of with every copy, far fewer messages on the public relay.
+- Tag online: reopening the panel during a round puts the wide panel back, and the rotate button next to Leave switches between wide and tall. In a tall panel the clock no longer overlaps the "whose turn" text and the power-up slots sit under the player cards.
+- Search box says how many games there are, for example "Search 44 games".
+- Hammer Climb: the mountain is about 2.4 times taller (summit near 945 m) with six new sky stages and much wider gaps between the floating rocks. There is nothing under the sky rocks any more: a miss means a long fall, and falling off the course plays a short warp that puts you back at the very start (your best is kept).
+
 ## 1.12.32 (28 Oct 2026)
 
 - Online room: cleaner player cards. The avatar sits centred and the line under each name is one quiet style: "Host" as plain text, "Make leader" as a plain text button of the same size.

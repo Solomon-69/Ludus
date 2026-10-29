@@ -84,6 +84,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
         content.addUserScript(WKUserScript(source: bootScript(), injectionTime: .atDocumentStart, forMainFrameOnly: true))
         config.userContentController = content
         config.preferences.setValue(true, forKey: "allowFileAccessFromFileURLs")
+        webPrefs = config.preferences
         // Game and interface sounds (WebAudio) may play without waiting for a click inside the page first.
         config.mediaTypesRequiringUserActionForPlayback = []
         webView = WKWebView(frame: NSRect(origin: .zero, size: currentSize()), configuration: config)
@@ -95,6 +96,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
             webView.loadFileURL(dir.appendingPathComponent("index.html"), allowingReadAccessTo: dir)
             armWatchdog()
         } else { DispatchQueue.main.async { self.showFallback() } }
+    }
+
+    /// An online room game is running (the page says so): keep the page running at full pace even while the panel is
+    /// closed or covered, so the host keeps sending and nobody else's screen stutters. WebKit otherwise slows the timers of
+    /// a hidden page to about once a second and lets macOS nap its process; both are put back when the game ends.
+    private var liveActivity: NSObjectProtocol?
+    private var webPrefs: WKPreferences?   // the page's own settings object (a copy from webView.configuration may not reach the page)
+    private func setLive(_ on: Bool) {
+        guard let prefs = webPrefs else { return }
+        for key in ["hiddenPageDOMTimerThrottlingEnabled", "pageVisibilityBasedProcessSuppressionEnabled"] {
+            let setter = NSSelectorFromString("_set" + key.prefix(1).uppercased() + key.dropFirst() + ":")
+            if prefs.responds(to: setter) { prefs.setValue(!on, forKey: key) }
+        }
+        if on, liveActivity == nil {
+            liveActivity = ProcessInfo.processInfo.beginActivity(options: [.userInitiated, .latencyCritical], reason: "Online game in progress")
+        } else if !on, let a = liveActivity {
+            ProcessInfo.processInfo.endActivity(a); liveActivity = nil
+        }
     }
 
     /// Runs before the page's own scripts: hands over saved scores/settings and the Mac's state.
@@ -290,6 +309,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
             }
         case "update": startUpdate(body)
         case "site": NSWorkspace.shared.open(URL(string: "https://solomon-69.github.io/Ludus/")!)   // the website, a fixed address only
+        case "live": setLive(body["on"] as? Bool ?? false)
         case "ready": uiReady = true; failTimer?.invalidate()
         case "uifail": DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { if !self.uiReady { self.showFallback() } }   // a startup error: unless the page still came up
         case "intro":

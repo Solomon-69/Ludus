@@ -1,7 +1,8 @@
 /* Hammer Climb: a spark sits in a pot and has only a long hammer.
    One long, wide, hand-made mountain that runs to the RIGHT: the tree and rocks, the boulders, the chimney,
    the slide and the orange-hell pit, furniture and pipes, ice mountain, the ridge, then the tall tower to the summit.
-   then the sky: rocks floating over a sea of clouds, climbed rock to rock, and from the last one a final push into space.
+   then the sky: six stages of rocks floating over a tall empty drop, climbed rock to rock with wide gaps, and from the
+   last one a final push into space. Miss a jump in the sky and you fall a long way into the void, then warp back to the start.
    One mountain, one difficulty (no levels to pick).
    Control: the mouse offset from the pot is where the hammer head wants to be (clamped to the arm, 1:1 with the view).
    The camera keeps the pot still on screen, so the cursor IS the head target. A free head chases it (stiff spring,
@@ -22,8 +23,19 @@
   // The one mountain (it used to be the middle, "Normal", of four levels). step: height of climbs, gap: width of gaps,
   // slope: steepness, slick: how slippery ice and the slide are, holds: extra rough stones, len: how long each part is.
   const P0 = { step: 1, gap: 1, slope: 1, slick: 1, holds: 2, len: 1 };
-  // The sky: floating rocks, each a little higher and to the right of the last (checked climbable by QA/climb-reach.js).
-  const SKY = { n: 10, dx: 178, rise: 82, w: 118, th: 54, sumW: 250 };   // 1.12.24: wider gaps, two more rocks
+  // The sky: six stages of floating rocks, each rock a little higher and to the right of the last, over an empty drop.
+  // gap = open air between one rock's edge and the next (the old sky had 60), rise = how much higher each rock is.
+  // The first rock of each stage is a wider resting rock with the stage flag. Checked climbable by QA/climb-fall.js.
+  const SKY = { th: 54, sumW: 250, restW: 170, stages: [
+    { name: 'The sky', n: 10, gap: 130, rise: 85, w: 118 },
+    { name: 'Floating isles', n: 14, gap: 165, rise: 80, w: 110 },
+    { name: 'High winds', n: 14, gap: 190, rise: 75, w: 104 },
+    { name: 'Thin air', n: 14, gap: 225, rise: 70, w: 100 },
+    { name: 'Starfield', n: 14, gap: 200, rise: 90, w: 96 },
+    { name: 'Edge of space', n: 14, gap: 240, rise: 80, w: 96 }
+  ] };
+  // Fall into the void below the sky: under this height (or after this long falling free) the pot warps back to the start.
+  const FALLY = -900, FALLT = 2.6, WARP = 1.25, WARPMID = 0.55;
 
   // ---------- the mountain, laid out left to right. [material, x1,y1, x2,y2, ...] simple polygons ----------
   function blob(k, cx, cy, rx, ry, seed, n) {
@@ -130,30 +142,40 @@
     for (let j = 0; j < nI; j++) { const t = (j + 0.7) / (nI + 0.4); out.push(blob('nub', mE + 80 + t * Li, yT + 12 + t * Ri, 22, 14, 11 + j, 10)); }
     deco.ice = [mE + 80, yT + 8, i1, Tp];
     mark(mE + 40, yT + 24, 'Ice'); R(mE + 80, yT + 24, i1, Tp + 16);
-    // 8. the sky: a sea of clouds at the top of the ice (it catches falls), rocks floating above it, rock to rock upward,
-    //    and the last, widest rock is the summit. Stand on it and the final push launches you into space.
-    const k0 = i1 + 100, fx0 = i1 + 250;
-    out.push(['rock', i1, 0, k0 + 40, 0, k0 + 40, Tp, i1, Tp]);
-    mark(i1 + 60, Tp + 16, 'The sky'); R(i1 + 60, Tp + 16);
+    // 8. the sky: the ice ends at a cliff over a tall empty drop. Rocks float out over it, rock to rock upward through six
+    //    stages; the last, widest rock is the summit. Stand on it and the final push launches you into space.
+    //    Nothing is under the sky rocks: a miss falls all the way down into the void (and warps you back to the start).
+    const k0 = i1 + 100, cliff = k0 + 40;
+    out.push(['rock', i1, 0, cliff, 0, cliff, Tp, i1, Tp]);
     deco.floats = [];
-    let cx = fx0, top = Tp;
-    for (let j = 0; j < SKY.n; j++) {
-      cx = fx0 + j * SKY.dx; top = Tp + (j + 1) * SKY.rise;
-      out.push(floater(cx, top, SKY.w, SKY.th)); deco.floats.push([cx, top, SKY.w]); R(cx, top + 16);
-    }
-    const sumC = cx + SKY.dx + (SKY.sumW - SKY.w) / 2, sumY = top + SKY.rise;
+    let cx = cliff, top = Tp, wPrev = 0;
+    const place = (gap, rise, wd, th) => {
+      cx += wPrev / 2 + gap + wd / 2; top += rise; wPrev = wd;
+      out.push(floater(cx, top, wd, th)); deco.floats.push([cx, top, wd]); R(cx, top + 16);
+    };
+    SKY.stages.forEach((sg, si) => {
+      if (si === 0) { mark(i1 + 60, Tp + 16, sg.name); R(i1 + 60, Tp + 16); }
+      for (let j = 0; j < sg.n; j++) {
+        const rest = si > 0 && j === 0, alt = j % 2 ? 1 : -1;
+        // a small wobble so the rhythm is not perfectly even: alternately a bit wider and lower, then narrower and higher
+        place(sg.gap * (1 + 0.08 * alt), sg.rise * (1 - 0.1 * alt), rest ? SKY.restW : sg.w, rest ? SKY.th * 1.2 : SKY.th);
+        if (rest) mark(cx - SKY.restW / 2 + 30, top + 16, sg.name);
+      }
+    });
+    const last = SKY.stages[SKY.stages.length - 1];
+    cx += wPrev / 2 + last.gap + SKY.sumW / 2; top += last.rise;
+    const sumC = cx, sumY = top;
     out.push(floater(sumC, sumY, SKY.sumW, SKY.th * 1.5)); deco.floats.push([sumC, sumY, SKY.sumW]);
     const sumX0 = sumC - SKY.sumW / 2 + 12, sumX1 = sumC + SKY.sumW / 2 - 12, XMAX = sumC + 900;
-    deco.clouds = [k0, XMAX, Tp];
-    out.push(['cloud', k0, Tp - 420, XMAX, Tp - 420, XMAX, Tp, k0, Tp], ['rock', k0, 0, XMAX, 0, XMAX, Tp - 420, k0, Tp - 420]);
     deco.flag = [sumC, sumY];
     mark(sumC, sumY + 16, 'Space'); R(sumC, sumY + 16);
-    // the ground under it all, and the world's edges (the right one is invisible: past it there is only sky)
-    out.push(['rock', XMIN, -300, XMAX, -300, XMAX, 0, XMIN, 0],
+    // the ground under the mountain only (it stops at the cliff), and the world's edges (the right one is invisible:
+    // past it there is only sky; it reaches down into the void so a fall along it still drops all the way)
+    out.push(['rock', XMIN, -300, cliff, -300, cliff, 0, XMIN, 0],
       ['wall', XMIN - 400, -300, XMIN, -300, XMIN, 9000, XMIN - 400, 9000],
-      ['edge', XMAX, -300, XMAX + 400, -300, XMAX + 400, 99999, XMAX, 99999]);
+      ['edge', XMAX, FALLY - 600, XMAX + 400, FALLY - 600, XMAX + 400, 99999, XMAX, 99999]);
     deco.backN = route.findIndex(q => q[1] >= Tp + 10);
-    return { P, shapes: out, route, marks, deco, XMAX, YTOP: sumY + 2500, skyY: Tp, summit: { y: sumY + 5, x0: sumX0, x1: sumX1 } };
+    return { P, shapes: out, route, marks, deco, XMAX, YTOP: sumY + 2500, skyY: Tp, cliff, summit: { y: sumY + 5, x0: sumX0, x1: sumX1 } };
   }
 
   function makeWorld() {
@@ -168,7 +190,7 @@
     const grid = new Map(), C = 160, pad = PR + 4;
     world.forEach(sh => {
       for (let cx = Math.floor((sh.x0 - pad) / C); cx <= Math.floor((sh.x1 + pad) / C); cx++)
-        for (let cy = Math.floor((Math.max(sh.y0, -400) - pad) / C); cy <= Math.floor((Math.min(sh.y1, C0.YTOP) + pad) / C); cy++) {
+        for (let cy = Math.floor((Math.max(sh.y0, FALLY - 700) - pad) / C); cy <= Math.floor((Math.min(sh.y1, C0.YTOP) + pad) / C); cy++) {
           const key = cx * 4096 + cy; if (!grid.has(key)) grid.set(key, []); grid.get(key).push(sh);
         }
     });
@@ -187,7 +209,7 @@
     };
     world.total = rl[rl.length - 1];
     world.marks = C0.marks.map(m => Object.assign({ at: world.progress(m.x, m.y).at }, m));
-    Object.assign(world, { deco: C0.deco, XMAX: C0.XMAX, YTOP: C0.YTOP, skyY: C0.skyY, summit: C0.summit, route: C0.route });
+    Object.assign(world, { deco: C0.deco, XMAX: C0.XMAX, YTOP: C0.YTOP, skyY: C0.skyY, cliff: C0.cliff, summit: C0.summit, route: C0.route });
     return world;
   }
   // Closest point on a polygon's outline, and whether (x, y) is inside it.
@@ -327,7 +349,7 @@
     id: 'climb', name: 'Hammer Climb', tag: 'Arcade', tint: '#3d4f93', resetOnQuit: true,
     waitForMove: true,   // stands still until the first move (see engine.js)
     hint: 'The mouse moves the hammer head. Plant it, keep moving to lever yourself · <kbd>←</kbd><kbd>→</kbd> swing <kbd>↑</kbd><kbd>↓</kbd> reach · <kbd>-</kbd><kbd>+</kbd> sensitivity',
-    _rules: { build, makeWorld, step, newState, clampArm, probe, SKY, START, HL, HMIN, PR, HR, STEP, VIEW },
+    _rules: { build, makeWorld, step, newState, clampArm, probe, SKY, FALLY, FALLT, START, HL, HMIN, PR, HR, STEP, VIEW },
     art(ctx, w, h) {
       // dusk sky over a rocky slope: a climber in an iron cauldron swings a big hammer, and floating rocks rise
       // away into the stars (the way the climb ends). Fixed colours: the cover reads the same in light and dark.
@@ -390,12 +412,16 @@
       canvas.style.cursor = 'crosshair'; canvas.style.touchAction = 'none';   // a touch screen or pen drives the hammer too, never scrolls
       let world, s, maxH, maxP, time, state = 'play', cam = { x: 0, y: 0 }, winLift = 0, liftV = 0, acc = 0, aim, mouse = null, keysDown = {}, clock = 0, winAt = 0;
       let fallFrom = 0, fallNote = null, lastTap = 0, wasHc = false, falls = 0, reached = 1, sectionNote = null, back = null;
+      let warpAt = 0, warpDone = false, warpFrom = null;   // the warp back to the start after a fall into the void
       let sensI = SENS.indexOf(+Ludus.state.climbSens); if (sensI < 0) sensI = 2;
       // the old difficulty levels are gone: forget the saved pick
       if (Ludus.state.climbDiff !== undefined) { delete Ludus.state.climbDiff; try { Ludus.save(); } catch (e) {} }
 
       const fin = v => typeof v === 'number' && isFinite(v);
       const pt = q => q && fin(q.x) && fin(q.y);
+      // Best: the furthest anyone got (as route distance); kept across warps back to the start and across runs
+      let bestP = fin(+Ludus.state.climbBest) ? Math.max(0, +Ludus.state.climbBest) : 0;
+      const keepBest = () => { if (maxP > bestP) bestP = maxP; Ludus.state.climbBest = bestP; };
       function setWorld() {
         world = makeWorld();
         // the mountain mass behind the route, so hanging parts read as one mountain (decor only; it stops where the sky starts)
@@ -405,9 +431,9 @@
       function restore(o) {
         // v2 4 = the one mountain with the sky ending; a v2 3 save from the old middle level ("Normal") is the same mountain
         // up to the ice, so it carries over; saves from the other old levels start fresh
-        if (!o || !(o.v2 === 4 || (o.v2 === 3 && o.di === 1)) || !pt(o.p) || !pt(o.v) || !pt(o.o) || !pt(o.h)) return false;
+        if (!o || !(o.v2 === 5 || o.v2 === 4 || (o.v2 === 3 && o.di === 1)) || !pt(o.p) || !pt(o.v) || !pt(o.o) || !pt(o.h)) return false;
         setWorld();
-        if (o.p.x < XMIN || o.p.x > world.XMAX || o.p.y < -100 || o.p.y > world.YTOP || Math.hypot(o.o.x, o.o.y) > HL + 1) return false;
+        if (o.p.x < XMIN || o.p.x > world.XMAX || o.p.y < FALLY || o.p.y > world.YTOP || Math.hypot(o.o.x, o.o.y) > HL + 1) return false;
         s = { p: { x: o.p.x, y: o.p.y }, v: { x: o.v.x, y: o.v.y }, o: { x: o.o.x, y: o.o.y }, h: { x: o.h.x, y: o.h.y }, hc: !!o.hc,
           hn: pt(o.hn) ? { x: o.hn.x, y: o.hn.y } : { x: 0, y: 1 }, ground: !!o.ground, air: 0 };
         maxH = fin(o.maxH) ? Math.max(0, o.maxH) : 0; time = fin(o.time) ? o.time : 0; falls = fin(o.falls) ? o.falls : 0;
@@ -482,17 +508,42 @@
         return { x: Math.cos(aim.a) * aim.l, y: Math.sin(aim.a) * aim.l };
       }
 
+      // A fall into the void: the pot keeps falling while it shrinks away in a swirl of sparks, then the run starts over
+      // at the very bottom (Best is kept) and the pot pops back in. Reduce motion: a plain fade, no shrinking or sparks.
+      const warpLen = () => api.reduceMotion ? 0.7 : WARP, warpMid = () => api.reduceMotion ? 0.35 : WARPMID;
+      function startWarp() {
+        state = 'warp'; warpAt = clock; warpDone = false; warpFrom = { x: s.p.x, y: s.p.y }; fallNote = null;
+        api.sfx('hit');
+      }
+      function resetRun() {
+        keepBest(); try { Ludus.save(); } catch (e) {}
+        s = newState(); maxH = 0; maxP = 0; time = 0; falls = 0; acc = 0;
+        aim = { a: Math.atan2(s.o.y, s.o.x), l: Math.hypot(s.o.x, s.o.y) };
+        fallFrom = s.p.y; reached = 1; warpDone = true;
+        sectionNote = { text: 'Back to the start', t: clock }; api.score(0);
+      }
       function update(dt) {
+        if (state === 'warp') {
+          const t = clock - warpAt;
+          if (!warpDone) {                      // still falling while it fades out; the camera keeps following
+            acc = Math.min(acc + dt, STEP * 14);
+            while (acc >= STEP) { step(world, s, { x: s.o.x, y: s.o.y }, STEP); acc -= STEP; }
+            if (t >= warpMid()) resetRun();
+          } else if (t >= warpLen()) { state = 'play'; acc = 0; }
+          return;
+        }
         if (state !== 'play' || dt <= 0) return;
         time += dt;
         acc = Math.min(acc + dt, STEP * 14);
         const tg = target(dt);
         while (acc >= STEP) { step(world, s, tg, STEP); acc -= STEP; }
+        // fell off the sky rocks: below the course, or falling free for a long time out over the void
+        if (s.p.y < FALLY || (s.air > FALLT && s.v.y < -300 && s.p.x > world.cliff)) { startWarp(); return; }
         if (s.hc && !wasHc && clock - lastTap > 0.12) { api.sfx('click'); lastTap = clock; }
         wasHc = s.hc;
         const hgt = s.p.y - PR; if (hgt > maxH) maxH = hgt;
         const pr = world.progress(s.p.x, s.p.y);
-        if (pr.off < 150 && pr.at > maxP && (s.ground || s.hc)) { maxP = pr.at; api.score(Math.floor(maxP / 10)); }
+        if (pr.off < 150 && pr.at > maxP && (s.ground || s.hc)) { maxP = pr.at; if (maxP > bestP) bestP = maxP; api.score(Math.floor(maxP / 10)); }
         const r = countReached();
         if (r > reached) { reached = r; sectionNote = { text: world.marks[r - 1].name, t: clock }; api.sfx('score'); }
         if (s.ground || s.hc) {
@@ -504,7 +555,7 @@
         if (s.p.y > sm.y && s.p.y < sm.y + 60 && (s.ground || s.hc) && s.p.x > sm.x0 && s.p.x < sm.x1) win();
       }
       function win() {
-        state = 'won'; winAt = clock; maxP = world.total; reached = world.marks.length;
+        state = 'won'; winAt = clock; maxP = world.total; reached = world.marks.length; keepBest();
         const score = Math.floor(world.total / 10) + Math.max(0, Math.round(2400 - time)) * 2;
         api.score(score); api.sfx('win');
         const mm = Math.floor(time / 60), ss = String(Math.floor(time % 60)).padStart(2, '0');
@@ -606,13 +657,39 @@
           ctx.fillStyle = col.accent; ctx.beginPath(); ctx.moveTo(fp.x, fp.y - 56 * k); ctx.lineTo(fp.x + 24 * k, fp.y - 48 * k + Math.sin(clock * 3) * 2); ctx.lineTo(fp.x, fp.y - 40 * k); ctx.fill();
           D.spark(ctx, fp.x, fp.y - 64 * k, 8 * k, col.accent, clock * 0.8);
         }
-        drawClimber(col, k);
+        const wt = state === 'warp' ? clock - warpAt : -1;
+        if (wt >= 0) warpVeil(col, w, h, wt);
+        drawClimber(col, k, wt >= 0 ? warpScale(wt) : 1);
+        if (wt >= 0) warpSparks(col, k, wt);
         if (fallNote && clock - fallNote.t < 1.6 && state === 'play') {
           const p = toScreen(fallNote.x, fallNote.y), a = 1 - (clock - fallNote.t) / 1.6;
           ctx.globalAlpha = a; D.text(ctx, fallNote.text, p.x, p.y - 38 - (1 - a) * 16, 13, col.bad, 750); ctx.globalAlpha = 1;
         }
         hud(col, w, h);
         ctx.restore();
+      }
+      // the warp: 0..1 how far through each half
+      const warpOut = t => Math.min(1, t / warpMid()), warpIn = t => Math.max(0, Math.min(1, (t - warpMid()) / (warpLen() - warpMid())));
+      function warpScale(t) {
+        if (api.reduceMotion) return 1;
+        if (!warpDone) { const e = warpOut(t); return Math.max(0, 1 - e * e); }
+        return D.ease.outBack ? D.ease.outBack(warpIn(t)) : warpIn(t);
+      }
+      function warpVeil(col, w, h, t) {
+        const a = !warpDone ? warpOut(t) : 1 - warpIn(t);
+        ctx.globalAlpha = 0.72 * a * a * (3 - 2 * a); ctx.fillStyle = col.bg || (col.dark ? '#1c1916' : '#fbf7f0'); ctx.fillRect(0, 0, w, h); ctx.globalAlpha = 1;
+      }
+      function warpSparks(col, k, t) {
+        if (api.reduceMotion) return;
+        const pc = toScreen(s.p.x, s.p.y);
+        for (let i = 0; i < 10; i++) {
+          const ang = i / 10 * Math.PI * 2 + t * 7;
+          let r, al;
+          if (!warpDone) { const e = warpOut(t); r = (1 - e) * 80 * k + 6; al = Math.min(1, e * 3); }           // swirl in
+          else { const e = warpIn(t); r = 8 + e * 70 * k; al = 1 - e; }                                         // burst out
+          ctx.globalAlpha = Math.max(0, al); D.spark(ctx, pc.x + Math.cos(ang) * r, pc.y - Math.sin(ang) * r - PR * k * 0.5, (5 + (i % 3) * 1.5) * k, col.accent, t * 6 + i);
+        }
+        ctx.globalAlpha = 1;
       }
       function details(col, k) {
         const d = col.dark, on = (p, m) => p.x > -m && p.x < view.w + m && p.y > -m && p.y < view.h + m;
@@ -640,20 +717,6 @@
           for (let x = x1 - 16; x > x0 + 14; x -= 22) { const p = toScreen(x, y); ctx.lineTo(p.x, p.y + (5 + (Math.round(x) % 3) * 2) * k); }
           ctx.closePath(); ctx.fill();
         });
-        // the sea of clouds: soft puffs along its top
-        const [cx0, cx1, cy] = world.deco.clouds;
-        ctx.fillStyle = d ? '#4a4f5e' : '#ffffff';
-        for (let x = cx0 + 24; x < cx1; x += 38) {
-          const p = toScreen(x, cy); if (!on(p, 60)) continue;
-          const r = (20 + (Math.round(x) % 3) * 4) * k; ctx.beginPath(); ctx.arc(p.x, p.y + r * 0.62, r, Math.PI, 0); ctx.fill();
-        }
-        // and a soft fade where the cloud sea meets the rock under it
-        const cb = toScreen(cx0, cy - 420);
-        if (cb.y > -40 && cb.y < view.h + 200) {
-          const gr = ctx.createLinearGradient(0, cb.y - 120 * k, 0, cb.y);
-          gr.addColorStop(0, d ? 'rgba(74,79,94,0)' : 'rgba(255,255,255,0)'); gr.addColorStop(1, d ? 'rgba(74,79,94,0.9)' : 'rgba(255,255,255,0.9)');
-          const c1 = toScreen(cx1, cy); ctx.fillStyle = gr; ctx.fillRect(cb.x, cb.y - 120 * k, c1.x - cb.x, 140 * k);
-        }
         // grassy tops and a few hanging roots on the floating rocks
         world.deco.floats.forEach(([fx, ft, fw]) => {
           const a = toScreen(fx - fw / 2 + 8, ft), b = toScreen(fx + fw / 2 - 8, ft); if (!on(a, 300)) return;
@@ -673,7 +736,7 @@
       }
       function pill(x, y, w, h, d) { ctx.fillStyle = d ? 'rgba(42,38,33,0.86)' : 'rgba(255,252,247,0.9)'; D.roundRect(ctx, x, y, w, h, h / 2); ctx.fill(); }
       function hud(col, w, h) {
-        const d = col.dark, pct = Math.min(100, Math.floor(maxP / world.total * 100));
+        const d = col.dark, pct = Math.min(100, Math.floor(Math.max(bestP, maxP) / world.total * 100));
         const pw = Math.min(170, w - 150), px = w / 2 - pw / 2;
         pill(px, 8, pw, 30, d);
         D.fitText(ctx, `${Math.max(0, Math.floor((s.p.y + (state === 'won' ? winLift : 0) - PR) / 10))} m`, px + pw * 0.3, 23, pw * 0.42, 14, col.ink, 780);
@@ -687,7 +750,7 @@
         }
         const sb = sensBox(); pill(sb.x, sb.y, sb.w, sb.h, d);
         D.fitText(ctx, `${SENS[sensI]}×`, sb.x + sb.w / 2, sb.y + 15, sb.w - 12, 11, col.ink2, 700);
-        if (sectionNote && clock - sectionNote.t < 2 && state !== 'won') {
+        if (sectionNote && clock - sectionNote.t < 2 && state !== 'won' && !(state === 'warp' && !warpDone)) {
           const a = Math.min(1, (2 - (clock - sectionNote.t)) * 2);
           ctx.globalAlpha = a; D.fitText(ctx, sectionNote.text, w / 2, h * 0.22, w - 40, 17, col.ink, 780); ctx.globalAlpha = 1;
         }
@@ -706,8 +769,11 @@
           ctx.globalAlpha = 1;
         }
       }
-      function drawClimber(col, k) {
+      function drawClimber(col, k, sc) {
         const lift = state === 'won' ? winLift : 0, pc = toScreen(s.p.x, s.p.y + lift), hc = toScreen(s.h.x, s.h.y + lift);
+        if (sc <= 0.01) return;
+        ctx.save();
+        if (sc !== 1) { ctx.translate(pc.x, pc.y); ctx.scale(sc, sc); ctx.translate(-pc.x, -pc.y); }
         if (lift > 1) {                          // the launch trail: sparks streaming out under the pot
           for (let i = 0; i < 9; i++) {
             const f = ((clock * 3 + i / 9) % 1), y = pc.y + PR * k + f * Math.min(160, lift * 0.4) * k;
@@ -732,18 +798,19 @@
           const t = toScreen(s.p.x + Math.cos(aim.a) * aim.l, s.p.y + Math.sin(aim.a) * aim.l);
           ctx.strokeStyle = col.ink3; ctx.globalAlpha = 0.6; ctx.lineWidth = 1.2;
           ctx.beginPath(); ctx.arc(t.x, t.y, 4.5, 0, Math.PI * 2); ctx.stroke(); ctx.globalAlpha = 1;
-
         }
+        ctx.restore();
       }
 
       api.loop(dt => { clock += dt; update(dt); render(); });
-      if (window.ludusDebug) Ludus.games.find(x => x.id === 'climb')._peek = () => ({ s, maxH, maxP, state, aim, cam, time, reached, falls, toScreen, scale, anchor, sens: SENS[sensI], world, win,
+      if (window.ludusDebug) Ludus.games.find(x => x.id === 'climb')._peek = () => ({ s, maxH, maxP, bestP, state, aim, cam, time, reached, falls, toScreen, scale, anchor, sens: SENS[sensI], world, win, warpFrom, warpDone,
         teleport(x, y) { Object.assign(s, newState({ x, y })); fallFrom = y; } });
       return {
         save() {
+          keepBest();
           if (state !== 'play' || time < 1) return null;
           const c = q => ({ x: q.x, y: q.y });
-          return { v2: 4, p: c(s.p), v: c(s.v), o: c(s.o), h: c(s.h), hc: s.hc, hn: c(s.hn), ground: s.ground, maxH, maxP, time, falls, aim: { a: aim.a, l: aim.l } };
+          return { v2: 5, p: c(s.p), v: c(s.v), o: c(s.o), h: c(s.h), hc: s.hc, hn: c(s.hn), ground: s.ground, maxH, maxP, time, falls, aim: { a: aim.a, l: aim.l } };
         },
         resume() { acc = 0; },
         pause() { if (document.pointerLockElement === canvas) document.exitPointerLock(); },

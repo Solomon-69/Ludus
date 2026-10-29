@@ -160,6 +160,32 @@
     return snap;
   }
 
+  // One shared ~60 Hz beat for room games (see api.loop). A worker's timer keeps its pace in a hidden page, where the
+  // page's own timers and animation frames are slowed to about once a second; plain setInterval is the fallback.
+  const awake = new Set();
+  let awakeWorker = null, awakeTimer = 0;
+  const awakeBeat = () => { awake.forEach(f => { try { f(); } catch (e) {} }); };
+  function keepAwake(fn) {
+    awake.add(fn);
+    if (awake.size === 1) {
+      native('live', { on: true });
+      try {
+        if (!awakeWorker) {
+          const url = URL.createObjectURL(new Blob(['let t=0;onmessage=e=>{clearInterval(t);if(e.data)t=setInterval(()=>postMessage(0),16)}'], { type: 'text/javascript' }));
+          awakeWorker = new Worker(url);
+          awakeWorker.onmessage = awakeBeat;
+        }
+        awakeWorker.postMessage(1);
+      } catch (e) { awakeWorker = null; clearInterval(awakeTimer); awakeTimer = setInterval(awakeBeat, 16); }
+    }
+    return () => {
+      if (!awake.delete(fn) || awake.size) return;
+      if (awakeWorker) { try { awakeWorker.postMessage(0); } catch (e) {} }
+      clearInterval(awakeTimer); awakeTimer = 0;
+      native('live', { on: false });
+    };
+  }
+
   function makeApi(game, stage, hooks, online) {
     const cleanups = [];
     // online = the api.online object when this run is a room game (see ONLINE.md), otherwise null: local play.
@@ -268,24 +294,38 @@
         });
       },
       loop(fn) {
-        let last = performance.now(), id = 0, t0 = last;
+        let last = performance.now(), id = 0, t0 = last, rafAt = last;
         const entry = { running: true, needsFrame: true };
-        const tick = now => {
-          if (!entry.running) return;
+        const frame = now => {
           const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); last = now;   // never negative: a reset can land after this frame began
           // While paused, draw one still frame (dt 0) when asked, e.g. right after a restore or a resize.
           const step = !paused || entry.needsFrame;
           entry.needsFrame = false;
-          id = requestAnimationFrame(tick);
           if (step) {
             try { const d = paused || waiting ? 0 : dt; simTime += d; fn(d, (now - t0) / 1000); lastFrame = now; }
             catch (e) { if (!entry.failed) { entry.failed = true; crash(e, 'loop'); } }
           }
         };
+        const tick = now => {
+          if (!entry.running) return;
+          rafAt = performance.now();
+          id = requestAnimationFrame(tick);
+          frame(now > last ? now : performance.now());   // a frame the worker beat already ran has moved last on
+        };
         entry.reset = () => { last = performance.now(); };
         id = requestAnimationFrame(tick);
         loops.add(entry);
         cleanups.push(() => { entry.running = false; cancelAnimationFrame(id); });
+        // In a room the game must keep running when this screen stops drawing (panel closed, window hidden or covered):
+        // the browser then pauses animation frames, so the host would stop sending and every guest would freeze. A steady
+        // beat from a worker (not slowed down for hidden pages) runs the frames itself while animation frames are missing.
+        if (online) {
+          const stop = keepAwake(() => {
+            const now = performance.now();
+            if (entry.running && now - rafAt > 45 && now - last >= 14) frame(now);
+          });
+          cleanups.push(stop);
+        }
         return entry;
       },
       timeout(fn, ms) { fn = guard(fn, 'timer'); const id = setTimeout(() => { if (crashed) return; if (!paused && !waiting) fn(); else api.timeout(fn, 60); }, ms); cleanups.push(() => clearTimeout(id)); return id; },
@@ -470,7 +510,7 @@
       side(opts.left, x, false);
       side(opts.right, x + w - pw, true);
       let status = opts.status;
-      if (!status && (opts.turn === 'left' || opts.turn === 'right')) {   // a game that sends no text still says whose turn it is
+      if (!status && !opts.quiet && (opts.turn === 'left' || opts.turn === 'right')) {   // quiet: the game draws its own middle (Tag's clock)   // a game that sends no text still says whose turn it is
         const o = opts.turn === 'left' ? opts.left : opts.right;
         status = o ? (o.who === 'you' && (!o.label || o.label === 'You') ? 'Your turn' : String(o.label || (o.who === 'bot' ? 'Bot' : 'Player')) + '\u2019s turn') : '';
       }

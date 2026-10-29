@@ -1009,6 +1009,7 @@
         D.text(ctx, `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`, cx, 22, 16 * ts, hot ? (col.bad || '#d9534f') : col.ink, 800);
         D.fitText(ctx, map.name, cx, 40, mid - 6, 9.5, col.ink3, 650, 8);
       }
+      const NARROW = 560;   // a tall (narrow) panel: the power-up slots go under the player cards
       function drawHeader(col) {
         const w = view.w;
         if (ids.length > 2) { drawMultiHeader(col); return; }
@@ -1016,11 +1017,11 @@
         D.duelHeader(ctx, 10, 8, w - 20, {
           left: { who: friend ? (ia === 'p1' || ia === 'p2' ? ia : 'p1') : 'you', label: label(ia), pips: wins[ia] || 0, of: firstTo() },
           right: { who: friend ? (ib === 'p1' || ib === 'p2' ? ib : 'p2') : 'bot', label: label(ib), pips: wins[ib] || 0, of: firstTo() },
-          turn: phase === 'play' || phase === 'count' ? (it === ia ? 'left' : 'right') : null
+          turn: phase === 'play' || phase === 'count' ? (it === ia ? 'left' : 'right') : null, quiet: true   // the clock is in the middle
         }, col);
-        const pw = Math.min(132, (w - 20) * 0.34);
-        players.forEach(p => {   // held power-up slot next to each player's panel
-          const left = p.id === ia, sx = left ? 10 + pw + 18 : w - 10 - pw - 18, sy = 28;
+        const pw = Math.min(132, (w - 20) * 0.34), narrow = w < NARROW;
+        players.forEach(p => {   // held power-up slot next to each player's panel (a narrow panel: under it, so the clock has room)
+          const left = p.id === ia, sx = narrow ? (left ? 10 + pw - 14 : w - 10 - pw + 14) : left ? 10 + pw + 18 : w - 10 - pw - 18, sy = narrow ? 64 : 28;
           ctx.save();
           if (p.hold) {
             ctx.fillStyle = POWERS[p.hold].color; ctx.beginPath(); ctx.arc(sx, sy, 11, 0, 7); ctx.fill();
@@ -1032,13 +1033,13 @@
         const secs = Math.max(0, Math.ceil(timer)), hot = phase === 'play' && secs <= 10;
         const ts = hot && !api.reduceMotion ? 1 + 0.12 * Math.max(0, Math.sin(clock * Math.PI * 2)) : 1;
         D.text(ctx, `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`, w / 2, 22, 17 * ts, hot ? (col.bad || '#d9534f') : col.ink, 800);
-        D.fitText(ctx, map.name, w / 2, 40, Math.max(40, w - 2 * pw - 90), 9.5, col.ink3, 650, 8);
+        D.fitText(ctx, map.name, w / 2, 40, Math.max(40, narrow ? w - 2 * pw - 30 : w - 2 * pw - 90), 9.5, col.ink3, 650, 8);
       }
       function render() {
         const col = api.colors(), { w, h } = view; ctx.clearRect(0, 0, w, h);
         if (phase === 'menu') { drawMenu(col); return; }
         drawHeader(col);
-        const top = 54, avail = h - top - 8, s = Math.min((w - 16) / W, avail / H);
+        const top = w < NARROW && ids.length <= 2 ? 84 : 54, avail = h - top - 8, s = Math.min((w - 16) / W, avail / H);
         const ox = (w - W * s) / 2, oy = top + Math.max(0, (avail - H * s) / 2) * 0.3;
         fieldS = s;
         ctx.save(); ctx.translate(ox, oy); ctx.scale(s, s);

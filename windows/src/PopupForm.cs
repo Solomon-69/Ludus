@@ -139,7 +139,11 @@ internal sealed class PopupForm : Form
 
             var userData = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Ludus", "WebView2");
-            var env = await CoreWebView2Environment.CreateAsync(null, userData);
+            // Online room games must keep running at full pace while the panel is hidden or covered (clicking elsewhere hides it):
+            // without these Chromium slows a hidden page's timers to about once a second, so a host stopped sending and every
+            // guest's game stuttered. Ludus only runs its game beat while a room game is on (engine.js keepAwake).
+            var opts = new CoreWebView2EnvironmentOptions("--disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-renderer-backgrounding");
+            var env = await CoreWebView2Environment.CreateAsync(null, userData, opts);
             await web.EnsureCoreWebView2Async(env);
             var core = web.CoreWebView2;
 
@@ -416,6 +420,7 @@ internal sealed class PopupForm : Form
                     try { Process.Start(new ProcessStartInfo(SiteUrl) { UseShellExecute = true }); } catch (Exception ex) { Store.Log($"open site failed: {ex.Message}"); }
                     break;
                 case "playing":
+                case "live":   // an online room game started/ended: nothing to do here, the browser options above keep it running
                     break;   // the Mac ignores this too; kept for future use
             }
         }

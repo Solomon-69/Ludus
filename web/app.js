@@ -74,7 +74,8 @@
   // ---------- wide or tall ----------
   // The .io games work in either shape; the button next to Pause flips the panel and remembers the choice.
   // Air Hockey too (1.12.17): wide (side-on rink) by default, tall when turned; the choice is remembered per game.
-  const ORIENT = new Set(['slither', 'holeio', 'paperio', 'hockey']), ORIENT_WIDE = new Set(['hockey']);
+  // Tag too (1.12.33): wide by default, and the button brings the wide panel back if it ever opens tall.
+  const ORIENT = new Set(['slither', 'holeio', 'paperio', 'hockey', 'tag']), ORIENT_WIDE = new Set(['hockey', 'tag']);
   function wideFor(g) { return ORIENT.has(g.id) ? (S.orient && typeof S.orient[g.id] === 'boolean' ? S.orient[g.id] : ORIENT_WIDE.has(g.id) && !!g.wide) : !!g.wide; }
   function renderOrient(g) {
     const b = $('orientBtn'); b.hidden = !ORIENT.has(g.id);
@@ -360,6 +361,8 @@
     if (h !== fitSent) { fitSent = h; L.native('fit', { h }); }
   }
   function renderCards() {
+    const sb = $('search'), ph = 'Search ' + L.games.length + ' games';   // how many games Ludus has, from the real list
+    if (sb && sb.placeholder !== ph) sb.placeholder = ph;
     const grid = $('grid');
     const list = visibleGames();
     const searching = !!norm(query);
@@ -1255,7 +1258,8 @@
     // in the "Continue" card at the top.
     // A round being played stays as it is. A party that is waiting (lobby, scoreboard or still joining) stays joined but
     // goes behind All games; Rejoin on the Last party card brings it back.
-    if (online && online.started && inRoom()) return;
+    // The app opens the panel at the normal size; a wide game being played gets its own shape back at once.
+    if (online && online.started && inRoom()) { if (online.game) L.native('wide', { on: wideFor(online.game) }); return; }
     if (roomAlive()) parkRoom();
     if (view !== 'home') { root.classList.add('instant'); goHome(); }   // safety net; normally done on close
     if (S.filter !== 'All') { S.filter = 'All'; L.save(); renderFilters(); renderCards(); }

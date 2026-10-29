@@ -34,9 +34,9 @@ async () => {
   trySpot('orange step', [P(7)[0] + 40, P(7)[1]], P(8), 400);
   const m = w.marks.find(x => x.name === 'The mountain'), mi = rt.findIndex(q => q[0] > m.x + 100);
   trySpot('mountain step', [rt[mi][0] - 10, rt[mi][1]], rt[mi + 1], 400);
-  // the sky ending: from the cloud sea onto the first floating rock, rock to rock, and onto the summit rock
+  // the sky ending: from the cliff over the void onto the first floating rock, rock to rock, and onto the summit rock
   const sk = rt.findIndex(q => q[1] > w.skyY + 40);
-  trySpot('clouds to rock 1', [rt[sk][0] - 110, rt[sk - 1][1]], rt[sk], 600);
+  trySpot('cliff to rock 1', [w.cliff - 30, rt[sk - 1][1]], rt[sk], 600);
   for (let j = sk; j < rt.length - 1; j++) trySpot(`sky rock ${j - sk + 1} to ${j - sk + 2}`, [rt[j][0] + 20, rt[j][1]], rt[j + 1], 600);
   return out;
 }

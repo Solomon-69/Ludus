@@ -1,5 +1,5 @@
 /* Ludus real-time link for online action games (Paddle Duel, Air Hockey, Tag, Worm Arena, Land Claim).
-   The host's screen runs the game and sends a compact copy of the state ~15-20 times a second ("fast"
+   The host's screen runs the game and sends a compact copy of the state up to 20 times a second ("fast"
    messages: never repeated, dropped when the line is down, only the newest matters). Every guest sends
    its controls to the host and draws the host's state, smoothed between the last two copies it got.
 
@@ -24,7 +24,7 @@
   L.rt = function (api, o) {
     const on = api.online;
     if (!on) return null;
-    const hz = Math.max(5, Math.min(30, o.hz || 24)), inHz = Math.max(5, Math.min(40, o.inputHz || 30));
+    const hz = Math.max(5, Math.min(20, o.hz || 20)), inHz = Math.max(5, Math.min(40, o.inputHz || 30));
     const baseDelay = o.delay || 100;           // draw about 100 ms in the past (more when the line is jittery) so there is a copy on each side
     /* The guest's playback clock (1.12.17). Every copy carries the host's clock (_ts). off = the guest clock minus the host clock
        on the quickest delivery of the last few seconds (clock offset plus the shortest trip); spread = how much later than that a

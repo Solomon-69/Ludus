@@ -735,7 +735,7 @@
         api.over({ score: mineR ? mineR.len : 0, won: !!mineR && win === mineR, title: mineR && win === mineR ? 'You win' : win.h.name + ' wins',
           message: rows.map(r => r.h.name + ' ' + r.len).join(' · ') });
       }
-      let overDone = false, pendingEnd = null, link = null, pred = null, gv = BASE_V;
+      let overDone = false, pendingEnd = null, link = null, pred = null, gv = BASE_V, foodSentAt = 0;
       const validW = q => Array.isArray(q) && num(q[0]) && num(q[1]) && num(q[2]) && num(q[3]) && Number.isInteger(q[4]);
       function applyState(d) {
         if (!Array.isArray(d.wl) || !Array.isArray(d.w) || d.wl.length !== d.w.length || d.w.length > 40) return;
@@ -802,8 +802,14 @@
         link = Ludus.rt(api, {
           hz: 20,
           snapshot: () => {
-            while (fAdd.length) on.send('fa', fAdd.splice(0, 60));
-            while (fGone.length) on.send('fg', fGone.splice(0, 400));
+            // food changes go out in batches about 4 times a second (not with every copy): far fewer numbered messages
+            // on the public relay, so fewer go missing and need asking for again
+            const fnow = performance.now();
+            if (fnow - foodSentAt >= 240 || fAdd.length > 50) {
+              foodSentAt = fnow;
+              while (fAdd.length) on.send('fa', fAdd.splice(0, 60));
+              while (fGone.length) on.send('fg', fGone.splice(0, 400));
+            }
             const r1 = v => Math.round(v * 10) / 10;
             return { ph: phase, wl: W.map(w => [w.name, w.hex, w.human]),
               w: W.map(w => [Math.round(w.px[0]), Math.round(w.py[0]), Math.round(w.ang * 100) / 100, r1(w.mass),

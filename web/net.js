@@ -422,7 +422,7 @@
     me.conn = 'connecting';
     me.ev = {};
     me.started = false; me.gen = 0; me.seed = 0;
-    me.sq = 0; me.history = []; me.rxq = {}; me.nackAt = {}; me.pending = [];
+    me.sq = 0; me.history = []; me.rxq = {}; me.ooo = {}; me.nackAt = {}; me.pending = [];
     me.active = null;           // the api.online of the running game
     // tournaments (protocol 2): the host's plan, the series in progress, and what the other side speaks
     me.flex = role === 'host' && opts.flex !== false;     // a room whose games the host may pick
@@ -586,6 +586,8 @@
     if (this.over || this.conn !== 'online') return;
     const now = Date.now(), due = now - this.lastHb >= this._hbEvery() - 50, gone = this._peerTimeout();
     this.held = this.held.filter(h => h.until > now);
+    // messages still waiting for an earlier one that went missing: ask for it again (nothing newer may come to trigger it)
+    Object.keys(this.ooo).forEach(c => { const box = this.ooo[c]; if (box.size) this._maybeNack(c, Math.min.apply(null, Array.from(box.keys()))); });
     if (this.role === 'host') {
       if (!this.ready) return;
       this.roster.forEach((p, seat) => {
@@ -607,7 +609,7 @@
     // dropped out (not left on purpose): keep the seat and score for a while, for when they come back
     if (this.role === 'host' && why === 'timeout' && this.uids[p.cid]) this.held = this.held.filter(h => h.u !== this.uids[p.cid]).concat([{ u: this.uids[p.cid], seat, cid: p.cid, name: p.name, until: Date.now() + SEAT_HOLD }]);
     delete this.uids[p.cid];
-    delete this.rxq[p.cid];
+    delete this.rxq[p.cid]; delete this.ooo[p.cid];
     delete this.peerPv[p.cid]; delete this.peerHx[p.cid];
     this.order = this.order.filter(c => c !== p.cid);
     if (this.role === 'host') {
@@ -709,7 +711,7 @@
     let old = null;
     for (const p of this.roster.values()) if (p.seat > 0 && this.uids[p.cid] === u) old = p;
     let seat = -1, oldCid = '';
-    if (old) { seat = old.seat; oldCid = old.cid; this.roster.delete(seat); delete this.uids[oldCid]; delete this.rxq[oldCid]; delete this.peerPv[oldCid]; delete this.peerHx[oldCid]; }
+    if (old) { seat = old.seat; oldCid = old.cid; this.roster.delete(seat); delete this.uids[oldCid]; delete this.rxq[oldCid]; delete this.ooo[oldCid]; delete this.peerPv[oldCid]; delete this.peerHx[oldCid]; }
     else {
       const h = this.held.find(x => x.u === u);
       if (!h || this.roster.size >= this.max) return -1;
@@ -1122,7 +1124,7 @@
     const meE = list.find(p => p.cid === this.cid); if (meE) this.seat = meE.seat;
     list.forEach(p => { if (!this.seen[p.cid]) this.seen[p.cid] = Date.now(); });
     this._emit('roster', this.rosterList());
-    (gone || []).forEach(p => { delete this.rxq[p.cid]; if (this.started && this.active) this.active._left(p.seat, p.name, false); this._emit('left', { seat: p.seat, name: p.name, why: 'gone' }); });
+    (gone || []).forEach(p => { delete this.rxq[p.cid]; delete this.ooo[p.cid]; if (this.started && this.active) this.active._left(p.seat, p.name, false); this._emit('left', { seat: p.seat, name: p.name, why: 'gone' }); });
   };
   Session.prototype._onHandover = function (m) {
     if (this.role === 'host' || !this.ready || m.c !== this.hostCid || typeof m.to !== 'string' || m.to.length > 16 || !Number.isInteger(m.he) || m.he <= this.he) return;
@@ -1160,7 +1162,7 @@
     this.order = jo.concat(list.filter(p => p.cid !== this.cid && !jo.includes(p.cid)).sort((a, b) => a.seat - b.seat).map(p => p.cid));
     this._pub(this._hbObj());
     setTimeout(() => { if (!this.over && this.role === 'host') this._pub(this._hbObj()); }, 500);   // once more, in case the first copy is lost
-    gone.forEach(p => { delete this.rxq[p.cid]; this._emit('left', { seat: p.seat, name: p.name, why: 'gone' }); });
+    gone.forEach(p => { delete this.rxq[p.cid]; delete this.ooo[p.cid]; this._emit('left', { seat: p.seat, name: p.name, why: 'gone' }); });
     if (this.ser && this.ser.st === 'board') { clearTimeout(this.ser.t2); this.ser.t2 = setTimeout(() => this.advance(), SERIES_PAUSE); }
     else if (this.ser && this.ser.st === 'play') this._afterLeave();
     this._emit('plan', this.plan);
@@ -1200,22 +1202,42 @@
   };
   Session.prototype._maybeNack = function (cid, theirLast) {
     const have = this.rxq[cid] || 0, now = Date.now();
-    if (theirLast > have && now - (this.nackAt[cid] || 0) > 1500) {
+    // asked again after 700 ms when the copies sent back went missing too; u = the last missing one (newer Ludus sends
+    // back only up to it, older Ludus sends everything after f, which is fine too)
+    if (theirLast > have && now - (this.nackAt[cid] || 0) > 700) {
       this.nackAt[cid] = now;
-      this._pub({ t: 'nack', to: cid, f: have + 1 });
+      const box = this.ooo[cid];
+      let u = theirLast - 1;
+      if (box && box.size) { u = have + 1; while (u + 1 < theirLast && !box.has(u + 1)) u++; }
+      this._pub({ t: 'nack', to: cid, f: have + 1, u });
     }
   };
   Session.prototype._onNack = function (m) {
     if (m.to !== this.cid || !Number.isInteger(m.f)) return;
+    const u = Number.isInteger(m.u) && m.u >= m.f ? m.u : Infinity;
     let n = 0;
-    for (const h of this.history) if (h.q >= m.f && n++ < 100) this.client.publish(topicOf(this.code), h.text);
+    for (const h of this.history) if (h.q >= m.f && h.q <= u && n++ < 100) this.client.publish(topicOf(this.code), h.text);
   };
   Session.prototype._onGame = function (m) {
     const seat = this._seatOf(m.c);
     if (seat < 0 || typeof m.k !== 'string' || !TYPE_RE.test(m.k) || !Number.isInteger(m.q) || m.q < 1) return;
     const last = this.rxq[m.c] || 0;
     if (m.q <= last) return;                                       // already have it
-    if (m.q > last + 1) { this._maybeNack(m.c, m.q); return; }     // a message before it went missing: ask for it again
+    if (m.q > last + 1) {                                          // a message before it went missing: keep this one, ask for the missing one
+      const box = this.ooo[m.c] || (this.ooo[m.c] = new Map());
+      if (box.size < HISTORY) box.set(m.q, m);
+      this._maybeNack(m.c, m.q); return;
+    }
+    this._takeGame(m, seat);
+    // the ones that arrived early, now in order
+    const box = this.ooo[m.c];
+    if (box && box.size) {
+      let nx;
+      while ((nx = box.get((this.rxq[m.c] || 0) + 1))) { box.delete(nx.q); this._takeGame(nx, this._seatOf(nx.c)); }
+      box.forEach((v, q) => { if (q <= (this.rxq[m.c] || 0)) box.delete(q); });
+    }
+  };
+  Session.prototype._takeGame = function (m, seat) {
     this.rxq[m.c] = m.q;
     if (m.to !== undefined && m.to !== this.seat) return;          // meant for somebody else
     const r = Number.isInteger(m.r) ? m.r : 0;
