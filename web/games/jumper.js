@@ -32,6 +32,7 @@
       let WH = 520;
       let p, plats, camY, topGen, height, clock, state, deadAt, squash, spin, pops, lastChainY, best, mons = [], onFloor = true;
       let mode = Ludus.state.hopMode === 'monsters' ? 'monsters' : 'classic';
+      let swPos = mode === 'monsters' ? 1 : 0;   // slide position of the mode picker thumb (0 Classic, 1 Monsters)
       const MR = 14;   // monster radius
       const held = { l: false, r: false, pl: false, pr: false };
 
@@ -91,6 +92,7 @@
       }
 
       function update(dt) {
+        swPos += ((mode === 'monsters' ? 1 : 0) - swPos) * (1 - Math.exp(-16 * dt));
         clock += dt;
         const nh = worldH(); if (nh !== WH) WH = nh;
         squash = Math.max(0, squash - dt * 5);
@@ -268,13 +270,16 @@
           D.text(ctx, `Fell from ${height} m`, WW / 2, 55, 13, col.ink, 700);
         }
         if (switchOn()) {
-          const b = switchBox(), half = b.w / 2, on = mode === 'monsters' ? 1 : 0;
-          ctx.fillStyle = col.dark ? 'rgba(42,38,33,0.9)' : 'rgba(255,252,247,0.94)'; D.roundRect(ctx, b.x, b.y, b.w, b.h, b.h / 2); ctx.fill();
-          ctx.strokeStyle = col.line || 'rgba(0,0,0,0.12)'; ctx.lineWidth = 1; ctx.stroke();
-          D.text(ctx, 'Pick a mode', WW / 2, b.y - 11, 11, col.ink2, 650);
-          ctx.fillStyle = col.ink; D.roundRect(ctx, b.x + 3 + on * half, b.y + 3, half - 6, b.h - 6, (b.h - 6) / 2); ctx.fill();
-          D.text(ctx, 'Classic', b.x + half / 2, b.y + b.h / 2 + 0.5, 13, on ? col.ink2 : col.surface, 700);
-          D.text(ctx, 'Monsters', b.x + half * 1.5, b.y + b.h / 2 + 0.5, 13, on ? col.surface : col.ink2, 700);
+          // same look as the app's other switches: soft track on a raised slab, a raised thumb that slides
+          const b = switchBox(), half = b.w / 2, flat = document.documentElement.classList.contains('flat');
+          const on = api.reduceMotion ? (mode === 'monsters' ? 1 : 0) : swPos, tr = b.h / 2;
+          if (!flat) { ctx.fillStyle = col.dark ? 'rgba(0,0,0,0.38)' : 'rgba(32,28,23,0.14)'; D.roundRect(ctx, b.x, b.y + 3, b.w, b.h, tr); ctx.fill(); }
+          ctx.fillStyle = col.surface2; D.roundRect(ctx, b.x, b.y, b.w, b.h, tr); ctx.fill();
+          const tx = b.x + 4 + on * (half - 4), tw = half - 4, th = b.h - 8, ty = b.y + 4;
+          if (!flat) { ctx.fillStyle = col.dark ? 'rgba(0,0,0,0.45)' : 'rgba(32,28,23,0.2)'; D.roundRect(ctx, tx, ty + 2, tw, th, th / 2); ctx.fill(); }
+          ctx.fillStyle = col.surface; D.roundRect(ctx, tx, ty, tw, th, th / 2); ctx.fill();
+          D.text(ctx, 'Classic', b.x + half / 2, b.y + b.h / 2 + 0.5, 13, on > 0.5 ? col.ink2 : col.ink, 700);
+          D.text(ctx, 'Monsters', b.x + half * 1.5, b.y + b.h / 2 + 0.5, 13, on > 0.5 ? col.ink : col.ink2, 700);
         }
         ctx.restore();
       }
