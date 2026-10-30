@@ -5,6 +5,7 @@ All notable changes to Ludus. Versions follow the app's version number (`Info.pl
 
 ## 1.12.38 (30 Oct 2026)
 - Sky Hop: the Classic / Monsters switch on the start screen now looks like the app's other switches (soft track on a raised slab, a raised thumb that slides across). The "Pick a mode" label is gone.
+- Search bar: no more orange ring around it while you type.
 
 ## 1.12.37 (29 Oct 2026)
 - Mac download: the app is now a universal build (Apple silicon and Intel). Before, it only ran on Apple silicon, so a friend on an Intel Mac could not open it at all.
