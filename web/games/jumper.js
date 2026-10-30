@@ -32,7 +32,7 @@
       let WH = 520;
       let p, plats, camY, topGen, height, clock, state, deadAt, squash, spin, pops, lastChainY, best, mons = [], onFloor = true;
       let mode = Ludus.state.hopMode === 'monsters' ? 'monsters' : 'classic';
-      let swPos = mode === 'monsters' ? 1 : 0;   // slide position of the mode picker thumb (0 Classic, 1 Monsters)
+      let swPos = mode === 'monsters' ? 1 : 0, swLast = performance.now();   // slide position of the mode picker thumb (0 Classic, 1 Monsters)
       const MR = 14;   // monster radius
       const held = { l: false, r: false, pl: false, pr: false };
 
@@ -92,7 +92,6 @@
       }
 
       function update(dt) {
-        swPos += ((mode === 'monsters' ? 1 : 0) - swPos) * (1 - Math.exp(-16 * dt));
         clock += dt;
         const nh = worldH(); if (nh !== WH) WH = nh;
         squash = Math.max(0, squash - dt * 5);
@@ -272,6 +271,9 @@
         if (switchOn()) {
           // same look as the app's other switches: soft track on a raised slab, a raised thumb that slides
           const b = switchBox(), half = b.w / 2, flat = document.documentElement.classList.contains('flat');
+          // real clock, not game time: the game clock stands still while waiting for the first move
+          const nowMs = performance.now(), swDt = Math.min(0.05, (nowMs - swLast) / 1000); swLast = nowMs;
+          swPos += ((mode === 'monsters' ? 1 : 0) - swPos) * (1 - Math.exp(-16 * swDt));
           const on = api.reduceMotion ? (mode === 'monsters' ? 1 : 0) : swPos, tr = b.h / 2;
           if (!flat) { ctx.fillStyle = col.dark ? 'rgba(0,0,0,0.38)' : 'rgba(32,28,23,0.14)'; D.roundRect(ctx, b.x, b.y + 3, b.w, b.h, tr); ctx.fill(); }
           ctx.fillStyle = col.surface2; D.roundRect(ctx, b.x, b.y, b.w, b.h, tr); ctx.fill();

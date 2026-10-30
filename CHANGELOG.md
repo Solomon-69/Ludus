@@ -3,6 +3,9 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.39 (30 Oct 2026)
+- Sky Hop: the Classic / Monsters switch now slides across when you tap it. Before, only the board behind it changed, because the animation waited on the game clock, which stands still until the first move.
+
 ## 1.12.38 (30 Oct 2026)
 - Sky Hop: the Classic / Monsters switch on the start screen now looks like the app's other switches (soft track on a raised slab, a raised thumb that slides across). The "Pick a mode" label is gone.
 - Search bar: no more orange ring around it while you type.
