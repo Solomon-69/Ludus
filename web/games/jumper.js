@@ -31,7 +31,7 @@
       const { ctx, canvas } = view;
       let WH = 520;
       let p, plats, camY, topGen, height, clock, state, deadAt, squash, spin, pops, lastChainY, best, mons = [], onFloor = true;
-      let mode = Ludus.state.hopMode === 'monsters' ? 'monsters' : 'classic';
+      let mode = 'classic';   // every visit starts on Classic
       let swPos = mode === 'monsters' ? 1 : 0, swLast = performance.now();   // slide position of the mode picker thumb (0 Classic, 1 Monsters)
       const MR = 14;   // monster radius
       const held = { l: false, r: false, pl: false, pr: false };
@@ -161,7 +161,7 @@
         return x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h ? x : null; };
       function setMode(m) {
         if (m === mode) return;
-        mode = m; Ludus.state.hopMode = m; Ludus.save(); api.sfx('click'); reset();
+        mode = m; Ludus.state.hopMode = m; api.sfx('click'); reset();
       }
       // a press on the choice picks a mode and is not a move: it neither starts the climb nor steers (capture runs before the game's own listeners)
       const onPick = e => {

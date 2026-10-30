@@ -3,6 +3,9 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.41 (30 Oct 2026)
+- Sky Hop always opens on the Classic tab.
+
 ## 1.12.40 (30 Oct 2026)
 - Back from sleep or the lock screen, online rooms reconnect at once instead of waiting up to a minute (Mac wake and unlock, and the network coming back).
 
