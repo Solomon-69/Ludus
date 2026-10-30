@@ -57,6 +57,9 @@
     if (view === 'home') drawCards();
   }
   sysDark.addEventListener('change', applyTheme);
+  // The Mac woke or was unlocked: online rooms reconnect now, the clock for animations restarts.
+  window.ludusWake = () => { try { if (window.Ludus && Ludus.net) Ludus.net.wake(); } catch (e) {} visibleSince = performance.now(); };
+  window.addEventListener('online', () => window.ludusWake());   // network came back (Windows resume too)
   window.ludusSetSystemDark = d => { window.__LUDUS_DARK__ = d; applyTheme(); renderCards(); };
 
   // ---------- views ----------

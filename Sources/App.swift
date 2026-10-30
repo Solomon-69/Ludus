@@ -62,6 +62,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
         appearanceObserver = NSApp.observe(\.effectiveAppearance) { [weak self] _, _ in
             Task { @MainActor in self?.pushAppearance() }
         }
+        // Back from sleep or the lock screen: online rooms must not wait for their slow timeout.
+        let wake: (Notification) -> Void = { [weak self] _ in Task { @MainActor in self?.webView.evaluateJavaScript("window.ludusWake && ludusWake()") } }
+        NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main, using: wake)
+        NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.screensDidWakeNotification, object: nil, queue: .main, using: wake)
+        DistributedNotificationCenter.default().addObserver(forName: Notification.Name("com.apple.screenIsUnlocked"), object: nil, queue: .main, using: wake)
         // Our menu bar apps close their panel when another of them opens one.
         PanelGroup.listen { [weak self] in Task { @MainActor in self?.closePopover() } }
         #if LUDUS_TEST

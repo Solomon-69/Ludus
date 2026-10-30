@@ -183,9 +183,20 @@
     me.subs = new Map(); me.outbox = []; me.listeners = []; me.attempt = 0; me.pid = 1;
     me.closed = false; me.ws = null; me.everOnline = false; me.url = '';
     me.idx = o.start || 0; me.curIdx = me.idx % me.urls.length; me.pinned = !!o.pinned;   // pinned: a room code's own relay, never another one
+    NET.live.add(me);
     me.onFail = o.onFail || null;   // a room still looking for its code: may move to the next relay when this one cannot be reached
     me.connect();
   }
+  // The Mac woke or was unlocked: sockets that died in sleep still look open for up to a minute, so drop them now and reconnect at once.
+  Mqtt.prototype.wake = function () {
+    if (this.closed) return;
+    this.attempt = 0; clearTimeout(this.retryTimer);
+    const ws = this.ws; this.ws = null; clearInterval(this.pingTimer); clearInterval(this.watchdog);
+    if (ws) { try { ws.onclose = null; ws.onerror = null; ws.close(); } catch (e) {} }
+    this._ntfyShutAll();
+    this._set('connecting');
+    this.connect();
+  };
   Mqtt.prototype.pin = function () { this.pinned = true; this.idx = this.curIdx; };
   Mqtt.prototype.onState = function (fn) { this.listeners.push(fn); };
   Mqtt.prototype._set = function (s) {
@@ -288,7 +299,7 @@
     return false;
   };
   Mqtt.prototype.close = function () {
-    this.closed = true;
+    this.closed = true; NET.live.delete(this);
     clearInterval(this.pingTimer); clearTimeout(this.retryTimer); clearInterval(this.watchdog); clearTimeout(this.flushTimer);
     const ws = this.ws; this.ws = null;
     this._ntfyShutAll();
@@ -385,6 +396,8 @@
       this._ntfyPost(q[i].topic, q[i].text);
     }
   };
+  NET.live = new Set();
+  NET.wake = () => { NET.live.forEach(m => { try { m.wake(); } catch (e) {} }); };
   NET.Mqtt = Mqtt;
 
   // ---------- rooms ----------
