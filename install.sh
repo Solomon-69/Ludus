@@ -20,6 +20,6 @@ pkill -x Ludus 2>/dev/null || true
 rm -rf "$DEST/Ludus.app"
 ditto -x -k "$TMP/Ludus-mac.zip" "$DEST"
 xattr -dr com.apple.quarantine "$DEST/Ludus.app" 2>/dev/null || true
-codesign --force --deep --sign - "$DEST/Ludus.app" 2>/dev/null || true
+codesign --verify --strict "$DEST/Ludus.app" 2>/dev/null || codesign --force --deep --sign - "$DEST/Ludus.app" 2>/dev/null || true   # keep Apple's notarized signature; only sign locally if it is missing
 echo "Installed $DEST/Ludus.app"
 [ -n "${LUDUS_NO_OPEN:-}" ] || open "$DEST/Ludus.app"
