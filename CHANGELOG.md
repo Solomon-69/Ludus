@@ -3,6 +3,10 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.43 (31 Oct 2026)
+- Mac: the panel and the page can no longer disagree on Light or Dark (the page was drawing its light colours over a dark panel, making the title unreadable). The page now asks the panel itself for its look every time it opens and re-checks every second while open.
+- Mac installer keeps Apple's notarized signature.
+
 ## 1.12.42 (31 Oct 2026)
 - Mac: new reload / reset screen when the games can't open: Ludus icon, one flat layer, a Reload / Reset data pill that slides (raised or flat to match the setting), two taps to erase.
 - Sky Hop (Doodle Jump) score starts at 0 m, not 2.

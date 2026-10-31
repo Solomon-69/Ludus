@@ -252,12 +252,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
         fallbackReload()
     }
 
+    /// Ask the panel itself, not the app: the panel's material is what actually shows through the page, so the page's
+    /// colours must always match it (an accessory app's own appearance can lag behind the Mac's after a restart or an auto switch).
     private func isDark() -> Bool {
-        NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        let a = popover.contentViewController?.view.window?.effectiveAppearance ?? NSApp.effectiveAppearance
+        return a.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
     }
 
-    private func pushAppearance() {
-        webView.evaluateJavaScript("window.ludusSetSystemDark && ludusSetSystemDark(\(isDark()))")
+    private var lastPushedDark: Bool?
+    private var appearanceWatch: Timer?
+
+    private func pushAppearance(force: Bool = false) {
+        let d = isDark()
+        if !force && d == lastPushedDark { return }
+        lastPushedDark = d
+        webView.evaluateJavaScript("window.ludusSetSystemDark && ludusSetSystemDark(\(d))")
+    }
+
+    /// While the panel is open, re-check once a second so the page and the panel can never disagree on Light or Dark.
+    private func watchAppearance(_ on: Bool) {
+        appearanceWatch?.invalidate(); appearanceWatch = nil
+        guard on else { return }
+        appearanceWatch = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.pushAppearance() }
+        }
     }
 
     func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
@@ -620,6 +638,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
         popover.contentViewController?.preferredContentSize = currentSize()
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         applyThemeAppearance()
+        pushAppearance(force: true)
+        watchAppearance(true)
         if let window = popover.contentViewController?.view.window {
             // Take keys for the games without activating the app (the menu bar stays as it was).
             if !styled, let panel = window as? NSPanel { panel.styleMask.insert(.nonactivatingPanel); styled = true }
@@ -657,6 +677,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
     }
 
     func popoverDidClose(_ notification: Notification) {
+        watchAppearance(false)
         anchorWindow?.orderOut(nil)
         statusItem.button?.highlight(false)
         if let monitor = clickMonitor { NSEvent.removeMonitor(monitor); clickMonitor = nil }
