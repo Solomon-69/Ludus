@@ -921,11 +921,11 @@
       if (run && current && current.run === run) run.pause();
       // a tournament: tell the host who won; the scoreboard card comes up once everybody has reported
       if (online && online.session && online.session.ser && online.session.ser.st === 'play') { online.session.reportResult(!!res.won); return; }
-      $('overSheet').hidden = false; $('overPeek').hidden = true; overAt = performance.now(); L.sfx('result');
+      $('overSheet').hidden = false; overAt = performance.now(); L.sfx('result');
     }, window.ludusRevealMs ?? REVEAL_MS);
   }
-  function hideOver() { clearTimeout(revealTimer); $('overSheet').hidden = true; $('overPeek').hidden = true; }
-  function overShown() { return !$('overSheet').hidden || !$('overPeek').hidden; }
+  function hideOver() { clearTimeout(revealTimer); $('overSheet').hidden = true; }
+  function overShown() { return !$('overSheet').hidden; }
   function revealing() { return !!(current && current.run.ended && !overShown()); }
   let freshNext = false;   // the next launch is a "Play again" after the game ended: games with saved progress start from the very beginning
   function restart(fresh) {
@@ -982,8 +982,6 @@
   $('resumeBtn').onclick = resume;
   $('restartBtn').onclick = restart;
   $('againBtn').onclick = () => restart(true);
-  $('overHideBtn').onclick = () => { L.sfx('unsheet'); $('overSheet').hidden = true; $('overPeek').hidden = false; };
-  $('overPeek').onclick = () => { L.sfx('sheet'); $('overPeek').hidden = true; $('overSheet').hidden = false; overAt = performance.now(); };
   const search = $('search');
   search.addEventListener('input', () => { query = search.value; $('grid').scrollTop = 0; $('filters').classList.toggle('is-dim', !!norm(query)); renderCards(); });
   search.addEventListener('keydown', e => {

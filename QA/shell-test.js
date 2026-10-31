@@ -74,10 +74,7 @@
   window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' })); await wait(50);
   check('enter not armed in first 300ms', !$('overSheet').hidden);
   await wait(320);
-  $('overHideBtn').click(); await wait(30);
-  check('hide shows peek', $('overSheet').hidden && !$('overPeek').hidden);
-  $('overPeek').click(); await wait(30);
-  check('peek brings bar back', !$('overSheet').hidden);
+  check('bar stays up', !$('overSheet').hidden);
   await wait(320);
   window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' })); await wait(300);
   check('enter plays again', $('overSheet').hidden && $('scoreNow').textContent === '0' && $('stage').querySelector('canvas'));

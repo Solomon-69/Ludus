@@ -74,6 +74,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
         DistributedNotificationCenter.default().addObserver(
             self, selector: #selector(testCommand(_:)), name: testNotification, object: nil)
         // A test copy started with LUDUS_TEST_OPEN=1 opens its panel by itself (so a screenshot can be taken without any notification).
+        if ProcessInfo.processInfo.environment["LUDUS_TEST_FALLBACK"] != nil {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) { self.showFallback() }   // test copy: show the reload screen once
+        }
         if ProcessInfo.processInfo.environment["LUDUS_TEST_OPEN"] != nil {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { self.openPopover() }
         }
@@ -224,35 +227,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
 
     private func showFallback() {
         guard fallbackView == nil, let host = webView.superview else { return }
-        let box = NSView(frame: host.bounds); box.autoresizingMask = [.width, .height]; box.wantsLayer = true
-        box.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
-        let title = NSTextField(labelWithString: "Ludus couldn\u{2019}t start"); title.font = .systemFont(ofSize: 18, weight: .semibold)
-        let note = NSTextField(wrappingLabelWithString: "Something went wrong while opening the games. Try reloading. If it keeps happening, reset Ludus\u{2019}s saved data (best scores and settings).")
-        note.alignment = .center; note.textColor = .secondaryLabelColor; note.preferredMaxLayoutWidth = 280
-        let reload = NSButton(title: "Reload Ludus", target: self, action: #selector(fallbackReload)); reload.bezelStyle = .rounded; reload.keyEquivalent = "\r"
-        let reset = NSButton(title: "Reset this game\u{2019}s data", target: self, action: #selector(fallbackReset(_:))); reset.bezelStyle = .rounded
-        reload.identifier = NSUserInterfaceItemIdentifier("fallbackReload"); reset.identifier = NSUserInterfaceItemIdentifier("fallbackReset")
-        let stack = NSStackView(views: [title, note, reload, reset]); stack.orientation = .vertical; stack.alignment = .centerX; stack.spacing = 12
-        stack.translatesAutoresizingMaskIntoConstraints = false; box.addSubview(stack)
-        NSLayoutConstraint.activate([stack.centerXAnchor.constraint(equalTo: box.centerXAnchor), stack.centerYAnchor.constraint(equalTo: box.centerYAnchor), stack.widthAnchor.constraint(lessThanOrEqualToConstant: 300)])
+        let look = FallbackView.look(stateJSON: UserDefaults.standard.string(forKey: stateKey), systemDark: isDark())
+        let box = FallbackView(frame: host.bounds, look: look,
+                               onReload: { [weak self] in self?.fallbackReload() },
+                               onReset: { [weak self] in self?.fallbackReset() })
+        box.autoresizingMask = [.width, .height]
         host.addSubview(box); fallbackView = box
         appendErrorLog("web UI did not start: fallback screen shown")
     }
 
     private func hideFallback() { fallbackView?.removeFromSuperview(); fallbackView = nil }
 
-    @objc private func fallbackReload() {
+    private func fallbackReload() {
         hideFallback(); uiReady = false
         if let dir = webRoot { webView.loadFileURL(dir.appendingPathComponent("index.html"), allowingReadAccessTo: dir) }
         armWatchdog()
     }
 
-    @objc private func fallbackReset(_ sender: NSButton) {
-        if sender.title != "Tap again to erase" {   // two taps, so a stray click cannot wipe scores
-            sender.title = "Tap again to erase"
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3) { sender.title = "Reset this game\u{2019}s data" }
-            return
-        }
+    private func fallbackReset() {
         UserDefaults.standard.removeObject(forKey: stateKey)
         UserDefaults.standard.removeObject(forKey: sizeKey)
         webView.configuration.userContentController.removeAllUserScripts()

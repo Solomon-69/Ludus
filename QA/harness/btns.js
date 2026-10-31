@@ -18,7 +18,7 @@ async () => {
     check(g.id + '/' + vs + '/pause', ['resumeBtn', 'restartBtn', 'quitBtn'], 'pause');
     $('resumeBtn').click(); await wait(80);
     $('overSheet').hidden = false; await wait(100);
-    check(g.id + '/' + vs + '/over', ['againBtn', 'overQuitBtn', 'overHideBtn'], 'over');
+    check(g.id + '/' + vs + '/over', ['againBtn', 'overQuitBtn'], 'over');
     $('overSheet').hidden = true;
     $('backBtn').click(); await wait(150);
   }

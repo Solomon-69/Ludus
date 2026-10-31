@@ -119,7 +119,7 @@
         // camera only moves up
         const want = p.y - WH * 0.42;
         if (want < camY) camY = want;
-        height = Math.max(height, Math.round(-p.y / 10));
+        height = Math.max(height, Math.round((-p.y - (PH + R)) / 10));   // 0 m while standing on the start floor
         if (height > best) {
           if (Math.floor(height / 100) > Math.floor(best / 100) && height >= 100) { api.sfx('score'); pops.push({ t: clock, text: `${Math.floor(height / 100) * 100} m` }); }
           best = height; api.score(height);
