@@ -3,6 +3,9 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.63 (2 Nov 2026)
+- Map Hunt and Clue Spotter online: players who joined now see the setup choices (time, movement; clues, region) and can tap one to suggest it; the host sees their name on that choice. Before, they only saw "The host is choosing" text.
+
 ## 1.12.62 (2 Nov 2026)
 - Online: a player who joined someone's room and then left and pressed Rejoin could open a second room with the same code (the host in one, them in the other). Now only the player who made the code may reopen it; everyone else keeps looking for that host, on both relays the code can live on.
 
