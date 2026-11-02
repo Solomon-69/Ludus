@@ -405,7 +405,7 @@
       // The mini map is laid out once at its open size (and again only when the window or the size changes); closed, it is just scaled down.
       function sizeMini() {
         const rw = stage.clientWidth || 600, rh = stage.clientHeight || 400, [fw, fh] = MAP_SIZES[sizeLv];
-        const W = Math.round(Math.max(240, Math.min(rw - 20, rw * fw))), H = Math.round(Math.max(130, Math.min(rh - 67, rh * fh)));
+        const W = Math.round(Math.max(240, Math.min(rw - 20, rw * fw))), H = Math.round(Math.max(130, Math.min(rh - 137, rh * fh)));   // 137: guess button + gap below, and the round / compass / score row above stay uncovered
         const CW = Math.round(Math.max(150, Math.min(230, rw * 0.19))), CH = Math.round(CW * 0.7);
         root.style.setProperty('--mini-w', W + 'px'); root.style.setProperty('--mini-h', H + 'px');
         root.style.setProperty('--mini-cw', CW + 'px'); root.style.setProperty('--mini-ch', CH + 'px');

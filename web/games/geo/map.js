@@ -37,7 +37,7 @@
     const map = new ml.Map({
       container: el, style, center: [o.lon, o.lat], zoom: o.zoom - 1, minZoom: 0, maxZoom: 19, maxPitch: 0,
       attributionControl: false, dragRotate: false, pitchWithRotate: false, doubleClickZoom: true, boxZoom: false, keyboard: false,
-      fadeDuration: 120, renderWorldCopies: true
+      fadeDuration: 220, renderWorldCopies: true, maxTileCacheSize: 400
     });
     map.touchZoomRotate.disableRotation();
     credit.innerHTML = '<i>© OpenFreeMap · OSM</i>'; credit.title = CREDIT;
@@ -58,11 +58,11 @@
       setView(lat, lon, z) { if (!el.clientWidth || !el.clientHeight) { later = [lat, lon, z]; return; } later = null; map.jumpTo({ center: [lon, lat], zoom: z - 1 }); },
       getCenter() { const c = map.getCenter(); return { lat: c.lat, lng: c.lng }; },
       getZoom() { return map.getZoom() + 1; },
-      resize() { map.resize(); if (later && el.clientWidth && el.clientHeight) { const v = later; later = null; map.jumpTo({ center: [v[1], v[0]], zoom: v[2] - 1 }); } },
+      resize() { map.resize(); try { map.redraw(); } catch (e) {} if (later && el.clientWidth && el.clientHeight) { const v = later; later = null; map.jumpTo({ center: [v[1], v[0]], zoom: v[2] - 1 }); } },
       project(lat, lon) { const p = map.project([lon, lat]); return { x: p.x, y: p.y }; },
       size() { return { x: el.clientWidth, y: el.clientHeight }; },
       panBy(dx, dy, ms) { map.panBy([dx, dy], { duration: ms || 0, essential: true }); },
-      zoomBy(d) { map.easeTo({ zoom: map.getZoom() + d, duration: 220, essential: true }); },
+      zoomBy(d) { map.easeTo({ zoom: map.getZoom() + d, duration: 340, easing: t => 1 - Math.pow(1 - t, 3), essential: true }); },
       setZoom(z) { map.jumpTo({ zoom: z - 1 }); },
       onClick(fn) { map.on('click', e => { const ll = e.lngLat; fn({ lat: ll.lat, lon: wrapLon(ll.lng) }); }); },
       marker(lat, lon, html, mo) { const m = new ml.Marker({ element: markerEl(html, mo), anchor: 'center' }).setLngLat([lon, lat]).addTo(map); return { remove() { m.remove(); } }; },
