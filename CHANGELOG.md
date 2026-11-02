@@ -3,6 +3,9 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.47 (2 Nov 2026)
+- Sky Raiders cover: deep navy space with bigger raiders, three bunkers and a few stars, so it stands out in both the light and dark theme (it was cream on cream).
+
 ## 1.12.46 (2 Nov 2026)
 - Settings > More: all three rows are the same height again. The Invisible icon note is shorter, so it fits on one line.
 

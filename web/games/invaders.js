@@ -89,23 +89,24 @@
     id: 'skyraiders', name: 'Sky Raiders', aka: 'alien shooter', tag: 'Arcade', tint: '#5b6ee1',
     waitForMove: true,   // stands still until the first move (see engine.js)
     hint: '<kbd>←</kbd><kbd>→</kbd> or <kbd>A</kbd><kbd>D</kbd> move · <kbd>Space</kbd> fire',
-    art(ctx, w, h, col) {
-      // the real play screen, cropped: the same pixel raiders in their row colours (squid, crab, octo), the bunkers,
-      // the player's cannon and one shot on its way up, on the game's own background
-      col = col || Ludus.colors();
-      const pal = palette(col), u = h / 72;
+    art(ctx, w, h) {
+      // cover only (the play screen draws itself): fixed deep-navy space so the card reads in the light and the dark theme,
+      // bigger raiders in fewer columns, three bunkers, the cannon with one shot, a few stars
+      const pal = { squid: '#c3a0f0', crab: '#74bde0', octo: '#86c99a', shield: '#d9a66a', cannon: '#ff8a5c' }, u = h / 72;
       ctx.save(); ctx.imageSmoothingEnabled = false;
-      ctx.fillStyle = col.surface; ctx.fillRect(0, 0, w, h);
-      const pitch = 16 * u, cols = Math.max(3, Math.min(9, Math.floor((w - 12 * u) / pitch))), x0 = w / 2 - (cols - 1) * pitch / 2;
-      ['squid', 'crab', 'octo'].forEach((k, r) => {
-        const sw = WIDTH[k] * u, sh = 8 * u;
-        for (let c = 0; c < cols; c++) ctx.drawImage(spr(k, c % 2, pal[k]), Math.round(x0 + c * pitch - sw / 2), Math.round((4 + r * 12) * u), Math.round(sw), Math.round(sh));
+      ctx.fillStyle = '#0d1130'; ctx.fillRect(0, 0, w, h);
+      ctx.fillStyle = 'rgba(255,255,255,.55)';
+      [[0.07, 0.18], [0.93, 0.3], [0.05, 0.62], [0.96, 0.74], [0.2, 0.9], [0.82, 0.9]].forEach(([fx, fy]) => ctx.fillRect(Math.round(w * fx), Math.round(h * fy), Math.max(1, Math.round(u * 0.9)), Math.max(1, Math.round(u * 0.9))));
+      const k = 1.18, pitch = 19 * u, cols = Math.max(3, Math.min(7, Math.floor((w - 14 * u) / pitch))), x0 = w / 2 - (cols - 1) * pitch / 2;
+      ['squid', 'crab', 'octo'].forEach((n, r) => {
+        const sw = WIDTH[n] * u * k, sh = 8 * u * k;
+        for (let c = 0; c < cols; c++) ctx.drawImage(spr(n, c % 2, pal[n]), Math.round(x0 + c * pitch - sw / 2), Math.round((3 + r * 13) * u), Math.round(sw), Math.round(sh));
       });
-      const nS = Math.max(2, Math.min(4, Math.floor(w / (44 * u)))), sg = w / nS;
-      for (let i = 0; i < nS; i++) ctx.drawImage(spr('shield', 0, pal.shield), Math.round(sg * (i + 0.5) - 11 * u), Math.round(44 * u), Math.round(22 * u), Math.round(16 * u));
-      const cx = Math.round(sg * 0.5 + 8 * u + Math.min(sg * 0.5, 20 * u));
-      ctx.drawImage(spr('cannon', 0, pal.cannon), Math.round(cx - 6.5 * u), Math.round(63 * u), Math.round(13 * u), Math.round(8 * u));
-      ctx.fillStyle = col.ink; ctx.fillRect(Math.round(cx - 0.5 * u), Math.round(36 * u), Math.max(1, Math.round(u)), Math.round(5 * u));
+      const nS = Math.max(2, Math.min(3, Math.floor(w / (60 * u)))), sg = w / nS;
+      for (let i = 0; i < nS; i++) ctx.drawImage(spr('shield', 0, pal.shield), Math.round(sg * (i + 0.5) - 12 * u), Math.round(46 * u), Math.round(24 * u), Math.round(17 * u));
+      const cx = Math.round(sg * 1.0);
+      ctx.drawImage(spr('cannon', 0, pal.cannon), Math.round(cx - 7 * u), Math.round(62 * u), Math.round(14 * u), Math.round(9 * u));
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(Math.round(cx - 0.6 * u), Math.round(41 * u), Math.max(2, Math.round(1.3 * u)), Math.round(7 * u));
       ctx.restore();
     },
     create(stage, api) {
