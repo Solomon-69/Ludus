@@ -3,6 +3,11 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.53 (2 Nov 2026)
+- Turn Room: bigger, harder rooms (up to 7 turns), a 12-segment progress bar at the top, and Up now jumps.
+- Turn Room controls: Q and E (or A and D) turn the room left and right; the arrow keys and on-screen arrows only walk. The buttons show their keys, and the first rooms tell you about Q and E.
+- Turn Room: the person has walking legs and arms, the room turn is slower with a bounce and a swoosh arrow, and dying now splatters blood and body parts that land where gravity pulls them.
+
 ## 1.12.52 (2 Nov 2026)
 - Removed the smooth scrolling glide from 1.12.50. Lists scroll the normal way again.
 

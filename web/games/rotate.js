@@ -5,18 +5,18 @@
   const D = Ludus.draw;
   // . air (the room)   # wall   @ you   E door   spikes: u on the floor (points up), d on the ceiling, l on a right wall, r on a left wall
   const LEVELS = [
-    { hint: 'Walk to the door with the arrow keys.', m: ['##########', '#........#', '#@......E#', '##########'] },
-    { hint: 'Turn the room. Gravity follows.', m: ['#########', '#E......#', '#######.#', '#@......#', '#########'] },
-    { hint: 'Spikes only hurt where they are.', m: ['###########', '#.........#', '#@..uuu..E#', '###########'] },
-    { hint: 'Look for the way round.', m: ['#########', '###E...##', '###r...@#', '###r....#', '###.uu.##', '#########'] },
-    { hint: 'Floors become walls.', m: ['##########', '#E.....d##', '#r.....l##', '#.@.....##', '###u...###', '##########'] },
-    { hint: 'Take it one turn at a time.', m: ['#########', '#d....###', '#r......#', '#u..@...#', '###.....#', '###...uE#', '#########'] },
-    { hint: 'Up is a floor too.', m: ['##########', '#.d..#####', '#@...#####', '#.....Ed.#', '#.......l#', '####....l#', '####.....#', '##########'] },
-    { hint: 'Plan before you turn.', m: ['###########', '##........#', '##...###rl#', '##E.@###.l#', '##.u.###..#', '###########'] },
-    { hint: 'Spikes hide in corners.', m: ['#########', '##.dE####', '#..@....#', '#.......#', '#....uuu#', '#########'] },
-    { hint: 'Slow is fine.', m: ['###########', '#####.dl###', '#####..E###', '#####...###', '#####.....#', '######....#', '######@uu.#', '###########'] },
-    { hint: 'Nearly there.', m: ['##########', '##....#####', '#@....#####', '#......####', '#.l#r.l####', '#..#r.E####', '###########'] },
-    { hint: 'One last room.', m: ['#########', '##.dd####', '##...E..#', '##.@....#', '###....l#', '###....l#', '#########'] }
+    { hint: 'Walk with the arrow keys. Up jumps.', m: ['#############', '#...........#', '#...........#', '#.@......#..E#', '#############'] },
+    { hint: 'Press E or Q to turn the room. Gravity follows.', m: ['###########', '#E........#', '#########.#', '#@........#', '###########'] },
+    { hint: 'Spikes only hurt where they are.', m: ['##############', '########....E#', '#.d.d.d.....l#', '#.....##.....#', '#............#', '#.....##.....#', '#.uu..##..@..#', '########.....#', '##############'] },
+    { hint: 'Look for the way round.', m: ['##############', '##.dd....d####', '##r..........#', '##r..........#', '##.......@...#', '####....E..u.#', '####.......###', '####.....#####', '##############'] },
+    { hint: 'Floors become walls.', m: ['##############', '###......@...#', '#....l##.....#', '#.#...##.....#', '#.d.........##', '#E...l#.....##', '#....l#.....##', '#.....########', '##############'] },
+    { hint: 'Up is a floor too.', m: ['##############', '#.....########', '#.......dd.###', '#........@.###', '#..........###', '#..E........##', '#....##r....##', '#..u.##.....##', '##############'] },
+    { hint: 'Plan before you turn.', m: ['##############', '#.d.d..E....##', '#.....####..##', '#.....####..##', '#...........##', '#......#....##', '##.@...#....##', '##....u#....##', '##############'] },
+    { hint: 'Spikes hide in corners.', m: ['##############', '#...@...dd.###', '#....##....###', '#....##....###', '#............#', '#.#####.#....#', '#r.....l#....#', '#.....###E.u.#', '##############'] },
+    { hint: 'Take it one turn at a time.', m: ['##############', '########.....#', '##.....u.....#', '#d.....#.....#', '#.....l#.E...#', '#...........##', '#.u.u.#....l##', '#######@....##', '##############'] },
+    { hint: 'Slow is fine.', m: ['##############', '#....d...#####', '#........d.###', '#............#', '#.......E....#', '######.......#', '######r...@..#', '######u....###', '##############'] },
+    { hint: 'Nearly there.', m: ['#############', '#..d........#', '#.####....E.#', '#.####.@....#', '#.....u.....#', '#.....#..u..#', '#r...l####..#', '#...u.####..#', '#############'] },
+    { hint: 'One last room.', m: ['############', '#.d.......##', '#.........##', '#..####....#', '#..E.d.....#', '##....@....#', '##.....u...#', '##...u.#####', '############'] }
   ];
 
   const DIRS = [{ x: 0, y: 1 }, { x: 1, y: 0 }, { x: 0, y: -1 }, { x: -1, y: 0 }];   // gravity for k = 0..3: down, right, up, left
@@ -99,11 +99,14 @@
     return found;
   }
 
+  const TURN = 0.62;
+  const easeBack = u => { const c = 1.25, v = u - 1; return 1 + (c + 1) * v * v * v + c * v * v; };
+  const BLOOD = ['#b8352a', '#d4574a'];
   const TILE_A = ['#efe8da', '#e9e1d1'], TILE_A_DARK = ['#3a342c', '#352f28'];
 
   Ludus.register({
     id: 'rotate', name: 'Turn Room', aka: 'Room turner', tag: 'Puzzle', tint: '#7f9b8f',
-    hint: '<kbd>←</kbd><kbd>→</kbd> walk · <kbd>↑</kbd>/<kbd>X</kbd> turn the room right · <kbd>Z</kbd> turn it left · <kbd>R</kbd> start the room again',
+    hint: '<kbd>←</kbd><kbd>→</kbd> walk · <kbd>E</kbd> turn the room right · <kbd>Q</kbd> turn it left · <kbd>R</kbd> start the room again',
     _levels: LEVELS.map(l => l.m), _parse: parse, _solve: solve, _settle: settle, _walk: walk,
     art(ctx, w, h) {
       const s = Math.min(h * 0.27, w / 9), cols = 7, rows = 4;
@@ -130,14 +133,14 @@
       const { ctx, canvas } = view;
       let lvl = 0, m, p, k = 0, score = 0, turns = 0, deaths = 0, par = 0, clock = 0, done = false;
       let angle = 0, fx = 0, fy = 0, timeline = [], endT = 0, ending = null, face = 1, held = 0, bump = 0, shake = 0, flash = 0;
-      let buttons = [], drawAngle = 0;
+      let buttons = [], drawAngle = 0, turn = null, parts = [], drops = [], stains = [], phase = 0;
       const lay = { s: 40, cx: 0, cy: 0 };
 
       function load(i) {
         lvl = Math.max(0, Math.min(LEVELS.length - 1, i));
         m = parse(LEVELS[lvl].m); p = { x: m.start.x, y: m.start.y }; k = 0; angle = 0; drawAngle = 0; fx = p.x; fy = p.y;
         const sl = solve(m); par = sl ? sl.turns : 0;
-        turns = 0; timeline = []; endT = clock; ending = null; held = 0; flash = 0;
+        turns = 0; timeline = []; endT = clock; ending = null; held = 0; flash = 0; turn = null; parts = []; drops = []; stains = [];
         const s0 = settle(m, p, 0); if (s0.path.length) { play(s0.path.map(c => ({ x: c.x, y: c.y })), 0.06, 'fall'); p = { x: s0.x, y: s0.y }; }
       }
       // timeline: [{ t0, t1, type: 'move'|'rot', ... }] played from the moment it is queued
@@ -147,7 +150,7 @@
         cells.forEach(c => { timeline.push({ t0: t, t1: t + per, type: 'move', from, to: { x: c.x, y: c.y }, kind }); from = { x: c.x, y: c.y }; t += per; });
         endT = t;
       }
-      function rot(a0, a1) { const t = Math.max(clock, endT); timeline.push({ t0: t, t1: t + 0.34, type: 'rot', a0, a1 }); endT = t + 0.34; }
+      function rot(a0, a1) { const t = Math.max(clock, endT); timeline.push({ t0: t, t1: t + TURN, type: 'rot', a0, a1 }); endT = t + TURN; }
       function idle() { return clock >= endT && !ending && !done; }
 
       function finish(res) {
@@ -166,6 +169,22 @@
         api.sfx('move');
         play([{ x: w.x, y: w.y }], 0.11, 'walk');
         const s = settle(m, w, k);
+        if (s.path.length) play(s.path, 0.055, 'fall');
+        p = { x: s.x, y: s.y };
+        finish(s);
+      }
+      // jump: hop one cell against gravity, then one cell the way you face if that is free, then fall back down
+      function doJump() {
+        if (!idle()) return;
+        const g = gOf(k), r = rOf(k);
+        const ux = p.x - g.x, uy = p.y - g.y;
+        if (solid(cellAt(m, ux, uy)) || hazard(cellAt(m, ux, uy))) { bump = 1; api.sfx('tick'); return; }
+        api.sfx('move');
+        let q = { x: ux, y: uy };
+        play([q], 0.14, 'jump');
+        const fx2 = ux + r.x * face, fy2 = uy + r.y * face;
+        if (!solid(cellAt(m, fx2, fy2))) { q = { x: fx2, y: fy2 }; play([q], 0.12, 'jump'); }
+        const s = settle(m, q, k);
         if (s.path.length) play(s.path, 0.055, 'fall');
         p = { x: s.x, y: s.y };
         finish(s);
@@ -190,17 +209,18 @@
       }
 
       api.keys(e => {
-        if (e.metaKey || e.ctrlKey) return;
+        if (e.metaKey || e.ctrlKey || e.altKey) return;
         const key = e.key;
-        if (key === 'ArrowLeft' || key === 'a' || key === 'A') { held = -1; doWalk(-1); }
-        else if (key === 'ArrowRight' || key === 'd' || key === 'D') { held = 1; doWalk(1); }
-        else if (key === 'ArrowUp' || key === 'x' || key === 'X' || key === 'e' || key === 'E' || key === 'w' || key === 'W') { if (!e.repeat) doTurn(1); }
-        else if (key === 'z' || key === 'Z' || key === 'q' || key === 'Q' || key === 'ArrowDown' || key === 's' || key === 'S') { if (!e.repeat) doTurn(-1); }
+        if (key === 'ArrowLeft') { held = -1; doWalk(-1); }
+        else if (key === 'ArrowRight') { held = 1; doWalk(1); }
+        else if (key === 'ArrowUp' || key === ' ') { if (!e.repeat) doJump(); }
+        else if (key === 'e' || key === 'E' || key === 'd' || key === 'D') { if (!e.repeat) doTurn(1); }
+        else if (key === 'q' || key === 'Q' || key === 'a' || key === 'A') { if (!e.repeat) doTurn(-1); }
         else if (key === 'r' || key === 'R') { if (!ending && !done) restart(false); }
       });
       api.keysUp(e => {
         const key = e.key;
-        if (((key === 'ArrowLeft' || key === 'a' || key === 'A') && held === -1) || ((key === 'ArrowRight' || key === 'd' || key === 'D') && held === 1)) held = 0;
+        if ((key === 'ArrowLeft' && held === -1) || (key === 'ArrowRight' && held === 1)) held = 0;
       });
       api.on(canvas, 'pointerdown', e => {
         const r = canvas.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
@@ -211,24 +231,60 @@
       const release = () => { held = 0; };
       api.on(canvas, 'pointerup', release); api.on(canvas, 'pointercancel', release); api.on(canvas, 'pointerleave', release);
 
+      function moving() {
+        for (const t of timeline) if (t.type === 'move' && clock >= t.t0 && clock < t.t1) return t.kind;
+        return null;
+      }
+      const rnd = (a, b) => a + Math.random() * (b - a);
+      const solidAt = (x, y) => solid(cellAt(m, Math.floor(x), Math.floor(y)));
+      function burst() {
+        const x = fx + 0.5, y = fy + 0.5;
+        stains.push({ x, y, r: 0.3, c: 0 });
+        for (let i = 0; i < 7; i++) stains.push({ x: x + rnd(-0.35, 0.35), y: y + rnd(-0.35, 0.35), r: rnd(0.05, 0.14), c: i & 1 });
+        if (api.reduceMotion) return;
+        const g = gOf(k);
+        for (let i = 0; i < 34; i++) { const a = rnd(0, 6.283), v = rnd(1.5, 7); drops.push({ x, y, vx: Math.cos(a) * v - g.x * 2, vy: Math.sin(a) * v - g.y * 2, r: rnd(0.04, 0.11), c: i & 1 }); }
+        ['head', 'torso', 'leg', 'leg', 'arm', 'arm'].forEach(t => { const a = rnd(0, 6.283), v = rnd(2, 5); parts.push({ t, x, y, vx: Math.cos(a) * v - g.x * 2.5, vy: Math.sin(a) * v - g.y * 2.5, rot: rnd(0, 6.283), vr: rnd(-9, 9), rest: false }); });
+      }
+      function stepBlood(dt) {
+        if (!drops.length && !parts.length) return;
+        const g = gOf(k), G = 24;
+        for (let i = drops.length - 1; i >= 0; i--) {
+          const d = drops[i]; d.vx += g.x * G * dt; d.vy += g.y * G * dt;
+          const nx = d.x + d.vx * dt, ny = d.y + d.vy * dt;
+          if (solidAt(nx, ny)) { stains.push({ x: d.x, y: d.y, r: d.r * 1.7, c: d.c }); drops.splice(i, 1); continue; }
+          d.x = nx; d.y = ny;
+        }
+        parts.forEach(q => {
+          if (q.rest) return;
+          q.vx += g.x * G * dt; q.vy += g.y * G * dt;
+          const nx = q.x + q.vx * dt, ny = q.y + q.vy * dt, hx = solidAt(nx, q.y), hy = solidAt(q.x, ny);
+          if (hx) { q.vx *= -0.35; q.vy *= 0.8; q.vr *= 0.7; } else q.x = nx;
+          if (hy) { if (Math.abs(q.vx * g.x + q.vy * g.y) > 2) stains.push({ x: q.x, y: q.y, r: 0.1, c: 0 }); q.vy *= -0.35; q.vx *= 0.8; q.vr *= 0.6; } else q.y = ny;
+          q.rot += q.vr * dt;
+          if (hx && hy || (Math.hypot(q.vx, q.vy) < 0.7 && (solidAt(q.x + g.x * 0.3, q.y + g.y * 0.3)))) { q.vx = q.vy = q.vr = 0; q.rest = true; }
+        });
+      }
+
       function update(dt) {
-        clock += dt; bump = Math.max(0, bump - dt * 4); shake = Math.max(0, shake - dt * 2.5); flash = Math.max(0, flash - dt * 2.2);
+        clock += dt; stepBlood(dt); if (moving() === 'walk') phase += dt * 20; bump = Math.max(0, bump - dt * 4); shake = Math.max(0, shake - dt * 2.5); flash = Math.max(0, flash - dt * 2.2);
         // play the timeline: moves tween a cell to the next, turns tween the picture's angle
         for (let i = 0; i < timeline.length; i++) {
           const s = timeline[i];
-          if (clock >= s.t1) { if (s.type === 'move') { fx = s.to.x; fy = s.to.y; } else drawAngle = s.a1; continue; }
+          if (clock >= s.t1) { if (s.type === 'move') { fx = s.to.x; fy = s.to.y; } else { drawAngle = s.a1; turn = null; } continue; }
           if (clock >= s.t0) {
             const u = (clock - s.t0) / (s.t1 - s.t0);
             if (s.type === 'move') { const e = s.kind === 'fall' ? u * u * 0.5 + u * 0.5 : u; fx = D.lerp(s.from.x, s.to.x, e); fy = D.lerp(s.from.y, s.to.y, e); }
-            else drawAngle = D.lerp(s.a0, s.a1, api.reduceMotion ? 1 : D.ease.outCubic(u));
+            else { drawAngle = D.lerp(s.a0, s.a1, api.reduceMotion ? 1 : easeBack(u)); turn = { u, dir: s.a1 > s.a0 ? 1 : -1 }; }
           }
           break;
         }
         if (clock >= endT) {
           // trim the finished timeline, keep the final angle
-          if (timeline.length) { drawAngle = angle; timeline = []; fx = p.x; fy = p.y; }
+          if (timeline.length) { drawAngle = angle; timeline = []; fx = p.x; fy = p.y; turn = null; }
           if (ending) {
-            if (clock - ending.t > 0.55) {
+            if (ending.type === 'dead' && !ending.burst) { ending.burst = true; burst(); }
+            if (clock - ending.t > (ending.type === 'dead' ? 1.6 : 0.55)) {
               if (ending.type === 'dead') { ending = null; restart(false); }
               else if (lvl >= LEVELS.length - 1) {
                 done = true; ending = null;
@@ -241,25 +297,26 @@
 
       // ---------- drawing ----------
       function layout(w, h) {
-        const top = 40, bottom = 74, avW = w - 24, avH = h - top - bottom;
+        const top = 46, bottom = 74, avW = w - 24, avH = h - top - bottom;
         const side = Math.max(m.W, m.H);
         lay.s = Math.max(14, Math.floor(Math.min(avW / side, avH / side) * 2) / 2);
         lay.cx = w / 2; lay.cy = top + avH / 2;
       }
-      function roundBtn(x, y, w, h, on, act, col, icon, hold) {
+      function roundBtn(x, y, w, h, on, act, col, icon, hold, label) {
         buttons.push({ x, y, w, h, act, hold });
         ctx.save(); ctx.globalAlpha = on ? 1 : 0.4;
         ctx.fillStyle = col.dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.055)';
         D.roundRect(ctx, x, y, w, h, h / 2); ctx.fill();
         ctx.strokeStyle = col.ink; ctx.fillStyle = col.ink; ctx.lineWidth = 2.2; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-        icon(x + w / 2, y + h / 2);
+        icon(x + w / 2 - (label ? 7 : 0), y + h / 2);
+        if (label) D.text(ctx, label, x + w - 12, y + h / 2 + 0.5, 11, col.ink2, 700);
         ctx.restore();
       }
       function arcArrow(cx, cy, dir) {
-        const r = 8;
-        ctx.beginPath(); ctx.arc(cx, cy, r, dir > 0 ? -Math.PI * 0.85 : -Math.PI * 0.15, dir > 0 ? Math.PI * 0.35 : Math.PI * 1.15, dir < 0); ctx.stroke();
-        const ex = cx + r * Math.cos(dir > 0 ? Math.PI * 0.35 : Math.PI * 1.15), ey = cy + r * Math.sin(dir > 0 ? Math.PI * 0.35 : Math.PI * 1.15);
-        ctx.beginPath(); ctx.moveTo(ex - dir * 6, ey - 1); ctx.lineTo(ex, ey); ctx.lineTo(ex + dir * 0.5, ey - 6.5); ctx.stroke();
+        const r = 8, a0 = dir > 0 ? -1.9 : -1.24, a1 = a0 + dir * 4.2;
+        ctx.beginPath(); ctx.arc(cx, cy, r, a0, a1, dir < 0); ctx.stroke();
+        const ex = cx + r * Math.cos(a1), ey = cy + r * Math.sin(a1), tx = -Math.sin(a1) * dir, ty = Math.cos(a1) * dir;
+        for (const sg of [-1, 1]) { const c = Math.cos(sg * 0.6), sn = Math.sin(sg * 0.6), bx = -(tx * c - ty * sn), by = -(tx * sn + ty * c); ctx.beginPath(); ctx.moveTo(ex, ey); ctx.lineTo(ex + bx * 6.5, ey + by * 6.5); ctx.stroke(); }
       }
       function spikes(x, y, s, c, col) {
         // spikes attached to a side of the cell: u floor, d ceiling, l right wall (point left), r left wall (point right)
@@ -275,15 +332,41 @@
           ctx.closePath(); ctx.fill();
         }
       }
-      function person(x, y, s, col, up) {
+      function person(x, y, s, col, tilt) {
         // drawn upright on the screen: the caller has already turned the picture back
-        const ink = col.ink, w = s * 0.38, hgt = s * 0.5;
+        const ink = col.ink, w = s * 0.36, mv = moving(), air = mv === 'fall' || mv === 'jump';
+        const lean = (mv === 'walk' ? face * 0.1 : 0) + (tilt || 0);
         ctx.save(); ctx.translate(x, y);
-        ctx.fillStyle = 'rgba(0,0,0,0.12)'; ctx.beginPath(); ctx.ellipse(0, s * 0.46, s * 0.26, s * 0.06, 0, 0, Math.PI * 2); ctx.fill();
-        const sway = Math.sin(clock * 14) * (clock < endT && timeline.some(t => t.type === 'move' && t.kind === 'walk' && clock >= t.t0 && clock < t.t1) ? s * 0.04 : 0);
-        ctx.fillStyle = ink; D.roundRect(ctx, -w / 2 + sway, -s * 0.06, w, hgt, w * 0.45); ctx.fill();
-        ctx.beginPath(); ctx.arc(sway, -s * 0.2, s * 0.17, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = col.accent; ctx.beginPath(); ctx.arc(sway + face * s * 0.08, -s * 0.2, s * 0.045, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = 'rgba(0,0,0,0.12)'; ctx.beginPath(); ctx.ellipse(0, s * 0.47, s * 0.24, s * 0.05, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.translate(0, s * 0.3); ctx.rotate(lean); ctx.translate(0, -s * 0.3);
+        ctx.strokeStyle = ink; ctx.fillStyle = ink; ctx.lineCap = 'round';
+        const sw = mv === 'walk' ? Math.sin(phase) : air ? Math.sin(clock * 22) * 0.9 : 0, lift = mv === 'walk' ? 1 : 0;
+        // arms behind, then legs, then body
+        ctx.lineWidth = s * 0.075;
+        for (const i of [-1, 1]) { const sg = air ? i * 0.9 + Math.sin(clock * 22) * 0.2 : i * sw; ctx.beginPath(); ctx.moveTo(i * w * 0.38, s * 0.04); ctx.lineTo(i * w * 0.38 + sg * s * 0.13 + (air ? i * s * 0.1 : 0), s * 0.2 - (air ? s * 0.1 : 0)); ctx.stroke(); }
+        ctx.lineWidth = s * 0.095;
+        for (const i of [-1, 1]) {
+          const ph = air ? Math.sin(clock * 22 + (i > 0 ? 0 : 2.4)) : sw * -i, fx2 = i * s * 0.07 + ph * s * 0.15, up = lift ? Math.max(0, Math.cos(phase + (i > 0 ? 0 : Math.PI))) * s * 0.06 : (air ? s * 0.04 : 0);
+          ctx.beginPath(); ctx.moveTo(i * s * 0.07, s * 0.26); ctx.lineTo(fx2, s * 0.46 - up); ctx.stroke();
+        }
+        D.roundRect(ctx, -w / 2, -s * 0.1, w, s * 0.4, w * 0.42); ctx.fill();
+        ctx.beginPath(); ctx.arc(0, -s * 0.2, s * 0.16, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = col.accent; ctx.beginPath(); ctx.arc(face * s * 0.07, -s * 0.21, s * 0.04, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+      }
+      function bloodDraw(s, col) {
+        ctx.save();
+        for (const d of stains) { ctx.globalAlpha = 0.85; ctx.fillStyle = BLOOD[col.dark ? 1 : 0]; ctx.beginPath(); ctx.arc(d.x * s, d.y * s, Math.max(1.2, d.r * s), 0, Math.PI * 2); ctx.fill(); }
+        ctx.globalAlpha = 1;
+        for (const q of parts) {
+          ctx.save(); ctx.translate(q.x * s, q.y * s); ctx.rotate(q.rot); ctx.fillStyle = col.ink; ctx.strokeStyle = col.ink; ctx.lineCap = 'round';
+          if (q.t === 'head') { ctx.beginPath(); ctx.arc(0, 0, s * 0.16, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = col.accent; ctx.beginPath(); ctx.arc(s * 0.06, -s * 0.01, s * 0.04, 0, Math.PI * 2); ctx.fill(); }
+          else if (q.t === 'torso') D.roundRect(ctx, -s * 0.18, -s * 0.2, s * 0.36, s * 0.4, s * 0.15), ctx.fill();
+          else { ctx.lineWidth = s * (q.t === 'leg' ? 0.095 : 0.075); ctx.beginPath(); ctx.moveTo(0, -s * 0.1); ctx.lineTo(0, s * 0.1); ctx.stroke(); }
+          ctx.fillStyle = BLOOD[col.dark ? 1 : 0]; ctx.beginPath(); ctx.arc(0, q.t === 'head' ? s * 0.12 : s * 0.1, s * 0.05, 0, Math.PI * 2); ctx.fill();
+          ctx.restore();
+        }
+        for (const d of drops) { ctx.fillStyle = BLOOD[col.dark ? 1 : 0]; ctx.beginPath(); ctx.arc(d.x * s, d.y * s, Math.max(1.2, d.r * s), 0, Math.PI * 2); ctx.fill(); }
         ctx.restore();
       }
       function render() {
@@ -294,11 +377,14 @@
         layout(w, h);
         const s = lay.s, ink = col.ink;
         // header
-        D.text(ctx, 'Room ' + (lvl + 1) + ' of ' + LEVELS.length, w / 2, 20, 13, col.ink2, 650);
+        const n = LEVELS.length, gp = 3, bwid = w - 40, seg = (bwid - gp * (n - 1)) / n;
+        for (let i = 0; i < n; i++) { ctx.fillStyle = i < lvl || done ? col.accent : (col.dark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.1)'); D.roundRect(ctx, 20 + i * (seg + gp), 8, seg, 4, 2); ctx.fill(); if (i === lvl && !done) { ctx.fillStyle = col.accent; ctx.globalAlpha = 0.45; D.roundRect(ctx, 20 + i * (seg + gp), 8, seg, 4, 2); ctx.fill(); ctx.globalAlpha = 1; } }
+        D.text(ctx, 'Room ' + (lvl + 1) + ' of ' + LEVELS.length, w / 2, 28, 13, col.ink2, 650);
         // the room, turned
         const sx = shake && !api.reduceMotion ? Math.sin(clock * 60) * shake * 3 : 0;
         ctx.save();
-        ctx.translate(lay.cx + sx, lay.cy); ctx.rotate(drawAngle); ctx.translate(-m.W * s / 2, -m.H * s / 2);
+        const zoom = turn && !api.reduceMotion ? 1 - 0.09 * Math.sin(turn.u * Math.PI) : 1;
+        ctx.translate(lay.cx + sx, lay.cy); ctx.scale(zoom, zoom); ctx.rotate(drawAngle); ctx.translate(-m.W * s / 2, -m.H * s / 2);
         const tiles = col.dark ? TILE_A_DARK : TILE_A;
         for (let y = 0; y < m.H; y++) for (let x = 0; x < m.W; x++) {
           const c = m.cells[y][x];
@@ -326,23 +412,32 @@
             ctx.fillStyle = '#fffaf2'; ctx.beginPath(); ctx.arc(x0 + s * 0.64, y0 + s * 0.56, s * 0.06, 0, Math.PI * 2); ctx.fill();
           }
         }
+        bloodDraw(s, col);
         // you, turned back upright
         const dead = ending && ending.type === 'dead';
         const px = (fx + 0.5) * s, py = (fy + 0.5) * s;
+        const tilt = turn && !api.reduceMotion ? turn.dir * 0.55 * Math.sin(turn.u * Math.PI) : 0;
         ctx.save(); ctx.translate(px, py); ctx.rotate(-drawAngle);
-        if (dead && !api.reduceMotion) ctx.globalAlpha = Math.max(0, 1 - (clock - ending.t) / 0.5);
         const bx = bump > 0 && !api.reduceMotion ? Math.sin(bump * 30) * bump * 2 : 0;
-        person(bx, 0, s, col);
+        if (!(dead && ending.burst)) person(bx, 0, s, col, tilt);
         ctx.restore();
         ctx.restore();
+        if (turn && !api.reduceMotion) {
+          const R = Math.min(w, h) * 0.2, a1 = -Math.PI / 2 + turn.dir * Math.min(1, turn.u * 1.15) * 4.4;
+          ctx.save(); ctx.globalAlpha = Math.sin(turn.u * Math.PI) * 0.55; ctx.strokeStyle = col.accent; ctx.lineWidth = 6; ctx.lineCap = 'round';
+          ctx.beginPath(); ctx.arc(lay.cx, lay.cy, R, -Math.PI / 2, a1, turn.dir < 0); ctx.stroke();
+          const ex = lay.cx + R * Math.cos(a1), ey = lay.cy + R * Math.sin(a1), tx = -Math.sin(a1) * turn.dir, ty = Math.cos(a1) * turn.dir;
+          for (const sg of [-1, 1]) { const c = Math.cos(sg * 0.6), sn = Math.sin(sg * 0.6); ctx.beginPath(); ctx.moveTo(ex, ey); ctx.lineTo(ex - (tx * c - ty * sn) * 16, ey - (tx * sn + ty * c) * 16); ctx.stroke(); }
+          ctx.restore();
+        }
         if (flash > 0) { ctx.fillStyle = 'rgba(201,80,58,' + (flash * 0.18).toFixed(3) + ')'; ctx.fillRect(0, 0, w, h); }
         // the hint, then the buttons
         D.text(ctx, LEVELS[lvl].hint, w / 2, h - 58, 13, col.ink2, 560);
         const by = h - 44, bw = 54, bh = 34, gap = 10, total = bw * 4 + gap * 3, x0 = (w - total) / 2;
-        roundBtn(x0, by, bw, bh, true, () => doTurn(-1), col, (x, y) => arcArrow(x, y, -1));
+        roundBtn(x0, by, bw, bh, true, () => doTurn(-1), col, (x, y) => arcArrow(x, y, -1), 0, 'Q');
         roundBtn(x0 + (bw + gap), by, bw, bh, true, () => doWalk(-1), col, (x, y) => { ctx.beginPath(); ctx.moveTo(x + 5, y - 6); ctx.lineTo(x - 3, y); ctx.lineTo(x + 5, y + 6); ctx.stroke(); }, -1);
         roundBtn(x0 + (bw + gap) * 2, by, bw, bh, true, () => doWalk(1), col, (x, y) => { ctx.beginPath(); ctx.moveTo(x - 5, y - 6); ctx.lineTo(x + 3, y); ctx.lineTo(x - 5, y + 6); ctx.stroke(); }, 1);
-        roundBtn(x0 + (bw + gap) * 3, by, bw, bh, true, () => doTurn(1), col, (x, y) => arcArrow(x, y, 1));
+        roundBtn(x0 + (bw + gap) * 3, by, bw, bh, true, () => doTurn(1), col, (x, y) => arcArrow(x, y, 1), 0, 'E');
       }
 
       score = 0;
