@@ -3,6 +3,11 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.56 (2 Nov 2026)
+- Turn Room: real jumping. You fly up and fall back with gravity, and the left and right keys steer you in the air.
+- Turn Room: dying now sends you back to room 1 with a score of 0 (R still restarts just the room). The body parts fade away after a moment instead of staying in the spikes.
+- Turn Room: the bottom buttons are plain words (Q turn, left, right, jump, E turn) and the hint text uses a spooky font (Creepster, SIL Open Font License, bundled).
+
 ## 1.12.55 (2 Nov 2026)
 - Turn Room: jumping is now one smooth arc (up, over, and down) instead of snapping back to the floor.
 

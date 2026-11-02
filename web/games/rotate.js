@@ -106,7 +106,7 @@
 
   Ludus.register({
     id: 'rotate', name: 'Turn Room', aka: 'Room turner', tag: 'Puzzle', tint: '#7f9b8f',
-    hint: '<kbd>←</kbd><kbd>→</kbd> walk · <kbd>E</kbd> turn the room right · <kbd>Q</kbd> turn it left · <kbd>R</kbd> start the room again',
+    hint: '<kbd>←</kbd><kbd>→</kbd> walk · <kbd>↑</kbd> jump (steer in the air) · <kbd>Q</kbd> <kbd>E</kbd> turn the room · <kbd>R</kbd> restart the room',
     _levels: LEVELS.map(l => l.m), _parse: parse, _solve: solve, _settle: settle, _walk: walk,
     art(ctx, w, h) {
       const s = Math.min(h * 0.27, w / 9), cols = 7, rows = 4;
@@ -129,18 +129,19 @@
       ctx.restore();
     },
     create(stage, api) {
+      try { document.fonts.load("17px 'LudusCreep'"); } catch (e) {}
       const view = api.canvas(() => render());
       const { ctx, canvas } = view;
       let lvl = 0, m, p, k = 0, score = 0, turns = 0, deaths = 0, par = 0, clock = 0, done = false;
       let angle = 0, fx = 0, fy = 0, timeline = [], endT = 0, ending = null, face = 1, held = 0, bump = 0, shake = 0, flash = 0;
-      let buttons = [], drawAngle = 0, turn = null, parts = [], drops = [], stains = [], phase = 0;
+      let air = null, buttons = [], drawAngle = 0, turn = null, parts = [], drops = [], stains = [], phase = 0;
       const lay = { s: 40, cx: 0, cy: 0 };
 
       function load(i) {
         lvl = Math.max(0, Math.min(LEVELS.length - 1, i));
         m = parse(LEVELS[lvl].m); p = { x: m.start.x, y: m.start.y }; k = 0; angle = 0; drawAngle = 0; fx = p.x; fy = p.y;
         const sl = solve(m); par = sl ? sl.turns : 0;
-        turns = 0; timeline = []; endT = clock; ending = null; held = 0; flash = 0; turn = null; parts = []; drops = []; stains = [];
+        turns = 0; timeline = []; endT = clock; ending = null; held = 0; flash = 0; turn = null; parts = []; drops = []; stains = []; air = null;
         const s0 = settle(m, p, 0); if (s0.path.length) { play(s0.path.map(c => ({ x: c.x, y: c.y })), 0.06, 'fall'); p = { x: s0.x, y: s0.y }; }
       }
       // timeline: [{ t0, t1, type: 'move'|'rot', ... }] played from the moment it is queued
@@ -151,7 +152,7 @@
         endT = t;
       }
       function rot(a0, a1) { const t = Math.max(clock, endT); timeline.push({ t0: t, t1: t + TURN, type: 'rot', a0, a1 }); endT = t + TURN; }
-      function idle() { return clock >= endT && !ending && !done; }
+      function idle() { return clock >= endT && !ending && !done && !air; }
 
       function finish(res) {
         if (res.dead) { ending = { type: 'dead', t: endT }; shake = 1; flash = 1; api.sfx('hit'); }
@@ -173,23 +174,43 @@
         p = { x: s.x, y: s.y };
         finish(s);
       }
-      // jump: one smooth arc, up and over one cell the way you face if that is free, then down to wherever gravity lets you land
+      // jump: real flight. You leave the floor going up, gravity pulls you back, and the left and right keys steer you in the air.
+      const HW = 0.26;
+      function bodyHits(x, y, g, r) {
+        // solid at any of six points around the body (x, y are cell coordinates, the person's middle is x + 0.5, y + 0.5)
+        const cx = x + 0.5, cy = y + 0.5;
+        for (const a of [-HW, 0, HW]) for (const b of [-0.34, 0.44]) if (solidAt(cx + r.x * a + g.x * b, cy + r.y * a + g.y * b)) return true;
+        return false;
+      }
       function doJump() {
         if (!idle()) return;
         const g = gOf(k), r = rOf(k);
-        const ux = p.x - g.x, uy = p.y - g.y;
-        if (solid(cellAt(m, ux, uy)) || hazard(cellAt(m, ux, uy))) { bump = 1; api.sfx('tick'); return; }
+        if (bodyHits(fx - g.x * 0.3, fy - g.y * 0.3, g, r)) { bump = 1; api.sfx('tick'); return; }
         api.sfx('move');
-        let q = { x: ux, y: uy };
-        const fx2 = ux + r.x * face, fy2 = uy + r.y * face;
-        if (!solid(cellAt(m, fx2, fy2))) q = { x: fx2, y: fy2 };
-        const s = settle(m, q, k), end = { x: s.x, y: s.y };
-        const drop = Math.abs(end.x - p.x) * Math.abs(g.x) + Math.abs(end.y - p.y) * Math.abs(g.y);
-        const t = Math.max(clock, endT), dur = 0.46 + 0.05 * Math.max(0, drop);
-        timeline.push({ t0: t, t1: t + dur, type: 'move', from: { x: fx, y: fy }, to: end, kind: 'jump', gx: g.x, gy: g.y });
-        endT = t + dur;
-        p = end;
-        finish(s);
+        air = { vg: -9.8, vr: held ? held * 4.2 : 0 };
+        if (held) face = held;
+      }
+      function landAt(g, r) {
+        const cx = Math.round(fx), cy = Math.round(fy);
+        air = null; p = { x: cx, y: cy };
+        const tgt = { x: cx, y: cy }, t = Math.max(clock, endT);
+        timeline.push({ t0: t, t1: t + 0.07, type: 'move', from: { x: fx, y: fy }, to: tgt, kind: 'land' }); endT = t + 0.07;
+        const s = settle(m, p, k); finish(s);
+        if (s.path.length) { play(s.path, 0.055, 'fall'); p = { x: s.x, y: s.y }; }
+      }
+      function stepAir(dt) {
+        const g = gOf(k), r = rOf(k), G = 30;
+        const want = held ? held * 4.2 : 0; air.vr += Math.max(-40 * dt, Math.min(40 * dt, want - air.vr));
+        if (held) face = held;
+        air.vg += G * dt;
+        // across (along r)
+        let nx = fx + r.x * air.vr * dt, ny = fy + r.y * air.vr * dt;
+        if (bodyHits(nx, ny, g, r)) air.vr = 0; else { fx = nx; fy = ny; }
+        // along gravity
+        nx = fx + g.x * air.vg * dt; ny = fy + g.y * air.vg * dt;
+        if (bodyHits(nx, ny, g, r)) { const down = air.vg > 0; air.vg = down ? 0 : 0.5; if (down) { landAt(g, r); return; } } else { fx = nx; fy = ny; }
+        const c = cellAt(m, Math.round(fx), Math.round(fy));
+        if (hazard(c) || c === 'E') { air = null; p = { x: Math.round(fx), y: Math.round(fy) }; fx = p.x; fy = p.y; finish({ dead: hazard(c), won: c === 'E' }); }
       }
       function doTurn(d) {
         if (!idle()) return;
@@ -234,6 +255,7 @@
       api.on(canvas, 'pointerup', release); api.on(canvas, 'pointercancel', release); api.on(canvas, 'pointerleave', release);
 
       function moving() {
+        if (air) return 'jump';
         for (const t of timeline) if (t.type === 'move' && clock >= t.t0 && clock < t.t1) return t.kind;
         return null;
       }
@@ -257,6 +279,7 @@
           if (solidAt(nx, ny)) { stains.push({ x: d.x, y: d.y, r: d.r * 1.7, c: d.c }); drops.splice(i, 1); continue; }
           d.x = nx; d.y = ny;
         }
+        for (let i = parts.length - 1; i >= 0; i--) { const q = parts[i]; if (q.rest) { q.restT = (q.restT || 0) + dt; if (q.restT > 0.7) parts.splice(i, 1); } }
         parts.forEach(q => {
           if (q.rest) return;
           q.vx += g.x * G * dt; q.vy += g.y * G * dt;
@@ -269,7 +292,7 @@
       }
 
       function update(dt) {
-        clock += dt; stepBlood(dt); if (moving() === 'walk') phase += dt * 20; bump = Math.max(0, bump - dt * 4); shake = Math.max(0, shake - dt * 2.5); flash = Math.max(0, flash - dt * 2.2);
+        clock += dt; stepBlood(dt); if (air) stepAir(dt); if (moving() === 'walk') phase += dt * 20; bump = Math.max(0, bump - dt * 4); shake = Math.max(0, shake - dt * 2.5); flash = Math.max(0, flash - dt * 2.2);
         // play the timeline: moves tween a cell to the next, turns tween the picture's angle
         for (let i = 0; i < timeline.length; i++) {
           const s = timeline[i];
@@ -290,7 +313,7 @@
           if (ending) {
             if (ending.type === 'dead' && !ending.burst) { ending.burst = true; burst(); }
             if (clock - ending.t > (ending.type === 'dead' ? 1.6 : 0.55)) {
-              if (ending.type === 'dead') { ending = null; restart(false); }
+              if (ending.type === 'dead') { ending = null; score = 0; api.score(0); deaths++; const dd = deaths; load(0); deaths = dd; }
               else if (lvl >= LEVELS.length - 1) {
                 done = true; ending = null;
                 api.timeout(() => api.over({ score, title: 'Every room turned', won: true, message: 'All ' + LEVELS.length + ' rooms cleared' }), 300);
@@ -313,9 +336,8 @@
         ctx.fillStyle = col.dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.055)';
         D.roundRect(ctx, x, y, w, h, h / 2); ctx.fill();
         ctx.strokeStyle = col.ink; ctx.fillStyle = col.ink; ctx.lineWidth = 2.2; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-        icon(x + w / 2 - (label ? 7 : 0), y + h / 2);
-        if (label) D.text(ctx, label, x + w - 12, y + h / 2 + 0.5, 11, col.ink2, 700);
-        ctx.restore();
+        icon(x + w / 2, y + h / 2);
+                ctx.restore();
       }
       function arcArrow(cx, cy, dir) {
         const r = 8.5, a0 = dir > 0 ? -2.5 : -0.64, a1 = a0 + dir * 4.3;
@@ -364,7 +386,7 @@
         for (const d of stains) { ctx.globalAlpha = 0.85; ctx.fillStyle = BLOOD[col.dark ? 1 : 0]; ctx.beginPath(); ctx.arc(d.x * s, d.y * s, Math.max(1.2, d.r * s), 0, Math.PI * 2); ctx.fill(); }
         ctx.globalAlpha = 1;
         for (const q of parts) {
-          ctx.save(); ctx.translate(q.x * s, q.y * s); ctx.rotate(q.rot); ctx.fillStyle = col.ink; ctx.strokeStyle = col.ink; ctx.lineCap = 'round';
+          ctx.save(); ctx.globalAlpha = Math.max(0, 1 - (q.restT || 0) / 0.7); ctx.translate(q.x * s, q.y * s); ctx.rotate(q.rot); ctx.fillStyle = col.ink; ctx.strokeStyle = col.ink; ctx.lineCap = 'round';
           if (q.t === 'head') { ctx.beginPath(); ctx.arc(0, 0, s * 0.16, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = col.accent; ctx.beginPath(); ctx.arc(s * 0.06, -s * 0.01, s * 0.04, 0, Math.PI * 2); ctx.fill(); }
           else if (q.t === 'torso') D.roundRect(ctx, -s * 0.18, -s * 0.2, s * 0.36, s * 0.4, s * 0.15), ctx.fill();
           else { ctx.lineWidth = s * (q.t === 'leg' ? 0.095 : 0.075); ctx.beginPath(); ctx.moveTo(0, -s * 0.1); ctx.lineTo(0, s * 0.1); ctx.stroke(); }
@@ -437,12 +459,16 @@
         }
         if (flash > 0) { ctx.fillStyle = 'rgba(201,80,58,' + (flash * 0.18).toFixed(3) + ')'; ctx.fillRect(0, 0, w, h); }
         // the hint, then the buttons
-        D.text(ctx, LEVELS[lvl].hint, w / 2, h - 58, 13, col.ink2, 560);
-        const by = h - 44, bw = 54, bh = 34, gap = 10, total = bw * 4 + gap * 3, x0 = (w - total) / 2;
-        roundBtn(x0, by, bw, bh, true, () => doTurn(-1), col, (x, y) => arcArrow(x, y, -1), 0, 'Q');
-        roundBtn(x0 + (bw + gap), by, bw, bh, true, () => doWalk(-1), col, (x, y) => { ctx.beginPath(); ctx.moveTo(x + 5, y - 6); ctx.lineTo(x - 3, y); ctx.lineTo(x + 5, y + 6); ctx.stroke(); }, -1);
-        roundBtn(x0 + (bw + gap) * 2, by, bw, bh, true, () => doWalk(1), col, (x, y) => { ctx.beginPath(); ctx.moveTo(x - 5, y - 6); ctx.lineTo(x + 3, y); ctx.lineTo(x - 5, y + 6); ctx.stroke(); }, 1);
-        roundBtn(x0 + (bw + gap) * 3, by, bw, bh, true, () => doTurn(1), col, (x, y) => arcArrow(x, y, 1), 0, 'E');
+        const FONT = "'LudusCreep', Chiller, Luminari, Herculanum, Papyrus, fantasy";
+        ctx.save(); ctx.font = '17px ' + FONT; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = col.ink2;
+        ctx.fillText(LEVELS[lvl].hint, w / 2, h - 60); ctx.restore();
+        const by = h - 46, gap = 6, bw = Math.min(70, (w - 16 - gap * 4) / 5), bh = 34, x0 = (w - (bw * 5 + gap * 4)) / 2;
+        const label = t => ctx.fillText(t[0], 0, 0);
+        const defs = [['Q', 'turn', () => doTurn(-1), 0], ['', 'left', () => doWalk(-1), -1], ['', 'right', () => doWalk(1), 1], ['', 'jump', () => doJump(), 0], ['E', 'turn', () => doTurn(1), 0]];
+        defs.forEach((d, i) => roundBtn(x0 + i * (bw + gap), by, bw, bh, true, d[2], col, (x, y) => {
+          ctx.font = '15px ' + FONT; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineWidth = 0;
+          ctx.fillText((d[0] ? d[0] + ' ' : '') + d[1], x, y + 1);
+        }, d[3]));
       }
 
       score = 0;
