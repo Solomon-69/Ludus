@@ -4,7 +4,7 @@ All notable changes to Ludus. Versions follow the app's version number (`Info.pl
 `windows/Ludus.csproj`).
 
 ## 1.12.44 (2 Nov 2026)
-- Covers can no longer stay empty: each one is checked after drawing, redrawn when it scrolls into view, and falls back to a plain tinted cover if its drawing ever fails (Chess and Sky Raiders were blank on Windows). The Windows self-test now fails if any cover is blank.
+- Covers can no longer stay empty: each one is checked after drawing, redrawn when it scrolls into view or the panel is shown again, and falls back to a plain tinted cover if its drawing ever fails (Chess and Sky Raiders were blank on Windows). The Windows self-test now fails if any cover is blank.
 - The vs Bot / vs Friend switch is bigger, easier to hit, and its highlight glides across with the smooth spring.
 - Air Hockey: online matches always use the classic rink length for both players, so a tall screen and a wide screen see the same rink; the "Ready" label no longer sits on the puck.
 

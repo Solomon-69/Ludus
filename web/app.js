@@ -520,6 +520,11 @@
     // Layout can settle after the first draw (cards slide in, the panel resizes): look again, redrawing any blank cover.
     [250, 900].forEach(ms => setTimeout(() => cvs.forEach(cv => { if (cv.isConnected && cv.dataset.blank) drawArt(cv, true); }), ms));
   }
+  // Shown again after being hidden (the Windows tray panel, a Mac wake): a hidden webview can drop its canvas pixels, so redraw every cover.
+  const redrawCovers = () => { if (view === 'home') document.querySelectorAll('.card .art canvas').forEach(cv => drawArt(cv, true)); };
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) redrawCovers(); });
+  window.addEventListener('focus', () => setTimeout(redrawCovers, 60));
+  window.addEventListener('pageshow', redrawCovers);
   (function watchScale() {   // moving to a screen with another scale (or zooming) redraws the covers sharply
     const mq = matchMedia('(resolution: ' + (devicePixelRatio || 1) + 'dppx)');
     mq.addEventListener('change', () => { if (view === 'home') drawCards(); watchScale(); }, { once: true });
