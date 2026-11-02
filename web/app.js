@@ -834,14 +834,14 @@
     if (!onlineApi && current.instance && current.instance.save) current.saver = setInterval(() => { if (!run.api.paused) persist(); }, SAVE_EVERY_MS);
   }
   // "Move to start" / "Tap to start": a small pill above the controls line while a game waits for the first move.
-  // It keeps its space after the start (only fades), so the stage never changes size as play begins.
+  // It floats over the foot of the board (no layout space), so the board fills the panel and never resizes as play begins.
   function waitHint(on, text, still) {
     const foot = $('hint');
     let pill = foot.querySelector('.wait-start');
     if (on) {
       if (!pill) {
         const row = document.createElement('div');
-        row.style.cssText = 'display:flex;justify-content:center;margin:0 0 5px';
+        row.style.cssText = 'position:absolute;left:0;right:0;bottom:100%;display:flex;justify-content:center;margin:0 0 8px;pointer-events:none;z-index:2';   // floats over the foot of the board, so it takes no layout space
         pill = document.createElement('span'); pill.className = 'wait-start'; pill.setAttribute('role', 'status');
         pill.style.cssText = 'display:inline-flex;align-items:center;gap:6px;padding:3px 10px 3px 8px;border-radius:999px;font-size:11.5px;font-weight:650;line-height:16px;color:var(--ink);background:var(--surface-2);border:1px solid var(--line);pointer-events:none';
         const dot = document.createElement('i');
