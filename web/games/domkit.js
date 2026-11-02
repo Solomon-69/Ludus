@@ -97,6 +97,7 @@
 .lk-chip:active{transform:scale(.96)}
 .lk-chip.on{background:var(--ink);color:var(--surface)}
 .lk-chip:disabled{opacity:.5;cursor:default}
+.lk-sug{display:inline-block;margin-left:6px;padding:2px 7px;border-radius:999px;background:var(--accent);color:var(--accent-ink);font:700 10px/1.2 var(--font-round);vertical-align:1px}
 .lk-btn{height:40px;padding:0 16px;border-radius:12px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);font:700 14px/1 var(--font-round);cursor:pointer;transition:transform .15s var(--spring),background .15s,border-color .15s}
 .lk-btn:hover:not(:disabled){border-color:color-mix(in srgb,var(--ink) 22%,transparent)}
 .lk-btn:active:not(:disabled){transform:scale(.97)}

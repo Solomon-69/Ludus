@@ -471,19 +471,32 @@
       function showRaceSetup() {
         phase = 'setup'; sheet.innerHTML = ''; const p = el('div', 'lk-panel lk-pop');
         p.appendChild(el('h2', '', 'Clue Spotter race'));
-        p.appendChild(el('p', 'lk-muted', isHost ? `Same ${RACE_N} clues for everyone, ${RACE_T} seconds each. Faster right answers score more.` : 'The host is choosing the clues.'));
-        const row = (label, opts, cur, pick) => {
+        p.appendChild(el('p', 'lk-muted', isHost ? `Same ${RACE_N} clues for everyone, ${RACE_T} seconds each. Faster right answers score more.`
+          : Object.keys(mySug).length ? `Sent to ${nameOf(0)}. Tap another to change it.` : `${nameOf(0)} picks the clues. Tap one to suggest it.`));
+        const row = (label, opts, cur, pick, key) => {
           p.appendChild(el('span', 'lk-label', label)); const r = el('div', 'lk-chips');
-          opts.forEach(([v, l]) => { const b = el('button', 'lk-chip' + (v === cur ? ' on' : ''), l); b.type = 'button'; b.disabled = !isHost; b.onclick = () => { pick(v); api.sfx('click'); sendCfg(); showRaceSetup(); }; r.appendChild(b); });
+          opts.forEach(([v, l]) => {
+            const b = el('button', 'lk-chip' + (v === cur ? ' on' : ''), l); b.type = 'button';
+            b.onclick = () => { if (!isHost) { suggest(key, v); return; } pick(v); api.sfx('click'); sendCfg(); showRaceSetup(); };
+            const who = !isHost ? (mySug[key] === v ? ['Your pick'] : []) : seats().filter(s => sugs[s] && sugs[s][key] === v).map(nameOf);
+            if (who.length) b.appendChild(el('span', 'lk-sug', who.join(', ')));
+            r.appendChild(b);
+          });
           p.appendChild(r);
         };
-        row('Clues', KINDS, kind, v => { kind = v; });
-        row('Region', REGIONS.map(r => [r, r || 'All']), region, v => { region = v; });
+        row('Clues', KINDS, kind, v => { kind = v; }, 'k');
+        row('Region', REGIONS.map(r => [r, r || 'All']), region, v => { region = v; }, 'g');
         if (isHost) {
           const go = el('button', 'lk-btn lk-primary', 'Start'); go.onclick = beginRace; p.appendChild(go);
           p.appendChild(el('p', 'lk-muted', `${on.count} of ${on.max} players here`));
         } else p.appendChild(el('p', 'lk-muted', 'Waiting for the host to start…'));
         sheet.appendChild(p); sheet.hidden = false; chips(); hud();
+      }
+      // online guests never change the clues (the host picks): they suggest a choice, which the host sees as a name tag on it
+      const mySug = {}, sugs = {};   // guest: key -> my suggested value; host: seat -> { key: value }
+      function suggest(key, v) {
+        if (isHost || phase !== 'setup') return;
+        mySug[key] = v; on.send('sug', { k: key, v }); api.sfx('click'); showRaceSetup();
       }
       const sendCfg = () => { if (isHost && on) on.send('cfg', { k: kind, g: region }); };
       function beginRace() {
@@ -501,6 +514,11 @@
         on.on('cfg', (d, from) => {
           if (from !== 0 || isHost || !d || !KINDS.some(k => k[0] === d.k) || !REGIONS.includes(d.g)) return;
           kind = d.k; region = d.g; if (phase === 'setup') showRaceSetup();
+        });
+        on.on('sug', (d, from) => {
+          if (!isHost || phase !== 'setup' || !d || !okInt(from, 1, 3)) return;
+          if (d.k === 'k' ? !KINDS.some(k => k[0] === d.v) : d.k === 'g' ? !REGIONS.includes(d.v) : true) return;
+          sugs[from] = Object.assign({}, sugs[from], { [d.k]: d.v }); api.sfx('tap'); showRaceSetup();
         });
         on.on('plan', (d, from) => {
           if (from !== 0 || isHost || !d || !Array.isArray(d.p) || d.p.length !== RACE_N || !C) return;
@@ -526,7 +544,7 @@
           on.sendTo(from, 'cfg', { k: kind, g: region });
           if (plan) { on.sendTo(from, 'plan', { k: kind, g: region, p: plan }); on.sendTo(from, 'rnd', { r: Math.max(0, round) }); }
         });
-        on.onLeave(() => { hud(); checkRoundDone(); });
+        on.onLeave(() => { hud(); checkRoundDone(); if (isHost && phase === 'setup') showRaceSetup(); });
       }
 
       // ----- study list -----

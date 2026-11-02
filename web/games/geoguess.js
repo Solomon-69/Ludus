@@ -232,6 +232,8 @@
 .geo-chip:active{transform:scale(.96)}
 .geo-chip.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 .geo-chip:disabled{opacity:.5;cursor:default}
+.geo-sug{display:inline-block;margin-left:6px;padding:2px 7px;border-radius:999px;background:var(--accent);color:var(--accent-ink);font:700 10px var(--font);vertical-align:1px}
+.geo-chip.on .geo-sug{background:var(--accent-ink);color:var(--accent)}
 .geo-go{margin-top:16px;width:100%;height:42px;border:0;border-radius:13px;background:var(--accent);color:var(--accent-ink);font:700 14.5px var(--font-round);cursor:pointer;transition:transform .15s var(--spring),filter .15s}
 .geo-go:hover{filter:brightness(1.06)}
 .geo-go:active{transform:scale(.98)}
@@ -813,20 +815,32 @@
         }
         setCard(true);
       }
-      const chipRow = (opts, cur_, pick, disabled) => {
+      // online guests never change the rules (the host picks): they suggest a choice, which the host sees as a name tag on it
+      const guest = !!on && !host, mySug = {}, sugs = {};   // guest: key -> my suggested value; host: seat -> { key: value }
+      function suggest(key, v) {
+        if (!guest || phase !== 'setup') return;
+        mySug[key] = v; on.send('sug', { k: key, v }); api.sfx('click'); showSetup();
+      }
+      const chipRow = (opts, cur_, pick, key) => {
         const row = el('div', 'geo-chips');
-        opts.forEach(([v, label]) => { const b = txt('button', 'geo-chip' + (v === cur_ ? ' on' : ''), label); b.disabled = !!disabled; b.onclick = () => { pick(v); api.sfx('click'); }; row.appendChild(b); });
+        opts.forEach(([v, label]) => {
+          const b = txt('button', 'geo-chip' + (v === cur_ ? ' on' : ''), label);
+          b.onclick = () => { if (guest) { suggest(key, v); return; } pick(v); api.sfx('click'); };
+          const who = guest ? (mySug[key] === v ? ['Your pick'] : []) : seats().filter(s => sugs[s] && sugs[s][key] === v).map(nameOf);
+          if (who.length) b.appendChild(txt('span', 'geo-sug', who.join(', ')));
+          row.appendChild(b);
+        });
         return row;
       };
       function showSetup() {
         phase = 'setup'; hud(false); loadEl.hidden = true; resEl.hidden = true;
         card.className = 'geo-card'; card.innerHTML = '';
         card.appendChild(txt('h2', '', 'Map Hunt'));
-        card.appendChild(txt('p', '', on ? (host ? 'Same places for everyone. Pick the rules, then start.' : 'The host is choosing the rules.') : 'Look around, move along the road, then pin where you are.'));
+        card.appendChild(txt('p', '', on ? (host ? 'Same places for everyone. Pick the rules, then start.' : Object.keys(mySug).length ? `Sent to ${nameOf(0)}. Tap another to change it.` : `${nameOf(0)} picks the rules. Tap one to suggest it.`) : 'Look around, move along the road, then pin where you are.'));
         card.appendChild(txt('span', 'lab', 'Time per round'));
-        card.appendChild(chipRow(TIMES, cfg.time, v => { cfg.time = v; remember(); showSetup(); }, !host));
+        card.appendChild(chipRow(TIMES, cfg.time, v => { cfg.time = v; remember(); showSetup(); }, 't'));
         card.appendChild(txt('span', 'lab', 'Movement'));
-        card.appendChild(chipRow(MOVES, cfg.move, v => { cfg.move = v; remember(); showSetup(); }, !host));
+        card.appendChild(chipRow(MOVES, cfg.move, v => { cfg.move = v; remember(); showSetup(); }, 'm'));
         card.appendChild(txt('p', 'note small', MOVE_NOTE[cfg.move])); applyMove();
         if (host) {
           const go = txt('button', 'geo-go', 'Start'); go.onclick = begin; card.appendChild(go);
@@ -861,12 +875,17 @@
           if (started && d.r <= round && phase !== 'offline') return;
           started = true; startRound(d.r);
         });
+        on.on('sug', (d, from) => {
+          if (!host || phase !== 'setup' || !d || !okInt(from, 1, 3)) return;
+          if (d.k === 't' ? !TIMES.some(t => t[0] === d.v) : d.k === 'm' ? !MOVES.some(m => m[0] === d.v) : true) return;
+          sugs[from] = Object.assign({}, sugs[from], { [d.k]: d.v }); api.sfx('tap'); showSetup();
+        });
         on.on('ready', (d, from) => { if (!host || !d || d.r !== round) return; ready.add(from); maybeAdvance(); });
         on.on('hello', (d, from) => {
           if (!host) return;
           on.sendTo(from, 'cfg', { t: cfg.time, m: cfg.move }); if (started) on.sendTo(from, 'rnd', { r: round });
         });
-        on.onLeave(() => { checkDone(); maybeAdvance(); if (phase === 'play' || phase === 'wait') renderScore(round); });
+        on.onLeave(() => { checkDone(); maybeAdvance(); if (phase === 'play' || phase === 'wait') renderScore(round); else if (phase === 'setup' && host) showSetup(); });
       }
 
       // ----- boot -----
