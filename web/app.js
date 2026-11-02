@@ -288,7 +288,7 @@
     // Forget: the page is drawn without the card at once; glideOnline fades the old card out whole (never squashed or clipped)
     // while the blocks below glide up into place with one shared curve. Instant with reduced motion.
     fg.onclick = () => { L.sfx('click'); S.party = null; L.save(); renderCards(); };
-    const rj = el('button', 'btn small primary', 'Rejoin'); rj.type = 'button'; rj.id = 'opRejoin'; rj.onclick = () => { L.sfx('click'); if (roomAlive() && roomSession().code === p.code) unparkRoom(); else rejoinParty(); };
+    const rj = el('button', 'btn small primary', 'Rejoin'); rj.type = 'button'; rj.id = 'opRejoin'; rj.onclick = () => { L.sfx('click'); if (roomHealthy() && roomSession().code === p.code) unparkRoom(); else rejoinParty(); };
     acts.appendChild(fg); acts.appendChild(rj);
     row.appendChild(ppl); row.appendChild(acts); card.appendChild(row);
     return card;
@@ -1342,6 +1342,15 @@
   // (a room made on the Online page keeps its session in the lobby until the first round starts)
   function roomSession() { return online ? (online.session || L.lobby.session || null) : null; }
   function roomAlive() { const s = roomSession(); return !!(s && !s.over); }
+  // A room kept behind All games is only worth going back to if it still works: joined, connected, and (for a guest) the
+  // host heard from lately. One that is stuck reconnecting, still looking, or whose host went quiet (a Mac that slept,
+  // an old party) is left and joined again from scratch, so Rejoin works on the first press.
+  function roomHealthy() {
+    const s = roomSession(); if (!s || s.over || !s.ready || s.conn !== 'online') return false;
+    if (s.role === 'host') return true;
+    const quiet = Math.min(s._peerTimeout(), 3 * s._hbEvery());
+    return Date.now() - (s.lastHost || 0) < quiet;
+  }
   // The party stays joined while home shows: the lobby card hides, room events keep it up to date behind the scenes.
   function parkRoom() {
     L.lobby.park(); hideOver(); $('pauseSheet').hidden = true;
