@@ -313,10 +313,10 @@
         ctx.restore();
       }
       function arcArrow(cx, cy, dir) {
-        const r = 8, a0 = dir > 0 ? -1.9 : -1.24, a1 = a0 + dir * 4.2;
+        const r = 8.5, a0 = dir > 0 ? -2.5 : -0.64, a1 = a0 + dir * 4.3;
         ctx.beginPath(); ctx.arc(cx, cy, r, a0, a1, dir < 0); ctx.stroke();
-        const ex = cx + r * Math.cos(a1), ey = cy + r * Math.sin(a1), tx = -Math.sin(a1) * dir, ty = Math.cos(a1) * dir;
-        for (const sg of [-1, 1]) { const c = Math.cos(sg * 0.6), sn = Math.sin(sg * 0.6), bx = -(tx * c - ty * sn), by = -(tx * sn + ty * c); ctx.beginPath(); ctx.moveTo(ex, ey); ctx.lineTo(ex + bx * 6.5, ey + by * 6.5); ctx.stroke(); }
+        const ex = cx + r * Math.cos(a1), ey = cy + r * Math.sin(a1), tx = -Math.sin(a1) * dir, ty = Math.cos(a1) * dir, nx = -ty, ny = tx;
+        ctx.beginPath(); ctx.moveTo(ex + tx * 5.5, ey + ty * 5.5); ctx.lineTo(ex - tx * 2 + nx * 5, ey - ty * 2 + ny * 5); ctx.lineTo(ex - tx * 2 - nx * 5, ey - ty * 2 - ny * 5); ctx.closePath(); ctx.fill();
       }
       function spikes(x, y, s, c, col) {
         // spikes attached to a side of the cell: u floor, d ceiling, l right wall (point left), r left wall (point right)

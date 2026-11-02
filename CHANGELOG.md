@@ -3,6 +3,9 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.54 (2 Nov 2026)
+- Turn Room: the two turn arrows are redrawn as clean circle arrows (they looked broken).
+
 ## 1.12.53 (2 Nov 2026)
 - Turn Room: bigger, harder rooms (up to 7 turns), a 12-segment progress bar at the top, and Up now jumps.
 - Turn Room controls: Q and E (or A and D) turn the room left and right; the arrow keys and on-screen arrows only walk. The buttons show their keys, and the first rooms tell you about Q and E.
