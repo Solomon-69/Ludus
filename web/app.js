@@ -670,7 +670,9 @@
   // more before showing anything, which is what a second press used to do.
   function rejoinParty(retried) {
     const p = S.party; if (!p || !L.net.validCode(p.code)) return;
-    joinFromInvite(p.code, false, { rejoin: true, retried: !!retried, fallback: () => createFlexRoom(p, !!retried) });
+    // Only the player who made the code may open it again when nobody answers. A player who joined someone else's room
+    // keeps asking for that host instead: reopening it themselves made a second room with the same code (2 Nov 2026).
+    joinFromInvite(p.code, false, { rejoin: true, retried: !!retried, fallback: (p.mine || p.role === 'host') ? () => createFlexRoom(p, !!retried) : null });
   }
   // Rejoin never ends in nothing: when no relay can be reached (or a room cannot be reopened) a card says so, with Try again.
   function rejoinFailed(p, retried) {

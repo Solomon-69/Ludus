@@ -98,7 +98,8 @@
     // worth asking. On a network that blocks the MQTT ports that is ntfy.sh, and waiting 10 s for a blocked relay first made
     // Rejoin look dead. When it is the code's own relay, its fallback still follows.
     const good = rejoin ? urls.indexOf(NET.goodRelay()) : -1;
-    if (good >= 0 && all.includes(good) && good !== home) return [good];
+    // ...but the code's own relay is still asked after it, so a host who is there is always found (same code, same room).
+    if (good >= 0 && all.includes(good) && good !== home) return rejoin === 'quick' ? [good] : [good, home];
     return live.length ? live : all;
   };
   NET.codeFor = (idx, n) => { for (let i = 0; i < 500; i++) { const c = NET.newCode(); if (NET.codeBroker(c, n) === idx % n) return c; } return NET.newCode(); };
@@ -455,7 +456,7 @@
     me.wantTries = 0; me.flex0 = me.flex;
     // A guest (and a host coming back to its own code) stays on the relays the code belongs to: its own relay, then the one
     // fallback (see NET.codeRelays). A relay that cannot be reached, or where nobody answers, moves the room to the next one.
-    me.route = role === 'guest' ? NET.codeRelays(opts.code, urls, !!opts.rejoin) : me.wantCode ? NET.codeRelays(me.wantCode, urls, true) : null;
+    me.route = role === 'guest' ? NET.codeRelays(opts.code, urls, opts.rejoin === 'quick' ? 'quick' : !!opts.rejoin) : me.wantCode ? NET.codeRelays(me.wantCode, urls, true) : null;
     me.hop = 0;
     me._dial(me.route ? me.route[0] : NET.startRelay(urls), !!me.route);
     me.lastHost = Date.now(); me.lastHb = 0;
