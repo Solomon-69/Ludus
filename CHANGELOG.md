@@ -3,6 +3,9 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.52 (2 Nov 2026)
+- Removed the smooth scrolling glide from 1.12.50. Lists scroll the normal way again.
+
 ## 1.12.51 (2 Nov 2026)
 - New game: Turn Room (Puzzle). Turn the whole room to change which way is down, then walk, fall and reach the door. 12 rooms, spikes, undo-free restarts with R.
 - Pac-Man: the chasers are a little slower.
