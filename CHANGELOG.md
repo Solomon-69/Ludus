@@ -3,6 +3,11 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.59 (2 Nov 2026)
+- Turn Room: the bottom line now tells a story, one line per room: someone is watching you, they need your mind, and they were once where you are.
+- Turn Room: every door stands on a wall and opens only when it looks the right way up (you would stand on its floor). No more standing in a door that will not open.
+- Turn Room: jumping no longer stops you short of a block or snaps you backwards when you land; you settle into the step you were moving in.
+
 ## 1.12.58 (2 Nov 2026)
 - Turn Room: no more orange circle while the room turns, and no on-screen buttons. The keys do everything (listed under the game).
 - Turn Room: a cold voice speaks one red line per room at the bottom, in the spirit of the original Rotate ("Wake up. The room is waiting."). Dying shows "Subject lost".

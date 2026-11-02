@@ -10,15 +10,14 @@
     { hint: 'Arrow keys walk. Up jumps.', m: ['#############', '#...........#', '#...........#', '#.@......#..E#', '#############'] },
     { hint: 'Q and E turn the room. Only an upright door opens.', m: ['############', '##E#########', '#..........#', '#........@.#', '############'] }
   ];
-  // A cold voice speaks to you between rooms, one line per room (new lines, in the spirit of the original Rotate).
-  const VOICE = [
-    'Wake up. The room is waiting.', 'Doors only open for those who stand straight.', 'Every wall was once a floor.',
-    'We have watched others fall here.', 'Your mind is the only way out.', 'Do not trust the floor.',
-    'Gravity obeys you. For now.', 'The spikes remember everyone.', 'Curiosity brought you this far.',
-    'We built these rooms for minds like yours.', 'There is no outside. Only the next room.', 'Some of us never stopped turning.',
-    'You are learning. We are taking notes.', 'Think. It is all you have.', 'Up and down are only opinions.',
-    'Someone stood exactly where you stand.', 'The test does not end. It only changes shape.', 'Your hands shake. Ours never did.',
-    'Keep going. We are listening.', 'Every door you open closes another.'
+  // The story, one line per room: someone is watching you, they need your mind, and they were once where you are.
+  // (Our own words, told the way the original Rotate tells its story.)
+  const STORY = [
+    'Find the door. That is all we ask of you.', 'Mind the spikes. We need you in one piece.', 'A broken subject teaches us nothing.',
+    'It is your mind we brought you here for.', 'A sharp mind is worth more than a body.', 'Without the mind, there is nothing left.',
+    'Every room shows us how you think.', 'We are close to the answer now.', 'The answer is all that matters here.',
+    'You wonder why you are here. So did I.', 'I stood in these rooms once, like you.', 'I turned them, and they turned me.',
+    'When you finish, you will take my place.', 'Keep turning. The answer is close.', 'You are starting to think like us.', 'Do not stop. We never did.'
   ];
   function makeRng(seed) { let x = (seed >>> 0) || 1; return () => { x = (Math.imul(x, 1664525) + 1013904223) >>> 0; return x / 4294967296; }; }
   function genRoom(seed, n) {
@@ -36,6 +35,7 @@
       if (air.length < 20) continue;
       const st = air[R(0, air.length - 1)], en = air[R(0, air.length - 1)]; if (st === en) continue;
       g[en[1]][en[0]] = 'E';
+      if (![[0, 1], [1, 0], [-1, 0], [0, -1]].some(([dx, dy]) => (g[en[1] + dy] || [])[en[0] + dx] === '#')) continue;
       let ns = R(2, 4 + Math.min(5, Math.floor(n / 3)));
       for (let i = 0; i < 60 && ns > 0; i++) {
         const [x, y] = air[R(0, air.length - 1)]; if (g[y][x] !== '.') continue;
@@ -70,11 +70,15 @@
         cells[y].push(c);
       }
     }
-    return { W, H, cells, start, exit };
+    // the door stands on a wall: its "down" is the first solid side (floor first). It opens only when gravity points that way.
+    let doorK = 0;
+    if (exit) { const at = (x, y) => (x < 0 || y < 0 || x >= W || y >= H) ? '#' : cells[y][x]; const solidK = [0, 1, 2, 3].filter(kk => at(exit.x + DIRS[kk].x, exit.y + DIRS[kk].y) === '#'), open = [0, 1, 2, 3].filter(kk => !solidK.includes(kk));
+      if (solidK.includes(0)) doorK = 0; else if (open.length === 1) doorK = (open[0] + 2) % 4; else doorK = [0, 2, 1, 3].find(kk => solidK.includes(kk)) || 0; }
+    return { W, H, cells, start, exit, doorK };
   }
   const cellAt = (m, x, y) => (x < 0 || y < 0 || x >= m.W || y >= m.H) ? '#' : m.cells[y][x];
   const solid = c => c === '#';
-  const upright = k => ((k % 4) + 4) % 4 === 0;   // the door only opens when the room is the right way up
+  const upright = (m, k) => ((k - m.doorK) % 4 + 4) % 4 === 0;   // the door only opens when you would stand on its floor
   const hazard = c => c === 'u' || c === 'd' || c === 'l' || c === 'r';
 
   // Let go at p with gravity k: the cells you pass through until you stand on something. dead / won say how it ended.
@@ -84,7 +88,7 @@
     for (let i = 0; i < 99; i++) {
       const c = cellAt(m, x, y);
       if (hazard(c)) { dead = true; break; }
-      if (c === 'E' && upright(k)) { won = true; break; }
+      if (c === 'E' && upright(m, k)) { won = true; break; }
       if (solid(cellAt(m, x + g.x, y + g.y))) break;
       x += g.x; y += g.y; path.push({ x, y });
     }
@@ -184,7 +188,7 @@
       function load(i) {
         lvl = Math.max(0, i);
         const rows = lvl < LEVELS.length ? LEVELS[lvl].m : genRoom(seed, lvl);
-        hintText = VOICE[lvl % VOICE.length];
+        hintText = lvl < STORY.length ? STORY[lvl] : '';
         m = parse(rows); p = { x: m.start.x, y: m.start.y }; k = 0; angle = 0; drawAngle = 0; fx = p.x; fy = p.y;
         const sl = solve(m); par = sl ? sl.turns : 0;
         turns = 0; timeline = []; endT = clock; ending = null; held = 0; flash = 0; turn = null; parts = []; drops = []; stains = []; air = null;
@@ -221,7 +225,7 @@
         finish(s);
       }
       // ---- jump: real flight. You leave the floor going up, gravity pulls you back, and left and right steer you in the air.
-      const HW = 0.26, V0 = 9.6, GRAV = 34, STEER = 4.4;
+      const HW = 0.2, V0 = 9.6, GRAV = 34, STEER = 4.4;
       const solidAt = (x, y) => solid(cellAt(m, Math.floor(x), Math.floor(y)));
       function bodyHits(x, y, g, r) {
         const cx = x + 0.5, cy = y + 0.5;
@@ -238,17 +242,23 @@
         if (held) face = held;
       }
       function landAt() {
-        const cx = Math.round(fx), cy = Math.round(fy);
+        // finish the step you were moving in (no snapping backwards), unless a wall is there
+        const g = gOf(k), r = rOf(k), rc = fx * r.x + fy * r.y, v = air ? air.vr : 0;
+        let tr = v > 0.5 ? Math.ceil(rc - 0.15) : v < -0.5 ? Math.floor(rc + 0.15) : Math.round(rc);
+        const gc = Math.round(fx * g.x + fy * g.y);
+        const at = t => ({ x: r.x * t + g.x * gc, y: r.y * t + g.y * gc });
+        if (solid(cellAt(m, at(tr).x, at(tr).y))) tr = Math.round(rc);
+        const cx = at(tr).x, cy = at(tr).y;
         air = null; p = { x: cx, y: cy }; squash = 1;
         const t = Math.max(clock, endT);
-        timeline.push({ t0: t, t1: t + 0.06, type: 'move', from: { x: fx, y: fy }, to: { x: cx, y: cy }, kind: 'land' }); endT = t + 0.06;
+        timeline.push({ t0: t, t1: t + 0.1, type: 'move', from: { x: fx, y: fy }, to: { x: cx, y: cy }, kind: 'land' }); endT = t + 0.1;
         const s = settle(m, p, k);
         if (s.path.length) play(s.path, 0.055, 'fall');
         p = { x: s.x, y: s.y }; finish(s);
       }
       function stepAir(dt) {
         const g = gOf(k), r = rOf(k);
-        const want = held ? held * STEER : 0; air.vr += Math.max(-46 * dt, Math.min(46 * dt, want - air.vr));
+        const rc = fx * r.x + fy * r.y, want = held ? held * STEER : Math.max(-STEER, Math.min(STEER, (Math.round(rc) - rc) * 9)); air.vr += Math.max(-46 * dt, Math.min(46 * dt, want - air.vr));
         if (held) face = held;
         air.vg += GRAV * dt;
         let nx = fx + r.x * air.vr * dt, ny = fy + r.y * air.vr * dt;
@@ -256,7 +266,7 @@
         nx = fx + g.x * air.vg * dt; ny = fy + g.y * air.vg * dt;
         if (bodyHits(nx, ny, g, r)) { const down = air.vg > 0; air.vg = down ? 0 : 0.5; if (down) { landAt(); return; } } else { fx = nx; fy = ny; }
         const c = cellAt(m, Math.round(fx), Math.round(fy));
-        if (hazard(c) || (c === 'E' && upright(k))) { air = null; p = { x: Math.round(fx), y: Math.round(fy) }; fx = p.x; fy = p.y; finish({ dead: hazard(c), won: c === 'E' }); }
+        if (hazard(c) || (c === 'E' && upright(m, k))) { air = null; p = { x: Math.round(fx), y: Math.round(fy) }; fx = p.x; fy = p.y; finish({ dead: hazard(c), won: c === 'E' }); }
       }
       function doTurn(d, fromQueue) {
         if (!idle()) { if (!fromQueue && !air && !ending && !done) queued = { fn: () => doTurn(d, true), until: clock + 0.25 }; return; }
@@ -441,13 +451,15 @@
           ctx.fillStyle = col.dark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.4)';
           D.roundRect(ctx, x * s + s * 0.16, y * s + s * 0.12, s * 0.68, s * 0.18, s * 0.09); ctx.fill();
         }
-        const open = upright(k);
+        const open = upright(m, k);
         for (let y = 0; y < m.H; y++) for (let x = 0; x < m.W; x++) {
           const c = m.cells[y][x];
           if (hazard(c)) spikes(x * s, y * s, s, c, col);
           else if (c === 'E') {
-            const x0 = x * s, y0 = y * s, won = ending && ending.type === 'won';
+            const won = ending && ending.type === 'won';
             ctx.save(); ctx.globalAlpha = open ? 1 : 0.5;
+            ctx.translate((x + 0.5) * s, (y + 0.5) * s); ctx.rotate(-m.doorK * Math.PI / 2); ctx.translate(-(x + 0.5) * s, -(y + 0.5) * s);
+            const x0 = x * s, y0 = y * s;
             ctx.fillStyle = col.dark ? 'rgba(0,0,0,0.3)' : 'rgba(80,50,20,0.14)'; D.roundRect(ctx, x0 + s * 0.2, y0 + s * 0.1, s * 0.6, s * 0.9, s * 0.14); ctx.fill();
             ctx.fillStyle = won ? col.good : (open ? col.accent : col.ink2); D.roundRect(ctx, x0 + s * 0.22, y0 + s * 0.06, s * 0.56, s * 0.88, s * 0.14); ctx.fill();
             ctx.fillStyle = 'rgba(255,255,255,0.28)'; D.roundRect(ctx, x0 + s * 0.3, y0 + s * 0.14, s * 0.4, s * 0.16, s * 0.08); ctx.fill();
