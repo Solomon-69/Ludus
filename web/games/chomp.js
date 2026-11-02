@@ -151,7 +151,7 @@
       let modeIdx = 0, modeT = 0, fright = 0, eatChain = 0;
       let pac, ghosts, pops = [], particles = [], shake = 0, lay = null, catcher = null;
 
-      const ghostBase = () => [5.6, 6.6, 7.3][L0] + Math.min(1.2, (level - 1) * 0.3);
+      const ghostBase = () => ([5.6, 6.6, 7.3][L0] + Math.min(1.2, (level - 1) * 0.3)) * 0.82;   // chasers 18 % slower (2 Nov 2026)
       const pacSpeed = () => 7.4 + Math.min(1, (level - 1) * 0.2);
       const frightTime = () => Math.max(6, [18, 15, 12][L0] - (level - 1) * 1);   // plenty of time to hunt the chasers down
 

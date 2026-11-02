@@ -364,7 +364,6 @@
           });
           ctx.globalAlpha = 1;
           const pc = cellsOf(cur);
-          const pivot = pc[Math.min(2, pc.length - 1)];
           const born = Math.min(1, (now - (cur.spawnT || 0)) / 140);
           const rotK = Math.min(1, (now - lastRot) / 120);
           const squash = api.reduceMotion ? 1 : D.lerp(0.9, 1, D.ease.outBack(rotK));
@@ -377,7 +376,7 @@
             const px = L.ox + x * c, py = L.oy + (y - HIDDEN) * c;
             ctx.save(); ctx.translate(px + c / 2, py + c / 2);
             const s = (api.reduceMotion ? 1 : D.ease.outBack(born)) * squash; ctx.scale(s, s);
-            block(-c / 2, -c / 2, c, COLORS[cur.type], pieceAlpha, x === pivot[0] && y === pivot[1] ? now / 900 : 0);
+            block(-c / 2, -c / 2, c, COLORS[cur.type], pieceAlpha, 0);
             ctx.restore();
           });
         }

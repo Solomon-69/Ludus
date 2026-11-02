@@ -7,10 +7,10 @@
 
 <h1>Ludus</h1>
 
-<p><b>44 little games in your menu bar. Take a little break.</b></p>
+<p><b>45 little games in your menu bar. Take a little break.</b></p>
 
 <p>
-  <a href="https://github.com/Solomon-69/Ludus/releases/latest"><img alt="Version 1.12.50" src="https://img.shields.io/badge/version-1.12.50-d97757?style=flat-square"></a>
+  <a href="https://github.com/Solomon-69/Ludus/releases/latest"><img alt="Version 1.12.51" src="https://img.shields.io/badge/version-1.12.51-d97757?style=flat-square"></a>
   <img alt="macOS 14 or later" src="https://img.shields.io/badge/macOS-14%2B-1f1d1a?style=flat-square&logo=apple&logoColor=white">
   <img alt="Windows 10 or 11" src="https://img.shields.io/badge/Windows-10%20%7C%2011-1f1d1a?style=flat-square">
 </p>
@@ -53,7 +53,7 @@ It is free, source-available, works fully offline by default and collects nothin
 
 ## Features
 
-Ludus puts 44 small, polished games one click away. Here is what is inside.
+Ludus puts 45 small, polished games one click away. Here is what is inside.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/showcase/ludus-2-dark.png">
@@ -203,7 +203,7 @@ brew install --cask ludus   # not available yet
 | Group | Games |
 | --- | --- |
 | **Arcade** (beat your best) | Blocks, Brick Break, Chomp, Hammer Climb, Garden Defence, Flap Through, Rock Blaster, Sky Raiders, Snake, Sky Hop, Stack, City Swallow, Land Claim, Worm Arena, Map Hunt, balloon-fusing tower-defence game |
-| **Puzzle** | 2048, Crate Push, Five Letters, Minefield, Memory, Solitaire, Sweet Match, Sudoku, Flag Quiz, Mosaic Hunt, Clue Spotter, Tongue Twister |
+| **Puzzle** | 2048, Crate Push, Five Letters, Minefield, Memory, Solitaire, Sweet Match, Sudoku, Flag Quiz, Mosaic Hunt, Clue Spotter, Tongue Twister, Turn Room |
 | **Duel** (you against the computer) | Chess, Dots and Boxes, Dead Centre, Four in a Row, Last Wire, Ultimate Tic-Tac-Toe, Sword Duel, Hex, Rock Paper Scissors, Wall Race, Pop Duel, stick-figure brawler |
 | **Same laptop** (two people, one keyboard) | Air Hockey, Paddle Duel, Tag, Tank Arena, plus the arcade games with a vs Friend mode |
 | **Online, 2-4 players** | Tag, Land Claim, City Swallow, Worm Arena, Map Hunt, Clue Spotter |

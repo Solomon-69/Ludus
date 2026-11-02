@@ -3,6 +3,11 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.51 (2 Nov 2026)
+- New game: Turn Room (Puzzle). Turn the whole room to change which way is down, then walk, fall and reach the door. 12 rooms, spikes, undo-free restarts with R.
+- Pac-Man: the chasers are a little slower.
+- Tetris: the small star inside each falling block is gone.
+
 ## 1.12.50 (2 Nov 2026)
 - Smooth scrolling everywhere you can scroll in Ludus (All games, Settings, the room card), the same gentle glide as the website. Off with Reduce motion.
 - Settings: "Share with a friend" now has a Copy link button that copies the Ludus download page link (always the newest version, Mac and Windows), instead of sending the app file by AirDrop or Messages.
