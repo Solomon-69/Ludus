@@ -3,6 +3,11 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.45 (2 Nov 2026)
+- Geo Guess map: more detail from further out (roads, towns, woods, places), smoother zooming, and the maximised map no longer covers the top row.
+- Games fill the panel: the tap-to-start pill floats over the board, so there is no gap under Sky Hop.
+- Shorter control hints on four games give the board 15 px more room.
+
 ## 1.12.44 (2 Nov 2026)
 - Covers can no longer stay empty: each one is checked after drawing, redrawn when it scrolls into view or the panel is shown again, and falls back to a plain tinted cover if its drawing ever fails (Chess and Sky Raiders were blank on Windows). The Windows self-test now fails if any cover is blank.
 - The vs Bot / vs Friend switch is bigger, easier to hit, and its highlight glides across with the smooth spring.
