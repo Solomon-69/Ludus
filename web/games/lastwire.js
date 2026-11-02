@@ -75,7 +75,7 @@
 
   Ludus.register({
     id: 'lastwire', name: 'Last Wire', tag: 'Duel', tint: '#d1495b', versus: true, online: { min: 2, max: 2 },
-    hint: 'Click a wire (or <kbd>↑</kbd><kbd>↓</kbd> + <kbd>Space</kbd>) to cut. <kbd>S</kbd> then a wire scans it and its neighbours. Cutting the live wire loses the round. Bot or vs Friend (take turns on one keyboard)',
+    hint: 'Click a wire (or <kbd>↑</kbd><kbd>↓</kbd> + <kbd>Space</kbd>) to cut. <kbd>S</kbd> scans a wire and its neighbours. The live wire loses the round.',
     _logic: logic,
     art(ctx, w, h) {
       const D = Ludus.draw;

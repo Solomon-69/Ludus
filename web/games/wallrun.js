@@ -134,7 +134,7 @@
 
   Ludus.register({
     id: 'wallrun', name: 'Wall Race', aka: 'Wall Run', tag: 'Duel', tint: GREEN, versus: true, online: { min: 2, max: 2 },
-    hint: 'Reach the top row first. Click a dot or use <kbd>←</kbd><kbd>↑</kbd><kbd>→</kbd><kbd>↓</kbd> to step. Click a groove to place a wall (6 each), <kbd>R</kbd> or right-click turns it. vs Friend: take turns, Player 2 races to the bottom',
+    hint: 'Reach the top row first. Click a dot or use <kbd>←↑→↓</kbd> to step, click a groove to place a wall (6 each), <kbd>R</kbd> turns it.',
     _rules: { blank, clone, legalMoves, dist, wallOk, apply, rankWalls, chooseAction, S, G },
     art(ctx, w, h) {
       const n = 5, cell = h * 0.13, gap = cell * 0.3, size = n * cell + (n - 1) * gap, ox = (w - size) / 2, oy = (h - size) / 2;
