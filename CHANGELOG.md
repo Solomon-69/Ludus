@@ -3,6 +3,9 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.61 (2 Nov 2026)
+- Online: smooth again with the panel closed. On newer macOS a closed panel let Ludus run only about half of each second (measured 6 beats a second), so the host sent in bursts and every screen in the room stuttered. During a room game the page now waits in an invisible window of its own and keeps full speed (measured 53 beats a second).
+
 ## 1.12.60 (2 Nov 2026)
 - Turn Room: the story now follows the original Rotate: a rogue voice runs the test rooms, a cat appears by the door from room 7 and leads you out, the voice tries to talk you out of following it, and at the exit it says you will come back.
 - Turn Room: you walk right up to a block until you touch it, instead of stopping half a tile short. This works the same against every block and wall.

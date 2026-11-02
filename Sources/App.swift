@@ -119,9 +119,46 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
         }
         if on, liveActivity == nil {
             liveActivity = ProcessInfo.processInfo.beginActivity(options: [.userInitiated, .latencyCritical], reason: "Online game in progress")
+            if !popover.isShown { park() }
         } else if !on, let a = liveActivity {
             ProcessInfo.processInfo.endActivity(a); liveActivity = nil
+            unpark()
         }
+    }
+
+    /// While a room game runs with the panel closed, the page stays in a window of its own, off the screen and invisible.
+    /// A page with no window counts as hidden, and newer macOS then runs it only about half of each second however the
+    /// settings above are set: the host sent in bursts and every screen in the room stuttered (measured 2 Nov 2026).
+    private var parkWindow: NSWindow?
+    private func park() {
+        guard webView.window == nil || webView.window === parkWindow else { return }
+        let size = webView.frame.size
+        let win = parkWindow ?? {
+            let w = NSPanel(contentRect: NSRect(origin: .zero, size: size), styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+            w.isReleasedWhenClosed = false; w.hasShadow = false; w.ignoresMouseEvents = true; w.isOpaque = false
+            w.backgroundColor = .clear; w.alphaValue = 0.01
+            w.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenAuxiliary]
+            w.contentView = NSView(frame: NSRect(origin: .zero, size: size))
+            parkWindow = w
+            return w
+        }()
+        let screen = NSScreen.screens.first?.frame ?? .zero
+        win.setFrame(NSRect(x: screen.minX - size.width - 200, y: screen.minY - size.height - 200, width: size.width, height: size.height), display: false)
+        webView.removeFromSuperview()
+        webView.frame = NSRect(origin: .zero, size: size)
+        win.contentView?.addSubview(webView)
+        let occlusion = NSSelectorFromString("_setWindowOcclusionDetectionEnabled:")
+        if webView.responds(to: occlusion) { webView.perform(occlusion, with: false) }
+        win.orderFrontRegardless()
+    }
+    private func unpark() {
+        guard let win = parkWindow, webView.window === win, let container = popover.contentViewController?.view else { return }
+        webView.removeFromSuperview()
+        webView.frame = container.bounds
+        container.addSubview(webView)
+        let occlusion = NSSelectorFromString("_setWindowOcclusionDetectionEnabled:")
+        if webView.responds(to: occlusion) { webView.perform(occlusion, with: true) }
+        win.orderOut(nil)
     }
 
     /// Runs before the page's own scripts: hands over saved scores/settings and the Mac's state.
@@ -632,6 +669,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
 
     private func openPopover(settings: Bool = false) {
         guard let button = popoverAnchor() else { return }
+        unpark()
         PanelGroup.announceOpen()   // close our other menu bar apps' panels
         bounceIcon()
         wide = false   // Ludus always opens on All games, so never at a wide game's landscape size
@@ -688,6 +726,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
             return
         }
         webView.evaluateJavaScript("window.ludusClosed && ludusClosed()")
+        if liveActivity != nil { park() }
     }
 
     /// Menu bar icon: the Ludus mark, a solid controller with the d-pad and a diamond of four face buttons cut out
@@ -817,6 +856,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
             }
             webView.evaluateJavaScript("window.__ludusTestMuted=true") { _, _ in }
             appendLog("\(Date()) mute \(webView.responds(to: sel))\n")
+        case "livetest", "livetest0":
+            // Panel closed during a room game: how many beats per second the page still gets (livetest0 = without the parking window).
+            let parkIt = command == "livetest"
+            setLive(true)
+            if !parkIt { unpark() }
+            webView.evaluateJavaScript("window.__lt=[];window.__ltw&&window.__ltw.terminate();const u=URL.createObjectURL(new Blob(['setInterval(()=>postMessage(0),16)']));window.__ltw=new Worker(u);window.__ltw.onmessage=()=>__lt.push(performance.now());")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 6) { [weak self] in
+                self?.webView.evaluateJavaScript("(()=>{const t=__lt.filter(x=>x>performance.now()-4000);const g=[];for(let i=1;i<t.length;i++)g.push(t[i]-t[i-1]);g.sort((a,b)=>a-b);return JSON.stringify({perSec:(t.length/4).toFixed(1),p50:g[g.length>>1]|0,p90:g[Math.floor(g.length*.9)]|0,max:g[g.length-1]|0,vis:document.visibilityState})})()") { result, _ in
+                    self?.appendLog("\(Date()) \(command) parked=\(self?.webView.window === self?.parkWindow) \(result as? String ?? "nil")\n")
+                    self?.setLive(false)
+                }
+            }
         case "state":
             webView.evaluateJavaScript("window.ludusState && ludusState()") { [weak self] result, _ in
                 self?.appendLog("\(Date()) \(result as? String ?? "nil")\n")
