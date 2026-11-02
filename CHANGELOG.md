@@ -6,6 +6,9 @@ All notable changes to Ludus. Versions follow the app's version number (`Info.pl
 ## 1.12.48 (2 Nov 2026)
 - Rejoin on the Last party card now works on the first press for old parties. Before, if the old room was still kept behind All games but had gone stale (the Mac slept, the connection was stuck reconnecting, or the host had gone quiet), the first press went back into that dead room and only a second press really rejoined. Now Rejoin only goes back to a kept room that is still working; otherwise it rejoins the party straight away.
 
+## 1.12.48 (2 Nov 2026)
+- Map Hunt: moving along the street no longer shows a loading circle. The old picture stays and the next one fades in over it (a little slower, 0.45 s). The circle only appears for the first picture, or if a picture takes over 1.5 s.
+
 ## 1.12.47 (2 Nov 2026)
 - Sky Raiders cover: deep navy space with bigger raiders, three bunkers and a few stars, so it stands out in both the light and dark theme (it was cream on cream).
 

@@ -456,7 +456,7 @@
         const spots = cfg.move !== 'move' ? [] : item.next.slice(0, 1).concat(item.prev.slice(0, 1)).map(nb => arrowSpot(item, nb));
         return { type: 'equirectangular', panorama: item.src, hotSpots: spots, autoLoad: true, crossOrigin: 'anonymous' };
       }
-      const NO_UI = { showControls: false, showFullscreenCtrl: false, showZoomCtrl: false, compass: false, mouseZoom: true, hfov: 90, minHfov: 50, maxHfov: 110, pitch: 0, yaw: 0, disableKeyboardCtrl: true, sceneFadeDuration: 250, friction: 0.1, touchPanSpeedCoeffFactor: 1, autoRotate: 0 };
+      const NO_UI = { showControls: false, showFullscreenCtrl: false, showZoomCtrl: false, compass: false, mouseZoom: true, hfov: 90, minHfov: 50, maxHfov: 110, pitch: 0, yaw: 0, disableKeyboardCtrl: true, sceneFadeDuration: 450, friction: 0.1, touchPanSpeedCoeffFactor: 1, autoRotate: 0 };
       // One picture load at a time: Pannellum breaks ('Cannot set properties of undefined') when a scene is swapped while
       // the previous picture is still downloading, so a new request waits for the current one to finish.
       let busy = false, queued = null, activeReq = null, rebuilt = 0;
@@ -497,7 +497,10 @@
         const prevScene = curScene, id = 's' + (++sceneN);
         const hd = keepHeading ? heading : item.az;
         const yaw = view ? view.yaw : wrap180(hd - item.az), pitch = view ? view.pitch : viewer ? viewer.getPitch() : 0, hfov = view ? view.hfov : viewer ? viewer.getHfov() : 90;
-        loadEl.hidden = false; busy = true;
+        // Moving along the street: no loading circle, the old picture stays and the new one fades in over it. The circle
+        // only shows for the first picture, or when a picture is really slow (over 1.5 s).
+        busy = true;
+        if (!viewer) loadEl.hidden = false; else later(() => { if (token === loadToken && busy) loadEl.hidden = false; }, 1500);
         let fin = false;
         const done = ok => {
           if (fin || token < rebuilt) return; fin = true; busy = false; activeReq = null;
