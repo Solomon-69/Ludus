@@ -3,6 +3,11 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.60 (2 Nov 2026)
+- Turn Room: the story now follows the original Rotate: a rogue voice runs the test rooms, a cat appears by the door from room 7 and leads you out, the voice tries to talk you out of following it, and at the exit it says you will come back.
+- Turn Room: you walk right up to a block until you touch it, instead of stopping half a tile short. This works the same against every block and wall.
+- Turn Room: you come down from a jump more slowly than you go up, and dropping off a ledge falls smoothly instead of sliding down fast.
+
 ## 1.12.59 (2 Nov 2026)
 - Turn Room: the bottom line now tells a story, one line per room: someone is watching you, they need your mind, and they were once where you are.
 - Turn Room: every door stands on a wall and opens only when it looks the right way up (you would stand on its floor). No more standing in a door that will not open.

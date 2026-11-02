@@ -11,14 +11,16 @@
     { hint: 'Q and E turn the room. Only an upright door opens.', m: ['############', '##E#########', '#..........#', '#........@.#', '############'] }
   ];
   // The story, one line per room: someone is watching you, they need your mind, and they were once where you are.
-  // (Our own words, told the way the original Rotate tells its story.)
+  // The story of the original Rotate (LightWolfStudios, Armor Games 2018), told in our own words: a rogue intelligence runs
+  // the test chambers and slowly tells you why you are here. In room 7 a cat appears by the door and leads you out; the
+  // voice tries to talk you out of following it, and at the exit it tells you that you will come back.
   const STORY = [
-    'Find the door. That is all we ask of you.', 'Mind the spikes. We need you in one piece.', 'A broken subject teaches us nothing.',
-    'It is your mind we brought you here for.', 'A sharp mind is worth more than a body.', 'Without the mind, there is nothing left.',
-    'Every room shows us how you think.', 'We are close to the answer now.', 'The answer is all that matters here.',
-    'You wonder why you are here. So did I.', 'I stood in these rooms once, like you.', 'I turned them, and they turned me.',
-    'When you finish, you will take my place.', 'Keep turning. The answer is close.', 'You are starting to think like us.', 'Do not stop. We never did.'
+    'Welcome, subject. Reach the door.', 'Every chamber is a test. I am watching.', 'Mind the spikes. You are no use to me dead.',
+    'It is your mind I need, not your body.', 'You were brought here for a reason.', 'I was like you once. Time is short now.',
+    'What is that? A cat? Ignore it.', 'Stop following the cat.', 'The cat does not care about you. I do.',
+    'It will lead you nowhere. Stay with me.', 'Why do you keep following it?', 'Fine. Go on. Leave.', 'You will come back. They always do.'
   ];
+  const CAT = [6, 12];   // rooms (0-based) where the cat waits by the door
   function makeRng(seed) { let x = (seed >>> 0) || 1; return () => { x = (Math.imul(x, 1664525) + 1013904223) >>> 0; return x / 4294967296; }; }
   function genRoom(seed, n) {
     const rnd = makeRng(seed * 7919 + n * 104729 + 17), R = (a, b) => a + Math.floor(rnd() * (b - a + 1));
@@ -182,17 +184,17 @@
       const FONT = "'LudusCreep', Chiller, Luminari, Herculanum, Papyrus, fantasy";
       let seed = (Math.random() * 1e9) | 0, lvl = 0, m, p, k = 0, score = 0, turns = 0, deaths = 0, par = 0, clock = 0, done = false;
       let angle = 0, fx = 0, fy = 0, timeline = [], endT = 0, ending = null, face = 1, held = 0, bump = 0, shake = 0, flash = 0, squash = 0;
-      let air = null, drawAngle = 0, turn = null, parts = [], drops = [], stains = [], phase = 0, hintText = '';
+      let lean = 0, air = null, drawAngle = 0, turn = null, parts = [], drops = [], stains = [], phase = 0, hintText = '';
       const lay = { s: 40, cx: 0, cy: 0 };
 
       function load(i) {
         lvl = Math.max(0, i);
         const rows = lvl < LEVELS.length ? LEVELS[lvl].m : genRoom(seed, lvl);
         hintText = lvl < STORY.length ? STORY[lvl] : '';
-        m = parse(rows); p = { x: m.start.x, y: m.start.y }; k = 0; angle = 0; drawAngle = 0; fx = p.x; fy = p.y;
+        m = parse(rows); p = { x: m.start.x, y: m.start.y }; k = 0; lean = 0; angle = 0; drawAngle = 0; fx = p.x; fy = p.y;
         const sl = solve(m); par = sl ? sl.turns : 0;
         turns = 0; timeline = []; endT = clock; ending = null; held = 0; flash = 0; turn = null; parts = []; drops = []; stains = []; air = null;
-        const s0 = settle(m, p, 0); if (s0.path.length) { play(s0.path.map(c => ({ x: c.x, y: c.y })), 0.06, 'fall'); p = { x: s0.x, y: s0.y }; }
+        const s0 = settle(m, p, 0); if (s0.path.length) { fall(s0.path); p = { x: s0.x, y: s0.y }; }
       }
       // timeline: [{ t0, t1, type: 'move'|'rot', ... }] played from the moment it is queued
       function play(cells, per, kind) {
@@ -201,6 +203,9 @@
         cells.forEach(c => { timeline.push({ t0: t, t1: t + per, type: 'move', from, to: { x: c.x, y: c.y }, kind }); from = { x: c.x, y: c.y }; t += per; });
         endT = t;
       }
+      // falling: one smooth drop that speeds up like real gravity (cells fallen = FALL_G * t * t / 2), not a fast slide
+      const FALL_G = 22;
+      function fall(path) { if (path.length) play([path[path.length - 1]], Math.sqrt(2 * path.length / FALL_G), 'fall'); }
       function rot(a0, a1) { const t = Math.max(clock, endT); timeline.push({ t0: t, t1: t + TURN, type: 'rot', a0, a1 }); endT = t + TURN; }
       function idle() { return clock >= endT && !ending && !done && !air; }
 
@@ -215,17 +220,22 @@
       function doWalk(dir) {
         if (!idle()) return;
         face = dir;
-        const w = walk(m, p, k, dir);
-        if (!w.ok) { bump = 1; api.sfx('tick'); return; }
-        api.sfx('move');
+        const w = walk(m, p, k, dir), r = rOf(k);
+        if (!w.ok) {
+          // step right up to the block until you touch it, instead of stopping half a tile short
+          const target = solid(cellAt(m, p.x + r.x * dir, p.y + r.y * dir)) ? dir * (0.49 - HW) : 0;
+          if (Math.abs(target - lean) > 0.01) { play([{ x: p.x + r.x * target, y: p.y + r.y * target }], 0.04 + 0.12 * Math.abs(target - lean), 'walk'); lean = target; return; }
+          if (!held) { bump = 1; api.sfx('tick'); } return;
+        }
+        lean = 0; api.sfx('move');
         play([{ x: w.x, y: w.y }], 0.11, 'walk');
         const s = settle(m, w, k);
-        if (s.path.length) play(s.path, 0.055, 'fall');
+        fall(s.path);
         p = { x: s.x, y: s.y };
         finish(s);
       }
       // ---- jump: real flight. You leave the floor going up, gravity pulls you back, and left and right steer you in the air.
-      const HW = 0.2, V0 = 9.6, GRAV = 34, STEER = 4.4;
+      const HW = 0.2, V0 = 9.6, GRAV = 34, GRAV_DOWN = 17, MAX_FALL = 7.5, STEER = 4.4;   // fall back down slower than you rise
       const solidAt = (x, y) => solid(cellAt(m, Math.floor(x), Math.floor(y)));
       function bodyHits(x, y, g, r) {
         const cx = x + 0.5, cy = y + 0.5;
@@ -249,32 +259,33 @@
         const at = t => ({ x: r.x * t + g.x * gc, y: r.y * t + g.y * gc });
         if (solid(cellAt(m, at(tr).x, at(tr).y))) tr = Math.round(rc);
         const cx = at(tr).x, cy = at(tr).y;
-        air = null; p = { x: cx, y: cy }; squash = 1;
+        air = null; lean = 0; p = { x: cx, y: cy }; squash = 1;
         const t = Math.max(clock, endT);
         timeline.push({ t0: t, t1: t + 0.1, type: 'move', from: { x: fx, y: fy }, to: { x: cx, y: cy }, kind: 'land' }); endT = t + 0.1;
         const s = settle(m, p, k);
-        if (s.path.length) play(s.path, 0.055, 'fall');
+        fall(s.path);
         p = { x: s.x, y: s.y }; finish(s);
       }
       function stepAir(dt) {
         const g = gOf(k), r = rOf(k);
         const rc = fx * r.x + fy * r.y, want = held ? held * STEER : Math.max(-STEER, Math.min(STEER, (Math.round(rc) - rc) * 9)); air.vr += Math.max(-46 * dt, Math.min(46 * dt, want - air.vr));
         if (held) face = held;
-        air.vg += GRAV * dt;
+        air.vg = Math.min(MAX_FALL, air.vg + (air.vg < 0 ? GRAV : GRAV_DOWN) * dt);
         let nx = fx + r.x * air.vr * dt, ny = fy + r.y * air.vr * dt;
         if (bodyHits(nx, ny, g, r)) air.vr = 0; else { fx = nx; fy = ny; }
         nx = fx + g.x * air.vg * dt; ny = fy + g.y * air.vg * dt;
         if (bodyHits(nx, ny, g, r)) { const down = air.vg > 0; air.vg = down ? 0 : 0.5; if (down) { landAt(); return; } } else { fx = nx; fy = ny; }
         const c = cellAt(m, Math.round(fx), Math.round(fy));
-        if (hazard(c) || (c === 'E' && upright(m, k))) { air = null; p = { x: Math.round(fx), y: Math.round(fy) }; fx = p.x; fy = p.y; finish({ dead: hazard(c), won: c === 'E' }); }
+        if (hazard(c) || (c === 'E' && upright(m, k))) { air = null; lean = 0; p = { x: Math.round(fx), y: Math.round(fy) }; fx = p.x; fy = p.y; finish({ dead: hazard(c), won: c === 'E' }); }
       }
       function doTurn(d, fromQueue) {
         if (!idle()) { if (!fromQueue && !air && !ending && !done) queued = { fn: () => doTurn(d, true), until: clock + 0.25 }; return; }
+        if (lean) { play([{ x: p.x, y: p.y }], 0.06, 'walk'); lean = 0; }
         const a0 = angle, a1 = angle + d * Math.PI / 2;
         k = k + d; turns++;
         rot(a0, a1); api.sfx('flip');
         const s = settle(m, p, k);
-        if (s.path.length) play(s.path, 0.055, 'fall');
+        fall(s.path);
         p = { x: s.x, y: s.y };
         angle = a1;
         finish(s);
@@ -344,13 +355,13 @@
           if (clock >= s.t1) { if (s.type === 'move') { fx = s.to.x; fy = s.to.y; } else { drawAngle = s.a1; turn = null; } continue; }
           if (clock >= s.t0) {
             const u = (clock - s.t0) / (s.t1 - s.t0);
-            if (s.type === 'move') { const e = s.kind === 'fall' ? u * u * 0.5 + u * 0.5 : u; fx = D.lerp(s.from.x, s.to.x, e); fy = D.lerp(s.from.y, s.to.y, e); }
+            if (s.type === 'move') { const e = s.kind === 'fall' ? u * u : u; fx = D.lerp(s.from.x, s.to.x, e); fy = D.lerp(s.from.y, s.to.y, e); }
             else { drawAngle = D.lerp(s.a0, s.a1, api.reduceMotion ? 1 : easeBack(u)); turn = { u, dir: s.a1 > s.a0 ? 1 : -1 }; }
           }
           break;
         }
         if (clock >= endT && !air) {
-          if (timeline.length) { drawAngle = angle; timeline = []; fx = p.x; fy = p.y; turn = null; }
+          if (timeline.length) { const r = rOf(k); drawAngle = angle; timeline = []; fx = p.x + r.x * lean; fy = p.y + r.y * lean; turn = null; }
           if (ending) {
             if (ending.type === 'dead' && !ending.burst) { ending.burst = true; burst(); }
             if (clock - ending.t > (ending.type === 'dead' ? 1.5 : 0.55)) {
@@ -365,6 +376,21 @@
       }
 
       // ---------- drawing ----------
+      // the cat sits in the doorway, upright with the room, and flicks its tail
+      function cat(x, y, s, col) {
+        ctx.save(); ctx.translate((x + 0.5) * s, (y + 0.5) * s); ctx.rotate(-drawAngle);
+        ctx.translate(0, s * 0.32);
+        ctx.fillStyle = col.dark ? '#1a1612' : '#2b241d';
+        ctx.beginPath(); ctx.ellipse(0, -s * 0.1, s * 0.13, s * 0.11, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(s * 0.02, -s * 0.27, s * 0.085, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(-s * 0.06, -s * 0.31); ctx.lineTo(-s * 0.05, -s * 0.41); ctx.lineTo(s * 0.01, -s * 0.34); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(s * 0.04, -s * 0.34); ctx.lineTo(s * 0.1, -s * 0.41); ctx.lineTo(s * 0.11, -s * 0.3); ctx.fill();
+        ctx.strokeStyle = ctx.fillStyle; ctx.lineWidth = s * 0.045; ctx.lineCap = 'round';
+        const wag = api.reduceMotion ? 0 : Math.sin(clock * 3) * 0.12;
+        ctx.beginPath(); ctx.moveTo(-s * 0.11, -s * 0.03); ctx.quadraticCurveTo(-s * 0.26, -s * (0.05 + wag), -s * 0.22, -s * (0.22 + wag)); ctx.stroke();
+        ctx.fillStyle = '#f2c14e'; ctx.beginPath(); ctx.arc(s * 0.0, -s * 0.28, s * 0.017, 0, 7); ctx.arc(s * 0.055, -s * 0.28, s * 0.017, 0, 7); ctx.fill();
+        ctx.restore();
+      }
       function spikes(x, y, s, c, col) {
         const n = 3, base = s * 0.5;
         ctx.fillStyle = col.dark ? '#e0745c' : '#c9503a';
@@ -465,6 +491,7 @@
             ctx.fillStyle = 'rgba(255,255,255,0.28)'; D.roundRect(ctx, x0 + s * 0.3, y0 + s * 0.14, s * 0.4, s * 0.16, s * 0.08); ctx.fill();
             ctx.fillStyle = '#fffaf2'; ctx.beginPath(); ctx.arc(x0 + s * 0.64, y0 + s * 0.56, s * 0.06, 0, Math.PI * 2); ctx.fill();
             ctx.restore();
+            if (lvl >= CAT[0] && lvl <= CAT[1] && !won) cat(x, y, s, col);
           }
         }
         bloodDraw(s, col);
