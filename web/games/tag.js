@@ -222,8 +222,9 @@
     create(stage, api) {
       const view = api.canvas(), { ctx } = view, friend = api.friend;
       const on = api.online, guest = !!(on && !on.isHost), myId = on ? 'p' + (on.seat + 1) : null;
-      // guests never drive the scene menu (the host picks); they only send their keys
-      const pads = makePads(api, e => phase === 'menu' && (guest || menuKey(e)), () => myId);
+      // guests never drive the scene menu (the host picks): they suggest a scene, which the host sees on its tile
+      const pads = makePads(api, e => phase === 'menu' && (guest ? guestKey(e) : menuKey(e)), () => myId);
+      let mySug = null; const sugs = {};   // guest: the scene I suggested; host: seat id -> suggested scene
       const BASE = [150, 162, 175][api.level];
       let sel = { map: 0, time: 0, rounds: 1, players: 0 }, focus = { row: 1, col: 0 }, clicked = null;
       let map = BUILT[0], mapIdx = 0, round = 0, wins = { p1: 0, p2: 0 }, it = 'p1', firstIt = 'p1', timer = 60, phase = 'menu', phaseT = 0;
@@ -332,9 +333,21 @@
         else if (k === 'Enter' || k === ' ' || k === 'f' || k === '/') { e.preventDefault(); choose(focusItem(menuLayout())); }
         return true;
       }
+      function suggest(item) {
+        if (!item || item.key || !on) return;
+        mySug = item.map; on.send('sug', { m: item.map }); api.sfx('tap');
+      }
+      function guestKey(e) {
+        const k = e.key && e.key.length === 1 ? e.key.toLowerCase() : e.key;
+        const dir = { ArrowUp: [0, -1], w: [0, -1], ArrowDown: [0, 1], s: [0, 1], ArrowLeft: [-1, 0], a: [-1, 0], ArrowRight: [1, 0], d: [1, 0] }[k];
+        if (dir) { e.preventDefault(); moveFocus(dir[0], dir[1]); if (focus.row < 1) focus.row = 1; }
+        else if (k === 'Enter' || k === ' ' || k === 'f' || k === '/') { e.preventDefault(); suggest(focusItem(menuLayout())); }
+        return true;
+      }
       api.on(view.canvas, 'pointerdown', e => {
-        if (phase !== 'menu' || guest) return;
+        if (phase !== 'menu') return;
         const r = view.canvas.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top, L = menuLayout();
+        if (guest) { L.tiles.forEach((t, ci) => { if (x >= t.x && x <= t.x + t.w && y >= t.y && y <= t.y + t.h) { focus = { row: 1 + Math.floor(ci / L.rows[1].length), col: ci % L.rows[1].length }; suggest(t); } }); return; }
         L.rows.forEach((row, ri) => row.forEach((item, ci) => {
           if (x >= item.x && x <= item.x + item.w && y >= item.y && y <= item.y + item.h) {
             // Scene tiles: first click selects (orange ring), a second click on the same tile opens it.
@@ -357,13 +370,11 @@
       }
       function drawMenu(col) {
         const L = menuLayout(), w = view.w, f = focusItem(L);
-        if (guest) {   // online: the host picks the scene
-          D.fitText(ctx, label('p1') + ' is choosing a scene', w / 2, view.h / 2 - 12, w - 40, 17, col.ink, 800, 12);
-          D.fitText(ctx, ids.length + ' players in the room', w / 2, view.h / 2 + 14, w - 40, 12, col.ink2, 650, 10);
-          return;
-        }
-        D.text(ctx, 'Choose a scene', w / 2, 22, 17, col.ink, 800);
-        L.chips.forEach(c => {
+        if (guest) {   // online: the host picks; you can suggest a scene
+          D.text(ctx, 'Suggest a scene', w / 2, 22, 17, col.ink, 800);
+          D.fitText(ctx, mySug === null ? label('p1') + ' picks. Tap a scene to suggest it.' : 'Sent to ' + label('p1') + '. Tap another to change it.', w / 2, 50, w - 40, 12.5, col.ink2, 650, 10);
+        } else D.text(ctx, 'Choose a scene', w / 2, 22, 17, col.ink, 800);
+        if (!guest) L.chips.forEach(c => {
           if (c.glabel) { ctx.font = '700 12px ui-rounded, system-ui, sans-serif'; const lx = c.gx + (c.lw || 72) - 10, lt = ctx.measureText(c.glabel).width; D.fitText(ctx, c.glabel, lx - Math.min(lt, (c.lw || 72) - 12) / 2, c.y + c.h / 2, (c.lw || 72) - 12, 12, col.ink2, 700, 10); }
           const on = sel[c.key] === c.val, foc = c === f;
           D.roundRect(ctx, c.x, c.y, c.w, c.h, 14); ctx.fillStyle = on ? col.accent : (col.dark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)'); ctx.fill();
@@ -387,7 +398,15 @@
           const name = t.map >= 0 ? MAPS[t.map].name : 'Random', note = t.map >= 0 ? MAPS[t.map].note : 'New map each round';
           D.fitText(ctx, name, t.w / 2, th + 25, t.w - 8, Math.max(9.5, Math.min(13.5, t.w / 8.5)), col.ink, 750, 8.5);
           D.fitText(ctx, note, t.w / 2, th + 43, t.w - 8, Math.max(8.5, Math.min(11, t.w / 10.5)), col.ink2, 600, 8);
-          if (sel.map === t.map && !foc) { ctx.fillStyle = col.accent; ctx.beginPath(); ctx.arc(t.w - 12, 13, 4, 0, 7); ctx.fill(); }
+          if (!guest && sel.map === t.map && !foc) { ctx.fillStyle = col.accent; ctx.beginPath(); ctx.arc(t.w - 12, 13, 4, 0, 7); ctx.fill(); }
+          // suggestions: a name tag on the tile (host sees who suggested it; the guest sees their own pick)
+          const who = guest ? (mySug === t.map ? ['Your pick'] : []) : Object.keys(sugs).filter(id => sugs[id] === t.map && ids.includes(id)).map(label);
+          if (who.length) {
+            const txt = who.join(', '), fs = 10.5; ctx.font = '750 ' + fs + 'px ui-rounded, system-ui, sans-serif';
+            const bw = Math.min(t.w - 16, ctx.measureText(txt).width + 16);
+            D.roundRect(ctx, 10, 10, bw, 20, 10); ctx.fillStyle = col.accent; ctx.fill();
+            D.fitText(ctx, txt, 10 + bw / 2, 20.5, bw - 10, fs, '#fffaf3', 750, 8);
+          }
           ctx.restore();
         });
       }
@@ -1123,6 +1142,10 @@
           onState: applyState
         });
         if (on.isHost) {
+          on.on('sug', (d, seat) => {
+            if (phase !== 'menu' || !d || !Number.isInteger(d.m) || d.m < -1 || d.m >= MAPS.length) return;
+            sugs['p' + (seat + 1)] = d.m; api.sfx('tap');
+          });
           on.onLeave(seat => {   // a player left: the match carries on without them (the app ends it below two players)
             const id = 'p' + (seat + 1); if (!ids.includes(id) || ids.length <= 1) return;
             ids = ids.filter(x => x !== id); players = players.filter(p => p.id !== id);

@@ -1009,7 +1009,8 @@
     L.native('playing', { id: null }); L.native('wide', { on: false });
   }
 
-  const quitHome = () => { L.sfx('back'); goHome('quit'); };
+  // In a room game, leaving goes back to that party's lobby (still in the room), never to the Online page.
+  const quitHome = () => { L.sfx('back'); if (online && online.session && online.started && online.session.leaveGame()) return; goHome('quit'); };
   $('backBtn').onclick = quitHome;
   $('leaveBtn').onclick = quitHome;
   $('quitBtn').onclick = quitHome;

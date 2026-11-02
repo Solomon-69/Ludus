@@ -3,6 +3,11 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.62 (2 Nov 2026)
+- Online: Leave during a game takes everyone back to that party's lobby (still in the room), not to the Online page. Works for the host and for players who joined.
+- Tag online: players who joined see every scene and can tap one to suggest it; the host sees their name on that scene. Before, they only saw a line of text.
+- Online page: the cards lose their raised outer edge, so only two layers remain and the corners run parallel.
+
 ## 1.12.61 (2 Nov 2026)
 - Online: smooth again with the panel closed. On newer macOS a closed panel let Ludus run only about half of each second (measured 6 beats a second), so the host sent in bursts and every screen in the room stuttered. During a room game the page now waits in an invisible window of its own and keeps full speed (measured 53 beats a second).
 

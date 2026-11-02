@@ -659,6 +659,7 @@
       case 'tr': return this._onResult(m);
       case 'sb': return this._onBoard(m);
       case 'lob': return m.c === this.hostCid ? this._toLobbyLocal() : undefined;
+      case 'lg': return this.role === 'host' ? this.leaveGame() : undefined;
       case 'g': return this._onGame(m);
       case 'f': return this._onFast(m);
     }
@@ -957,6 +958,14 @@
   Session.prototype.toLobby = function () {
     if (this.role !== 'host' || !this.ser) return false;
     clearTimeout(this.ser.t1); clearTimeout(this.ser.t2);
+    this.ser = null; this.started = false; this._pub({ t: 'lob' }); this._pub(this._hbObj()); this._emit('lobby', {});
+    return true;
+  };
+  // Leave the game, not the room: everybody goes back to this party's lobby. A guest asks the host, who sends everyone back.
+  Session.prototype.leaveGame = function () {
+    if (!this.started && !this.ser) return false;
+    if (this.role !== 'host') { this._pub({ t: 'lg' }); this._toLobbyLocal(); return true; }
+    if (this.ser) { clearTimeout(this.ser.t1); clearTimeout(this.ser.t2); }
     this.ser = null; this.started = false; this._pub({ t: 'lob' }); this._pub(this._hbObj()); this._emit('lobby', {});
     return true;
   };
