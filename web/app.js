@@ -1229,7 +1229,7 @@
       // The app hands over __LUDUS_INVISIBLE__. Mac: an empty menu bar slot. Windows: no tray icon, Ctrl+Alt+G or the Start menu.
       const win = window.__LUDUS_PLATFORM__ === 'windows';
       const invisibleHelp = v => v
-        ? (win ? 'On: no tray icon. Open Ludus with Ctrl+Alt+G, or from the Start menu' : 'On: hidden in the menu bar. Click the empty space at the far left of your menu bar icons to open')
+        ? (win ? 'On: no tray icon, open with Ctrl+Alt+G' : 'On: hidden, click its empty menu bar spot')
         : (win ? 'Off: the Ludus icon shows in the tray' : 'Off: the Ludus icon shows in the menu bar');
       moreRows.push(liveRow('Invisible icon', invisibleHelp, !!window.__LUDUS_INVISIBLE__,
         set => sw(!!window.__LUDUS_INVISIBLE__, v => { set(v); window.__LUDUS_INVISIBLE__ = v; L.native('invisible', { on: v }); }, 'Invisible icon')));

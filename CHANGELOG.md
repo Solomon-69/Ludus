@@ -3,6 +3,9 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.46 (2 Nov 2026)
+- Settings > More: all three rows are the same height again. The Invisible icon note is shorter, so it fits on one line.
+
 ## 1.12.45 (2 Nov 2026)
 - Geo Guess map: more detail from further out (roads, towns, woods, places), smoother zooming, and the maximised map no longer covers the top row.
 - Games fill the panel: the tap-to-start pill floats over the board, so there is no gap under Sky Hop.
