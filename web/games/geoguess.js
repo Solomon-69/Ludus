@@ -616,8 +616,9 @@
         round = r; phase = 'load'; ready = new Set(); pin = null; moving = false; applyMove();
         resEl.hidden = true; waitEl.hidden = true; setCard(false); hud(true);
         if (miniPin) { miniPin.remove(); miniPin = null; }
-        if (miniMap) { miniMap.setView(25, 10, 1); }
+        // show the map box first: a hidden map cannot move, so the world view is set once it has a size again
         mini.style.display = ''; openMini(false);
+        if (miniMap) { try { miniMap.resize(); } catch (e) {} miniMap.setView(25, 10, 1); requestAnimationFrame(() => { if (!destroyed && miniMap && round === r && !pin && !(snap && snap.map)) { try { miniMap.resize(); } catch (e) {} miniMap.setView(25, 10, 1); } }); }
         guessBtn.disabled = true; guessLabel();
         roundPill.textContent = `Round ${r + 1}/${cfg.rounds}`;
         timerEl.hidden = true; elapsed = 0; lastSec = 99;

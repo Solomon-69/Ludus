@@ -1209,12 +1209,20 @@
       if (typeof window.__LUDUS_DOCK__ === 'boolean') appRows.push(liveRow('Show in Dock', v => v ? 'On: Ludus also shows in the Dock' : 'Off: Ludus stays in the menu bar only', !!window.__LUDUS_DOCK__,
         set => sw(!!window.__LUDUS_DOCK__, v => { set(v); window.__LUDUS_DOCK__ = v; L.native('dock', { on: v }); }, 'Show in Dock')));
     }
-    if (native && window.__LUDUS_PLATFORM__ !== 'windows') {
-      const sh = el('button', 'small-btn', 'Share'); sh.id = 'shareFriend';
-      sh.onclick = () => { const b = sh.getBoundingClientRect(); L.native('share', { x: b.left, y: b.top, w: b.width, h: b.height }); };
-      const shRow = row('Share with a friend', 'Send a copy by AirDrop or Messages', sh);
-      window.ludusShareError = m => { const e = shRow.querySelector('.row-sub'); if (e) e.textContent = m; };
-      appRows.push(shRow);
+    if (native) {
+      // Share with a friend: copies the download page link (always the newest version, Mac and Windows), never the app file
+      const SHARE_URL = 'https://solomon-69.github.io/Mac-Apps/ludus/';
+      const sh = el('button', 'small-btn', 'Copy link'); sh.id = 'shareFriend';
+      let shTimer = 0;
+      const done = () => { L.sfx('copy'); sh.textContent = 'Copied'; clearTimeout(shTimer); shTimer = setTimeout(() => { sh.textContent = 'Copy link'; }, 1500); };
+      const fallback = () => {
+        try {
+          const t = document.createElement('textarea'); t.value = SHARE_URL; t.style.cssText = 'position:fixed;opacity:0;user-select:text;-webkit-user-select:text';
+          document.body.appendChild(t); t.select(); const ok = document.execCommand('copy'); t.remove(); if (ok) done();
+        } catch (e) { /* no clipboard here */ }
+      };
+      sh.onclick = () => { try { navigator.clipboard.writeText(SHARE_URL).then(done, fallback); } catch (e) { fallback(); } };
+      appRows.push(row('Share with a friend', 'Copy the download link to send', sh));
     }
     const reset = el('button', 'small-btn bad', 'Reset');
     reset.onclick = () => {

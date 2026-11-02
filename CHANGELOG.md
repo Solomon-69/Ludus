@@ -3,6 +3,11 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.50 (2 Nov 2026)
+- Smooth scrolling everywhere you can scroll in Ludus (All games, Settings, the room card), the same gentle glide as the website. Off with Reduce motion.
+- Settings: "Share with a friend" now has a Copy link button that copies the Ludus download page link (always the newest version, Mac and Windows), instead of sending the app file by AirDrop or Messages.
+- Map Hunt: the map goes back to the whole world at the start of every round (it could stay zoomed on the last round's place).
+
 ## 1.12.49 (2 Nov 2026)
 - Map Hunt: moving along the street no longer shows a loading circle. The old picture stays and the next one fades in over it (a little slower, 0.45 s). The circle only appears for the first picture, or if a picture takes over 1.5 s.
 
