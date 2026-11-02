@@ -3,6 +3,13 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.57 (2 Nov 2026)
+- Turn Room is now endless: no room count and no progress bar. Clear room after room for a higher score; dying ends the run and your best score is kept. Rooms are made on the spot (each one is solved by the checker first) and get harder as you go.
+- Turn Room: the door only opens when the room is the right way up. A turned room greys the door out.
+- Turn Room: walking no longer climbs a block in your way. You have to jump over it. Jumping is smoother, with a crouch and squash, and a jump or turn pressed mid-step is no longer lost.
+- Turn Room: the red circle left on the spikes after dying is gone (smaller splatter).
+- Turn Room: a new button layout (left and right on the left, turn, jump and turn on the right), the room fills the space (no dead space), and the rotate button next to Pause turns the game wide for a bigger view.
+
 ## 1.12.56 (2 Nov 2026)
 - Turn Room: real jumping. You fly up and fall back with gravity, and the left and right keys steer you in the air.
 - Turn Room: dying now sends you back to room 1 with a score of 0 (R still restarts just the room). The body parts fade away after a moment instead of staying in the spikes.
