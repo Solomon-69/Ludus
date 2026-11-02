@@ -224,11 +224,12 @@ svg { display: block; }
 .scores b { color: var(--ink); font-variant-numeric: tabular-nums; font-weight: 650; display: inline-block; min-width: 1ch; }
 .scores b.bump { animation: bump 0.35s var(--spring); }
 /* Bot / Friend switch under the game name (board games). */
-.vs-toggle { display: inline-flex; gap: 2px; margin-top: 4px; padding: 2px; border-radius: 999px; background: var(--surface-2); }
+.vs-toggle { position: relative; display: inline-flex; gap: 2px; margin-top: 4px; padding: 3px; border-radius: 999px; background: var(--surface-2); }
+.vs-toggle .seg-thumb { top: 3px; bottom: 3px; left: 3px; border-radius: 999px; pointer-events: none; }
 .vs-toggle[hidden] { display: none; }
-.vs-toggle button { padding: 2px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; color: var(--ink-3);
-  transition: background 0.25s var(--spring), color 0.2s ease, transform 0.2s var(--spring); }
-.vs-toggle button.is-on { background: var(--surface); color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,0.12); }
+.vs-toggle button { position: relative; z-index: 1; padding: 6px 16px; min-height: 30px; border-radius: 999px; font-size: 12.5px; font-weight: 600; color: var(--ink-3);
+  transition: color 0.2s ease, transform 0.2s var(--spring); }
+.vs-toggle button.is-on { color: var(--ink); }   /* the sliding thumb (.seg-thumb) is the highlight, so the switch glides instead of swapping */
 .vs-toggle button:active { transform: scale(0.95); }
 @keyframes bump { 0% { transform: scale(1); } 40% { transform: scale(1.35); color: var(--accent); } 100% { transform: scale(1); } }
 .stage-wrap { position: relative; flex: 1; margin: 0 12px; min-height: 0; }
@@ -840,14 +841,14 @@ svg { display: block; }
 :root { --edge: 4px; --edge-mix: 30%; --raise-ease: cubic-bezier(0.34, 1.56, 0.64, 1); }
 :root:not(.flat)[data-theme="dark"] { --edge-mix: 55%; }
 :root:not(.flat) .btn:not(.ghost), :root:not(.flat) .small-btn, :root:not(.flat) .icon-btn, :root:not(.flat) .card, :root:not(.flat) .mode-tab.is-on, :root:not(.flat) .seg-thumb, :root:not(.flat) .tab-pill,
-:root:not(.flat) .vs-toggle button.is-on, :root:not(.flat) .pick-chips .chip, :root:not(.flat) .lk-btn, :root:not(.flat) .lk-chip, :root:not(.flat) .lk-opt, :root:not(.flat) .ih-guess {
+:root:not(.flat) .pick-chips .chip, :root:not(.flat) .lk-btn, :root:not(.flat) .lk-chip, :root:not(.flat) .lk-opt, :root:not(.flat) .ih-guess {
   --face: var(--surface-2);
   --edge-c: color-mix(in srgb, var(--face) calc(100% - var(--edge-mix)), #000);
   --edge-now: var(--edge);
   --lift: 0px;
 }
 /* faces: each control's own colour */
-:root:not(.flat) .icon-btn, :root:not(.flat) .card, :root:not(.flat) .seg-thumb, :root:not(.flat) .vs-toggle button.is-on, :root:not(.flat) .lk-btn, :root:not(.flat) .lk-opt { --face: var(--surface); }
+:root:not(.flat) .icon-btn, :root:not(.flat) .card, :root:not(.flat) .seg-thumb, :root:not(.flat) .lk-btn, :root:not(.flat) .lk-opt { --face: var(--surface); }
 :root:not(.flat) .btn.primary, :root:not(.flat) .mode-tab.is-on, :root:not(.flat) .tab-pill, :root:not(.flat) .pick-chips .chip.is-on, :root:not(.flat) .lk-chip.on { --face: var(--ink); }
 :root:not(.flat) .small-btn.warm { --face: #E8833A; }
 :root:not(.flat) .ih-guess { --face: #6cb928; }
@@ -856,7 +857,7 @@ svg { display: block; }
 :root:not(.flat) .lk-opt.wrong { --face: var(--bad); }
 :root:not(.flat) .sug-actions .sug-decline { --edge-c: color-mix(in srgb, var(--ink) 20%, transparent); }
 /* thin edges for thumbs that ride inside a track (the track's own padding holds the edge) */
-:root:not(.flat) .seg-thumb, :root:not(.flat) .vs-toggle button.is-on { --edge: 2px; }
+:root:not(.flat) .seg-thumb { --edge: 2px; }
 :root:not(.flat) .mode-tab.is-on, :root:not(.flat) .tab-pill, :root:not(.flat) .pick-chips .chip, :root:not(.flat) .lk-chip { --edge: 3px; }
 :root:not(.flat) .icon-btn.small { --edge: 3px; }
 

@@ -86,7 +86,7 @@
       let net = null;   // host: the guest's mallet keys, already turned into rink directions
       // Rink length follows the stage: portrait keeps the classic 300 x 440 rink; landscape lays it on
       // its side and stretches it to fill the width (P1 goal left, P2 goal right).
-      const lengthFor = (w, h) => w > h ? Math.max(PH, Math.min(MAX_H, Math.round((W + 16) * (w - 16) / Math.max(1, h - 64) - 16))) : PH;
+      const lengthFor = (w, h) => (w > h && !api.online) ? Math.max(PH, Math.min(MAX_H, Math.round((W + 16) * (w - 16) / Math.max(1, h - 64) - 16))) : PH;
       // Untransformed stage size (the panel's slide-in scale would skew getBoundingClientRect).
       const dims = () => [stage.clientWidth || view.w, stage.clientHeight || view.h];
       let H = lengthFor(...dims());
@@ -411,7 +411,7 @@
           D.text(ctx, `${score.p1} : ${score.p2}`, 0, 13, 11.5, col.ink2, 700);
           ctx.restore();
         } else if (phase === 'ready') {
-          ctx.globalAlpha = 0.5 + 0.5 * Math.sin(clock * 9); D.text(ctx, 'Ready', RW / 2, RH / 2 - 54, 13, col.ink2, 700); ctx.globalAlpha = 1;
+          ctx.globalAlpha = 0.5 + 0.5 * Math.sin(clock * 9); D.text(ctx, 'Ready', RW / 2, RH / 2 - 20, 13, col.ink2, 700); ctx.globalAlpha = 1;
         }
         ctx.restore();
       }

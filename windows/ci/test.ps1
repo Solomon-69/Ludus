@@ -21,7 +21,7 @@ Check $r.ready 'WebView2 loaded the games page'
 Check (($r.cards -ge 33) -and ($r.cards -eq [int]$r.games)) "every game has a card (cards $($r.cards), games $($r.games))"
 Check ($r.filter -eq 'All') "opens on All games (tab: $($r.filter))"
 $c1 = $r.check | ConvertFrom-Json
-Check (($c1.covers.cards -ge 33) -and ($c1.covers.bad.Count -eq 0)) "every cover drawn true to shape ($($c1.covers.cards) covers, worst $($c1.covers.worst), bad: $($c1.covers.bad -join '; '))"
+Check (($c1.covers.cards -ge 33) -and ($c1.covers.bad.Count -eq 0) -and (-not $c1.covers.blank)) "every cover drawn true to shape ($($c1.covers.cards) covers, worst $($c1.covers.worst), blank: $($c1.covers.blank -join ","), bad: $($c1.covers.bad -join '; '))"
 Check $r.panelVisible 'panel opened (--test-open)'
 Check ($null -ne $r.tray) 'tray icon has a position on screen'
 Check $r.hotKey 'Ctrl+Alt+G registered'
@@ -161,7 +161,7 @@ foreach ($case in $cases) {
   Check (([math]::Abs($pg.w - 400) -le 1) -and ([math]::Abs($pg.h - 600) -le 1)) "${tag}: page laid out at its designed 400x600 (got $($pg.w)x$($pg.h)), not squashed"
   Check ($pg.sw -le $pg.w + 1) "${tag}: no sideways overflow"
   $cs = $rs.check | ConvertFrom-Json
-  Check (($cs.covers.cards -ge 33) -and ($cs.covers.bad.Count -eq 0)) "${tag}: covers true to shape (worst $($cs.covers.worst), bad: $($cs.covers.bad -join '; '))"
+  Check (($cs.covers.cards -ge 33) -and ($cs.covers.bad.Count -eq 0) -and (-not $cs.covers.blank)) "${tag}: covers true to shape (worst $($cs.covers.worst), bad: $($cs.covers.bad -join '; '))"
   Start-Sleep -Seconds 1
   Save-Screen (Join-Path $Shots ("11-dpi-$tag-desktop.png"))
   $b = $rs.panelBounds
@@ -182,7 +182,7 @@ $pL = Start-App $Exe @('--test-open', "--selftest=$jsonL")
 Check (Wait-File $jsonL 120) 'large run: self-test file written'
 $rL = Get-Content $jsonL -Raw | ConvertFrom-Json
 $cL = $rL.check | ConvertFrom-Json
-Check (($cL.covers.cards -ge 33) -and ($cL.covers.bad.Count -eq 0)) "large run: covers true to shape (worst $($cL.covers.worst), bad: $($cL.covers.bad -join '; '))"
+Check (($cL.covers.cards -ge 33) -and ($cL.covers.bad.Count -eq 0) -and (-not $cL.covers.blank)) "large run: covers true to shape (worst $($cL.covers.worst), bad: $($cL.covers.bad -join '; '))"
 $bL = $rL.panelBounds
 Save-Crop (Join-Path $Shots '12-ludus-large-panel.png') $bL[0] $bL[1] $bL[2] $bL[3]
 Check (Quit-App $Exe 'Ludus') 'large run: clean quit'

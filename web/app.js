@@ -486,20 +486,39 @@
   // cover can never be left stretched or squashed. Sizes come from layout (clientWidth), never from the on-screen box,
   // which a card's slide-in animation scales.
   const artSize = new ResizeObserver(entries => entries.forEach(e => drawArt(e.target)));
+  // A cover must never stay empty (seen on Windows: Chess and Sky Raiders blank in the lists). Painted covers are checked
+  // by sampling the pixels; a blank one, or one whose drawing threw, gets the plain fallback cover and is drawn again
+  // whenever it scrolls into view or the panel is shown.
+  const isBlank = (ctx, w, h) => {
+    try { const d = ctx.getImageData(0, 0, w, h).data; for (let i = 3; i < d.length; i += 4 * 11) if (d[i] > 0) return false; return true; } catch (e) { return false; }
+  };
+  function fallbackArt(ctx, w, h, g) {
+    ctx.save(); ctx.fillStyle = g.tint || '#888'; ctx.globalAlpha = 0.22; ctx.fillRect(0, 0, w, h); ctx.globalAlpha = 1;
+    ctx.fillStyle = g.tint || '#888'; ctx.font = '700 ' + Math.round(h * 0.6) + 'px ui-rounded, system-ui, sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText((g.name || '?').charAt(0), w / 2, h / 2 + h * 0.04); ctx.restore();
+  }
   function drawArt(cv, force) {
     const card = cv.closest('.card'), g = card && L.games.find(x => x.id === card.dataset.id);
     const w = cv.clientWidth, h = cv.clientHeight;
     if (!g || !w || !h) return;
     const dpr = Math.min(3, devicePixelRatio || 1), key = w + 'x' + h + '@' + dpr;
-    if (!force && cv.dataset.drawn === key) return;
-    cv.dataset.drawn = key;
+    if (!force && cv.dataset.drawn === key && !cv.dataset.blank) return;
+    cv.dataset.drawn = key; delete cv.dataset.blank;
     cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
     const ctx = cv.getContext('2d'); ctx.setTransform(cv.width / w, 0, 0, cv.height / h, 0, 0);
-    try { g.art && g.art(ctx, w, h, L.colors()); } catch (e) { /* a broken thumbnail must not break the grid */ }
+    let ok = true;
+    try { g.art && g.art(ctx, w, h, L.colors()); } catch (e) { ok = false; }
+    if (!ok || isBlank(ctx, cv.width, cv.height)) {
+      ctx.setTransform(cv.width / w, 0, 0, cv.height / h, 0, 0); ctx.clearRect(0, 0, w, h); fallbackArt(ctx, w, h, g); cv.dataset.blank = '1';
+    }
   }
+  const artSeen = 'IntersectionObserver' in window ? new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) drawArt(e.target, true); }), { rootMargin: '120px' }) : null;
   function drawCards() {
-    artSize.disconnect();
-    document.querySelectorAll('.card .art canvas').forEach(cv => { artSize.observe(cv); drawArt(cv, true); });
+    artSize.disconnect(); if (artSeen) artSeen.disconnect();
+    const cvs = [...document.querySelectorAll('.card .art canvas')];
+    cvs.forEach(cv => { artSize.observe(cv); if (artSeen) artSeen.observe(cv); drawArt(cv, true); });
+    // Layout can settle after the first draw (cards slide in, the panel resizes): look again, redrawing any blank cover.
+    [250, 900].forEach(ms => setTimeout(() => cvs.forEach(cv => { if (cv.isConnected && cv.dataset.blank) drawArt(cv, true); }), ms));
   }
   (function watchScale() {   // moving to a screen with another scale (or zooming) redraws the covers sharply
     const mq = matchMedia('(resolution: ' + (devicePixelRatio || 1) + 'dppx)');
@@ -571,6 +590,9 @@
     syncOnlineBar(g);
     if (!g.versus) return;
     const mode = inRoom ? 'online' : ((S.vs && S.vs[g.id]) || g.defaultVs || 'bot') === 'friend' ? 'friend' : 'bot';
+    // One thumb glides under the chosen side (placed without animation the first time, then springs).
+    let vt = box.querySelector('.seg-thumb');
+    if (!vt) { vt = el('div', 'seg-thumb'); box.insertBefore(vt, box.firstChild); try { new ResizeObserver(() => placeVs(box, true)).observe(box); } catch (e) {} }
     box.querySelectorAll('button').forEach(b => {
       if (b.dataset.vs === 'online') b.hidden = true;   // online play lives in the Online section
       const on = b.dataset.vs === mode;
@@ -590,6 +612,15 @@
       };
     });
     if (inRoom && !playing) box.querySelector('[data-vs="online"]').onclick = null;
+    placeVs(box, false);
+  }
+  function placeVs(box, still) {
+    const t = box.querySelector('.seg-thumb'), on = box.querySelector('button.is-on:not([hidden])');
+    if (!t || !on || !on.offsetWidth) return;
+    const first = !t.dataset.placed;
+    if (still || first) t.style.transition = 'none';
+    t.style.width = on.offsetWidth + 'px'; t.style.transform = `translateX(${on.offsetLeft - 3}px)`; t.dataset.placed = '1';
+    if (still || first) { void t.offsetWidth; t.style.transition = ''; }
   }
 
   /* ---------- online rooms ----------
@@ -1351,10 +1382,11 @@
   window.ludusSnapshot = () => { try { return current && current.instance && current.instance.save ? current.instance.save() : null; } catch (e) { return null; } };   // test helper   // test helper: the current room, if any
   // Test helper (Mac harness and the Windows CI self-test): every cover's drawn shape against its shape on screen.
   window.ludusCoverCheck = () => {
-    const out = { cards: 0, worst: 0, bad: [] };
+    const out = { cards: 0, worst: 0, bad: [], blank: [] };
     document.querySelectorAll('#grid .card .art canvas').forEach(cv => {
       const w = cv.clientWidth, h = cv.clientHeight; if (!w || !h) return;
       out.cards++;
+      if (cv.dataset.blank) out.blank.push(cv.closest('.card').dataset.id);
       const d = cv.width && cv.height ? Math.abs((cv.width / cv.height) / (w / h) - 1) : 1;
       out.worst = Math.max(out.worst, Math.round(d * 1000) / 1000);
       if (d > 0.02) out.bad.push(cv.closest('.card').dataset.id + ' ' + cv.width + 'x' + cv.height + ' shown ' + w + 'x' + h);
