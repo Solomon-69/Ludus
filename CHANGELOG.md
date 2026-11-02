@@ -3,6 +3,10 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.58 (2 Nov 2026)
+- Turn Room: no more orange circle while the room turns, and no on-screen buttons. The keys do everything (listed under the game).
+- Turn Room: a cold voice speaks one red line per room at the bottom, in the spirit of the original Rotate ("Wake up. The room is waiting."). Dying shows "Subject lost".
+
 ## 1.12.57 (2 Nov 2026)
 - Turn Room is now endless: no room count and no progress bar. Clear room after room for a higher score; dying ends the run and your best score is kept. Rooms are made on the spot (each one is solved by the checker first) and get harder as you go.
 - Turn Room: the door only opens when the room is the right way up. A turned room greys the door out.

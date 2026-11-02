@@ -10,6 +10,16 @@
     { hint: 'Arrow keys walk. Up jumps.', m: ['#############', '#...........#', '#...........#', '#.@......#..E#', '#############'] },
     { hint: 'Q and E turn the room. Only an upright door opens.', m: ['############', '##E#########', '#..........#', '#........@.#', '############'] }
   ];
+  // A cold voice speaks to you between rooms, one line per room (new lines, in the spirit of the original Rotate).
+  const VOICE = [
+    'Wake up. The room is waiting.', 'Doors only open for those who stand straight.', 'Every wall was once a floor.',
+    'We have watched others fall here.', 'Your mind is the only way out.', 'Do not trust the floor.',
+    'Gravity obeys you. For now.', 'The spikes remember everyone.', 'Curiosity brought you this far.',
+    'We built these rooms for minds like yours.', 'There is no outside. Only the next room.', 'Some of us never stopped turning.',
+    'You are learning. We are taking notes.', 'Think. It is all you have.', 'Up and down are only opinions.',
+    'Someone stood exactly where you stand.', 'The test does not end. It only changes shape.', 'Your hands shake. Ours never did.',
+    'Keep going. We are listening.', 'Every door you open closes another.'
+  ];
   function makeRng(seed) { let x = (seed >>> 0) || 1; return () => { x = (Math.imul(x, 1664525) + 1013904223) >>> 0; return x / 4294967296; }; }
   function genRoom(seed, n) {
     const rnd = makeRng(seed * 7919 + n * 104729 + 17), R = (a, b) => a + Math.floor(rnd() * (b - a + 1));
@@ -168,13 +178,13 @@
       const FONT = "'LudusCreep', Chiller, Luminari, Herculanum, Papyrus, fantasy";
       let seed = (Math.random() * 1e9) | 0, lvl = 0, m, p, k = 0, score = 0, turns = 0, deaths = 0, par = 0, clock = 0, done = false;
       let angle = 0, fx = 0, fy = 0, timeline = [], endT = 0, ending = null, face = 1, held = 0, bump = 0, shake = 0, flash = 0, squash = 0;
-      let air = null, buttons = [], drawAngle = 0, turn = null, parts = [], drops = [], stains = [], phase = 0, hintText = '';
+      let air = null, drawAngle = 0, turn = null, parts = [], drops = [], stains = [], phase = 0, hintText = '';
       const lay = { s: 40, cx: 0, cy: 0 };
 
       function load(i) {
         lvl = Math.max(0, i);
         const rows = lvl < LEVELS.length ? LEVELS[lvl].m : genRoom(seed, lvl);
-        hintText = lvl < LEVELS.length ? LEVELS[lvl].hint : '';
+        hintText = VOICE[lvl % VOICE.length];
         m = parse(rows); p = { x: m.start.x, y: m.start.y }; k = 0; angle = 0; drawAngle = 0; fx = p.x; fy = p.y;
         const sl = solve(m); par = sl ? sl.turns : 0;
         turns = 0; timeline = []; endT = clock; ending = null; held = 0; flash = 0; turn = null; parts = []; drops = []; stains = []; air = null;
@@ -281,15 +291,6 @@
         const key = e.key;
         if ((key === 'ArrowLeft' && held === -1) || (key === 'ArrowRight' && held === 1)) held = 0;
       });
-      api.on(canvas, 'pointerdown', e => {
-        const r = canvas.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
-        const b = buttons.find(b => x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h);
-        if (!b) return;
-        b.act(); if (b.hold) held = b.hold;
-      });
-      const release = () => { held = 0; };
-      api.on(canvas, 'pointerup', release); api.on(canvas, 'pointercancel', release); api.on(canvas, 'pointerleave', release);
-
       const rnd = (a, b) => a + Math.random() * (b - a);
       function moving() {
         if (air) return 'jump';
@@ -344,7 +345,7 @@
             if (ending.type === 'dead' && !ending.burst) { ending.burst = true; burst(); }
             if (clock - ending.t > (ending.type === 'dead' ? 1.5 : 0.55)) {
               if (ending.type === 'dead') {
-                if (!done) { done = true; const cleared = Math.max(0, lvl); api.timeout(() => api.over({ score, title: 'Splat', message: cleared === 1 ? 'You cleared 1 room' : 'You cleared ' + cleared + ' rooms' }), 50); }
+                if (!done) { done = true; const cleared = Math.max(0, lvl); api.timeout(() => api.over({ score, title: 'Subject lost', message: cleared === 1 ? 'You cleared 1 room' : 'You cleared ' + cleared + ' rooms' }), 50); }
                 ending = { type: 'dead', t: clock, burst: true };
               } else { ending = null; load(lvl + 1); }
             }
@@ -354,16 +355,6 @@
       }
 
       // ---------- drawing ----------
-      function roundBtn(x, y, w, h, act, col, text, hold, key) {
-        buttons.push({ x, y, w, h, act, hold });
-        ctx.save();
-        ctx.fillStyle = col.dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.07)';
-        D.roundRect(ctx, x, y, w, h, 14); ctx.fill();
-        ctx.fillStyle = col.ink; ctx.font = '18px ' + FONT; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillText(text, x + w / 2, y + h / 2 + 1);
-        if (key) { ctx.fillStyle = col.ink2; ctx.font = '11px ' + FONT; ctx.textAlign = 'left'; ctx.textBaseline = 'top'; ctx.fillText(key, x + 7, y + 4); }
-        ctx.restore();
-      }
       function spikes(x, y, s, c, col) {
         const n = 3, base = s * 0.5;
         ctx.fillStyle = col.dark ? '#e0745c' : '#c9503a';
@@ -425,19 +416,10 @@
       function render() {
         const w = view.w, h = view.h; if (!m) return;
         const col = Ludus.colors();
-        buttons = [];
         ctx.clearRect(0, 0, w, h);
-        // the bottom bar: walk on the left, turn and jump on the right (works wide or tall)
-        const bh = 48, by = h - bh - 10, gap = 8, pad = 12, wide = w > h * 1.15;
-        const bw = Math.min(wide ? 100 : 80, (w - pad * 2 - gap * 4 - 14) / 5), cg = w - pad * 2 - bw * 5 - gap * 3;
-        roundBtn(pad, by, bw, bh, () => doWalk(-1), col, 'left', -1);
-        roundBtn(pad + bw + gap, by, bw, bh, () => doWalk(1), col, 'right', 1);
-        const rx = w - pad - (bw * 3 + gap * 2);
-        roundBtn(rx, by, bw, bh, () => doTurn(-1), col, 'turn', 0, 'Q');
-        roundBtn(rx + bw + gap, by, bw, bh, () => doJump(), col, 'jump', 0);
-        roundBtn(rx + (bw + gap) * 2, by, bw, bh, () => doTurn(1), col, 'turn', 0, 'E');
+        const by = h - 6;   // no buttons: the keys do everything (listed under the game)
         // the room, turned. It is fitted to the space that is left, and to its turned shape, so no room is wasted.
-        const hintH = hintText ? 26 : 0, topPad = 10, avW = w - 16, avH = by - 8 - topPad - hintH;
+        const hintH = 34, topPad = 10, avW = w - 16, avH = by - topPad - hintH;
         const ca = Math.abs(Math.cos(drawAngle)), sa = Math.abs(Math.sin(drawAngle)), boxW = m.W * ca + m.H * sa, boxH = m.W * sa + m.H * ca;
         const s = Math.max(10, Math.min(64, Math.min(avW / boxW, avH / boxH)));
         lay.s = s; lay.cx = w / 2; lay.cy = topPad + avH / 2;
@@ -482,14 +464,8 @@
         if (!(dead && ending.burst)) person(bx, 0, s, col, tilt);
         ctx.restore();
         ctx.restore();
-        if (turn && !api.reduceMotion) {
-          const R = Math.min(w, h) * 0.2, a1 = -Math.PI / 2 + turn.dir * Math.min(1, turn.u * 1.15) * 4.4;
-          ctx.save(); ctx.globalAlpha = Math.sin(turn.u * Math.PI) * 0.5; ctx.strokeStyle = col.accent; ctx.lineWidth = 6; ctx.lineCap = 'round';
-          ctx.beginPath(); ctx.arc(lay.cx, lay.cy, R, -Math.PI / 2, a1, turn.dir < 0); ctx.stroke();
-          ctx.restore();
-        }
         if (flash > 0) { ctx.fillStyle = 'rgba(201,80,58,' + (flash * 0.18).toFixed(3) + ')'; ctx.fillRect(0, 0, w, h); }
-        if (hintText) { ctx.save(); ctx.font = '17px ' + FONT; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = col.ink2; ctx.fillText(hintText, w / 2, by - 18); ctx.restore(); }
+        if (hintText) { ctx.save(); ctx.font = '18px ' + FONT; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = col.dark ? '#e0745c' : '#b8352a'; ctx.fillText(hintText, w / 2, by - 16); ctx.restore(); }
       }
 
       score = 0;
