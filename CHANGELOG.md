@@ -3,6 +3,9 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.55 (2 Nov 2026)
+- Turn Room: jumping is now one smooth arc (up, over, and down) instead of snapping back to the floor.
+
 ## 1.12.54 (2 Nov 2026)
 - Turn Room: the two turn arrows are redrawn as clean circle arrows (they looked broken).
 

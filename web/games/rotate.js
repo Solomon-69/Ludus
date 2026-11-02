@@ -173,7 +173,7 @@
         p = { x: s.x, y: s.y };
         finish(s);
       }
-      // jump: hop one cell against gravity, then one cell the way you face if that is free, then fall back down
+      // jump: one smooth arc, up and over one cell the way you face if that is free, then down to wherever gravity lets you land
       function doJump() {
         if (!idle()) return;
         const g = gOf(k), r = rOf(k);
@@ -181,12 +181,14 @@
         if (solid(cellAt(m, ux, uy)) || hazard(cellAt(m, ux, uy))) { bump = 1; api.sfx('tick'); return; }
         api.sfx('move');
         let q = { x: ux, y: uy };
-        play([q], 0.14, 'jump');
         const fx2 = ux + r.x * face, fy2 = uy + r.y * face;
-        if (!solid(cellAt(m, fx2, fy2))) { q = { x: fx2, y: fy2 }; play([q], 0.12, 'jump'); }
-        const s = settle(m, q, k);
-        if (s.path.length) play(s.path, 0.055, 'fall');
-        p = { x: s.x, y: s.y };
+        if (!solid(cellAt(m, fx2, fy2))) q = { x: fx2, y: fy2 };
+        const s = settle(m, q, k), end = { x: s.x, y: s.y };
+        const drop = Math.abs(end.x - p.x) * Math.abs(g.x) + Math.abs(end.y - p.y) * Math.abs(g.y);
+        const t = Math.max(clock, endT), dur = 0.46 + 0.05 * Math.max(0, drop);
+        timeline.push({ t0: t, t1: t + dur, type: 'move', from: { x: fx, y: fy }, to: end, kind: 'jump', gx: g.x, gy: g.y });
+        endT = t + dur;
+        p = end;
         finish(s);
       }
       function doTurn(d) {
@@ -274,7 +276,10 @@
           if (clock >= s.t1) { if (s.type === 'move') { fx = s.to.x; fy = s.to.y; } else { drawAngle = s.a1; turn = null; } continue; }
           if (clock >= s.t0) {
             const u = (clock - s.t0) / (s.t1 - s.t0);
-            if (s.type === 'move') { const e = s.kind === 'fall' ? u * u * 0.5 + u * 0.5 : u; fx = D.lerp(s.from.x, s.to.x, e); fy = D.lerp(s.from.y, s.to.y, e); }
+            if (s.type === 'move') {
+              const e = s.kind === 'fall' ? u * u * 0.5 + u * 0.5 : u; fx = D.lerp(s.from.x, s.to.x, e); fy = D.lerp(s.from.y, s.to.y, e);
+              if (s.kind === 'jump') { const hgt = 4 * 1.3 * u * (1 - u); fx -= s.gx * hgt; fy -= s.gy * hgt; }
+            }
             else { drawAngle = D.lerp(s.a0, s.a1, api.reduceMotion ? 1 : easeBack(u)); turn = { u, dir: s.a1 > s.a0 ? 1 : -1 }; }
           }
           break;
@@ -444,7 +449,7 @@
       const restored = !!(api.saved && restore(api.saved));
       if (!restored) load(0);
       api.score(score);
-      if (window.ludusDebug) window.ludusDebug.rotate = () => ({ lvl, score, k, turns, deaths, par, p, busy: clock < endT, ending: ending && ending.type, done });
+      if (window.ludusDebug) window.ludusDebug.rotate = () => ({ fx: +fx.toFixed(2), fy: +fy.toFixed(2), lvl, score, k, turns, deaths, par, p, busy: clock < endT, ending: ending && ending.type, done });
       if (window.ludusDebug) window.ludusDebug.rotateAct = (a) => { if (a === 'L') doWalk(-1); else if (a === 'R') doWalk(1); else if (a === 'cw') doTurn(1); else if (a === 'ccw') doTurn(-1); else if (a === 'go') load(+arguments[1] || 0); };
       if (window.ludusDebug) window.ludusDebug.rotateLoad = i => load(i);
       api.loop(dt => { update(dt); render(); });
