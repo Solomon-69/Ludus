@@ -999,3 +999,7 @@ svg { display: block; }
 .seat-acts { margin-top: 0; }
 .seat-act:not(.is-yes) { border: 0; padding: 0; background: none; font: 650 10.5px/1.2 var(--font-round); }
 .seat-act:not(.is-yes):hover:not(:disabled) { background: none; text-decoration: underline; text-underline-offset: 2px; }
+
+/* 1.12.62: Online cards are two layers only (card + what sits in it). The raised edge under them was a third, outer layer
+   whose corner did not run parallel with the card's, so it is gone here; inner corners stay card radius minus padding. */
+:root:not(.flat) .online-page .op-head, :root:not(.flat) .online-page .op-card, :root:not(.flat) .online-page .party-card { box-shadow: inset 0 0 0 1px var(--box-line); }
