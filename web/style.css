@@ -285,7 +285,7 @@ svg { display: block; }
 .btn.ghost { background: transparent; color: var(--ink-2); }
 
 /* Settings */
-.settings-body { flex: 1; overflow-y: auto; padding: 4px 14px 18px; scrollbar-width: none; }
+.settings-body { position: relative; flex: 1; overflow-y: auto; padding: 4px 14px 18px; scrollbar-width: none; }
 .settings-body::-webkit-scrollbar { display: none; }
 .group-label { font-size: 11px; line-height: 13px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-2); margin: 5px 4px 4px; }
 .group-label:first-child { margin-top: 14px; }
@@ -1003,3 +1003,8 @@ svg { display: block; }
 /* 1.12.62: Online cards are two layers only (card + what sits in it). The raised edge under them was a third, outer layer
    whose corner did not run parallel with the card's, so it is gone here; inner corners stay card radius minus padding. */
 :root:not(.flat) .online-page .op-head, :root:not(.flat) .online-page .op-card, :root:not(.flat) .online-page .party-card { box-shadow: inset 0 0 0 1px var(--box-line); }
+
+/* The keyboard highlight in Settings: a soft pill that glides from row to row. */
+.kbd-pill { position: absolute; left: 0; top: 0; z-index: 2; pointer-events: none; border-radius: 12px; opacity: 0; background: color-mix(in srgb, var(--ink) 9%, transparent);
+  transition: transform 0.45s var(--spring), height 0.3s var(--spring), width 0.3s var(--spring), opacity 0.15s; }
+.reduce .kbd-pill { transition: opacity 0.1s; }

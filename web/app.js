@@ -1045,11 +1045,62 @@
         e.preventDefault();
         if (!$('pauseSheet').hidden) resume(); else pause();
       }
-    } else if (view === 'settings' && e.key === 'Escape') closeSettings();
+    } else if (view === 'settings') {
+      if (e.key === 'Escape') closeSettings(); else settingsKey(e);
+    }
   });
   window.addEventListener('pagehide', persist);
 
   // ---------- settings ----------
+  // ---------- settings by keyboard ----------
+  // Up and Down glide a soft pill through every visible setting (wrapping); Left and Right or Space and Return change the
+  // highlighted one; Esc goes back (above). A mouse press or typing in a text field hands control back.
+  let kbdIdx = -1, kbdPillEl = null;
+  function kbdRows() { return [...$('settingsBody').querySelectorAll('.row')].filter(r => r.getClientRects().length && !r.closest('[hidden]')); }
+  function kbdReset() { kbdIdx = -1; kbdPillEl = null; }
+  function kbdPaint(animate) {
+    const body = $('settingsBody'), rows = kbdRows(), r = rows[kbdIdx];
+    if (!r) { if (kbdPillEl) kbdPillEl.style.opacity = '0'; return; }
+    if (!kbdPillEl || !kbdPillEl.isConnected) { kbdPillEl = el('div', 'kbd-pill'); kbdPillEl.setAttribute('aria-hidden', 'true'); body.appendChild(kbdPillEl); animate = false; }
+    const b = body.getBoundingClientRect(), q = r.getBoundingClientRect(), p = kbdPillEl;
+    if (!animate) p.style.transition = 'none';
+    p.style.height = q.height + 'px'; p.style.width = q.width + 'px';
+    p.style.transform = 'translate(' + (q.left - b.left + body.scrollLeft) + 'px,' + (q.top - b.top + body.scrollTop) + 'px)'; p.style.opacity = '1';
+    if (!animate) { void p.offsetWidth; p.style.transition = ''; }
+    const pad = 12;   // scroll the row into view, with a little air above and below
+    if (q.top < b.top + pad) body.scrollTop -= (b.top + pad - q.top);
+    else if (q.bottom > b.bottom - pad) body.scrollTop += (q.bottom - (b.bottom - pad));
+  }
+  function kbdStep(dir) {
+    const rows = kbdRows(); if (!rows.length) return;
+    kbdIdx = kbdIdx < 0 ? (dir > 0 ? 0 : rows.length - 1) : (kbdIdx + dir + rows.length) % rows.length;
+    kbdPaint(true); L.sfx('click');
+  }
+  function kbdAct(key) {
+    const r = kbdRows()[kbdIdx]; if (!r) return;
+    const step = key === 'ArrowLeft' ? -1 : 1;
+    const pickIn = btns => { if (!btns.length) return; const i = Math.max(0, btns.findIndex(b => b.classList.contains('is-on'))); btns[(i + step + btns.length) % btns.length].click(); };
+    const sg = r.querySelector('.seg'), sws = r.querySelectorAll('.swatch'), vol = r.querySelector('.vol:not([hidden]) .vol-track'), sw = r.querySelector('.switch');
+    if (r.classList.contains('more-head')) { const open = r.parentElement.classList.contains('is-open'); if (key === 'ArrowLeft' ? open : key === 'ArrowRight' ? !open : true) r.click(); }
+    else if (sg) pickIn([...sg.querySelectorAll('button')]);
+    else if (sws.length) pickIn([...sws]);
+    else if (vol && (key === 'ArrowLeft' || key === 'ArrowRight')) vol.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
+    else if (sw) sw.click();
+    else { const b = r.querySelector('button'); if (b && (key === ' ' || key === 'Enter')) b.click(); }
+    requestAnimationFrame(() => kbdPaint(true)); setTimeout(() => kbdPaint(true), 520);   // rows can change height or open (More)
+  }
+  function settingsKey(e) {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    const t = document.activeElement;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;   // typing is left alone
+    const blur = () => { if (t && t.blur && t !== document.body) t.blur(); };
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); blur(); kbdStep(e.key === 'ArrowDown' ? 1 : -1); }
+    else if (kbdIdx >= 0 && (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === ' ' || e.key === 'Enter')) {
+      e.preventDefault(); if (e.repeat && (e.key === ' ' || e.key === 'Enter')) return; blur(); kbdAct(e.key);
+    }
+  }
+  $('settingsBody').addEventListener('pointerdown', () => { kbdIdx = -1; if (kbdPillEl) kbdPillEl.style.opacity = '0'; });
+
   function toast(text) {
     let t = document.querySelector('.toast');
     if (!t) { t = document.createElement('div'); t.className = 'toast'; $('app').appendChild(t); }
@@ -1182,7 +1233,7 @@
   const MORE_CLOSE_MS = 460;   // the More card's closing animation (style.css .more-box)
   let settingsFrom = 'home';   // the screen the gear was pressed on: Back returns there (a game stays paused behind it)
   function renderSettings() {
-    const body = $('settingsBody'); body.innerHTML = '';
+    const body = $('settingsBody'); body.innerHTML = ''; kbdReset();
     const sw8 = el('div', 'swatches');
     ACCENTS.forEach(c => {
       const b = el('button', 'swatch' + (S.accent === c ? ' is-on' : '')); b.style.setProperty('--c', c); b.setAttribute('aria-label', 'Accent ' + c);

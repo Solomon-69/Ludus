@@ -3,6 +3,9 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.66 (3 Nov 2026)
+- Settings by keyboard (Mac and Windows): Up and Down glide a soft highlight through every setting, wrapping top to bottom and into More settings. Left and Right or Space and Return change the highlighted one (switches flip, options step to the next, volume nudges, More opens and closes). Esc goes back. It stays out of the way while you type in a text field or use the mouse.
+
 ## 1.12.65 (3 Nov 2026)
 - Turn Room: falling is faster (closer to the original Rotate) and turning the room is a little quicker.
 
