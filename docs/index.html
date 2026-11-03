@@ -4,16 +4,16 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Ludus: little games for little breaks</title>
-<meta name="description" content="Ludus is a free menu bar and tray app for Mac and Windows with quick, offline mini games: arcade, puzzles, duels against the computer and two-player games.">
+<meta name="description" content="Ludus is a free menu bar and tray app for Mac and Windows with 45 quick mini games: arcade, puzzles, duels against the computer and two-player games. Works offline.">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" content="#f4efe6" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#1b1814" media="(prefers-color-scheme: dark)">
 <meta property="og:title" content="Ludus">
 <meta property="og:description" content="Take a little break. Free for Mac and Windows.">
 <meta property="og:type" content="website">
-<link rel="icon" type="image/png" href="img/icon-light.png">
-<link rel="apple-touch-icon" href="img/icon-light.png">
-<meta property="og:image" content="img/og.png">
+<link rel="icon" type="image/png" href="pg/img/icon-light.png">
+<link rel="apple-touch-icon" href="pg/img/icon-light.png">
+<meta property="og:image" content="https://solomon-69.github.io/Ludus/pg/img/og.png">
 <!--
   Download links point at the newest GitHub Release. Replace Solomon-69/Ludus (it appears in the
   three links marked data-repo below, and in the footer) with the real GitHub user and repository,
@@ -25,8 +25,8 @@
     --bg-2: #ebe4d7;
     --surface: #fffcf7;
     --ink: #201c17;
-    --ink-2: #5b5348;
-    --ink-3: #6a6155;
+    --ink-2: #6b6256;
+    --ink-3: #8f857a;
     --line: rgba(32, 28, 23, 0.10);
     --accent: #d97757;
     --accent-deep: #b9573a;
@@ -46,8 +46,8 @@
       --bg-2: #24201b;
       --surface: #2a2621;
       --ink: #f3ede3;
-      --ink-2: #cbc1b2;
-      --ink-3: #b2a899;
+      --ink-2: #b5aa9b;
+      --ink-3: #8c8276;
       --line: rgba(255, 245, 230, 0.09);
       --accent-deep: #e48a6c;
       --accent-soft: rgba(217, 119, 87, 0.18);
@@ -118,18 +118,19 @@
   .stagebox { position: relative; display: grid; place-items: center; }
   @media (max-width: 880px) { .stagebox .glow { inset: -4% 0; } }
   .glow { position: absolute; inset: -6% -10%; pointer-events: none; background: radial-gradient(closest-side, var(--accent-soft), transparent 92%); -webkit-mask-image: radial-gradient(closest-side, #000 55%, transparent 100%); mask-image: radial-gradient(closest-side, #000 55%, transparent 100%); }
-  .menubar { position: relative; width: min(400px, 100%); }
+  .menubar { position: relative; width: min(500px, 100%); }
   /* menu bar: three columns with equal outer sides, so the icon sits on the panel's centre line (like the real app) */
-  .menubar .strip { height: 30px; border-radius: 10px; background: color-mix(in srgb, var(--ink) 7%, transparent); display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 14px; padding: 0 14px; }
-  .menubar .strip .side { display: flex; align-items: center; gap: 14px; }
+  .menubar .strip { height: 36px; border-radius: 13px; background: linear-gradient(180deg, rgba(255,255,255,.92), rgba(255,255,255,.66)); border: 1px solid rgba(255,255,255,.75); box-shadow: 0 1px 0 rgba(255,255,255,.9) inset, 0 -1px 0 rgba(40,28,16,.05) inset, 0 10px 24px -12px rgba(40,28,16,.38), 0 1px 3px rgba(40,28,16,.10); display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 14px; padding: 0 16px; }
+  @media (prefers-color-scheme: dark) { .menubar .strip { background: linear-gradient(180deg, rgba(72,66,58,.92), rgba(48,44,39,.78)); border-color: rgba(255,245,230,.14); box-shadow: 0 1px 0 rgba(255,245,230,.12) inset, 0 12px 26px -12px rgba(0,0,0,.7); } }
+  .menubar .strip .side { display: flex; align-items: center; gap: 16px; color: color-mix(in srgb, var(--ink) 78%, transparent); }
+  .menubar .strip .side svg { width: 15px; height: 15px; }
   .menubar .strip .side.l { justify-content: flex-end; }
   .menubar .strip .side.r { justify-content: flex-start; }
   .menubar .strip .side.r .clock { font-style: normal; margin-left: auto; font: 600 12px/1 var(--font); color: color-mix(in srgb, var(--ink) 70%, transparent); white-space: nowrap; }
-  .menubar .strip span { width: 16px; height: 5px; border-radius: 3px; background: color-mix(in srgb, var(--ink) 18%, transparent); }
   .menubar .strip .pad { width: 22px; height: 18px; color: var(--ink); background: none; display: grid; place-items: center; }
   .menubar .strip .pad svg { width: 20px; height: 13px; }
   /* the popover arrow: tip under the icon, base on the panel's top edge */
-  .shot .nub { position: absolute; left: 50%; top: 1px; width: 22px; height: 11px; transform: translate(-50%, -100%); z-index: 1; color: var(--panel); filter: drop-shadow(0 -1px 0 color-mix(in srgb, var(--ink) 12%, transparent)); }
+  .shot .nub { position: absolute; left: 50%; top: 2px; width: 38px; height: 18px; transform: translate(-50%, -100%); z-index: 1; color: var(--panel); filter: drop-shadow(0 -1px 0 color-mix(in srgb, var(--ink) 12%, transparent)); }
   .shot .nub svg { width: 100%; height: 100%; }
   /* Windows: the tray sits under the panel */
   .taskbar { display: none; position: relative; margin-top: 12px; height: 44px; border-radius: 10px; background: color-mix(in srgb, var(--ink) 7%, transparent); grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; padding: 0 12px; font-family: "Segoe UI Variable Text", "Segoe UI", var(--font); }
@@ -143,6 +144,11 @@
   html[data-os="windows"] .menubar .strip { display: none; }
   html[data-os="windows"] .taskbar { display: grid; }
   html[data-os="windows"] .shot .nub { display: none; }
+  .winpic { display: none !important; }
+  html[data-os="windows"] .winpic { display: block !important; }
+  html[data-os="windows"] .macpic { display: none !important; }
+  .macpic img { filter: drop-shadow(0 -1px 1px rgba(60, 40, 20, .22)) drop-shadow(0 18px 30px rgba(20, 16, 40, .13)) drop-shadow(0 1px 3px rgba(20, 16, 40, .08)) !important; }
+  @media (prefers-color-scheme: dark) { .macpic img { filter: drop-shadow(0 -1px 1px rgba(255, 245, 230, .18)) drop-shadow(0 18px 30px rgba(0, 0, 0, .55)) !important; } }
 
   /* Mac / Windows switch */
   .os-switch { display: inline-flex; gap: 2px; padding: 3px; border-radius: 12px; background: color-mix(in srgb, var(--ink) 6%, transparent); border: 1px solid var(--line); margin: 0 0 18px; }
@@ -158,7 +164,7 @@
   .install .card .yours { display: none; margin-left: auto; font: 600 12px/1 var(--font); color: var(--accent-deep); background: var(--accent-soft); padding: 5px 8px; border-radius: 999px; }
   .install .card.mine .yours { display: inline-block; }
   /* previews: solid screens with a soft shadow that never ends in a line (a filter, not a clipped picture) */
-  .shot picture img, .gallery picture img { filter: drop-shadow(0 18px 28px rgba(60, 36, 20, .16)) drop-shadow(0 2px 4px rgba(60, 36, 20, .08)); }
+  .shot picture img, .gallery picture img { filter: drop-shadow(0 26px 38px rgba(60, 36, 20, .26)) drop-shadow(0 3px 6px rgba(60, 36, 20, .14)); }
   @media (prefers-color-scheme: dark) { .shot picture img, .gallery picture img { filter: drop-shadow(0 18px 30px rgba(0, 0, 0, .5)) drop-shadow(0 2px 4px rgba(0, 0, 0, .3)); } }
 
   .appicon { display: block; width: 96px; height: 96px; margin: 0 0 18px -6px; animation: iconIn 1s var(--spring) both; }
@@ -170,7 +176,7 @@
   .shot picture img { transform: perspective(1200px) rotateX(var(--tx, 0deg)) rotateY(var(--ty, 0deg)); transition: transform .6s var(--ease-out); }
   @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
   .menubar .strip .pad { position: relative; }
-  .menubar .strip .pad::after { content: ""; position: absolute; inset: -5px -6px; border-radius: 7px; background: color-mix(in srgb, var(--ink) 12%, transparent); z-index: -1; animation: pill .5s var(--ease-out) both .1s; }
+  .menubar .strip .pad::after { content: ""; position: absolute; inset: -6px -8px; border-radius: 8px; background: color-mix(in srgb, var(--ink) 11%, transparent); box-shadow: inset 0 1px 0 rgba(255,255,255,.5); z-index: -1; animation: pill .5s var(--ease-out) both .1s; }
   @keyframes pill { from { opacity: 0; transform: scale(.7); } to { opacity: 1; transform: none; } }
 
   .gallery { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; align-items: start; }
@@ -181,6 +187,17 @@
   .gallery figcaption { text-align: center; font-size: 14px; color: var(--ink-2); margin-top: 6px; }
   .gallery figure:nth-child(2) { margin-top: 36px; }
   @media (max-width: 800px) { .gallery figure:nth-child(2) { margin-top: 0; } }
+
+  .gallery.welcome { max-width: 900px; margin: 0 auto 44px; }
+  .gallery.welcome figure:nth-child(2) { margin-top: 0; }
+  .gallery.welcome img { border-radius: 22px; box-shadow: var(--shadow-lift); }
+  .mapfig { margin: 44px auto 0; max-width: 760px; }
+  .mapfig img { display: block; width: 100%; height: auto; }
+  .mapfig figcaption { margin-top: 12px; color: var(--ink-2); font-size: 14px; text-align: center; }
+  @media (max-width: 800px) { .gallery.welcome { max-width: 300px; } }
+  .points.four { grid-template-columns: repeat(2, 1fr); }
+  @media (max-width: 800px) { .points.four { grid-template-columns: 1fr; } }
+  .dlnote { margin: 10px 0 0; font-size: 13px; color: var(--ink-3); }
 
   /* ---------- sections ---------- */
   section { padding: 76px 0; }
@@ -199,11 +216,12 @@
   .group { margin-top: 34px; }
   .group h3 { display: flex; align-items: baseline; gap: 10px; margin: 0 0 14px; font: 700 20px/1.2 var(--font-round); }
   .group h3 small { font: 500 14px/1 var(--font); color: var(--ink-3); }
-  .games { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; list-style: none; margin: 0; padding: 0; }
-  .game { display: flex; gap: 12px; align-items: flex-start; background: var(--surface); border-radius: 14px; padding: 12px 14px; box-shadow: var(--shadow); transition: transform .35s var(--spring), box-shadow .3s; }
+  .games { display: grid; grid-template-columns: repeat(auto-fill, minmax(236px, 1fr)); gap: 12px; list-style: none; margin: 0; padding: 0; }
+  .game { display: flex; flex-direction: column; gap: 10px; background: var(--surface); border-radius: 16px; padding: 8px 8px 12px; box-shadow: var(--shadow); transition: transform .35s var(--spring), box-shadow .3s; }
   .game:hover { transform: translateY(-2px); box-shadow: var(--shadow-lift); }
-  .game i { flex: none; display: block; width: 72px; height: 52px; border-radius: 12px; overflow: hidden; background: var(--t, var(--accent)); margin-top: 2px; box-shadow: inset 0 0 0 1px rgba(0,0,0,.06); }
+  .game i { flex: none; display: block; width: 100%; aspect-ratio: 221 / 78; border-radius: 11px; overflow: hidden; background: var(--t, var(--accent)); box-shadow: inset 0 0 0 1px rgba(0,0,0,.06); }
   .game i img { display: block; width: 100%; height: 100%; }
+  .game div { padding: 0 6px; }
   .game b { display: block; font-size: 15px; font-weight: 650; }
   .game span { display: block; font-size: 13.5px; color: var(--ink-2); line-height: 1.45; }
   .note { margin-top: 26px; font-size: 13.5px; color: var(--ink-3); }
@@ -242,6 +260,9 @@
     .js .reveal { opacity: 1; transform: none; }
   }
 </style>
+<link rel="stylesheet" href="assets/site.css">
+<script src="assets/site.js" defer></script>
+<script>try{history.scrollRestoration='manual'}catch(e){}if(!location.hash){scrollTo(0,0);addEventListener('pageshow',function(){scrollTo(0,0)});addEventListener('load',function(){scrollTo(0,0);setTimeout(function(){scrollTo(0,0)},60)})}</script>
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
@@ -255,16 +276,16 @@
 
 <header class="top" id="top">
   <div class="wrap bar">
-    <a class="brand" href="#top" aria-label="Ludus, back to top">
-      <span class="mark"><picture><source media="(prefers-color-scheme: dark)" srcset="img/icon-dark.png"><img src="img/icon-light.png" width="34" height="34" alt=""></picture></span>
+    <a class="brand" href="https://solomon-69.github.io/Mac-Apps/" aria-label="Ludus, back to all apps">
+      <span class="mark"><picture><source media="(prefers-color-scheme: dark)" srcset="pg/img/icon-dark.png"><img src="pg/img/icon-light.png" width="34" height="34" alt=""></picture></span>
       Ludus
     </a>
     <nav aria-label="Sections">
       <ul>
+        <li class="opt"><a href="#new">Details</a></li>
         <li class="opt"><a href="#games">Games</a></li>
         <li><a href="#install">Install</a></li>
         <li class="opt"><a href="#faq">FAQ</a></li>
-        <li><a href="https://github.com/Solomon-69/Ludus" target="_blank" rel="noopener" data-repo>GitHub</a></li>
       </ul>
     </nav>
   </div>
@@ -274,8 +295,8 @@
   <div class="wrap hero">
     <div>
       <picture class="appicon">
-        <source media="(prefers-color-scheme: dark)" srcset="img/icon-dark.png">
-        <img src="img/icon-light.png" width="96" height="96" alt="The Ludus app icon">
+        <source media="(prefers-color-scheme: dark)" srcset="pg/img/icon-dark.png">
+        <img src="pg/img/icon-light.png" width="96" height="96" alt="The Ludus app icon">
       </picture>
       <span class="eyebrow"><i aria-hidden="true"></i>Free for Mac and Windows</span>
       <h1>Ludus</h1>
@@ -283,29 +304,33 @@
       <p class="lede">A small panel of games that lives in your menu bar or system tray. Click the controller, play a round of Snake, Sudoku or a quick duel against the computer, then get back to work. Your place is saved when you close it.</p>
       <div class="os-switch" role="group" aria-label="Show the Mac or Windows version"><button type="button" data-os-pick="mac" aria-pressed="true"><svg aria-hidden="true"><use href="#apple"/></svg>Mac</button><button type="button" data-os-pick="windows" aria-pressed="false"><svg aria-hidden="true"><use href="#windows"/></svg>Windows</button></div>
       <div class="downloads">
-        <a class="btn" id="dl-mac" data-os="mac" href="https://github.com/Solomon-69/Ludus/releases/latest/download/Ludus.dmg" target="_blank" rel="noopener" data-repo>
+        <a class="btn" id="dl-mac" data-os="mac" href="https://github.com/Solomon-69/Ludus/releases/latest/download/Ludus.dmg" data-repo>
           <svg class="os" aria-hidden="true"><use href="#apple"/></svg>
           <span>Download for Mac<small>macOS 14 or later, any Mac</small></span>
           <svg class="arrow" aria-hidden="true"><use href="#arrow"/></svg>
         </a>
-        <a class="btn" id="dl-win" data-os="windows" href="https://github.com/Solomon-69/Ludus/releases/latest/download/Ludus-windows.zip" target="_blank" rel="noopener" data-repo>
+        <a class="btn" id="dl-win" data-os="windows" href="https://github.com/Solomon-69/Ludus/releases/latest/download/Ludus-windows.zip" data-repo>
           <svg class="os" aria-hidden="true"><use href="#windows"/></svg>
           <span>Download for Windows<small>Windows 10 or 11, 64-bit</small></span>
           <svg class="arrow" aria-hidden="true"><use href="#arrow"/></svg>
         </a>
       </div>
-      <p class="reqs"><b>Mac:</b> macOS 14 Sonoma or later on Apple silicon (M1 or newer). <b>Windows:</b> Windows 10 or 11, 64-bit. Both are free and open source. Everything works offline except Play online, Map Hunt and Mosaic Hunt.</p>
+      <p class="reqs"><b>Mac:</b> macOS 14 Sonoma or later on any Mac (Apple silicon or Intel). <b>Windows:</b> Windows 10 or 11, 64-bit. Both are free. Everything works offline except Play online, Map Hunt photos and updates. Version 1.12.61.</p>
+      <p class="dlnote">The download button always gives the newest build.</p>
     </div>
 
     <div class="stagebox">
       <div class="glow" aria-hidden="true"></div>
       <div class="menubar">
-        <div class="strip" aria-hidden="true"><div class="side l"><span></span><span></span></div><b class="pad"><svg viewBox="0 0 88 55"><use href="#ludus-mark"/></svg></b><div class="side r"><span></span><i class="clock">Wed 9:41</i></div></div>
+        <div class="strip" aria-hidden="true"><div class="side l"><svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6" fill="none" stroke="currentColor" stroke-width="2"/><path d="M15 15l5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><svg viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M2 9a15 15 0 0 1 20 0M5.5 12.5a10 10 0 0 1 13 0M9 16a5 5 0 0 1 6 0"/><circle cx="12" cy="19.5" r="1.4" fill="currentColor"/></svg><svg viewBox="0 0 24 24" style="width:19px"><rect x="2" y="7" width="17" height="10" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><rect x="4.5" y="9.5" width="10" height="5" rx="1" fill="currentColor"/><path d="M21 10.5v3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div><b class="pad"><svg viewBox="0 0 88 55"><use href="#ludus-mark"/></svg></b><div class="side r"><i class="clock">Wed 9:41</i></div></div>
         <div class="shot" id="heroShot">
-          <i class="nub" aria-hidden="true"><svg viewBox="0 0 22 11"><path fill="currentColor" d="M0 11C5 11 8 1.5 11 0.5C14 1.5 17 11 22 11Z"/></svg></i>
-          <picture class="float" data-shot="panel">
-            <source media="(prefers-color-scheme: dark)" srcset="img/panel-dark.png">
-            <img src="img/panel-light.png" width="448" height="648" fetchpriority="high" alt="The Ludus panel open under the menu bar, with a grid of games">
+          <div class="pv macpic" style="--w:448px"><picture class="float" data-shot="shot-panel">
+            <source media="(prefers-color-scheme: dark)" srcset="pg/img/shot-panel-dark.png">
+            <img src="pg/img/shot-panel-light.png" width="448" height="660" fetchpriority="high" alt="The Ludus panel open under the menu bar, with a grid of games">
+          </picture></div>
+          <picture class="float winpic" data-shot="panel">
+            <source media="(prefers-color-scheme: dark)" srcset="pg/img/panel-dark.png">
+            <img src="pg/img/panel-light.png" width="448" height="648" alt="The Ludus panel open above the Windows taskbar, with a grid of games">
           </picture>
         </div>
         <div class="taskbar" aria-hidden="true">
@@ -316,6 +341,86 @@
       </div>
     </div>
   </div>
+
+  <section id="games">
+    <div class="wrap">
+      <p class="kicker reveal">The games</p>
+      <h2 class="reveal">Arcade, puzzles, duels and games for two</h2>
+      <p class="intro reveal">Every game has a light and a dark look, sound you can turn off, and an easy, normal or hard setting.</p>
+
+      <!-- Game list and covers (45 games) rendered from the register() calls and art() functions in web/games/*.js on 23 October 2026 (version 1.12.61). Refresh both when games are added. -->
+      <div class="group">
+        <h3 class="reveal">Arcade <small>Beat your best score</small></h3>
+        <ul class="games">
+          <li class="game reveal" style="--t:#5b8def"><i><picture><img src="pg/covers/blocks.webp" width="221" height="78" alt="" loading="lazy" decoding="async"></picture></i><div><b>Blocks</b><span>Falling blocks with hold, ghost piece and a next queue.</span></div></li>
+          <li class="game reveal" style="--t:#3aa6a6"><i><picture><img src="pg/covers/flappy.webp" width="221" height="78" alt="" loading="lazy" decoding="async"></picture></i><div><b>Flap Through</b><span>Guide the spark through the gaps.</span></div></li>
+          <li class="game reveal" style="--t:#2f2a24"><i><picture><img src="pg/covers/chomp.webp" width="221" height="78" alt="" loading="lazy" decoding="async"></picture></i><div><b>Chomp</b><span>A maze chase with pellets, power sparks and four ghosts.</span></div></li>
+          <li class="game reveal" style="--t:#4f9d69"><i><picture><img src="pg/covers/snake.webp" width="221" height="78" alt="" loading="lazy" decoding="async"></picture></i><div><b>Snake</b><span>The classic, smooth and quick.</span></div></li>
+          <li class="game reveal" style="--t:#e05d8b"><i><picture><img src="pg/covers/breakout.webp" width="221" height="78" alt="" loading="lazy" decoding="async"></picture></i><div><b>Brick Break</b><span>Clear the bricks, catch the power-ups.</span></div></li>
+          <li class="game reveal" style="--t:#7c6bb5"><i><picture><img src="pg/covers/slither.webp" width="221" height="78" alt="" loading="lazy" decoding="async"></picture></i><div><b>Worm Arena</b><span>Eat the dots, grow longer and avoid the other worms.</span></div></li>
+          <li class="game reveal" style="--t:#5b6ee1"><i><picture><img src="pg/covers/skyraiders.webp" width="221" height="78" alt="" loading="lazy" decoding="async"></picture></i><div><b>Sky Raiders</b><span>Rows of raiders march down. Shoot them before they land.</span></div></li>
+          <li class="game reveal" style="--t:#6b7a8f"><i><picture><img src="pg/covers/drift.webp" width="221" height="78" alt="" loading="lazy" decoding="async"></picture></i><div><b>Rock Blaster</b><span>Steer a little ship through drifting rocks and split them apart.</span></div></li>
+          <li class="game reveal" style="--t:#e08a3c"><i><picture><img src="pg/covers/sparkhop.webp" width="221" height="78" alt="" loading="lazy" decoding="async"></picture></i><div><b>Sky Hop</b><span>Bounce from platform to platform and climb as high as you can.</span></div></li>
+          <li class="game reveal" style="--t:#6f9a4a"><i><picture><img src="pg/covers/garden.webp" width="221" height="78" alt="" loading="lazy" decoding="async"></picture></i><div><b>Garden Defence</b><span>Plant a garden that holds five lanes against creeping weeds.</span></div></li>
+          <li class="game reveal" style="--t:#7d6a58"><i><picture><img src="pg/covers/climb.webp" width="221" height="78" alt="" loading="lazy" decoding="async"></picture></i><div><b>Hammer Climb</b><span>A spark in a pot climbs a mountain with nothing but a hammer.</span></div></li>
+          <li class="game reveal" style="--t:#3f8fb3"><i><picture><source media="(prefers-color-scheme: dark)" srcset="pg/covers/stack-dark.webp"><img src="pg/covers/stack.webp" width="221" height="78" alt="" loading="lazy" decoding="async"></picture></i><div><b>Stack</b><span>Drop each sliding block on the tower. Perfect drops keep it wide.</span></div></li>
+          <li class="game reveal" style="--t:#5f8f94"><i><picture><img src="pg/covers/holeio.webp" width="221" height="78" alt="" loading="lazy" decoding="async"></picture></i><div><b>City Swallow</b><span>Grow a black hole by swallowing the city. Up to four players online.</span></div></li>
+          <li class="game reveal" style="--t:#4fb3a9"><i><picture><img src="pg/covers/paperio.webp" width="221" height="78" alt="" loading="lazy" decoding="async"></picture></i><div><b>Land Claim</b><span>Claim land by looping out and back home. Up to four players online.</span></div></li>
+          <li class="game reveal" style="--t:#2f8f83"><i><picture><img src="pg/covers/geoguess.webp" width="221" height="78" alt="" loading="lazy" decoding="async"></picture></i><div><b>Map Hunt</b><span>Look around a street photo and pin where in the world it is. Solo or online.</span></div></li>
+          <li class="game reveal" style="--t:#c4683a"><i><picture><img src="pg/covers/popfusion.webp" width="221" height="78" alt="" loading="lazy" decoding="async"></picture></i><div><b>Pop Fusion</b><span>A solo balloon tower defence. Fuse towers into stronger ones to pop every wave.</span></div></li>
+        </ul>
+      </div>
+
+      <div class="group">
+        <h3 class="reveal">Puzzle <small>Take your time</small></h3>
+        <ul class="games">
+          <li class="game reveal" style="--t:#e0a526"><i><picture><img src="pg/covers/g2048.webp" width="221" height="78" alt="" loading="lazy" decoding="async"></picture></i><div><b>2048</b><span>Slide the tiles, merge the pairs.</span></div></li>
+          <li class="game reveal" style="--t:#9b6dd6"><i><picture><img src="pg/covers/mines.webp" width="221" height="78" alt="" loading="lazy" decoding="async"></picture></i><div><b>Minefield</b><span>The first click is always safe.</span></div></li>
+          <li class="game reveal" style="--t:#c06c9a"><i><picture><img src="pg/covers/pairs.webp" width="221" height="78" alt="" loading="lazy" decoding="async"></picture></i><div><b>Memory</b><span>Flip two cards at a time and find every match.</span></div></li>
+          <li class="game reveal" style="--t:#4f9d69"><i><picture><img src="pg/covers/fiveletters.webp" width="221" height="78" alt="" loading="lazy" decoding="async"></picture></i><div><b>Five Letters</b><span>Find the hidden five-letter word in six tries.</span></div></li>
+          <li class="game reveal" style="--t:#b5894f"><i><picture><img src="pg/covers/crates.webp" width="221" height="78" alt="" loading="lazy" decoding="async"></picture></i><div><b>Crate Push</b><span>Push every crate onto its spot. Hand-made levels, with undo.</span></div></li>
+          <li class="game reveal" style="--t:#2e7a5f"><i><picture><img src="pg/covers/patience.webp" width="221" height="78" alt="" loading="lazy" decoding="async"></picture></i><div><b>Solitaire</b><span>Klondike solitaire, Ace to King.</span></div></li>
+          <li class="game reveal" style="--t:#4b6fae"><i><picture><img src="pg/covers/sudoku.webp" width="221" height="78" alt="" loading="lazy" decoding="async"></picture></i><div><b>Sudoku</b><span>Fresh puzzles with exactly one solution.</span></div></li>
+          <li class="game reveal" style="--t:#e07a3f"><i><picture><img src="pg/covers/sparkmatch.webp" width="221" height="78" alt="" loading="lazy" decoding="async"></picture></i><div><b>Sweet Match</b><span>Swap gems to line up three or more.</span></div></li>
+          <li class="game reveal" style="--t:#3b7dd8"><i><picture><img src="pg/covers/flags.webp" width="221" height="78" alt="" loading="lazy" decoding="async"></picture></i><div><b>Flag Quiz</b><span>Name the country from its flag, or the US state, Canadian province, UK nation or region.</span></div></li>
+          <li class="game reveal" style="--t:#2f7d55"><i><picture><img src="pg/covers/metaspot.webp" width="221" height="78" alt="" loading="lazy" decoding="async"></picture></i><div><b>Clue Spotter</b><span>Spot the clues in the road: signs, plates, lines and poles. Online rooms work.</span></div></li>
+          <li class="game reveal" style="--t:#2f5d62"><i><picture><img src="pg/covers/tongue.webp" width="221" height="78" alt="" loading="lazy" decoding="async"></picture></i><div><b>Tongue Twister</b><span>Read a phrase and guess its language on a map. Works offline.</span></div></li>
+          <li class="game reveal" style="--t:#24315c"><i><picture><img src="pg/covers/invhunt.webp" width="221" height="78" alt="" loading="lazy" decoding="async"></picture></i><div><b>Mosaic Hunt</b><span>Hunt pixel-art mosaics on a map, then crack the code. Map photos need the internet.</span></div></li>
+          <li class="game reveal" style="--t:#7f9b8f"><i><picture><img src="pg/covers/rotate.webp" width="221" height="78" alt="" loading="lazy" decoding="async"></picture></i><div><b>Turn Room</b><span>Turn the whole room to change which way is down. Walk, fall and reach the door.</span></div></li>
+        </ul>
+      </div>
+
+      <div class="group">
+        <h3 class="reveal">Duel <small>You against the computer</small></h3>
+        <ul class="games">
+          <li class="game reveal" style="--t:#4f7a66"><i><picture><img src="pg/covers/chess.webp" width="221" height="78" alt="" loading="lazy" decoding="async"></picture></i><div><b>Chess</b><span>Full chess against the computer at four levels, a friend, or online.</span></div></li>
+          <li class="game reveal" style="--t:#c4633f"><i><picture><img src="pg/covers/fourup.webp" width="221" height="78" alt="" loading="lazy" decoding="async"></picture></i><div><b>Four in a Row</b><span>Four in a row, first to three games.</span></div></li>
+          <li class="game reveal" style="--t:#e0a526"><i><picture><img src="pg/covers/boxit.webp" width="221" height="78" alt="" loading="lazy" decoding="async"></picture></i><div><b>Dots and Boxes</b><span>Dots and boxes. Close a box and go again.</span></div></li>
+          <li class="game reveal" style="--t:#5b8def"><i><picture><img src="pg/covers/ninesq.webp" width="221" height="78" alt="" loading="lazy" decoding="async"></picture></i><div><b>Ultimate Tic-Tac-Toe</b><span>Ultimate tic-tac-toe: your square picks their board.</span></div></li>
+          <li class="game reveal" style="--t:#d1495b"><i><picture><img src="pg/covers/lastwire.webp" width="221" height="78" alt="" loading="lazy" decoding="async"></picture></i><div><b>Last Wire</b><span>Nine wires, one is live. Take turns cutting.</span></div></li>
+          <li class="game reveal" style="--t:#4f9d69"><i><picture><img src="pg/covers/wallrun.webp" width="221" height="78" alt="" loading="lazy" decoding="async"></picture></i><div><b>Wall Race</b><span>Race across the board and block the computer with walls.</span></div></li>
+          <li class="game reveal" style="--t:#9b6dd6"><i><picture><img src="pg/covers/crossing.webp" width="221" height="78" alt="" loading="lazy" decoding="async"></picture></i><div><b>Hex</b><span>Hex on a 7 by 7 board. Join your two sides first.</span></div></li>
+          <li class="game reveal" style="--t:#e05d8b"><i><picture><img src="pg/covers/decider.webp" width="221" height="78" alt="" loading="lazy" decoding="async"></picture></i><div><b>Rock Paper Scissors</b><span>Rock, paper, scissors. First to three takes the match.</span></div></li>
+          <li class="game reveal" style="--t:#3aa6a6"><i><picture><img src="pg/covers/deadcentre.webp" width="221" height="78" alt="" loading="lazy" decoding="async"></picture></i><div><b>Dead Centre</b><span>Stop the needle on the line before the computer does.</span></div></li>
+          <li class="game reveal" style="--t:#a4553a"><i><picture><img src="pg/covers/finalpush.webp" width="221" height="78" alt="" loading="lazy" decoding="async"></picture></i><div><b>Sword Duel</b><span>A spear duel across five screens. Change height to get past the guard.</span></div></li>
+          <li class="game reveal" style="--t:#4f9a4a"><i><picture><img src="pg/covers/popduel.webp" width="221" height="78" alt="" loading="lazy" decoding="async"></picture></i><div><b>Pop Duel</b><span>A balloon tower defence duel. Build towers and pop the balloons.</span></div></li>
+          <li class="game reveal" style="--t:#4a6fd8"><i><picture><img src="pg/covers/stickbrawl.webp" width="221" height="78" alt="" loading="lazy" decoding="async"></picture></i><div><b>Stick Brawl</b><span>A Stick Brawl. Punch, dodge and win the round.</span></div></li>
+        </ul>
+      </div>
+
+      <div class="group">
+        <h3 class="reveal">Same laptop <small>Two people, one keyboard</small></h3>
+        <ul class="games">
+          <li class="game reveal" style="--t:#6aa56b"><i><picture><img src="pg/covers/tag.webp" width="221" height="78" alt="" loading="lazy" decoding="async"></picture></i><div><b>Tag</b><span>One of you is it. Touch the other to pass it on.</span></div></li>
+          <li class="game reveal" style="--t:#3f8fb5"><i><picture><img src="pg/covers/pong.webp" width="221" height="78" alt="" loading="lazy" decoding="async"></picture></i><div><b>Paddle Duel</b><span>Two-paddle table tennis.</span></div></li>
+          <li class="game reveal" style="--t:#e05d8b"><i><picture><img src="pg/covers/hockey.webp" width="221" height="78" alt="" loading="lazy" decoding="async"></picture></i><div><b>Air Hockey</b><span>Air hockey. Guard your goal.</span></div></li>
+          <li class="game reveal" style="--t:#c98a3a"><i><picture><img src="pg/covers/tanks.webp" width="221" height="78" alt="" loading="lazy" decoding="async"></picture></i><div><b>Tank Arena</b><span>Bouncing shells in a fresh maze every round.</span></div></li>
+        </ul>
+      </div>
+      <p class="note reveal">Play online: 13 games can be played with a friend in another place. Create a room, share its 5 character code or invite link, and join on Mac or Windows. Tag, Land Claim and City Swallow take up to four players. Rooms are not private, so only share the code with people you trust.</p>
+      <p class="note reveal">The panel stays open when you click other menu bar icons. On Windows there is no accidental zooming, and the panel now fits different screen sizes and scaling. The line-up grows with new releases. The app itself always shows the current list.</p>
+    </div>
+  </section>
 
   <section id="about">
     <div class="wrap">
@@ -336,37 +441,26 @@
         <div class="point reveal">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M12 3l7 3v5c0 4.5-3 8.3-7 9.5-4-1.2-7-5-7-9.5V6z"/></svg>
           <h3>Private and offline</h3>
-          <p>Everything runs on your computer. Ludus only goes online if you choose Play online, Map Hunt or Mosaic Hunt, and collects nothing.</p>
+          <p>Everything runs on your computer. Ludus only goes online if you choose Play online, Map Hunt or an update, and collects nothing.</p>
         </div>
       </div>
     </div>
   </section>
 
-  <section id="new112">
+  <section id="new">
     <div class="wrap">
-      <p class="kicker reveal">Version 1.12.67</p>
-      <h2 class="reveal">Chess, Mosaic Hunt and more</h2>
-      <p class="intro reveal">45 little games now. Here is what is new.</p>
-      <div class="points">
+      <p class="kicker reveal">Details</p>
+      <h2 class="reveal">Small things that make it feel finished</h2>
+      <div class="points four">
         <div class="point reveal">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M5 12.5l4 4L19 7"/></svg>
-          <h3>Chess</h3>
-          <p>Play the computer (four levels), a friend on the same screen, or a friend online. The computer thinks in the background, so the board never stutters.</p>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M12 3v9M7 6.5a7 7 0 1 0 10 0"/></svg>
+          <h3>Offline mode</h3>
+          <p>Everything except Online, Map Hunt photos and updates works with no internet at all. The Online page says so and waits quietly.</p>
         </div>
         <div class="point reveal">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M3 12a9 9 0 1 0 18 0 9 9 0 0 0-18 0zM3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/></svg>
-          <h3>Mosaic Hunt</h3>
-          <p>Look at a small tile mosaic on a wall, then guess where in the world it is. Live close-up photos (credited, never stored in the app), a small map and scoring like Map Hunt.</p>
-        </div>
-        <div class="point reveal">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M16 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM8 12a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM2.5 19c.5-3 3-4.5 5.5-4.5s5 1.5 5.5 4.5"/></svg>
-          <h3>Suggestions in online rooms</h3>
-          <p>Players who are not the host can suggest games, the number of rounds, single game or tournament, and the Map Hunt time and movement. The host accepts or declines.</p>
-        </div>
-        <div class="point reveal">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M5 12.5l4 4L19 7"/></svg>
-          <h3>Worm Arena online, clearer turns</h3>
-          <p>Worm Arena now plays online for two to four players. Two-sided games show whose turn it is with a coloured card.</p>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M12 15V3M8 7l4-4 4 4M5 12v7h14v-7"/></svg>
+          <h3>An update button</h3>
+          <p>Settings, App: Check, then Update. Ludus checks the download against its SHA-256 fingerprint, swaps itself and reopens. It always asks first.</p>
         </div>
       </div>
     </div>
@@ -374,7 +468,7 @@
 
   <section id="online">
     <div class="wrap">
-      <p class="kicker reveal">New in V2</p>
+      <p class="kicker reveal">Online</p>
       <h2 class="reveal">Play online with up to four friends</h2>
       <p class="intro reveal">Make a room, share the code and play together on Mac and Windows. No accounts, nothing to sign up for.</p>
       <div class="points">
@@ -414,10 +508,10 @@
 
   <section id="geoguess">
     <div class="wrap">
-      <p class="kicker reveal">New game</p>
+      <p class="kicker reveal">Featured game</p>
       <h2 class="reveal">Map Hunt: where in the world is this?</h2>
-      <p class="intro reveal">A real street-level photo from somewhere on Earth. Look around, work out where you are and drop a pin on the map. Needs an internet connection.</p>
-      <div class="points">
+      <p class="intro reveal">A real street-level photo from somewhere on Earth. Look around, work out where you are and drop a pin on the map. Needs an internet connection for the photos.</p>
+      <div class="points four">
         <div class="point reveal">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M3 12a9 9 0 1 0 18 0 9 9 0 0 0-18 0zM3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/></svg>
           <h3>Look around and move</h3>
@@ -438,16 +532,6 @@
           <h3>Online for 2 to 4 players</h3>
           <p>Play it in an online room and everyone gets the same places, so you can compare guesses.</p>
         </div>
-        <div class="point reveal">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M5 12.5l4 4L19 7"/></svg>
-          <h3>New covers and Rock Paper Scissors</h3>
-          <p>New artwork for City Swallow, Land Claim, Crate Push and Worm Arena, and a new Rock Paper Scissors, solo or against a friend online with secret picks.</p>
-        </div>
-        <div class="point reveal">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M12 15V3M8 7l4-4 4 4M5 12v7h14v-7"/></svg>
-          <h3>Share with a friend</h3>
-          <p>On a Mac, one click packs the app up and opens the share sheet, so you can send it to a friend by AirDrop.</p>
-        </div>
       </div>
     </div>
   </section>
@@ -456,132 +540,40 @@
     <div class="wrap">
       <p class="kicker reveal">A closer look</p>
       <h2 class="reveal">Small panel, lots to play</h2>
-      <div class="os-row"><p class="intro reveal">Screenshots of the panel<span class="os-name"> on a Mac</span>. Ludus follows your light or dark setting, or you can pick one.</p><div class="os-switch" role="group" aria-label="Show the Mac or Windows version"><button type="button" data-os-pick="mac" aria-pressed="true"><svg aria-hidden="true"><use href="#apple"/></svg>Mac</button><button type="button" data-os-pick="windows" aria-pressed="false"><svg aria-hidden="true"><use href="#windows"/></svg>Windows</button></div></div>
-      <div class="gallery">
-        <figure class="reveal">
-          <picture data-shot="home"><source media="(prefers-color-scheme: dark)" srcset="img/home-dark.png"><img src="img/home-light.png" width="448" height="648" loading="lazy" alt="The games list"></picture>
-          <figcaption>Every game in one list</figcaption>
-        </figure>
-        <figure class="reveal">
-          <picture data-shot="game"><source media="(prefers-color-scheme: dark)" srcset="img/game-dark.png"><img src="img/game-light.png" width="448" height="648" loading="lazy" alt="A game of Sky Raiders in progress"></picture>
-          <figcaption>Close it mid-game, it waits for you</figcaption>
-        </figure>
-        <figure class="reveal">
-          <picture data-shot="settings"><source media="(prefers-color-scheme: dark)" srcset="img/settings-dark.png"><img src="img/settings-light.png" width="448" height="648" loading="lazy" alt="The settings screen"></picture>
-          <figcaption>Make it yours in Settings</figcaption>
-        </figure>
-      </div>
+      <p class="intro reveal">Ludus follows your light or dark setting, or you can pick one.</p>
+      <div class="pvgrid"><figure class="reveal" style="--w:320px"><div class="pv"><picture><source media="(prefers-color-scheme: dark)" srcset="pg/img/pop-home-dark.png"><img src="pg/img/pop-home-light.png" width="448" height="648" loading="lazy" alt="The games list"></picture></div><figcaption>Every game in one list</figcaption></figure><figure class="reveal" style="--w:320px"><div class="pv"><picture><source media="(prefers-color-scheme: dark)" srcset="pg/img/pop-game-dark.png"><img src="pg/img/pop-game-light.png" width="448" height="648" loading="lazy" alt="A game of 2048 in progress"></picture></div><figcaption>Close it mid-game, it waits for you</figcaption></figure><figure class="reveal" style="--w:320px"><div class="pv"><picture><source media="(prefers-color-scheme: dark)" srcset="pg/img/pop-settings-dark.png"><img src="pg/img/pop-settings-light.png" width="448" height="648" loading="lazy" alt="The settings screen"></picture></div><figcaption>Make it yours in Settings</figcaption></figure></div>
     </div>
   </section>
 
-  <section id="games">
-    <div class="wrap">
-      <p class="kicker reveal">The games</p>
-      <h2 class="reveal">Arcade, puzzles, duels and games for two</h2>
-      <p class="intro reveal">Every game has a light and a dark look, sound you can turn off, and an easy, normal or hard setting.</p>
-
-      <!-- Game list taken from the register() calls in web/games/*.js on 22 October 2026. Refresh it when games are added. -->
-      <div class="group">
-        <h3 class="reveal">Arcade <small>Beat your best score</small></h3>
-        <ul class="games">
-          <li class="game reveal" style="--t:#5b8def"><i><picture><img src="covers/blocks.webp" width="72" height="52" alt="" loading="lazy" decoding="async"></picture></i><div><b>Blocks</b><span>Falling blocks with hold, ghost piece and a next queue.</span></div></li>
-          <li class="game reveal" style="--t:#e05d8b"><i><picture><img src="covers/breakout.webp" width="72" height="52" alt="" loading="lazy" decoding="async"></picture></i><div><b>Brick Break</b><span>Clear the bricks, catch the power-ups.</span></div></li>
-          <li class="game reveal" style="--t:#2f2a24"><i><picture><img src="covers/chomp.webp" width="72" height="52" alt="" loading="lazy" decoding="async"></picture></i><div><b>Chomp</b><span>A maze chase with pellets, power sparks and four ghosts.</span></div></li>
-          <li class="game reveal" style="--t:#6b7a8f"><i><picture><img src="covers/drift.webp" width="72" height="52" alt="" loading="lazy" decoding="async"></picture></i><div><b>Rock Blaster</b><span>Steer a little ship through drifting rocks and split them apart.</span></div></li>
-          <li class="game reveal" style="--t:#3aa6a6"><i><picture><img src="covers/flappy.webp" width="72" height="52" alt="" loading="lazy" decoding="async"></picture></i><div><b>Flap Through</b><span>Guide the spark through the gaps.</span></div></li>
-          <li class="game reveal" style="--t:#6f9a4a"><i><picture><img src="covers/garden.webp" width="72" height="52" alt="" loading="lazy" decoding="async"></picture></i><div><b>Garden Defence</b><span>Plant a garden that holds five lanes against creeping weeds.</span></div></li>
-          <li class="game reveal" style="--t:#c96a4a"><i><picture><img src="covers/climb.webp" width="72" height="52" alt="" loading="lazy" decoding="async"></picture></i><div><b>Hammer Climb</b><span>A spark in a pot climbs a mountain with nothing but a hammer.</span></div></li>
-          <li class="game reveal" style="--t:#5b6ee1"><i><picture><img src="covers/skyraiders.webp" width="72" height="52" alt="" loading="lazy" decoding="async"></picture></i><div><b>Sky Raiders</b><span>Rows of raiders march down. Shoot them before they land.</span></div></li>
-          <li class="game reveal" style="--t:#4f9d69"><i><picture><img src="covers/snake.webp" width="72" height="52" alt="" loading="lazy" decoding="async"></picture></i><div><b>Snake</b><span>The classic, smooth and quick.</span></div></li>
-          <li class="game reveal" style="--t:#e08a3c"><i><picture><img src="covers/sparkhop.webp" width="72" height="52" alt="" loading="lazy" decoding="async"></picture></i><div><b>Sky Hop</b><span>Bounce from platform to platform and climb as high as you can.</span></div></li>
-          <li class="game reveal" style="--t:#3f8fb3"><i><picture><source media="(prefers-color-scheme: dark)" srcset="covers/stack-dark.webp"><img src="covers/stack.webp" width="72" height="52" alt="" loading="lazy" decoding="async"></picture></i><div><b>Stack</b><span>Drop each sliding block on the tower. Perfect drops keep it wide.</span></div></li>
-          <li class="game reveal" style="--t:#5f8f94"><i><picture><img src="covers/holeio.webp" width="72" height="52" alt="" loading="lazy" decoding="async"></picture></i><div><b>City Swallow</b><span>Grow a black hole by swallowing the city. Up to four players online.</span></div></li>
-          <li class="game reveal" style="--t:#4fb3a9"><i><picture><img src="covers/paperio.webp" width="72" height="52" alt="" loading="lazy" decoding="async"></picture></i><div><b>Land Claim</b><span>Claim land by looping out and back home. Up to four players online.</span></div></li>
-          <li class="game reveal" style="--t:#2f8f83"><i><picture><img src="covers/geoguess.webp" width="72" height="52" alt="" loading="lazy" decoding="async"></picture></i><div><b>Map Hunt</b><span>Look around a street photo and pin where in the world it is. Solo or online.</span></div></li>
-          <li class="game reveal" style="--t:#7c6bb5"><i><picture><img src="covers/slither.webp" width="72" height="52" alt="" loading="lazy" decoding="async"></picture></i><div><b>Worm Arena</b><span>Eat the dots, grow longer and avoid the other worms.</span></div></li>
-          <li class="game reveal" style="--t:#c4683a"><i><picture><img src="covers/popfusion.webp" width="72" height="52" alt="" loading="lazy" decoding="async"></picture></i><div><b>Pop Fusion</b><span>Balloon tower defence where you can fuse two towers into a stronger one.</span></div></li>
-        </ul>
-      </div>
-
-      <div class="group">
-        <h3 class="reveal">Puzzle <small>Take your time</small></h3>
-        <ul class="games">
-          <li class="game reveal" style="--t:#e0a526"><i><picture><img src="covers/g2048.webp" width="72" height="52" alt="" loading="lazy" decoding="async"></picture></i><div><b>2048</b><span>Slide the tiles, merge the pairs.</span></div></li>
-          <li class="game reveal" style="--t:#b5894f"><i><picture><img src="covers/crates.webp" width="72" height="52" alt="" loading="lazy" decoding="async"></picture></i><div><b>Crate Push</b><span>Push every crate onto its spot. Hand-made levels, with undo.</span></div></li>
-          <li class="game reveal" style="--t:#4f9d69"><i><picture><img src="covers/fiveletters.webp" width="72" height="52" alt="" loading="lazy" decoding="async"></picture></i><div><b>Five Letters</b><span>Find the hidden five-letter word in six tries.</span></div></li>
-          <li class="game reveal" style="--t:#9b6dd6"><i><picture><img src="covers/mines.webp" width="72" height="52" alt="" loading="lazy" decoding="async"></picture></i><div><b>Minefield</b><span>The first click is always safe.</span></div></li>
-          <li class="game reveal" style="--t:#c06c9a"><i><picture><img src="covers/pairs.webp" width="72" height="52" alt="" loading="lazy" decoding="async"></picture></i><div><b>Memory</b><span>Flip two cards at a time and find every match.</span></div></li>
-          <li class="game reveal" style="--t:#2e7a5f"><i><picture><img src="covers/patience.webp" width="72" height="52" alt="" loading="lazy" decoding="async"></picture></i><div><b>Solitaire</b><span>Klondike solitaire, Ace to King.</span></div></li>
-          <li class="game reveal" style="--t:#e07a3f"><i><picture><img src="covers/sparkmatch.webp" width="72" height="52" alt="" loading="lazy" decoding="async"></picture></i><div><b>Sweet Match</b><span>Swap gems to line up three or more.</span></div></li>
-          <li class="game reveal" style="--t:#4b6fae"><i><picture><img src="covers/sudoku.webp" width="72" height="52" alt="" loading="lazy" decoding="async"></picture></i><div><b>Sudoku</b><span>Fresh puzzles with exactly one solution.</span></div></li>
-          <li class="game reveal" style="--t:#3b7dd8"><i><picture><img src="covers/flags.webp" width="72" height="52" alt="" loading="lazy" decoding="async"></picture></i><div><b>Flag Quiz</b><span>Name the country from its flag, or the US state, Canadian province, UK nation or region.</span></div></li>
-          <li class="game reveal" style="--t:#2f7d55"><i><picture><img src="covers/metaspot.webp" width="72" height="52" alt="" loading="lazy" decoding="async"></picture></i><div><b>Clue Spotter</b><span>Read the road signs, plates and clues in a street photo and name the country. Solo or online.</span></div></li>
-          <li class="game reveal" style="--t:#2f5d62"><i><picture><img src="covers/tongue.webp" width="72" height="52" alt="" loading="lazy" decoding="async"></picture></i><div><b>Tongue Twister</b><span>Guess the language from a few words, six tries.</span></div></li>
-          <li class="game reveal" style="--t:#24315c"><i><picture><img src="covers/invhunt.webp" width="72" height="52" alt="" loading="lazy" decoding="async"></picture></i><div><b>Mosaic Hunt</b><span>Find the spot of a tiny tile mosaic on the map, with a close-up photo to help. Needs the internet.</span></div></li>
-          <li class="game reveal" style="--t:#7f9b8f"><i><picture><img src="covers/rotate.webp" width="72" height="52" alt="" loading="lazy" decoding="async"></picture></i><div><b>Turn Room</b><span>Turn the whole room to change which way is down. Walk, fall and reach the door.</span></div></li>
-        </ul>
-      </div>
-
-      <div class="group">
-        <h3 class="reveal">Duel <small>You against the computer</small></h3>
-        <ul class="games">
-          <li class="game reveal" style="--t:#e0a526"><i><picture><img src="covers/boxit.webp" width="72" height="52" alt="" loading="lazy" decoding="async"></picture></i><div><b>Dots and Boxes</b><span>Dots and boxes. Close a box and go again.</span></div></li>
-          <li class="game reveal" style="--t:#3aa6a6"><i><picture><img src="covers/deadcentre.webp" width="72" height="52" alt="" loading="lazy" decoding="async"></picture></i><div><b>Dead Centre</b><span>Stop the needle on the line before the computer does.</span></div></li>
-          <li class="game reveal" style="--t:#c4633f"><i><picture><img src="covers/fourup.webp" width="72" height="52" alt="" loading="lazy" decoding="async"></picture></i><div><b>Four in a Row</b><span>Four in a row, first to three games.</span></div></li>
-          <li class="game reveal" style="--t:#d1495b"><i><picture><img src="covers/lastwire.webp" width="72" height="52" alt="" loading="lazy" decoding="async"></picture></i><div><b>Last Wire</b><span>Nine wires, one is live. Take turns cutting.</span></div></li>
-          <li class="game reveal" style="--t:#5b8def"><i><picture><img src="covers/ninesq.webp" width="72" height="52" alt="" loading="lazy" decoding="async"></picture></i><div><b>Ultimate Tic-Tac-Toe</b><span>Ultimate tic-tac-toe: your square picks their board.</span></div></li>
-          <li class="game reveal" style="--t:#a4553a"><i><picture><img src="covers/finalpush.webp" width="72" height="52" alt="" loading="lazy" decoding="async"></picture></i><div><b>Sword Duel</b><span>A spear duel across five screens. Change height to get past the guard.</span></div></li>
-          <li class="game reveal" style="--t:#7a8b5a"><i><picture><img src="covers/crossing.webp" width="72" height="52" alt="" loading="lazy" decoding="async"></picture></i><div><b>Hex</b><span>Hex on a 7 by 7 board. Join your two sides first.</span></div></li>
-          <li class="game reveal" style="--t:#b0686b"><i><picture><img src="covers/decider.webp" width="72" height="52" alt="" loading="lazy" decoding="async"></picture></i><div><b>Rock Paper Scissors</b><span>Rock, paper, scissors. First to three takes the match.</span></div></li>
-          <li class="game reveal" style="--t:#8a6fb0"><i><picture><img src="covers/wallrun.webp" width="72" height="52" alt="" loading="lazy" decoding="async"></picture></i><div><b>Wall Race</b><span>Race across the board and block the computer with walls.</span></div></li>
-          <li class="game reveal" style="--t:#4f9a4a"><i><picture><img src="covers/popduel.webp" width="72" height="52" alt="" loading="lazy" decoding="async"></picture></i><div><b>Pop Duel</b><span>A balloon tower defence duel. Build towers and pop the balloons.</span></div></li>
-          <li class="game reveal" style="--t:#4f7a66"><i><picture><img src="covers/chess.webp" width="72" height="52" alt="" loading="lazy" decoding="async"></picture></i><div><b>Chess</b><span>Play the computer at four levels, a friend on the same screen, or a friend online.</span></div></li>
-          <li class="game reveal" style="--t:#4a6fd8"><i><picture><img src="covers/stickbrawl.webp" width="72" height="52" alt="" loading="lazy" decoding="async"></picture></i><div><b>Stick Brawl</b><span>A stick-figure fight with jumps, throws and weapons on the floor.</span></div></li>
-        </ul>
-      </div>
-
-      <div class="group">
-        <h3 class="reveal">2 Player <small>Two people, one keyboard</small></h3>
-        <ul class="games">
-          <li class="game reveal" style="--t:#e05d8b"><i><picture><img src="covers/hockey.webp" width="72" height="52" alt="" loading="lazy" decoding="async"></picture></i><div><b>Air Hockey</b><span>Air hockey. Guard your goal.</span></div></li>
-          <li class="game reveal" style="--t:#3f8fb5"><i><picture><img src="covers/pong.webp" width="72" height="52" alt="" loading="lazy" decoding="async"></picture></i><div><b>Paddle Duel</b><span>Two-paddle table tennis.</span></div></li>
-          <li class="game reveal" style="--t:#5b7d4a"><i><picture><img src="covers/tanks.webp" width="72" height="52" alt="" loading="lazy" decoding="async"></picture></i><div><b>Tank Arena</b><span>Bouncing shells in a fresh maze every round.</span></div></li>
-          <li class="game reveal" style="--t:#6aa56b"><i><picture><img src="covers/tag.webp" width="72" height="52" alt="" loading="lazy" decoding="async"></picture></i><div><b>Tag</b><span>One of you is it. Touch the other to pass it on.</span></div></li>
-        </ul>
-      </div>
-      <p class="note reveal">Play online: 18 games can be played with a friend in another place. Create a room, share its 5 character code or invite link, and join on Mac or Windows. Tag, Land Claim and City Swallow take up to four players. Rooms are not private, so only share the code with people you trust.</p>
-      <p class="note reveal">The panel stays open when you click other menu bar icons. On Windows there is no accidental zooming, and the panel now fits different screen sizes and scaling. The line-up grows with new releases. The app itself always shows the current list.</p>
-    </div>
-  </section>
 
   <section id="install">
     <div class="wrap">
       <p class="kicker reveal">Install</p>
-      <h2 class="reveal">Two minutes, then it lives by the clock</h2>
-      <p class="intro reveal">Ludus is not sold through an app store, so your computer asks you to confirm the first time you open it. That is expected; the steps below show where to click.</p>
+      <h2 class="reveal">Install Ludus</h2>
+      <p class="intro reveal">Download it, open it, drag it into Applications. Mac builds are signed and checked by Apple, so Ludus opens like any normal app.</p>
       <div class="install">
         <div class="card mac reveal">
-          <h3><svg aria-hidden="true"><use href="#apple"/></svg>Mac<span class="yours">Your computer</span></h3>
+          <h3><svg aria-hidden="true" viewBox="0 0 24 24"><path fill="currentColor" d="M16.4 12.6c0-2.6 2.1-3.8 2.2-3.9-1.2-1.8-3.1-2-3.7-2-1.6-.2-3.1.9-3.9.9-.8 0-2-.9-3.4-.9-1.7 0-3.3 1-4.2 2.6-1.8 3.1-.5 7.7 1.3 10.2.9 1.2 1.9 2.6 3.2 2.6 1.3-.1 1.8-.8 3.3-.8 1.6 0 2 .8 3.4.8 1.4 0 2.3-1.3 3.1-2.5 1-1.4 1.4-2.8 1.4-2.9-.1 0-2.7-1-2.7-4.1zM13.9 5c.7-.9 1.2-2 1.1-3.2-1-.0-2.3.7-3 1.6-.7.8-1.2 2-1.1 3.1 1.2.1 2.3-.6 3-1.5z"/></svg>Mac<span class="yours">Your computer</span></h3>
           <p class="req">macOS 14 Sonoma or later, any Mac (Apple silicon or Intel)</p>
+          <a class="dl" href="https://github.com/Solomon-69/Ludus/releases/latest/download/Ludus.dmg">Download for Mac <small>Ludus.dmg</small></a>
+          <p class="or">Or paste this into Terminal. It downloads, installs and opens Ludus in one go.</p>
+          <div class="code"><code>curl -fsSL https://solomon-69.github.io/Mac-Apps/download/install.sh | bash -s ludus</code><button type="button" class="copy" data-copy>Copy</button></div>
           <ol>
-            <li><b>Easiest, no warning:</b> open the <b>Terminal</b> app, paste this line and press Return. It downloads Ludus and opens it. <code id="mac-cmd" style="display:block;margin:6px 0;padding:8px 10px;border-radius:10px;background:rgba(127,127,127,.15);font-size:.85em;word-break:break-all">curl -fsSL https://raw.githubusercontent.com/Solomon-69/Ludus/main/install.sh | bash</code> <button type="button" onclick="navigator.clipboard&amp;&amp;navigator.clipboard.writeText(document.getElementById('mac-cmd').textContent);this.textContent='Copied'">Copy</button></li>
-            <li><b>Or download Ludus.dmg</b>, open it and drag Ludus into Applications.</li>
-            <li>If macOS says it cannot be verified: open <b>System Settings, Privacy &amp; Security</b>, scroll down and click <b>Open Anyway</b> next to Ludus. On older macOS you can right-click Ludus and choose Open instead.</li>
-            <li>Look for the <b>controller icon</b> in the menu bar and click it.</li>
+            <li>Open the downloaded file and drag <b>Ludus</b> into Applications.</li>
+            <li>Open Ludus from Applications. Look for the <b>controller icon</b> in the menu bar and click it.</li>
           </ol>
-          <p class="why">Why the extra step: builds that are not notarised by Apple need you to confirm once. A notarised build opens straight away. Homebrew install is coming soon.</p>
         </div>
         <div class="card win reveal">
-          <h3><svg aria-hidden="true"><use href="#windows"/></svg>Windows<span class="yours">Your computer</span></h3>
+          <h3><svg aria-hidden="true" viewBox="0 0 24 24"><path fill="currentColor" d="M3 5.3l7.4-1v7.2H3zM11.3 4.2L21 2.8v8.7h-9.7zM3 12.4h7.4v7.2L3 18.6zM11.3 12.4H21v8.8l-9.7-1.4z"/></svg>Windows<span class="yours">Your computer</span></h3>
           <p class="req">Windows 10 or 11, 64-bit</p>
+          <a class="dl" href="https://github.com/Solomon-69/Ludus/releases/latest/download/Ludus-windows.zip">Download for Windows <small>Ludus-windows.zip</small></a>
           <ol>
-            <li><b>Download</b> Ludus-windows.zip, right-click it and choose <b>Extract All</b>. Keep the Ludus folder somewhere permanent, for example Documents.</li>
+            <li>Right-click <b>Ludus-windows.zip</b> and choose <b>Extract All</b>. Keep the folder somewhere permanent, for example Documents.</li>
             <li>Open the folder and run <b>Ludus.exe</b>.</li>
             <li>If Windows shows "Windows protected your PC", click <b>More info</b>, then <b>Run anyway</b>.</li>
-            <li>If Windows asks for the <b>.NET Desktop Runtime</b> (or WebView2 on some Windows 10 PCs), accept the free Microsoft download, then run Ludus.exe again.</li>
+            <li>If Windows asks for the free <b>.NET Desktop Runtime</b> (or WebView2), accept the Microsoft download, then run Ludus.exe again.</li>
             <li>Click the <b>controller icon</b> in the system tray. If you cannot see it, click the small arrow next to the tray icons.</li>
           </ol>
-          <p class="why">Why the warning: this build is not code signed yet, so SmartScreen does not recognise it.</p>
         </div>
       </div>
     </div>
@@ -593,7 +585,7 @@
       <h2 class="reveal">Good to know</h2>
       <details class="reveal">
         <summary>Does it work offline?</summary>
-        <p>Yes, for almost everything. Every game and every sound is inside the app. Ludus only uses the internet for Play online, for Map Hunt (street photos and map pictures) and for Mosaic Hunt (close-up photos and map tiles).</p>
+        <p>Yes, for almost everything. Every game and every sound is inside the app. Ludus only uses the internet for Play online, and for Map Hunt, which loads street photos and map pictures.</p>
       </details>
       <details class="reveal">
         <summary>Where are my scores and saved games kept?</summary>
@@ -601,7 +593,7 @@
       </details>
       <details class="reveal">
         <summary>What does Ludus collect about me?</summary>
-        <p>Nothing. There are no accounts, no analytics, no ads and no tracking of any kind, and nothing you do in Ludus leaves your computer. Ludus never uses the camera or microphone.</p>
+        <p>Nothing. There are no accounts, no analytics, no ads and no tracking of any kind, and nothing you do in Ludus leaves your computer.</p>
       </details>
       <details class="reveal">
         <summary>How do I open it when my computer starts?</summary>
@@ -617,17 +609,22 @@
       </details>
       <details class="reveal">
         <summary>Can I read the code?</summary>
-        <p>Yes. Ludus is open source under the MIT licence: read it, build it, change it, share it. It is on <a href="https://github.com/Solomon-69/Ludus" target="_blank" rel="noopener" data-repo>GitHub</a>.</p>
+        <p>Yes, you can read it and build it for yourself, but the source is not licensed for reuse (all rights reserved). It is on <a href="https://github.com/Solomon-69/Ludus" target="_blank" rel="noopener" data-repo>GitHub</a>.</p>
       </details>
     </div>
   </section>
-<section style="max-width:720px;margin:48px auto;padding:0 20px;font:15px/1.6 system-ui,-apple-system,sans-serif;color:inherit"><h2 style="font-size:20px;margin:0 0 8px">Unsigned app: how to open it</h2><p>This app is not signed yet (Apple's developer account is paid, and one is not set up yet), so your computer warns you the first time. <b>Mac:</b> right-click the app, choose <b>Open</b>, then <b>Open</b> again (or System Settings &gt; Privacy &amp; Security &gt; <b>Open Anyway</b>). <b>Windows:</b> in SmartScreen click <b>More info</b>, then <b>Run anyway</b>. You can check your download against the SHA-256 fingerprints listed in the project's CHECKSUMS.md on GitHub.</p></section>
+<section style="max-width:720px;margin:48px auto;padding:0 20px;font:15px/1.6 system-ui,-apple-system,sans-serif;color:inherit"><h2 style="font-size:20px;margin:0 0 8px">Opening the app</h2><p><b>Mac:</b> every app here is signed and checked by Apple (notarized), so it opens like any normal app: open the download, drag to Applications, double-click. <b>Windows:</b> the first time, SmartScreen may warn you: click <b>More info</b>, then <b>Run anyway</b>. You can check a download against the SHA-256 fingerprints in each release (the SHA256SUMS file) on GitHub.</p></section>
 </main>
 
+<section class="oss">
+  <div class="wrap">
+    <a class="ossbtn" href="https://github.com/Solomon-69/Ludus" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.52-1.33-1.28-1.69-1.28-1.69-1.05-.71.08-.7.08-.7 1.16.08 1.77 1.2 1.77 1.2 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.28 1.19-3.09-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.83 1.19 3.09 0 4.42-2.69 5.39-5.25 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5Z"/></svg><span><b>Ludus is open source</b><small>Read the code, report a problem or star it on GitHub</small></span><i>&rarr;</i></a>
+  </div>
+</section>
 <footer>
   <div class="wrap row">
     <div>
-      <p>Ludus. Copyright (c) 2026 Solomon. MIT licence. Not affiliated with or endorsed by the makers of any game it resembles; all trademarks belong to their owners.</p>
+      <p>Ludus. Copyright (c) 2026 Solomon. All rights reserved. Source not licensed for reuse. Not affiliated with or endorsed by the makers of any game it resembles; all trademarks belong to their owners.</p>
       <p>Not affiliated with Anthropic. Settings icon from Lucide (ISC licence).</p>
     </div>
     <div>
@@ -650,7 +647,7 @@
     var dlMac = document.getElementById('dl-mac'), dlWin = document.getElementById('dl-win');
     function setOS(os, remember) {
       root.dataset.os = os;
-      var dir = os === 'windows' ? 'img/win/' : 'img/';
+      var dir = os === 'windows' ? 'pg/img/win/' : 'pg/img/';
       document.querySelectorAll('picture[data-shot]').forEach(function (p) {
         var n = p.getAttribute('data-shot'), src = p.querySelector('source'), img = p.querySelector('img');
         if (src) src.srcset = dir + n + '-dark.png';
