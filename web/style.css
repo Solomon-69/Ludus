@@ -1008,3 +1008,8 @@ svg { display: block; }
 .kbd-pill { position: absolute; left: 0; top: 0; z-index: 2; pointer-events: none; border-radius: 12px; opacity: 0; background: color-mix(in srgb, var(--ink) 9%, transparent);
   transition: transform 0.45s var(--spring), height 0.3s var(--spring), width 0.3s var(--spring), opacity 0.15s; }
 .reduce .kbd-pill { transition: opacity 0.1s; }
+
+/* The room lobby is ONE card: no tinted, blurred sheet around it and no raised slab under it, just the card with a hairline. */
+.sheet.lobby { background: none; backdrop-filter: none; -webkit-backdrop-filter: none; border-radius: 0; padding: 0; }
+.sheet.lobby .lobby-card { border-radius: var(--r-lg); }
+:root:not(.flat) .sheet.lobby .lobby-card { box-shadow: inset 0 0 0 1px var(--box-line); }

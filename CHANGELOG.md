@@ -3,6 +3,9 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.67 (3 Nov 2026)
+- Online room lobby: the "Your room" card is now a single card with matching rounded corners. The tinted blurred sheet around it and the dark raised edge under it are gone, in light and dark.
+
 ## 1.12.66 (3 Nov 2026)
 - Settings by keyboard (Mac and Windows): Up and Down glide a soft highlight through every setting, wrapping top to bottom and into More settings. Left and Right or Space and Return change the highlighted one (switches flip, options step to the next, volume nudges, More opens and closes). Esc goes back. It stays out of the way while you type in a text field or use the mouse.
 
