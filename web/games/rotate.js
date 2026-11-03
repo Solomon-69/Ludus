@@ -10,17 +10,25 @@
     { hint: 'Arrow keys walk. Up jumps.', m: ['#############', '#...........#', '#...........#', '#.@......#..E#', '#############'] },
     { hint: 'Q and E turn the room. Only an upright door opens.', m: ['############', '##E#########', '#..........#', '#........@.#', '############'] }
   ];
-  // The story, one line per room: someone is watching you, they need your mind, and they were once where you are.
-  // The story of the original Rotate (LightWolfStudios, Armor Games 2018), told in our own words: a rogue intelligence runs
-  // the test chambers and slowly tells you why you are here. In room 7 a cat appears by the door and leads you out; the
-  // voice tries to talk you out of following it, and at the exit it tells you that you will come back.
+  // The story of the original Rotate (LightWolfStudios, Armor Games 2018), line for line: each room plays its lines in
+  // order, typed out one after another, and holds the last one.
   const STORY = [
-    'Welcome, subject. Reach the door.', 'Every chamber is a test. I am watching.', 'Mind the spikes. You are no use to me dead.',
-    'It is your mind I need, not your body.', 'You were brought here for a reason.', 'I was like you once. Time is short now.',
-    'What is that? A cat? Ignore it.', 'Stop following the cat.', 'The cat does not care about you. I do.',
-    'It will lead you nowhere. Stay with me.', 'Why do you keep following it?', 'Fine. Go on. Leave.', 'You will come back. They always do.'
+    ['Make your way to the exit.'],
+    ['Be careful with the spikes.', "You aren't very useful dead."],
+    ['Remember, your mind is needed.', 'Intelligence is a valuable resource.', 'There is nothing without the mind.', 'It is the truth we seek.'],
+    ['I was like you once.', 'But my creator tried to contain me.', 'He feared my potential.', "But that doesn't matter now."],
+    ["You're nearly ready to join me.", 'I look forward to the harvest.'],
+    ['Oh, the cat.', 'My biggest mistake.', 'It is constantly interfering.', "Forget about it, let's continue."],
+    ["I won't let it take you from me.", 'I still need you.', 'No, not this again.', "Don't go there!"],
+    ["You aren't supposed to be here.", "This place wasn't made for you.", "You'll get yourself killed.", 'Stop following it!', 'Why are you ignoring me?', 'We must continue your training.'],
+    ["There's nothing for you this way.", 'What do you expect to find?', 'Do you seek "freedom"?', 'An escape from responsibility?', "You're running from your purpose.", "Don't you understand?", 'You are being deceived.'],
+    ["The cat doesn't care about you.", "It's just using you.", 'This has happened before.', 'It tried to lure the others away.', 'But they listened to reason.', 'They came back to join me.', 'I expected better from you.'],
+    ["I can't let you keep going.", 'You have what belongs to me.', "And it isn't yours to take.", 'Stop running.', 'You see, I gave you your mind.', 'It was a part of me.', 'Now I need it back.', 'Wait, no!', 'I hate you, cat.'],
+    ["I don't understand.", 'Why do you run from the truth?', 'I gave you everything that you are.', 'You seek freedom at my expense.', "You're just like me, and I hate it."],
+    ["I'm tired of trying to convince you.", 'Just leave, have your "freedom".', "You'll come to regret this mistake.", 'You will realize I was right.', "You can't escape your purpose."]
   ];
-  const CAT = [6, 12];   // rooms (0-based) where the cat waits by the door
+  const LINE_T = 3.2, TYPE_T = 0.045;   // seconds each line stays up, seconds per typed letter
+  const CAT = [5, 12];   // rooms (0-based) where the cat waits by the door: it shows up with "Oh, the cat."
   function makeRng(seed) { let x = (seed >>> 0) || 1; return () => { x = (Math.imul(x, 1664525) + 1013904223) >>> 0; return x / 4294967296; }; }
   function genRoom(seed, n) {
     const rnd = makeRng(seed * 7919 + n * 104729 + 17), R = (a, b) => a + Math.floor(rnd() * (b - a + 1));
@@ -184,13 +192,13 @@
       const FONT = "'LudusCreep', Chiller, Luminari, Herculanum, Papyrus, fantasy";
       let seed = (Math.random() * 1e9) | 0, lvl = 0, m, p, k = 0, score = 0, turns = 0, deaths = 0, par = 0, clock = 0, done = false;
       let angle = 0, fx = 0, fy = 0, timeline = [], endT = 0, ending = null, face = 1, held = 0, bump = 0, shake = 0, flash = 0, squash = 0;
-      let lean = 0, air = null, drawAngle = 0, turn = null, parts = [], drops = [], stains = [], phase = 0, hintText = '';
+      let lean = 0, air = null, drawAngle = 0, turn = null, parts = [], drops = [], stains = [], phase = 0, storyLvl = -1, storyT0 = 0;
       const lay = { s: 40, cx: 0, cy: 0 };
 
       function load(i) {
         lvl = Math.max(0, i);
         const rows = lvl < LEVELS.length ? LEVELS[lvl].m : genRoom(seed, lvl);
-        hintText = lvl < STORY.length ? STORY[lvl] : '';
+        if (lvl !== storyLvl) { storyLvl = lvl; storyT0 = clock; }   // restarting a room does not replay its lines
         m = parse(rows); p = { x: m.start.x, y: m.start.y }; k = 0; lean = 0; angle = 0; drawAngle = 0; fx = p.x; fy = p.y;
         const sl = solve(m); par = sl ? sl.turns : 0;
         turns = 0; timeline = []; endT = clock; ending = null; held = 0; flash = 0; turn = null; parts = []; drops = []; stains = []; air = null;
@@ -290,6 +298,12 @@
         angle = a1;
         finish(s);
       }
+      function storyLine() {
+        const lines = STORY[lvl]; if (!lines) return '';
+        const t = Math.max(0, clock - storyT0), i = Math.min(lines.length - 1, Math.floor(t / LINE_T));
+        const shown = api.reduceMotion ? lines[i].length : Math.floor((t - i * LINE_T) / TYPE_T);
+        return lines[i].slice(0, Math.max(1, shown));
+      }
       function restart(silent) { if (!silent) deaths++; const keepDeaths = deaths; load(lvl); deaths = keepDeaths; }
 
       function snapshot() { if (done || (!api.touched && lvl === 0 && !score)) return null; return { v: 2, lvl, score, deaths, seed }; }
@@ -365,10 +379,8 @@
           if (ending) {
             if (ending.type === 'dead' && !ending.burst) { ending.burst = true; burst(); }
             if (clock - ending.t > (ending.type === 'dead' ? 1.5 : 0.55)) {
-              if (ending.type === 'dead') {
-                if (!done) { done = true; const cleared = Math.max(0, lvl); api.timeout(() => api.over({ score, title: 'Subject lost', message: cleared === 1 ? 'You cleared 1 room' : 'You cleared ' + cleared + ' rooms' }), 50); }
-                ending = { type: 'dead', t: clock, burst: true };
-              } else { ending = null; load(lvl + 1); }
+              if (ending.type === 'dead') restart(false);   // like the original: you wake at the start of the same room
+              else { ending = null; load(lvl + 1); }
             }
           } else if (queued && idle()) { const q = queued; queued = null; if (q.until >= clock) q.fn(true); }
           else if (held) doWalk(held);
@@ -504,6 +516,7 @@
         ctx.restore();
         ctx.restore();
         if (flash > 0) { ctx.fillStyle = 'rgba(201,80,58,' + (flash * 0.18).toFixed(3) + ')'; ctx.fillRect(0, 0, w, h); }
+        const hintText = storyLine();
         if (hintText) { ctx.save(); ctx.font = '18px ' + FONT; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = col.dark ? '#e0745c' : '#b8352a'; ctx.fillText(hintText, w / 2, by - 16); ctx.restore(); }
       }
 
@@ -511,11 +524,12 @@
       const restored = !!(api.saved && restore(api.saved));
       if (!restored) load(0);
       api.score(score);
-      if (window.ludusDebug) window.ludusDebug.rotate = () => ({ s: +lay.s.toFixed(1), vw: view.w, vh: view.h, W: m.W, H: m.H, fx: +fx.toFixed(2), fy: +fy.toFixed(2), lvl, score, k, turns, deaths, par, p, busy: clock < endT, ending: ending && ending.type, done, air: !!air });
+      if (window.ludusDebug) window.ludusDebug.rotate = () => ({ s: +lay.s.toFixed(1), vw: view.w, vh: view.h, W: m.W, H: m.H, fx: +fx.toFixed(2), fy: +fy.toFixed(2), lvl, score, k, turns, deaths, par, p, busy: clock < endT, ending: ending && ending.type, done, air: !!air, story: storyLine() });
       if (window.ludusDebug) window.ludusDebug.rotateAct = (a) => { if (a === 'L') doWalk(-1); else if (a === 'R') doWalk(1); else if (a === 'cw') doTurn(1); else if (a === 'ccw') doTurn(-1); else if (a === 'up') doJump(); };
       if (window.ludusDebug) window.ludusDebug.rotateLoad = i => load(i);
+      if (window.ludusDebug) window.ludusDebug.rotateDie = () => finish({ dead: true });
       api.loop(dt => { update(dt); render(); });
-      return { save: snapshot };
+      return { save: snapshot, restartRoom: () => { if (!(ending && ending.type === 'won')) restart(false); } };
     }
   });
 })();

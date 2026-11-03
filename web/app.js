@@ -973,6 +973,10 @@
       else { online.session.requestRematch(); toast('Asked the host for a rematch'); }
       return;
     }
+    // A game with rooms (Turn Room) restarts only the room you are in, never the whole run
+    if (fresh !== true && !current.run.ended && current.instance && current.instance.restartRoom) {
+      current.instance.restartRoom(); resume(); return;
+    }
     const g = current.game, ended = !!current.run.ended; forget(g.id); stop();
     hideOver(); $('pauseSheet').hidden = true;
     $('scoreNow').textContent = '0';

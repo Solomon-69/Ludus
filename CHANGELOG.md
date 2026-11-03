@@ -3,6 +3,10 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.64 (3 Nov 2026)
+- Turn Room: the words at the bottom are now the real Rotate story, line for line as in the original game, typed out one after another in each room (the cat shows up with "Oh, the cat.").
+- Turn Room: dying or pressing Restart puts you back at the start of the room you are in, never back to room 1.
+
 ## 1.12.63 (2 Nov 2026)
 - Map Hunt and Clue Spotter online: players who joined now see the setup choices (time, movement; clues, region) and can tap one to suggest it; the host sees their name on that choice. Before, they only saw "The host is choosing" text.
 
