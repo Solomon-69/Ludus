@@ -156,7 +156,7 @@
     return found;
   }
 
-  const TURN = 0.62;
+  const TURN = 0.48;   // the original turns a room in just under half a second
   const easeBack = u => { const c = 1.25, v = u - 1; return 1 + (c + 1) * v * v * v + c * v * v; };
   const BLOOD = ['#b8352a', '#d4574a'];
   const TILE_A = ['#efe8da', '#e9e1d1'], TILE_A_DARK = ['#3a342c', '#352f28'];
@@ -211,8 +211,8 @@
         cells.forEach(c => { timeline.push({ t0: t, t1: t + per, type: 'move', from, to: { x: c.x, y: c.y }, kind }); from = { x: c.x, y: c.y }; t += per; });
         endT = t;
       }
-      // falling: one smooth drop that speeds up like real gravity (cells fallen = FALL_G * t * t / 2), not a fast slide
-      const FALL_G = 22;
+      // falling: one drop that speeds up like real gravity (cells fallen = FALL_G * t * t / 2)
+      const FALL_G = 46;   // faster than before, closer to the original Rotate (a 3-cell drop takes about 0.36 s)
       function fall(path) { if (path.length) play([path[path.length - 1]], Math.sqrt(2 * path.length / FALL_G), 'fall'); }
       function rot(a0, a1) { const t = Math.max(clock, endT); timeline.push({ t0: t, t1: t + TURN, type: 'rot', a0, a1 }); endT = t + TURN; }
       function idle() { return clock >= endT && !ending && !done && !air; }
@@ -243,7 +243,7 @@
         finish(s);
       }
       // ---- jump: real flight. You leave the floor going up, gravity pulls you back, and left and right steer you in the air.
-      const HW = 0.2, V0 = 9.6, GRAV = 34, GRAV_DOWN = 17, MAX_FALL = 7.5, STEER = 4.4;   // fall back down slower than you rise
+      const HW = 0.2, V0 = 9.6, GRAV = 34, GRAV_DOWN = 40, MAX_FALL = 16, STEER = 4.4;   // like the original: come down a touch faster than you rise
       const solidAt = (x, y) => solid(cellAt(m, Math.floor(x), Math.floor(y)));
       function bodyHits(x, y, g, r) {
         const cx = x + 0.5, cy = y + 0.5;

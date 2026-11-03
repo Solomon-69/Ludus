@@ -3,6 +3,9 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.65 (3 Nov 2026)
+- Turn Room: falling is faster (closer to the original Rotate) and turning the room is a little quicker.
+
 ## 1.12.64 (3 Nov 2026)
 - Turn Room: the words at the bottom are now the real Rotate story, line for line as in the original game, typed out one after another in each room (the cat shows up with "Oh, the cat.").
 - Turn Room: dying or pressing Restart puts you back at the start of the room you are in, never back to room 1.
