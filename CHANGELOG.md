@@ -3,6 +3,10 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.68 (4 Nov 2026)
+- No more error beep: pressing a key the game does not use (letters, WASD, Space and the rest) no longer plays the Mac error sound. Text boxes and buttons still work with the keyboard as before.
+- Turn Room: the story lines at the bottom now tick softly as each letter types in, like the original.
+
 ## 1.12.67 (3 Nov 2026)
 - Online room lobby: the "Your room" card is now a single card with matching rounded corners. The tinted blurred sheet around it and the dark raised edge under it are gone, in light and dark.
 

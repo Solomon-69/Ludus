@@ -95,7 +95,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
         webPrefs = config.preferences
         // Game and interface sounds (WebAudio) may play without waiting for a click inside the page first.
         config.mediaTypesRequiringUserActionForPlayback = []
-        webView = WKWebView(frame: NSRect(origin: .zero, size: currentSize()), configuration: config)
+        webView = QuietWebView(frame: NSRect(origin: .zero, size: currentSize()), configuration: config)
         webView.setValue(false, forKey: "drawsBackground")
         webView.allowsMagnification = false
         webView.navigationDelegate = self
@@ -923,4 +923,12 @@ enum LudusApp {
         app.setActivationPolicy(.accessory)
         withExtendedLifetime(delegate) { app.run() }
     }
+}
+
+
+/// The page owns the keyboard. Any key it leaves alone would otherwise reach AppKit's default handler and play the
+/// macOS error beep, so those commands end here.
+final class QuietWebView: WKWebView {
+    override func doCommand(by selector: Selector) {}
+    override func noResponder(for eventSelector: Selector) {}
 }

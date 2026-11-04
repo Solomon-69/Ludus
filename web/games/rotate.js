@@ -192,7 +192,7 @@
       const FONT = "'LudusCreep', Chiller, Luminari, Herculanum, Papyrus, fantasy";
       let seed = (Math.random() * 1e9) | 0, lvl = 0, m, p, k = 0, score = 0, turns = 0, deaths = 0, par = 0, clock = 0, done = false;
       let angle = 0, fx = 0, fy = 0, timeline = [], endT = 0, ending = null, face = 1, held = 0, bump = 0, shake = 0, flash = 0, squash = 0;
-      let lean = 0, air = null, drawAngle = 0, turn = null, parts = [], drops = [], stains = [], phase = 0, storyLvl = -1, storyT0 = 0;
+      let lean = 0, air = null, drawAngle = 0, turn = null, parts = [], drops = [], stains = [], phase = 0, storyLvl = -1, storyT0 = 0, tyKey = '', tyN = 0;
       const lay = { s: 40, cx: 0, cy: 0 };
 
       function load(i) {
@@ -517,6 +517,10 @@
         ctx.restore();
         if (flash > 0) { ctx.fillStyle = 'rgba(201,80,58,' + (flash * 0.18).toFixed(3) + ')'; ctx.fillRect(0, 0, w, h); }
         const hintText = storyLine();
+        // the typed lines tick softly, one blip per letter, like the original
+        { const k = lvl + ':' + storyLvl + ':' + (clock - storyT0 < 0 ? 0 : Math.floor((clock - storyT0) / LINE_T));
+          if (k !== tyKey) { tyKey = k; tyN = 0; }
+          if (hintText.length > tyN) { if (hintText.length - tyN <= 3 && hintText[hintText.length - 1] !== ' ' && !api.reduceMotion) api.sfx('type'); tyN = hintText.length; } }
         if (hintText) { ctx.save(); ctx.font = '18px ' + FONT; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = col.dark ? '#e0745c' : '#b8352a'; ctx.fillText(hintText, w / 2, by - 16); ctx.restore(); }
       }
 

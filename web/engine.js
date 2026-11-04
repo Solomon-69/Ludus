@@ -65,7 +65,7 @@
     hit: [[160, 0.09, 'sawtooth', 90]], boom: [[120, 0.25, 'sawtooth', 40]], power: [[300, 0.18, 'square', 900]],
     win: [[523, 0.09, 'sine'], [659, 0.09, 'sine'], [784, 0.09, 'sine'], [1046, 0.18, 'sine']],
     lose: [[392, 0.12, 'triangle'], [330, 0.12, 'triangle'], [262, 0.22, 'triangle']],
-    over: [[330, 0.12, 'triangle'], [247, 0.24, 'triangle']], tick: [[1200, 0.015, 'square']],
+    over: [[330, 0.12, 'triangle'], [247, 0.24, 'triangle']], type: [[1500, 0.012, 'square', 1100]], tick: [[1200, 0.015, 'square']],
     // game moments added in 1.12.20
     flip: [[900, 0.035, 'triangle', 620]], place: [[260, 0.05, 'triangle', 190]], bounce: [[520, 0.045, 'sine', 380]],
     correct: [[700, 0.05, 'sine'], [1050, 0.08, 'sine']], wrong: [[220, 0.1, 'triangle', 170], [196, 0.12, 'triangle']],
@@ -85,10 +85,10 @@
   };
   const QUIET = { tab: 0.45, open: 0.5, back: 0.45, on: 0.45, off: 0.45, sheet: 0.4, unsheet: 0.4, panel: 0.35, panelOff: 0.3,
     toast: 0.35, copy: 0.4, save: 0.5, room: 0.55, friend: 0.55, count: 0.6, go: 0.7, result: 0.65, shoot: 0.45, coin: 0.6,
-    deal: 0.5, wrong: 0.7, whoosh: 0.5, click: 0.8 };
+    deal: 0.5, type: 0.5, wrong: 0.7, whoosh: 0.5, click: 0.8 };
   // The same sound never stacks up: a repeat sooner than this (ms) is dropped. Busy games (a hit every frame,
   // online snapshots arriving in bursts) stay calm, and at most MAX_BURST sounds start in any 120 ms.
-  const GAP = { toast: 400, panel: 500, panelOff: 500, friend: 600, tick: 60, move: 45, eat: 45, hit: 60, flip: 40, deal: 30 };
+  const GAP = { toast: 400, panel: 500, panelOff: 500, friend: 600, tick: 60, move: 45, eat: 45, hit: 60, flip: 40, deal: 30, type: 30 };
   const MAX_BURST = 6, lastAt = {}, recent = [];
   function ctx() {
     if (!actx) { const C = window.AudioContext || window.webkitAudioContext; if (!C) return null; actx = new C(); }
@@ -134,6 +134,16 @@
     } catch (e) {}
   }
   ['pointerdown', 'touchend', 'keydown', 'mousedown'].forEach(t => window.addEventListener(t, unlockAudio, { capture: true, passive: true }));
+  // A key the page leaves alone makes macOS play its error beep. Marking every key as handled (outside text boxes and
+  // the keys buttons and links use themselves) keeps WASD, Space, letters and the rest silent.
+  window.addEventListener('keydown', e => {
+    if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey || e.isComposing) return;
+    const t = e.target, tag = t && t.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (t && t.isContentEditable)) return;
+    if (e.key === 'Tab') return;
+    if ((tag === 'BUTTON' || tag === 'A' || (t && t.getAttribute && t.getAttribute('role') === 'button')) && (e.key === 'Enter' || e.key === ' ')) return;
+    e.preventDefault();
+  }, false);
 
   // ---------- colours from CSS tokens ----------
   function colors() {
