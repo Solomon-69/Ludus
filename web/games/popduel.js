@@ -423,7 +423,7 @@
 
   Ludus.register({
     id: 'popduel', name: 'Pop Duel', aka: 'balloon tower defence', tag: 'Duel', wide: true, versus: true, tint: '#4f9a4a',
-    hint: 'Pick a tower, click grass to build · click it to upgrade · vs Friend: P1 left track, P2 right · <kbd>1</kbd>-<kbd>0</kbd> towers · <kbd>Space</kbd> speed',
+    hint: 'Pick a tower, click grass to build · click it to upgrade · vs Friend: click P1 or P2 at the top to swap tracks, or press <kbd>Tab</kbd> · <kbd>1</kbd>-<kbd>0</kbd> towers · <kbd>Space</kbd> speed',
     online: { min: 2, max: 2 },
     onlineHint: '<b>Online</b> You defend your own track, your friend defends theirs · same waves on the same clock · Send balloons at them from the Send tab · <kbd>1</kbd>-<kbd>0</kbd> towers',
     _rules: { TW, SENDS, wave, waveStart, canUp, stats, Board, aiThink },
@@ -448,7 +448,7 @@
       const on = api.online || null, friend = api.friend && !on;
       const me = on && on.seat === 1 ? 1 : 0, foe = 1 - me;
       let mode = 'duel', rule = 'classic', phase = 'menu', clock = 0, speed = 1, boards = [], active = me, aiT = 0, overT = 0, winner = -1, lastPop = 0, menuHover = null;
-      let hits = [], mouse = null, restored = false, netT = 0, foeDead = null, myDeadT = -1;
+      let peek = false, hits = [], mouse = null, restored = false, netT = 0, foeDead = null, myDeadT = -1;
 
       function makeBoards() {
         const common = { live: () => phase === 'play', sfx: n => api.sfx(n), pop: B => { const now = performance.now(); if (B.human && now - lastPop > 70) { lastPop = now; api.sfx('tick'); } } };
@@ -465,13 +465,13 @@
       }
       function startRun(m, r) {
         mode = m; if (r) rule = r;
-        makeBoards(); clock = 0; phase = 'play'; winner = -1; active = me; aiT = 0; netT = 0; foeDead = null; myDeadT = -1;
+        makeBoards(); clock = 0; phase = 'play'; winner = -1; active = me; peek = false; aiT = 0; netT = 0; foeDead = null; myDeadT = -1;
         api.score(0); api.sfx('score');
       }
       makeBoards();
 
       /* ---------- layout ---------- */
-      const TOP = 56, PANEL_MIN = 96;
+      const TOP = 56, PANEL_ONE = 104;
       function layout() {
         const w = view.w, h = view.h, wide = w >= 600 && w > h * 1.15;
         const L = { wide, boards: [], panels: [] };
@@ -488,21 +488,14 @@
           }
           return L;
         }
-        if (wide) {
-          // Two tracks side by side, one dock-style panel under them (in vs Friend it follows the last track clicked).
-          const bw = Math.min((w - 30) / 2, (h - TOP - 16 - PANEL_MIN) * 1.5), bh = bw / 1.5, x0 = (w - 2 * bw - 10) / 2;
-          L.boards.push({ i: 0, x: x0, y: TOP, w: bw, h: bh }, { i: 1, x: x0 + bw + 10, y: TOP, w: bw, h: bh });
-          const py = TOP + bh + 8, ph = h - py - 8, pw = Math.max(2 * bw + 10, Math.min(w - 20, 760));
-          L.panels.push({ i: friend ? active : me, x: (w - pw) / 2, y: py, w: pw, h: ph, shared: friend });
-        } else if (friend) {
-          const bh = Math.min((w - 20) / 1.5, (h - TOP - 24 - 150) / 2), bw = bh * 1.5;
-          L.boards.push({ i: 0, x: (w - bw) / 2, y: TOP, w: bw, h: bh }, { i: 1, x: (w - bw) / 2, y: TOP + bh + 8, w: bw, h: bh });
-          L.panels.push({ i: active, x: 10, y: TOP + 2 * bh + 16, w: w - 20, h: h - TOP - 2 * bh - 24, shared: true });
-        } else {
-          const bw = Math.min(w - 20, (h - TOP - 216) * 1.5), bh = bw / 1.5;
-          L.boards.push({ i: me, x: (w - bw) / 2, y: TOP, w: bw, h: bh });
-          L.panels.push({ i: me, x: 10, y: TOP + bh + 8, w: w - 20, h: h - TOP - bh - 16, rival: true });
-        }
+        // One big track in the middle. The other track keeps running: its name card at the top, or Tab, shows it.
+        const shown = friend ? active : peek && boards.length === 2 ? foe : me;
+        // Wide: the track rises up between the two name cards, so it gets all the height there is.
+        const top = wide ? 8 : TOP, chip = Math.min(132, (w - 20) * 0.34);
+        const bw = Math.min(wide ? w - 2 * chip - 40 : w - 20, (h - top - (wide ? 16 + PANEL_ONE : 216)) * 1.5), bh = bw / 1.5, py = top + bh + 8;
+        const pw = wide ? Math.min(w - 20, 760) : w - 20;
+        L.boards.push({ i: shown, x: (w - bw) / 2, y: top, w: bw, h: bh });
+        L.panels.push({ i: friend ? active : me, x: (w - pw) / 2, y: py, w: pw, h: h - py - 8, shared: friend, rival: !friend });
         return L;
       }
 
@@ -518,12 +511,14 @@
       api.on(canvas, 'contextmenu', e => { e.preventDefault(); boards.forEach(B => { B.pick = null; B.selT = null; }); });
       api.keys(e => {
         if (phase !== 'play') return;
+        if (e.key === 'Tab' && boards.length === 2) { e.preventDefault(); showTrack(friend ? 1 - active : peek ? me : foe); return; }
         if (e.key === ' ') { if (!on) { speed = nextSpeed(); api.sfx('click'); } return; }
         const n = '1234567890'.indexOf(e.key);
         const B = boards[active];
         if (n >= 0 && B && B.human) { const k = TKEYS[n]; B.pick = B.pick === k ? null : k; B.selT = null; B.tab = 'towers'; api.sfx('click'); }
       });
 
+      function showTrack(i) { if (friend) active = i; else peek = i !== me; api.sfx('click'); }
       // Solo goes up to triple speed; a duel on one screen up to double; online keeps both screens on the real clock.
       function nextSpeed() { const top = mode === 'solo' ? 3 : 2; return speed >= top ? 1 : speed + 1; }
 
@@ -787,9 +782,12 @@
         const L = a ? { who: a.opt.who, label: on ? nameOf(0) : a.opt.who === 'p1' ? 'P1' : 'You', score: lives(a) } : null;
         let Rt = null;
         if (mode === 'duel' && b) Rt = { who: b.opt.who, label: on ? nameOf(1) : b.opt.who === 'p2' ? 'P2' : 'Bot', score: lives(b) };
-        const thinking = !friend && !on && mode === 'duel' && phase === 'play';
-        D.duelHeader(ctx, 10, 8, w - 20, { left: L, right: Rt, turn: thinking ? 'right' : null, status: '', thinking }, col);
+        const duel = mode === 'duel' && boards.length === 2 && phase === 'play';
+        const shown = friend ? active : peek ? foe : me;
+        D.duelHeader(ctx, 10, 8, w - 20, { left: L, right: Rt, turn: duel ? (shown === 0 ? 'left' : 'right') : null, status: '', quiet: true, thinking: false }, col);
         const pw = Math.min(132, (w - 20) * 0.34), mx = 10 + pw + 10, mw = w - 20 - 2 * pw - 20;
+        const beside = mode === 'duel' && w >= 600 && w > view.h * 1.15 && phase !== 'menu';   // wide: the track fills the middle, so these sit under the left card
+        if (duel) [0, 1].forEach(i => hit(i ? w - 10 - pw : 10, 8, pw, 42, () => { if (i !== shown) showTrack(i); }, null, 'Show ' + (i ? Rt.label : L.label)));
         if (mode === 'solo') fit1(ctx, RULES[rule].n + ' solo', w - 10 - pw / 2, 28, pw, 12, col.ink2, 700);
         let status = 'Choose a game';
         if (phase === 'play' || phase === 'over') {
@@ -797,8 +795,9 @@
           status = A.wave === 0 ? `First wave in ${Math.max(1, Math.ceil(next))}s` : `Wave ${A.wave}` + (next > 0 && next < 60 ? ` · next in ${Math.ceil(next)}s` : '');
           if (phase === 'over') status = 'Game over';
         }
-        fit1(ctx, status, mx + mw / 2, 20, mw, 12, col.accent, 700);
-        if (phase === 'play' && mw > 40 && !on) button(mx + mw / 2 - 18, 32, 36, 16, { label: speed + 'x', tip: 'Game speed (Space)', r: 8, size: 9.5, on: speed > 1, fn: () => { speed = nextSpeed(); api.sfx('click'); } });
+        const sx = beside ? 10 + pw / 2 : mx + mw / 2, sy = beside ? 66 : 20;
+        fit1(ctx, status, sx, sy, beside ? pw : mw, 12, col.accent, 700);
+        if (phase === 'play' && mw > 40 && !on) button(sx - 18, sy + 12, 36, 16, { label: speed + 'x', tip: 'Game speed (Space)', r: 8, size: 9.5, on: speed > 1, fn: () => { speed = nextSpeed(); api.sfx('click'); } });
       }
 
       function drawMenu() {
@@ -807,7 +806,7 @@
         ctx.save(); ctx.fillStyle = col.surface; ctx.shadowColor = 'rgba(0,0,0,0.25)'; ctx.shadowBlur = 22; ctx.shadowOffsetY = 6;
         D.roundRect(ctx, x, y, cw, ch, 18); ctx.fill(); ctx.restore();
         fit1(ctx, 'Pop Duel', x + cw / 2, y + 24, cw - 30, 17, col.ink, 800);
-        const sub = friend ? 'P1 defends the left track, P2 the right. Same waves; send balloons at each other.' : 'Same waves on both tracks. Send balloons to break the bot’s defence.';
+        const sub = friend ? 'P1 and P2 each defend a track. Same waves; send balloons at each other.' : 'Same waves on both tracks. Send balloons to break the bot’s defence.';
         D.fitText(ctx, sub, x + cw / 2, y + 52, cw - 36, 11.5, col.ink2, 600, 10);
         button(x + 18, y + 76, cw - 36, 36, { label: friend ? 'Start duel: P1 vs P2' : 'Start duel vs bot', primary: true, r: 12, size: 12.5, fn: () => startRun('duel') });
         fit1(ctx, 'Or play solo, endless waves', x + cw / 2, y + 128, cw - 36, 10.5, col.ink3, 650);

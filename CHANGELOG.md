@@ -3,6 +3,13 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.70 (5 Nov 2026)
+- Updates: the bar now follows the real download, byte by byte, then shows checking and installing, so it no longer sits at 1% and jumps. If an update fails it says why, and a broken connection or a just-published release is retried by itself.
+- No more Mac error sound on arrow keys: every key the games do not take now stops quietly, in every game.
+- Turn Room: arrows steer you in the air on every fall, not only on a jump: walking off a ledge and falling after a turn too. Steering is also quicker.
+- Pop Duel: one big track in the middle instead of two side by side. Click a name at the top, or press Tab, to see the other track.
+- Sky Hop: six modes on the tab switcher: Classic, Monsters, Boost (jet, coil and bubble pick-ups), Moon (floaty bounces, drifting rocks), Storm (wind and rain) and Night (you only see your own glow). Up or Space fires at monsters.
+
 ## 1.12.69 (5 Nov 2026)
 - Online: closing and opening the panel brings you back to exactly the online room or round you were in (waiting room, scoreboard or game), not to All games. A room that has stopped working still goes behind All games with Rejoin on the Last party card.
 - Online: when the link drops, the party lobby shows a Rejoin button, so you can open the same party again without leaving it.

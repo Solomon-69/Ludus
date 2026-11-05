@@ -11,6 +11,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
     private var statusItem: NSStatusItem!
     private let popover = NSPopover()
     private var webView: WKWebView!
+    private var keyMonitor: Any?
     private var clickMonitor: Any?
     private var appearanceObserver: NSKeyValueObservation?
     private var styled = false
@@ -34,7 +35,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
     private static let wideLarge = NSSize(width: 900, height: 600)
     private var wide = false
     private var openCount = 0   // per-open counter, so a late reveal from an earlier open does nothing
-    private let testNotification = Notification.Name("com.solomon.Ludus.test")
+    private let testNotification = Notification.Name((Bundle.main.bundleIdentifier ?? "com.solomon.Ludus") + ".test")
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Keep "open at login" valid after the app is moved or renamed.
@@ -69,6 +70,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
         DistributedNotificationCenter.default().addObserver(forName: Notification.Name("com.apple.screenIsUnlocked"), object: nil, queue: .main, using: wake)
         // Our menu bar apps close their panel when another of them opens one.
         PanelGroup.listen { [weak self] in Task { @MainActor in self?.closePopover() } }
+        NoBeep.install()
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] e in
+            // Keys always belong to the page: after a click elsewhere in the panel, hand them back to it.
+            if let v = self?.webView, let w = v.window, w.isKeyWindow, w.firstResponder !== v, self?.uiReady == true { w.makeFirstResponder(v) }
+            return e
+        }
         #if LUDUS_TEST
         // UI test hook, compiled only into local test builds (build.sh adds -D LUDUS_TEST unless RELEASE=1).
         DistributedNotificationCenter.default().addObserver(
@@ -217,7 +224,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
                     })
             } catch {
                 appendErrorLog("update failed: \(error)")
-                report("window.ludusUpdateState && ludusUpdateState('error')")
+                let why = updateProblem(error, app: "Ludus")
+                report("window.ludusUpdateState && ludusUpdateState('error', \(String(reflecting: why)))")
             }
             await MainActor.run { self.updating = false }
         }
@@ -833,6 +841,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
             } else {
                 statusItem.button?.performClick(nil)
             }
+        case "park": setLive(true)
         case "reopen": _ = applicationShouldHandleReopen(NSApp, hasVisibleWindows: false)
         case "status":
             // Where the menu bar item is, how wide, and whether it draws anything (for the invisible-mode check).
@@ -873,6 +882,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
                 self?.appendLog("\(Date()) \(result as? String ?? "nil")\n")
             }
         default:
+            if command.hasPrefix("keys:") {
+                // Sends real arrow key events through the window, and logs how many ran past the page to the end of the chain.
+                let codes: [UInt16] = [123, 124, 125, 126]
+                let before = KeySink.caught
+                if let w = webView.window {
+                    w.makeFirstResponder(webView)
+                    for c in codes { for t in [NSEvent.EventType.keyDown, .keyUp] {
+                        if let e = NSEvent.keyEvent(with: t, location: .zero, modifierFlags: [.function, .numericPad], timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: w.windowNumber, context: nil, characters: String(UnicodeScalar(0xF700 + Int(c == 126 ? 0 : c == 125 ? 1 : c == 123 ? 2 : 3))!), charactersIgnoringModifiers: String(UnicodeScalar(0xF700 + Int(c == 126 ? 0 : c == 125 ? 1 : c == 123 ? 2 : 3))!), isARepeat: false, keyCode: c) { w.sendEvent(e) }
+                    } }
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in self?.appendLog("\(Date()) keys window=\(self?.webView.window != nil) caught=\(KeySink.caught - before)\n") }
+                return
+            }
+            if command.hasPrefix("js:") {
+                // Run a line of script in the page and log the answer (local test builds only).
+                webView.evaluateJavaScript(String(command.dropFirst(3))) { [weak self] result, _ in
+                    self?.appendLog("\(Date()) js \(result.map { "\($0)" } ?? "nil")\n")
+                }
+                return
+            }
             if command.hasPrefix("tap:") {
                 // Press an on-screen button by its label, exactly like a click would.
                 let label = String(command.dropFirst(4)).filter { $0.isLetter || $0.isNumber || $0 == " " }
@@ -929,6 +958,32 @@ enum LudusApp {
 /// The page owns the keyboard. Any key it leaves alone would otherwise reach AppKit's default handler and play the
 /// macOS error beep, so those commands end here.
 final class QuietWebView: WKWebView {
+    override func doCommand(by selector: Selector) {}
+    override func noResponder(for eventSelector: Selector) {}
+
+    /// WebKit passes a key the page left alone up the responder chain, and the window at the end of it beeps. Anything sent on from
+    /// here must stop at this one link, so it stays right after the web view wherever the view moves (popover, parking window).
+    private let sink = KeySink()
+    override var nextResponder: NSResponder? {
+        get { sink.nextResponder = super.nextResponder; return sink }
+        set { super.nextResponder = newValue }
+    }
+}
+
+/// The macOS error sound for a key nobody took is played in one place: the end of the responder chain. Ludus has no use for it.
+enum NoBeep {
+    static func install() {
+        guard let m = class_getInstanceMethod(NSResponder.self, #selector(NSResponder.noResponder(for:))) else { return }
+        let quiet: @convention(block) (AnyObject, Selector) -> Void = { _, _ in }
+        method_setImplementation(m, imp_implementationWithBlock(quiet))
+    }
+}
+
+/// Ends a key event quietly. Command shortcuts never come here: they are menu key equivalents, handled before keyDown.
+final class KeySink: NSResponder {
+    nonisolated(unsafe) static var caught = 0
+    override func keyDown(with event: NSEvent) { KeySink.caught += 1 }
+    override func keyUp(with event: NSEvent) {}
     override func doCommand(by selector: Selector) {}
     override func noResponder(for eventSelector: Selector) {}
 }

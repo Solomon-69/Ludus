@@ -72,8 +72,8 @@
   U.openSite = () => { L.native('site', {}); };
   // The shell reports back: progress 0..100, "verifying", or an error. A finished update restarts the app, so there is no "done".
   window.ludusUpdateState = (kind, v) => {
-    if (kind === 'progress') set('progress', { pct: Math.max(0, Math.min(100, +v || 0)) });
-    else if (kind === 'error') { clearTimeout(silentTimer); set('error'); }
+    if (kind === 'progress') { clearTimeout(silentTimer); silentTimer = setTimeout(() => { if (U.state === 'progress') set('error', { why: 'The download stopped. Check your internet and try again.' }); }, NO_PROGRESS_MS); set('progress', { pct: Math.max(0, Math.min(100, +v || 0)) }); }
+    else if (kind === 'error') { clearTimeout(silentTimer); set('error', { why: typeof v === 'string' ? v : '' }); }
   };
   conn.on(up => { if (!up && (U.state === 'idle' || U.state === 'cantcheck' || U.state === 'uptodate')) set('offline'); else if (up && U.state === 'offline') set('idle'); });
   L.update = U;

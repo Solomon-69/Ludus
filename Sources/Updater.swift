@@ -5,7 +5,7 @@ import CryptoKit
 import Foundation
 
 enum Updater {
-    struct Failure: Error { let why: String }
+    typealias Failure = UpdateFailure
 
     /// Hosts a release download may come from. Tests add 127.0.0.1 (see `testHosts`).
     static let hosts: Set<String> = ["github.com", "api.github.com", "objects.githubusercontent.com", "release-assets.githubusercontent.com"]
@@ -41,6 +41,8 @@ enum Updater {
     static func install(zip: URL, sums: URL, name: String, bundle: URL, progress: @escaping @Sendable (Double) -> Void,
                         relaunch: @escaping @Sendable (URL) -> Void) async throws {
         guard allowed(zip), allowed(sums), !name.contains("/") else { throw Failure(why: "source not allowed") }
+        let path = bundle.path
+        guard !path.contains("/AppTranslocation/"), !path.hasPrefix("/Volumes/"), FileManager.default.isWritableFile(atPath: bundle.deletingLastPathComponent().path) else { throw UpdateFailure(why: "not writable") }
         let work = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("ludus-update-\(UUID().uuidString)", isDirectory: true)
         let fm = FileManager.default
         try fm.createDirectory(at: work, withIntermediateDirectories: true)
@@ -67,10 +69,10 @@ enum Updater {
     /// Download (release link, then the releases/latest/download link as a fallback), verify, unzip. Returns the unzipped app.
     static func stage(zip: URL, sums: URL, name: String, work: URL, bundleName: String, progress: @escaping @Sendable (Double) -> Void) async throws -> URL {
         do { return try await stageOnce(zip: zip, sums: sums, name: name, work: work, bundleName: bundleName, progress: progress) }
-        catch let f as Failure where f.why == "checksum mismatch" { throw f }
         catch {
             let b = "https://github.com/\(repo)/releases/latest/download/"
             guard let z = URL(string: b + name), let s = URL(string: b + "SHA256SUMS.txt") else { throw error }
+            progress(0)
             try? FileManager.default.removeItem(at: work.appendingPathComponent("x")); try? FileManager.default.removeItem(at: work.appendingPathComponent(name))
             return try await stageOnce(zip: z, sums: s, name: name, work: work, bundleName: bundleName, progress: progress)
         }
@@ -82,35 +84,20 @@ enum Updater {
         guard (sumResp as? HTTPURLResponse)?.statusCode == 200, let text = String(data: sumData, encoding: .utf8),
               let want = expectedHash(in: text, for: name) else { throw Failure(why: "no checksum") }
 
-        // Stream the zip to disk, hashing as it arrives.
+        // 0 to 90 is the real download, by bytes. The rest are the steps after it, so 100 only shows when it is really finished.
         let file = work.appendingPathComponent(name)
-        fm.createFile(atPath: file.path, contents: nil)
-        let out = try FileHandle(forWritingTo: file)
-        var hasher = SHA256()
-        progress(1)   // started: the bar moves off 0 straight away
-        let (bytes, resp) = try await session.bytes(from: zip)
-        guard (resp as? HTTPURLResponse)?.statusCode == 200 else { throw Failure(why: "download failed") }
-        let total = Double(resp.expectedContentLength)
-        var buf = Data(); var got = 0.0; var last = -1.0
-        for try await b in bytes {
-            buf.append(b)
-            if buf.count >= 65536 {
-                hasher.update(data: buf); try out.write(contentsOf: buf); got += Double(buf.count); buf.removeAll(keepingCapacity: true)
-                let p = total > 0 ? min(99, max(1, (got / total * 100).rounded())) : min(95, 1 + (got / 1_000_000).rounded())
-                if p != last { last = p; progress(p) }
-            }
-        }
-        if !buf.isEmpty { hasher.update(data: buf); try out.write(contentsOf: buf) }
-        try out.close()
-        let have = hasher.finalize().map { String(format: "%02x", $0) }.joined()
-        guard have == want else { throw Failure(why: "checksum mismatch") }
-        progress(100)
+        let v = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0"
+        try await FileDownload.get(zip, to: file, userAgent: "Ludus/\(v) (Mac)") { got, total in if total > 0 { progress(Double(got) / Double(total) * 90) } }
+        progress(92)
+        guard try FileDownload.sha256(of: file) == want else { throw Failure(why: "checksum mismatch") }
+        progress(96)
 
         // Unzip and check it is an app.
         let unzipped = work.appendingPathComponent("x", isDirectory: true)
         try shell("/usr/bin/ditto", ["-x", "-k", file.path, unzipped.path])
         let newApp = unzipped.appendingPathComponent(bundleName)
         guard fm.fileExists(atPath: newApp.appendingPathComponent("Contents/MacOS").path) else { throw Failure(why: "not a Ludus app") }
+        progress(98)
         return newApp
     }
 
@@ -148,4 +135,55 @@ enum Updater {
         p.standardOutput = nil; p.standardError = nil
         try? p.run()
     }
+}
+
+/// Downloads to a file with real byte counts. A connection that stops sending fails within 20 s instead of sitting still.
+final class FileDownload: NSObject, URLSessionDownloadDelegate, @unchecked Sendable {
+    private let dest: URL
+    private let progress: @Sendable (Int64, Int64) -> Void
+    private var done: CheckedContinuation<Void, Error>?
+    private var failure: Error?
+
+    private init(dest: URL, progress: @escaping @Sendable (Int64, Int64) -> Void) { self.dest = dest; self.progress = progress }
+
+    static func get(_ url: URL, to dest: URL, userAgent: String, progress: @escaping @Sendable (Int64, Int64) -> Void) async throws {
+        let c = URLSessionConfiguration.ephemeral
+        c.timeoutIntervalForRequest = 20; c.timeoutIntervalForResource = 900
+        c.httpAdditionalHeaders = ["User-Agent": userAgent]
+        let job = FileDownload(dest: dest, progress: progress)
+        let s = URLSession(configuration: c, delegate: job, delegateQueue: nil)
+        defer { s.finishTasksAndInvalidate() }
+        try await withCheckedThrowingContinuation { (k: CheckedContinuation<Void, Error>) in
+            job.done = k
+            s.downloadTask(with: url).resume()
+        }
+    }
+    func urlSession(_ s: URLSession, downloadTask: URLSessionDownloadTask, didWriteData b: Int64, totalBytesWritten got: Int64, totalBytesExpectedToWrite total: Int64) {
+        progress(got, total)
+    }
+    func urlSession(_ s: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo tmp: URL) {
+        guard (downloadTask.response as? HTTPURLResponse)?.statusCode == 200 else { failure = UpdateFailure(why: "download failed"); return }
+        do { try? FileManager.default.removeItem(at: dest); try FileManager.default.moveItem(at: tmp, to: dest) } catch { failure = error }
+    }
+    func urlSession(_ s: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+        if let e = error ?? failure { done?.resume(throwing: e) } else { done?.resume() }
+        done = nil
+    }
+    static func sha256(of file: URL) throws -> String {
+        let h = try FileHandle(forReadingFrom: file); defer { try? h.close() }
+        var hasher = SHA256()
+        while let chunk = try h.read(upToCount: 1 << 20), !chunk.isEmpty { hasher.update(data: chunk) }
+        return hasher.finalize().map { String(format: "%02x", $0) }.joined()
+    }
+}
+struct UpdateFailure: Error { let why: String }
+
+/// What went wrong, in words a person can act on.
+func updateProblem(_ e: Error, app: String) -> String {
+    let why = (e as? UpdateFailure)?.why ?? ""
+    if why == "checksum mismatch" { return "The download was damaged, so it was thrown away. Try again." }
+    if why == "not writable" { return "\(app) can't replace itself where it is. Move it to the Applications folder, then try again." }
+    if e is URLError || why == "download failed" || why == "no checksum" { return "The download stopped. Check your internet and try again." }
+    if let c = (e as NSError?), c.domain == NSCocoaErrorDomain { return "\(app) can't replace itself where it is. Move it to the Applications folder, then try again." }
+    return "The update did not install, your current version is untouched."
 }

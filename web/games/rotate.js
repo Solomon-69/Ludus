@@ -201,7 +201,7 @@
         if (lvl !== storyLvl) { storyLvl = lvl; storyT0 = clock; }   // restarting a room does not replay its lines
         m = parse(rows); p = { x: m.start.x, y: m.start.y }; k = 0; lean = 0; angle = 0; drawAngle = 0; fx = p.x; fy = p.y;
         const sl = solve(m); par = sl ? sl.turns : 0;
-        turns = 0; timeline = []; endT = clock; ending = null; held = 0; flash = 0; turn = null; parts = []; drops = []; stains = []; air = null;
+        turns = 0; timeline = []; endT = clock; ending = null; held = 0; flash = 0; turn = null; parts = []; drops = []; stains = []; air = null; dropNext = false;
         const s0 = settle(m, p, 0); if (s0.path.length) { fall(s0.path); p = { x: s0.x, y: s0.y }; }
       }
       // timeline: [{ t0, t1, type: 'move'|'rot', ... }] played from the moment it is queued
@@ -215,7 +215,8 @@
       const FALL_G = 46;   // faster than before, closer to the original Rotate (a 3-cell drop takes about 0.36 s)
       function fall(path) { if (path.length) play([path[path.length - 1]], Math.sqrt(2 * path.length / FALL_G), 'fall'); }
       function rot(a0, a1) { const t = Math.max(clock, endT); timeline.push({ t0: t, t1: t + TURN, type: 'rot', a0, a1 }); endT = t + TURN; }
-      function idle() { return clock >= endT && !ending && !done && !air; }
+      let dropNext = false;   // the step or turn that is playing ends in a real, steerable fall
+      function idle() { return clock >= endT && !ending && !done && !air && !dropNext; }
 
       function finish(res) {
         if (res.dead) { ending = { type: 'dead', t: Math.max(clock, endT) }; shake = 1; flash = 1; api.sfx('hit'); }
@@ -238,12 +239,12 @@
         lean = 0; api.sfx('move');
         play([{ x: w.x, y: w.y }], 0.11, 'walk');
         const s = settle(m, w, k);
-        fall(s.path);
+        if (s.path.length) { p = { x: w.x, y: w.y }; dropNext = true; return; }   // off a ledge: you fly, so the arrows still steer
         p = { x: s.x, y: s.y };
         finish(s);
       }
       // ---- jump: real flight. You leave the floor going up, gravity pulls you back, and left and right steer you in the air.
-      const HW = 0.2, V0 = 9.6, GRAV = 34, GRAV_DOWN = 40, MAX_FALL = 16, STEER = 4.4;   // like the original: come down a touch faster than you rise
+      const HW = 0.2, V0 = 9.6, GRAV = 34, GRAV_DOWN = 40, MAX_FALL = 16, STEER = 5.2, AIR_ACC = 64;   // like the original: come down a touch faster than you rise
       const solidAt = (x, y) => solid(cellAt(m, Math.floor(x), Math.floor(y)));
       function bodyHits(x, y, g, r) {
         const cx = x + 0.5, cy = y + 0.5;
@@ -276,7 +277,7 @@
       }
       function stepAir(dt) {
         const g = gOf(k), r = rOf(k);
-        const rc = fx * r.x + fy * r.y, want = held ? held * STEER : Math.max(-STEER, Math.min(STEER, (Math.round(rc) - rc) * 9)); air.vr += Math.max(-46 * dt, Math.min(46 * dt, want - air.vr));
+        const rc = fx * r.x + fy * r.y, want = held ? held * STEER : Math.max(-STEER, Math.min(STEER, (Math.round(rc) - rc) * 9)); air.vr += Math.max(-AIR_ACC * dt, Math.min(AIR_ACC * dt, want - air.vr));
         if (held) face = held;
         air.vg = Math.min(MAX_FALL, air.vg + (air.vg < 0 ? GRAV : GRAV_DOWN) * dt);
         let nx = fx + r.x * air.vr * dt, ny = fy + r.y * air.vr * dt;
@@ -293,9 +294,9 @@
         k = k + d; turns++;
         rot(a0, a1); api.sfx('flip');
         const s = settle(m, p, k);
-        fall(s.path);
-        p = { x: s.x, y: s.y };
         angle = a1;
+        if (s.path.length) { dropNext = true; return; }   // the room turned under you: the fall is steerable too
+        p = { x: s.x, y: s.y };
         finish(s);
       }
       function storyLine() {
@@ -376,7 +377,8 @@
         }
         if (clock >= endT && !air) {
           if (timeline.length) { const r = rOf(k); drawAngle = angle; timeline = []; fx = p.x + r.x * lean; fy = p.y + r.y * lean; turn = null; }
-          if (ending) {
+          if (dropNext) { dropNext = false; lean = 0; air = { vg: 0, vr: held ? held * STEER : 0 }; if (held) face = held; }
+          else if (ending) {
             if (ending.type === 'dead' && !ending.burst) { ending.burst = true; burst(); }
             if (clock - ending.t > (ending.type === 'dead' ? 1.5 : 0.55)) {
               if (ending.type === 'dead') restart(false);   // like the original: you wake at the start of the same room
