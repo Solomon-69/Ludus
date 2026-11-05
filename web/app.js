@@ -699,6 +699,7 @@
   function lobbyOps(g) {
     return {
       toast, goHome,
+      rejoin: () => { L.sfx('click'); rejoinParty(); },
       onStart: (s, e) => beginOnline(s, e, g),
       onCancel: () => {
         // back to whatever mode was there before
@@ -1367,6 +1368,13 @@
     // goes behind All games; Rejoin on the Last party card brings it back.
     // The app opens the panel at the normal size; a wide game being played gets its own shape back at once.
     if (online && online.started && inRoom()) { if (online.game) L.native('wide', { on: wideFor(online.game) }); return; }
+    // A working online room (waiting, scoreboard or round) is shown again exactly as it was left. Only a room that has
+    // stopped working goes behind All games, where Rejoin on the Last party card opens it again.
+    if (roomAlive() && roomHealthy()) {
+      if (L.lobby.parked) unparkRoom();
+      else if (online && online.game) L.native('wide', { on: wideFor(online.game) });
+      return;
+    }
     if (roomAlive()) parkRoom();
     if (view !== 'home') { root.classList.add('instant'); goHome(); }   // safety net; normally done on close
     if (S.filter !== 'All') { S.filter = 'All'; L.save(); renderFilters(); renderCards(); }
@@ -1392,6 +1400,7 @@
   window.ludusClosed = () => {
     L.sfx('panelOff');
     if (online && online.started && inRoom()) { L.save(true); return; }   // a round being played stays open while the panel is closed
+    if (roomAlive() && roomHealthy()) { L.save(true); return; }   // a working online room stays exactly as it is while the panel is closed
     if (roomAlive()) { root.classList.add('instant'); parkRoom(); if (S.filter !== 'All') { S.filter = 'All'; renderFilters(); renderCards(); } { const g = $('grid'); if (g) g.scrollTop = 0; } L.save(true); return; }   // a waiting party stays joined, behind All games
     if (view !== 'home') {
       root.classList.add('instant');

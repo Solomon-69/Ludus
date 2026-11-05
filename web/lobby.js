@@ -439,6 +439,8 @@
         s.disabled = session.flex && !session.legacy ? (!session.playable().length || (session.plan.g.length > 1 || (modeFor.s === session && modeFor.mode === 'tournament')) && session.plan.g.length < 2) : n < session.min;
         card.appendChild(s);
       }
+      // the link dropped (a sleeping Mac, a relay blip): Rejoin opens the same party again from inside the lobby
+      if (session.conn !== 'online' && ops && ops.rejoin) card.appendChild(btn('Rejoin', 'primary', () => ops.rejoin()));
       card.appendChild(btn('Leave', 'ghost', cancel));
     } else if (screen === 'board' || screen === 'final') {
       const ser = session.ser, host = session.role === 'host';
@@ -451,6 +453,7 @@
         card.appendChild(standings(ser, false));
         card.appendChild(el('div', 'lobby-live', host ? 'Next round starts in a moment.' : 'Waiting for the host to start the next round.'));
         if (host) card.appendChild(btn(nx ? 'Start now' : 'Show results', 'primary', () => session.advance()));
+        if (session.conn !== 'online' && ops && ops.rejoin) card.appendChild(btn('Rejoin', 'primary', () => ops.rejoin()));
       } else {
         const why = ser.why === 'left' ? 'A player left, so this is how it stands so far.' : ser.why === 'few' ? 'There are not enough players for the next game. Final standings so far.' : ser.why === 'host' ? 'The host left. Final standings so far.' : '';
         title(winners.length === 1 ? winners[0][1] + ' wins' : winners.length > 1 ? 'A tie: ' + winners.map(w => w[1]).join(' and ') : 'No winner this time');

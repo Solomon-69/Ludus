@@ -3,6 +3,10 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.69 (5 Nov 2026)
+- Online: closing and opening the panel brings you back to exactly the online room or round you were in (waiting room, scoreboard or game), not to All games. A room that has stopped working still goes behind All games with Rejoin on the Last party card.
+- Online: when the link drops, the party lobby shows a Rejoin button, so you can open the same party again without leaving it.
+
 ## 1.12.68 (4 Nov 2026)
 - No more error beep: pressing a key the game does not use (letters, WASD, Space and the rest) no longer plays the Mac error sound. Text boxes and buttons still work with the keyboard as before.
 - Turn Room: the story lines at the bottom now tick softly as each letter types in, like the original.

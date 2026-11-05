@@ -25,23 +25,24 @@ const onAll = s => s.view === 'home' && s.filter === 'All' && !s.sheet && s.top 
     const A = await L.newPage(browser, br, { name: 'Ann', dark }), B = await L.newPage(browser, br, { name: 'Bo', dark });
     const c = await L.flexCreate(A); await L.flexJoin(B, c);
     await A.waitForFunction(() => document.querySelectorAll('.seat.on').length === 2, null, { timeout: 9000 });
+    const inRoom = s => s.view === 'game' && s.sheet && s.alive && s.code === c && !s.parked;
     const ra = await cycle(A, 6);
-    check(t + ' lobby: host opens on All every time', ra.every(onAll), ra);
-    check(t + ' lobby: host stays in the party', ra.every(s => s.alive && s.code === c && s.n === 2 && s.parked), ra);
+    check(t + ' lobby: host reopens straight in the room every time', ra.every(inRoom), ra);
+    check(t + ' lobby: host stays in the party', ra.every(s => s.alive && s.code === c && s.n === 2), ra);
     const rb = await cycle(B, 6);
-    check(t + ' lobby: guest opens on All every time', rb.every(onAll), rb);
+    check(t + ' lobby: guest reopens straight in the room every time', rb.every(inRoom), rb);
     check(t + ' lobby: guest stays in the party', rb.every(s => s.alive && s.code === c && s.n === 2), rb);
-    await L.shot(A, 'openall-' + t + '-home');
+    await L.shot(A, 'openall-' + t + '-room');
     // opened without the close first (the app can call open twice)
     await A.evaluate(() => window.ludusOpened()); await wait(200);
-    check(t + ' lobby: open twice still All', onAll(await state(A)));
+    check(t + ' lobby: open twice still in the room', inRoom(await state(A)));
     // right-click open goes to Settings, party kept
     await A.evaluate(() => window.ludusClosed()); await A.evaluate(() => window.ludusOpenedSettings()); await wait(250);
     const st = await state(A);
     check(t + ' lobby: settings open keeps party', st.view === 'settings' && st.alive && !st.sheet, st);
     await A.evaluate(() => window.ludusClosed()); await A.evaluate(() => window.ludusOpened()); await wait(250);
     // Rejoin brings back the same room
-    await L.onlineTab(A); await A.click('#opRejoin'); await wait(500);
+    await wait(300);
     const rj = await state(A);
     check(t + ' lobby: Rejoin shows the same room at once', rj.view === 'game' && rj.sheet && rj.code === c && rj.n === 2 && !rj.parked, rj);
     check(t + ' lobby: friend still sees 2 seats', (await B.$$eval('.seat.on', e => e.length).catch(() => 0)) === 2 || (await state(B)).n === 2);
