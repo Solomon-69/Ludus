@@ -3,6 +3,9 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.75 (6 Nov 2026)
+- Updates: if Ludus cannot reach GitHub's version check, for example on a busy school or office network, it now asks the Ludus website instead, so the update is still found.
+
 ## 1.12.74 (6 Nov 2026)
 - Updates on Windows: if an update fails it now says why, as on the Mac, and a folder Ludus cannot write to is found before the download instead of failing quietly.
 

@@ -7,6 +7,10 @@
   // The one place that says where updates come from: the latest release of this GitHub repository.
   // It is private for now, so a 404 just means "Couldn't check". No token is ever stored in the app.
   L.UPDATE_API = 'https://api.github.com/repos/Solomon-69/Ludus/releases/latest';
+  // The backup when that check fails: GitHub allows only 60 checks an hour per network, so a busy school or office can run out.
+  // The website lists the newest version and has no such limit. Its files are the fixed "latest" links of the same release.
+  L.UPDATE_BACKUP = 'https://solomon-69.github.io/Mac-Apps/apps.json';
+  L.UPDATE_FILES = 'https://github.com/Solomon-69/Ludus/releases/latest/download/';
 
   // ---------- online / offline ----------
   const conn = { shown: true, debounceMs: 3000, listeners: [], timer: 0 };
@@ -30,31 +34,46 @@
   const U = { state: 'idle', pct: 0, latest: '', listeners: [] };
   const version = () => String(window.__LUDUS_VERSION__ || L.VERSION);
   const apiUrl = () => String(window.__LUDUS_UPDATE_API__ || L.UPDATE_API);
+  const backupUrl = () => String(window.__LUDUS_UPDATE_BACKUP__ || L.UPDATE_BACKUP);
   const isWin = () => window.__LUDUS_PLATFORM__ === 'windows';
   const newer = (a, b) => { const x = a.split('.').map(Number), y = b.split('.').map(Number); for (let i = 0; i < Math.max(x.length, y.length); i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d > 0; } return false; };
   function set(state, extra) { Object.assign(U, extra || {}, { state }); U.listeners.forEach(f => f(U)); }
   U.on = f => { U.listeners.push(f); return () => { U.listeners = U.listeners.filter(x => x !== f); }; };
   U.version = version;
   let idleTimer = 0;
+  const zipName = () => (isWin() ? 'Ludus-windows.zip' : 'Ludus-mac.zip');
+  const goodTag = tag => { if (!/^\d+(\.\d+){0,3}$/.test(tag)) throw new Error('bad tag'); return tag; };
+  async function timed(source) {
+    const ctrl = new AbortController(), kill = setTimeout(() => ctrl.abort(), 10000);
+    try { return await source(ctrl.signal); } finally { clearTimeout(kill); }
+  }
+  async function fromGitHub(signal) {
+    const res = await fetch(apiUrl(), { headers: { Accept: 'application/vnd.github+json' }, cache: 'no-store', signal });
+    if (!res.ok) throw new Error('http ' + res.status);
+    const rel = await res.json(), tag = goodTag(String(rel.tag_name || '').replace(/^v/i, ''));
+    const assets = Array.isArray(rel.assets) ? rel.assets : [];
+    const zip = assets.find(a => a.name === zipName()), sums = assets.find(a => a.name === 'SHA256SUMS.txt');
+    if (!newer(tag, version())) return { tag };
+    if (!zip || !sums || !zip.browser_download_url || !sums.browser_download_url) throw new Error('release has no files');
+    return { tag, zip: zip.browser_download_url, sums: sums.browser_download_url, name: zip.name };
+  }
+  async function fromWebsite(signal) {
+    const res = await fetch(backupUrl(), { cache: 'no-store', signal });
+    if (!res.ok) throw new Error('http ' + res.status);
+    const apps = await res.json(), app = Array.isArray(apps) ? apps.find(a => a && a.key === 'ludus') : null;
+    const tag = goodTag(String((app && app.version) || '').replace(/^v/i, ''));
+    return { tag, zip: L.UPDATE_FILES + zipName(), sums: L.UPDATE_FILES + 'SHA256SUMS.txt', name: zipName() };
+  }
   U.check = async function () {
     if (U.state === 'checking' || U.state === 'progress') return;
     clearTimeout(idleTimer);
     if (!conn.shown) return set('offline');
     set('checking');
-    const ctrl = new AbortController(), kill = setTimeout(() => ctrl.abort(), 10000);
     try {
-      const res = await fetch(apiUrl(), { headers: { Accept: 'application/vnd.github+json' }, cache: 'no-store', signal: ctrl.signal });
-      if (!res.ok) throw new Error('http ' + res.status);
-      const rel = await res.json(), tag = String(rel.tag_name || '').replace(/^v/i, '');
-      if (!/^\d+(\.\d+){0,3}$/.test(tag)) throw new Error('bad tag');
-      const assets = Array.isArray(rel.assets) ? rel.assets : [];
-      const zip = assets.find(a => a.name === (isWin() ? 'Ludus-windows.zip' : 'Ludus-mac.zip'));
-      const sums = assets.find(a => a.name === 'SHA256SUMS.txt');
-      if (!newer(tag, version())) { set('uptodate'); idleTimer = setTimeout(() => U.state === 'uptodate' && set('idle'), 3000); return; }
-      if (!zip || !sums || !zip.browser_download_url || !sums.browser_download_url) throw new Error('release has no files');
-      set('available', { latest: tag, zip: zip.browser_download_url, sums: sums.browser_download_url, name: zip.name });
+      const rel = await timed(fromGitHub).catch(() => timed(fromWebsite));
+      if (!newer(rel.tag, version())) { set('uptodate'); idleTimer = setTimeout(() => U.state === 'uptodate' && set('idle'), 3000); return; }
+      set('available', { latest: rel.tag, zip: rel.zip, sums: rel.sums, name: rel.name });
     } catch (e) { set('cantcheck'); }
-    finally { clearTimeout(kill); }
   };
   U.askInstall = () => { if (U.state === 'available') set('confirm'); };
   U.cancel = () => { if (U.state === 'confirm') set('available'); };

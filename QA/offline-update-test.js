@@ -17,6 +17,10 @@ const server = http.createServer((req, res) => {
     { name: 'Ludus-mac.zip', browser_download_url: base + '/Ludus-mac.zip' }, { name: 'Ludus-windows.zip', browser_download_url: base + '/Ludus-windows.zip' }, { name: 'SHA256SUMS.txt', browser_download_url: base + '/SHA256SUMS.txt' }] })); }
   if (req.url === '/same') { res.setHeader('content-type', 'application/json'); return res.end(JSON.stringify({ tag_name: 'v1.12.3', assets: [] })); }
   if (req.url === '/broken') return res.end('<html>nope');
+  if (req.url === '/hang') return;   // a network that blocks GitHub without saying so
+  if (req.url === '/limit') { res.statusCode = 403; return res.end('{"message":"API rate limit exceeded"}'); }
+  if (req.url === '/site-new' || req.url === '/site-same') { res.setHeader('content-type', 'application/json'); return res.end(JSON.stringify([{ key: 'memo', version: '50.0.0' }, { key: 'ludus', version: req.url === '/site-new' ? latest : '1.12.3' }])); }
+  if (req.url === '/site-junk') { res.setHeader('content-type', 'application/json'); return res.end('[{"key":"ludus","version":"soon"}]'); }
   res.statusCode = 404; res.end('{"message":"Not Found"}');
 });
 const NATIVE = `window.__LUDUS_NATIVE__=true;window.__LUDUS_DOCK__=true;window.__LUDUS_INVISIBLE__=false;window.__LUDUS_LOGIN__=false;window.__LUDUS_VERSION__='1.12.3';
@@ -25,7 +29,7 @@ window.chrome={webview:{postMessage:m=>{(window.__msgs=window.__msgs||[]).push(m
   await new Promise(r => server.listen(0, '127.0.0.1', r));
   const port = server.address().port;
   const browser = await pw.chromium.launch({ executablePath: chrome });
-  async function open({ offline = false, dark = false, size = [400, 600], api, native = true } = {}) {
+  async function open({ offline = false, dark = false, size = [400, 600], api, backup = '/gone', platform, native = true } = {}) {
     const ctx = await browser.newContext({ viewport: { width: size[0], height: size[1] }, colorScheme: dark ? 'dark' : 'light', deviceScaleFactor: 2, offline });
     const page = await ctx.newPage(); const errors = [], requests = [];
     page.on('pageerror', e => errors.push(String(e))); page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
@@ -33,6 +37,8 @@ window.chrome={webview:{postMessage:m=>{(window.__msgs=window.__msgs||[]).push(m
     await page.addInitScript(() => { try { localStorage.clear(); } catch (e) {} window.__LUDUS_SKIP_INTRO__ = true; });
     if (native) await page.addInitScript(NATIVE);
     if (api) await page.addInitScript(`window.__LUDUS_UPDATE_API__='http://127.0.0.1:${port}${api}'`);
+    await page.addInitScript(`window.__LUDUS_UPDATE_BACKUP__='http://127.0.0.1:${port}${backup}'`);
+    if (platform) await page.addInitScript(`window.__LUDUS_PLATFORM__='${platform}'`);
     await page.goto('file://' + path.join(WEB, 'index.html')); await wait(300);
     return { page, ctx, errors, requests };
   }
@@ -85,6 +91,20 @@ window.chrome={webview:{postMessage:m=>{(window.__msgs=window.__msgs||[]).push(m
   for (const api of ['/gone', '/broken']) { const t = await open({ api }); await openSettings(t.page); await t.page.click('#updRow button'); await wait(500);
     const s = await rowState(t.page); ok(s.st === 'cantcheck' && /Couldn.t check/.test(s.text), `Update: ${api} is a quiet "Couldn't check"`);
     ok(!/error|wrong/i.test(s.text), 'Update: no scary wording'); await t.ctx.close(); }
+  // ===== Backup: GitHub's check fails, the website answers =====
+  const FILES = 'https://github.com/Solomon-69/Ludus/releases/latest/download/';
+  const upd = p => p.evaluate(() => { const u = window.Ludus.update; return { state: u.state, latest: u.latest, zip: u.zip, sums: u.sums, name: u.name }; });
+  for (const [api, platform, file, ms] of [['/limit', undefined, 'Ludus-mac.zip', 500], ['/broken', 'windows', 'Ludus-windows.zip', 500], ['/hang', undefined, 'Ludus-mac.zip', 10800]]) {
+    const t = await open({ api, backup: '/site-new', platform }); await openSettings(t.page); await t.page.click('#updRow button'); await wait(ms);
+    const u = await upd(t.page);
+    ok(u.state === 'available' && u.latest === latest && u.zip === FILES + file && u.sums === FILES + 'SHA256SUMS.txt' && u.name === file, `Backup: ${api} finds the update on the website (${JSON.stringify(u)})`);
+    await t.ctx.close(); }
+  { const t = await open({ api: '/limit', backup: '/site-same' }); await openSettings(t.page); await t.page.click('#updRow button'); await wait(500);
+    ok((await upd(t.page)).state === 'uptodate', 'Backup: same version on the website is "Up to date"'); await t.ctx.close(); }
+  for (const backup of ['/site-junk', '/broken', '/gone']) { const t = await open({ api: '/limit', backup }); await openSettings(t.page); await t.page.click('#updRow button'); await wait(500);
+    ok((await upd(t.page)).state === 'cantcheck', `Backup: ${backup} too means "Couldn't check"`); await t.ctx.close(); }
+  { const t = await open({ api: '/ok', backup: '/site-same' }); await openSettings(t.page); await t.page.click('#updRow button'); await wait(500);
+    ok(!t.requests.some(u => u.includes('/site-same')), 'Backup: not used when GitHub answers'); await t.ctx.close(); }
   { const t = await open({ api: '/ok', offline: true }); t.page.setDefaultTimeout(5000); await wait(3600); await openSettings(t.page);
     const s = await rowState(t.page); ok(s.st === 'offline' && /Needs the internet\./.test(s.text) && s.disabled.every(Boolean), 'Update: offline = disabled "Needs the internet." (' + s.text + ')');
     ok(!t.requests.some(u => u.includes('127.0.0.1')), 'Update: offline sends no request'); await t.ctx.close(); }
