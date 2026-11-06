@@ -595,11 +595,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
     /// A clicked room invite (ludus://join/K7M2Q): open the panel and go straight to joining that room.
     /// Only a 5 character letters/digits code is ever taken from the link and handed to the page.
     func application(_ application: NSApplication, open urls: [URL]) {
-        for url in urls where url.scheme?.lowercased() == "ludus" && url.host?.lowercased() == "join" {
+        for url in urls where url.scheme?.lowercased() == "ludus" && ["join", "carry"].contains(url.host?.lowercased() ?? "") {
             let code = url.lastPathComponent.uppercased()
             guard code.count == 5, code.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber) }) else { continue }
             if !popover.isShown { openPopover() }
-            webView.evaluateJavaScript("window.ludusJoin && ludusJoin('\(code)')")
+            let call = url.host?.lowercased() == "carry" ? "ludusCarryOnChess" : "ludusJoin"   // carry: the one-time chess room, see app.js
+            webView.evaluateJavaScript("window.\(call) && \(call)('\(code)')")
             return
         }
     }

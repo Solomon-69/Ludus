@@ -3,6 +3,11 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.72 (6 Nov 2026)
+- Online: coming back to a party during a game now takes you straight back into it, same position and same turn, and both players can carry on. Before, you were left waiting in the lobby while the other player's game sat frozen.
+- Online: a party with a game running shows Back to (the game's name) at the top of its lobby.
+- Chess online: a player who is waiting asks for any moves they missed, so a lost message cannot freeze the game.
+
 ## 1.12.71 (6 Nov 2026)
 
 - Sky Hop: every mode is now its own world. Moon is out on the moon, with Earth in the sky, a lander, slower floating bounces, drifting dust and burning rocks. Storm has dark rolling clouds, heavy slanted rain, sudden gusts, a wind marker, and lightning that lights the sky first and then knocks the ball away. Boost has far more pick-ups, a real jet with flames, speed lines and a time bar, and big bursts on every pick-up. Monsters is a dusk with watching eyes, and Classic has a real sky and hills.

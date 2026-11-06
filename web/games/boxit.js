@@ -125,7 +125,7 @@
   };
 
   Ludus.register({
-    id: 'boxit', name: 'Dots and Boxes', aka: 'Box It', tag: 'Duel', versus: true, online: { min: 2, max: 2 }, tint: '#e0a526',
+    id: 'boxit', name: 'Dots and Boxes', aka: 'Box It', tag: 'Duel', versus: true, online: { min: 2, max: 2, replay: true }, tint: '#e0a526',
     hint: 'Click a gap between two dots, or <kbd>←</kbd><kbd>↑</kbd><kbd>→</kbd><kbd>↓</kbd> + <kbd>Space</kbd>. Close a box to score and go again. Most boxes wins. vs Friend: take turns',
     _logic: logic,
     art(ctx, w, h) {

@@ -27,6 +27,8 @@
   const SEAT_HOLD = 120000;         // ms a player who dropped out keeps their seat (and score) for when they come back
   const CLAIM_LISTEN = 1100;        // ms a new room listens for somebody already hosting its code
   const RECLAIM_LISTEN = 4500;      // the same for a code that was used before (longer than one heartbeat, so an older host is heard too)
+  const JOURNAL_MAX = 1500, JOURNAL_PART = 2800;   // moves kept for a player who comes back; bytes in each part sent to them
+  const REPLAY_PATIENCE = 600000, RESTART_DELAY = 800;   // ms: a game may take its time playing the moves back; pause before a round starts over
   const MAX_PACKET = 4096;          // bytes of one game message, in and out
   const HISTORY = 300;              // sent game messages kept so a lost one can be sent again
   const QUEUE_LIMIT = 100;          // messages held while the connection is down
@@ -437,6 +439,7 @@
     me.ev = {};
     me.started = false; me.gen = 0; me.seed = 0;
     me.sq = 0; me.history = []; me.rxq = {}; me.ooo = {}; me.nackAt = {}; me.pending = [];
+    me.journal = []; me.replayQ = []; me.setup = null; me.nextSetup = null;   // journal: this round's moves, so a player who comes back can catch up
     me.active = null;           // the api.online of the running game
     // tournaments (protocol 2): the host's plan, the series in progress, and what the other side speaks
     me.flex = role === 'host' && opts.flex !== false;     // a room whose games the host may pick
@@ -658,6 +661,9 @@
       case 'sgr': return this._onSuggestReply(m);
       case 'hx': return this._onHandover(m);
       case 'tr': return this._onResult(m);
+      case 'jr': return this._onJournal(m);
+      case 'bq': return this.role === 'host' && !old ? this._onBackAsk(m) : undefined;
+      case 'bk': return this._onBackIn(m);
       case 'sb': return this._onBoard(m);
       case 'lob': return m.c === this.hostCid ? this._toLobbyLocal() : undefined;
       case 'lg': return this.role === 'host' ? this.leaveGame() : undefined;
@@ -714,11 +720,59 @@
     }
     const seat = this._seatOf(m.c);
     const w = { t: 'welcome', to: m.c, s: seat, p: this._rosterWire(), mx: this.max, mn: this.min, g: this.gameId, pv: PV };
-    if (this.started) w.gn = this.gen;   // a round is being played: wait in the room for the next one
+    const live = this._inRound(), gm = gameOf(this.gameId), fresh = live && !!(gm && gm.online && gm.online.fresh);
+    if (this.started) w.gn = this.gen;   // nobody new gets this far during a round: only a player coming back to their seat
+    if (live && !fresh) { w.rj = { sd: this.seed, g: this.gameId, sq: this.sq }; if (this.ser) w.rj.sr = this._srWire(); if (this.setup) w.rj.su = this.setup; }   // straight back into the game
     if (this.flex) { w.tn = { g: this.plan.g, n: this.plan.n }; if (this.legacy) w.lg = 1; }
     if (this.he) w.he = this.he;
     this._pub(w);
     this._pub(this._hbObj());
+    if (live && gm && gm.online && gm.online.replay) this._sendJournal(m.c);
+    if (fresh && existing0 < 0) setTimeout(() => { if (!this.over && this._inRound()) { if (this.ser) this._beginRound(); else this.start(); } }, RESTART_DELAY);   // a game that cannot be picked up again starts over for everybody
+  };
+  // A player in the party lobby presses Back to <game>: the host answers with the round, then the moves so far.
+  Session.prototype.backToGame = function () {
+    if (this.role === 'host') { this.replayQ = this.journal.map(e => ({ type: e[0], data: e[1], from: e[2], replay: true })); this._emit('start', { gen: this.gen, seed: this.seed, game: this.gameId }); return; }
+    this._pub({ t: 'bq' });
+  };
+  Session.prototype._onBackAsk = function (m) {
+    if (this._seatOf(m.c) <= 0 || !this._inRound()) return;
+    const gm = gameOf(this.gameId);
+    if (gm && gm.online && gm.online.fresh) { if (this.ser) this._beginRound(); else this.start(); return; }
+    const b = { t: 'bk', to: m.c, gn: this.gen, sd: this.seed, g: this.gameId, sq: this.sq };
+    if (this.ser) b.sr = this._srWire();
+    if (this.setup) b.su = this.setup;
+    this._pub(b);
+    if (gm && gm.online && gm.online.replay) this._sendJournal(m.c);
+  };
+  Session.prototype._onBackIn = function (m) {
+    if (this.role === 'host' || m.to !== this.cid || m.c !== this.hostCid || !Number.isInteger(m.gn) || !Number.isInteger(m.sd) || m.gn < this.gen) return;
+    if (m.sr) this._applySr(m.sr);
+    this.setup = m.su || null; this.journalNext = 0; this.gen = m.gn - 1;
+    if (Number.isInteger(m.sq)) this.rxq[m.c] = m.sq;
+    this.pending = [];   // anything heard in the lobby is in the list of moves too
+    this._startFrom(m.gn, m.sd, m.g);
+  };
+  // host: this round's moves, in order, for a player who came back. Each game plays them through as if they had just happened.
+  Session.prototype._sendJournal = function (to) {
+    let part = [], size = 0, i = 0;
+    const flush = last => { this._pub({ t: 'jr', to, gn: this.gen, i: i++, end: last ? 1 : 0, m: part }); part = []; size = 0; };
+    for (const e of this.journal) {
+      const n = bytes(JSON.stringify(e));
+      if (size + n > JOURNAL_PART) flush(false);
+      part.push(e); size += n;
+    }
+    flush(true);
+  };
+  Session.prototype._onJournal = function (m) {
+    if (this.role === 'host' || m.to !== this.cid || m.c !== this.hostCid || m.gn !== this.gen || !Array.isArray(m.m)) return;
+    if (m.i !== (this.journalNext || 0)) return;   // the same part twice (a slow first answer)
+    this.journalNext = m.end ? -1 : m.i + 1;
+    m.m.forEach(e => {
+      if (!Array.isArray(e) || e.length !== 3 || !TYPE_RE.test(String(e[0])) || !Number.isInteger(e[2])) return;
+      const item = { type: e[0], data: e[1], from: e[2], replay: true };
+      if (this.active) this.active._deliver(item); else this.replayQ.push(item);
+    });
   };
   // host: a player with this lasting id is in the room on another connection, or dropped out a moment ago: give them that seat again.
   // Returns the seat, or -1.
@@ -758,8 +812,11 @@
       if (!g || !this._fits(this.gameId)) return false;
       this.gmin = g.online.min; this.gmax = g.online.max; this._closeGaps();
     } else { if (this.roster.size < this.min) return false; this.gmin = this.min; this.gmax = this.max; }
-    this.started = true; this.gen++; this.seed = (randBytes(4).reduce((a, b) => a * 256 + b, 0)) >>> 0;
-    this._pub({ t: 'start', gen: this.gen, sd: this.seed, p: this._rosterWire(), g: this.gameId, gm: [this.gmin, this.gmax] });
+    this.started = true; this.gen++; this.seed = (randBytes(4).reduce((a, b) => a * 256 + b, 0)) >>> 0; this.journal = [];
+    this.setup = this.nextSetup; this.nextSetup = null;
+    const st = { t: 'start', gen: this.gen, sd: this.seed, p: this._rosterWire(), g: this.gameId, gm: [this.gmin, this.gmax] };
+    if (this.setup) st.su = this.setup;
+    this._pub(st);
     this._emit('start', { gen: this.gen, seed: this.seed, game: this.gameId });
     return true;
   };
@@ -881,7 +938,7 @@
     this._closeGaps();
     ser.st = 'play'; ser.rep = {}; clearTimeout(ser.t1); clearTimeout(ser.t2);
     this.rosterList().forEach(p => { if (!ser.sc.some(e => e[0] === p.cid)) ser.sc.push([p.cid, p.name, 0]); });
-    this.started = true; this.gen++; this.seed = (randBytes(4).reduce((a, b) => a * 256 + b, 0)) >>> 0;
+    this.started = true; this.gen++; this.seed = (randBytes(4).reduce((a, b) => a * 256 + b, 0)) >>> 0; this.journal = []; this.setup = null;
     this.gameId = id; this.gmin = g.online.min; this.gmax = g.online.max;
     this._pub({ t: 'start', gen: this.gen, sd: this.seed, p: this._rosterWire(), g: id, gm: [this.gmin, this.gmax], sr: this._srWire() });
     this._emit('start', { gen: this.gen, seed: this.seed, game: id });
@@ -987,11 +1044,15 @@
     this.seat = m.s; this.hostCid = m.c; this.lastHost = Date.now(); this.ready = true; this.client.pin();
     if (Number.isInteger(m.he) && m.he > 0) this.he = m.he;
     if (!this.gameId && typeof m.g === 'string' && TYPE_RE.test(m.g)) this.gameId = m.g;
-    // the room is in the middle of a round: wait in the room for the next one (never drop into a game half played)
-    if (Number.isInteger(m.gn) && m.gn > this.gen) { this.gen = m.gn; this.waitRound = true; }
+    // the room is in the middle of a round. This player's own game: straight back in. Otherwise wait in the room for the next one.
+    const back = Number.isInteger(m.gn) && m.gn > this.gen && m.rj && Number.isInteger(m.rj.sd) && !(window.ludusDebug && window.ludusDebug.stayInLobby) ? { gen: m.gn, sd: m.rj.sd, g: m.rj.g } : null;
+    if (back) { if (m.rj.sr) this._applySr(m.rj.sr); this.setup = m.rj.su || null; this.journalNext = 0; if (Number.isInteger(m.rj.sq)) this.rxq[m.c] = m.rj.sq; }   // the moves so far come as one list: never ask for them again one by one
+    else if (Number.isInteger(m.gn) && m.gn > this.gen) { this.gen = m.gn; this.waitRound = true; }
     this.max = Math.max(2, Math.min(MAX_SEATS, m.mx | 0)); this.min = Math.max(2, Math.min(this.max, m.mn | 0)); this.gmin = this.min; this.gmax = this.max;
     this._setRoster(list);
+    if (back) this.gen = back.gen - 1;
     this._emit('ready', { code: this.code });
+    if (back) this._startFrom(back.gen, back.sd, back.g);
   };
   Session.prototype._setRoster = function (list) {
     this.roster = new Map(list.map(p => [p.seat, p]));
@@ -1064,6 +1125,7 @@
     if (list) this._setRoster(list);
     if (Array.isArray(m.gm) && m.gm.length === 2 && m.gm.every(Number.isInteger)) { this.gmin = Math.max(2, m.gm[0]); this.gmax = Math.min(MAX_SEATS, m.gm[1]); }
     if (m.sr) this._applySr(m.sr); else if (this.ser && this.ser.st === 'final') this.ser = null;   // a rematch with a new plan
+    this.setup = m.su && typeof m.su === 'object' ? m.su : null;
     this._startFrom(m.gen, m.sd, m.g);
   };
   Session.prototype._startFrom = function (gen, seed, game) {
@@ -1204,8 +1266,12 @@
     try { text = JSON.stringify(m); } catch (e) { this.sq--; return false; }
     if (bytes(text) > MAX_PACKET) { this.sq--; return false; }
     this.history.push({ q: m.q, text }); if (this.history.length > HISTORY) this.history.shift();
+    if (to === undefined) this._note(m.k, m.d, this.seat);
     this.client.publish(topicOf(this.code), text);
     return true;
+  };
+  Session.prototype._note = function (type, data, seat) {
+    if (this.role === 'host' && this.started && this.journal.length < JOURNAL_MAX) this.journal.push([type, data, seat]);
   };
   // Fast messages: not numbered, never sent again, dropped when the line is down. For live action games that
   // send their state many times a second, where only the newest copy matters (see ONLINE.md, "Real-time games").
@@ -1266,6 +1332,7 @@
     if (m.to !== undefined && m.to !== this.seat) return;          // meant for somebody else
     const r = Number.isInteger(m.r) ? m.r : 0;
     if (r < this.gen) return;                                       // from an earlier round
+    if (m.to === undefined && r === this.gen) this._note(m.k, m.d === undefined ? null : m.d, seat);
     const item = { type: m.k, data: m.d === undefined ? null : m.d, from: seat };
     if (r > this.gen || !this.active) { this.pending.push({ r, item }); if (this.pending.length > 200) this.pending.shift(); return; }
     this.active._deliver(item);
@@ -1297,7 +1364,7 @@
       }
     };
     const o = {
-      code: s.code, seat: s.seat, min: s.gmin, max: s.gmax, isHost: s.role === 'host', gen: s.gen,
+      code: s.code, seat: s.seat, min: s.gmin, max: s.gmax, isHost: s.role === 'host', gen: s.gen, setup: s.setup,
       get count() { return s.roster.size; },
       get names() { const a = []; for (let i = 0; i < s.gmax; i++) { const p = s.roster.get(i); a.push(p ? p.name : ''); } return a; },
       get connected() { return s.conn === 'online' && !s.over; },
@@ -1320,7 +1387,7 @@
         if (disposed) return;
         const hs = handlers[item.type];
         if (hs && hs.length) { hs.slice().forEach(fn => { try { fn(item.data, item.from); } catch (e) { setTimeout(() => { throw e; }); } }); return; }
-        inbox.push({ type: item.type, data: item.data, from: item.from, at: Date.now() });
+        inbox.push({ type: item.type, data: item.data, from: item.from, at: item.replay ? Date.now() + REPLAY_PATIENCE : Date.now() });
         pump();
       },
       // fast messages only go to on() handlers; with no handler they are dropped (never queued)
@@ -1333,6 +1400,7 @@
     s.active = o;
     // messages from players who started the round a moment before us
     const keep = [];
+    s.replayQ.splice(0).forEach(item => o._deliver(item));   // a player who came back: the round so far comes first
     s.pending.forEach(p => { if (p.r === s.gen) o._deliver(p.item); else if (p.r > s.gen) keep.push(p); });
     s.pending = keep;
     return o;

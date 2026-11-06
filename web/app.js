@@ -697,11 +697,23 @@
     trackParty(s, 'host');
     if (party) s.on('error', () => rejoinFailed(party, retried));   // runs after the lobby's own handling of the error
     if (party && party.games && party.games.length) s.on('ready', () => { s.setPlan(party.games.filter(id => L.games.some(g => g.id === id && g.online)), party.n); });
+    return s;
   }
+  // One time only (Nov 2026): a friend's game of chess froze, so this room picks it up from the same position. This Mac is White, the friend Black, and the game starts when they join.
+  const CARRY_ON_FEN = 'r2qk2r/p2npbbp/1p4Q1/1B1p1p2/P2pnB1P/8/1PP3P1/R3K1NR b KQkq - 0 1';
+  window.ludusCarryOnChess = code => {
+    if (!L.net.validCode(code)) return false;
+    const s = createFlexRoom({ code, games: ['chess'], n: 1 });
+    if (!s) return false;
+    s.on('ready', () => { s.nextSetup = { fen: CARRY_ON_FEN }; });
+    s.on('roster', list => { if (list.length === 2 && !s.started && s.nextSetup) s.start(); });
+    return true;
+  };
   function lobbyOps(g) {
     return {
       toast, goHome,
       rejoin: () => { L.sfx('click'); rejoinParty(); },
+      backToGame: s => s.backToGame(),
       onStart: (s, e) => beginOnline(s, e, g),
       onCancel: () => {
         // back to whatever mode was there before

@@ -147,7 +147,7 @@
   }
 
   Ludus.register({
-    id: 'decider', name: 'Rock Paper Scissors', aka: 'The Decider', tag: 'Duel', tint: PINK, online: { min: 2, max: 2 },
+    id: 'decider', name: 'Rock Paper Scissors', aka: 'The Decider', tag: 'Duel', tint: PINK, online: { min: 2, max: 2, fresh: true },
     onlineHint: 'Pick with <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd>, <kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> or a click. Picks are secret until both players have locked in. First to 3',
     hint: 'Pick with <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd>, <kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> or a click. Rock beats scissors, scissors beat paper, paper beats rock. First to 3. To play a friend, use Online.',
     _rules: { makeBrain, outcome, BEATS, COUNTER }, _hand: drawHand,

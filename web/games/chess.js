@@ -637,6 +637,7 @@
     },
     create(stage, api) {
       const D = Ludus.draw, S = Ludus.state;
+      const SYNC_EVERY = 8000;
       const view = api.canvas();
       const { ctx } = view;
       const on = api.online;
@@ -646,6 +647,8 @@
       // colours: online the shared random stream picks who is White; against the bot you swap colours each game
       let myColor = 1;
       if (on) myColor = (on.rand() < 0.5 ? 0 : 1) === on.seat ? 1 : -1;
+      const setupFen = on && on.setup && typeof on.setup.fen === 'string' ? on.setup.fen : '';   // a game carried on from a set position: the host is White
+      if (setupFen) myColor = on.seat === 0 ? 1 : -1;
       else if (botMode) myColor = S.chessNextSide === -1 ? -1 : 1;
       const nameOf = c => {
         if (on) return on.names[c === myColor ? on.seat : 1 - on.seat] || (c === 1 ? 'White' : 'Black');
@@ -666,9 +669,9 @@
       const flip = () => myColor === -1;
       const mayAct = () => phase === 'play' && !api.ended && !promo && (friendLocal || pos.side === myColor);
       function reset() {
-        pos = core.loadFen(core.START); plies = []; sans = []; keys = [core.key(pos)]; lastMove = null;
+        pos = core.loadFen(setupFen || core.START); plies = []; sans = []; keys = [core.key(pos)]; lastMove = null;
         phase = 'play'; sel = -1; drag = null; promo = null; anims = []; fades = []; banner = null; thinking = false;
-        setTc(on && !on.isHost ? 0 : prefTime());
+        setTc(setupFen || (on && !on.isHost) ? 0 : prefTime());
         cursor = myColor === 1 ? 0x14 : 0x64;
       }
 
@@ -918,7 +921,7 @@
         if (!geo.chipH && !side) return;
         const y1 = side ? geo.py : chipY + 4, y2 = side ? geo.py + (on ? 0 : 68) : chipY + 4 + rowH + 10;
         if (on) {
-          if (on.isHost && !plies.length) drawSeg(col, 'clk', y1, 'Clock', TIME_LABELS, cur, true);
+          if (on.isHost && !plies.length && !setupFen) drawSeg(col, 'clk', y1, 'Clock', TIME_LABELS, cur, true);
           else D.text(ctx, tc ? 'Clock: ' + tc + ' min each' : 'No clock', side ? geo.px + geo.pw / 2 : bx + bs / 2, y1 + rowH / 2 + 1, 12, col.ink3, 650);
           return;
         }
@@ -927,7 +930,7 @@
       }
       function pickTime(i) {
         const m = TIMES[i];
-        if (on && (!on.isHost || plies.length)) return;
+        if (on && (!on.isHost || plies.length || setupFen)) return;
         if (m === prefTime()) return;
         S.chessTime = m; Ludus.save(); api.sfx('click');
         if (!plies.length && phase === 'play') { setTc(m); if (on) on.send('tcset', { m }); }
@@ -1062,6 +1065,7 @@
           const c = !!on.connected;
           if (c && !wasConnected) askSync(true);
           wasConnected = c;
+          if (c && phase === 'play' && pos.side !== myColor && performance.now() - lastSync > SYNC_EVERY) askSync();   // waiting on them: a lost message must not freeze the game
         }
       }
 
@@ -1158,6 +1162,7 @@
       if (botMode) getWorker();   // start the bot's worker now, so its first move does not pay for it
       reset();
       if (on || !restore(api.saved)) { reset(); if (botMode && myColor === -1) botTurn(); }
+      if (on) api.timeout(() => askSync(true), 300);   // a player back in a game opens on the first position: ask for the moves so far
       if (on) on.queue((type, d, from) => {
         if (type !== 'mv') return true;
         if (phase === 'anim') return false;

@@ -487,6 +487,14 @@ svg { display: block; }
 .lobby-sub { margin: 0; color: var(--ink-2); font-size: 12.5px; line-height: 1.4; overflow-wrap: anywhere; }
 .lobby-note { margin: 0; color: var(--ink-3); font-size: 11px; line-height: 1.35; }
 .lobby-error { min-height: 16px; color: var(--bad); font-size: 12px; line-height: 1.35; overflow-wrap: anywhere; }
+.lobby-back { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 56px; padding: 10px 14px; border: 1.5px solid var(--accent); border-radius: 14px; background: color-mix(in srgb, var(--accent) 12%, var(--surface)); color: var(--ink); text-align: left; cursor: pointer; transition: transform .14s ease, background-color .14s ease; }
+.lobby-back:hover { background: color-mix(in srgb, var(--accent) 20%, var(--surface)); }
+.lobby-back:active { transform: scale(.98); }
+.lobby-back-dot { flex: none; width: 9px; height: 9px; border-radius: 50%; background: var(--accent); }
+.lobby-back-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.lobby-back-note { color: var(--ink-2); font-size: 11px; font-weight: 650; }
+.lobby-back-name { font-size: 15px; font-weight: 760; overflow-wrap: anywhere; }
+.lobby-back-arrow { flex: none; font-size: 18px; font-weight: 700; color: var(--accent); }
 .lobby-live { color: var(--ink-2); font-size: 12px; font-weight: 600; overflow-wrap: anywhere; }
 .lobby-row { display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; }
 .btn.small { height: 30px; padding: 0 12px; font-size: 12px; border-radius: 10px; }

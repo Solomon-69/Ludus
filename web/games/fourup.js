@@ -90,7 +90,7 @@
   };
 
   Ludus.register({
-    id: 'fourup', name: 'Four in a Row', aka: 'Four Up', tag: 'Duel', versus: true, online: { min: 2, max: 2 }, tint: '#c4633f',
+    id: 'fourup', name: 'Four in a Row', aka: 'Four Up', tag: 'Duel', versus: true, online: { min: 2, max: 2, replay: true }, tint: '#c4633f',
     hint: 'Click a column, or <kbd>←</kbd><kbd>→</kbd> + <kbd>Space</kbd> (or <kbd>1</kbd>-<kbd>7</kbd>). Four in a row wins a game. First to 3 games. vs Friend: take turns',
     _logic: logic,
     art(ctx, w, h) {

@@ -422,6 +422,7 @@
     } else if (screen === 'room') {
       const host = session.role === 'host';
       title(host ? 'Your room' : 'In room');
+      if ((session.started || session.waitRound) && (!session.ser || session.ser.st === 'play') && ops && ops.backToGame) card.appendChild(backCard());
       card.appendChild(codeBoxes(session.code));
       const row = el('div', 'lobby-row');
       const cl = el('span', '', copied ? 'Copied' : 'Copy invite');
@@ -430,7 +431,7 @@
       row.appendChild(cb); row.appendChild(connChip(session.conn));
       card.appendChild(row);
       const n = session.count(), mx = session.max;
-      live.textContent = host ? (n >= session.min ? 'Ready to start. ' + n + '/' + mx + ' players' : n < 2 ? 'Waiting for a friend to join' : 'Waiting for players ' + n + '/' + mx) : session.waitRound ? 'A round is being played. You join the next one.' : 'Waiting for the host to start. ' + n + '/' + mx + ' players';
+      live.textContent = host ? (n >= session.min ? 'Ready to start. ' + n + '/' + mx + ' players' : n < 2 ? 'Waiting for a friend to join' : 'Waiting for players ' + n + '/' + mx) : session.waitRound ? 'A game is being played in this party.' : 'Waiting for the host to start. ' + n + '/' + mx + ' players';
       card.appendChild(live);
       card.appendChild(avatars(n, mx));
       if (host && n > 1 && session.promoteBlock() === 'old') card.appendChild(el('p', 'lobby-note leader-note', 'Make leader needs everyone on the newest Ludus.'));
@@ -475,6 +476,19 @@
       card.appendChild(btn(error[2] || 'OK', 'primary', () => { const f = ops && ops.noticeOk; hide(); if (f) f(); }));
       if (error[3]) card.appendChild(btn(error[3], 'ghost', () => { hide(); }));   // a second way out (Try again / Close)
     }
+  }
+
+  // a game is being played in this party: the way back into it
+  function backCard() {
+    const g = L.games.find(x => x.id === session.gameId), name = g ? (L.displayName ? L.displayName(g) : g.name) : 'the game';
+    const b = el('button', 'lobby-back', ''); b.type = 'button'; b.id = 'lobbyBack';
+    b.appendChild(el('span', 'lobby-back-dot', ''));
+    const t = el('span', 'lobby-back-text', '');
+    t.appendChild(el('span', 'lobby-back-note', 'Game in progress'));
+    t.appendChild(el('span', 'lobby-back-name', 'Back to ' + name));
+    b.appendChild(t); b.appendChild(el('span', 'lobby-back-arrow', '\u2192'));
+    b.onclick = () => { L.sfx('click'); ops.backToGame(session); };
+    return b;
   }
 
   // ---------- actions ----------

@@ -32,7 +32,7 @@
   };
 
   Ludus.register({
-    id: 'deadcentre', name: 'Dead Centre', tag: 'Duel', tint: TEAL, versus: true, online: { min: 2, max: 2 },
+    id: 'deadcentre', name: 'Dead Centre', tag: 'Duel', tint: TEAL, versus: true, online: { min: 2, max: 2, replay: true },
     onlineHint: '<kbd>Space</kbd> or a click stops the needle on your turn. Closer to the line than your opponent wins the round. First to 3',
     hint: '<kbd>Space</kbd> or a click stops the needle on your turn. Closer to the line than the bot wins the round. First to 3. vs Friend: take turns, Space stops for whoever is up',
     _rules: { stepNeedle, cpuError, judge, modeOf },

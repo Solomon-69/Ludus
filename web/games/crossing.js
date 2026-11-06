@@ -98,7 +98,7 @@
   }
 
   Ludus.register({
-    id: 'crossing', name: 'Hex', aka: 'The Crossing', tag: 'Duel', tint: PURPLE, versus: true, online: { min: 2, max: 2 },
+    id: 'crossing', name: 'Hex', aka: 'The Crossing', tag: 'Duel', tint: PURPLE, versus: true, online: { min: 2, max: 2, replay: true },
     hint: 'Click a hex or use <kbd>←↑→↓</kbd> + <kbd>Space</kbd>. Link your left and right edges. <kbd>S</kbd> steals the opening stone. vs Friend: first to 3 games',
     _rules: { winPath, cpuConnects, swapBoard, winningCell, bridgeReply, makeSearch, N, YOU, CPU },
     art(ctx, w, h) {

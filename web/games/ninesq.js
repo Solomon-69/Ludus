@@ -172,7 +172,7 @@
   };
 
   Ludus.register({
-    id: 'ninesq', name: 'Ultimate Tic-Tac-Toe', aka: 'Nine Squared', tag: 'Duel', tint: '#5b8def', versus: true, online: { min: 2, max: 2 },
+    id: 'ninesq', name: 'Ultimate Tic-Tac-Toe', aka: 'Nine Squared', tag: 'Duel', tint: '#5b8def', versus: true, online: { min: 2, max: 2, replay: true },
     hint: 'Click a square, or <kbd>←</kbd><kbd>↑</kbd><kbd>→</kbd><kbd>↓</kbd> + <kbd>Space</kbd>. The square you pick sends the bot to that board. Win 3 boards in a row. vs Friend: take turns',
     _logic: logic,
     art(ctx, w, h) {
