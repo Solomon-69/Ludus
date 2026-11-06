@@ -3,6 +3,9 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.73 (6 Nov 2026)
+- Sky Hop: the mode tabs now size to their names, so Monsters fits inside the sliding bubble.
+
 ## 1.12.72 (6 Nov 2026)
 - Online: coming back to a party during a game now takes you straight back into it, same position and same turn, and both players can carry on. Before, you were left waiting in the lobby while the other player's game sat frozen.
 - Online: a party with a game running shows Back to (the game's name) at the top of its lobby.

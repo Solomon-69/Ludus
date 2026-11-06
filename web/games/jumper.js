@@ -17,6 +17,12 @@
   ];
   const MODES = [['classic', 'Classic'], ['monsters', 'Monsters'], ['boost', 'Boost'], ['moon', 'Moon'], ['storm', 'Storm'], ['night', 'Night']];
   const MODE_IDS = MODES.map(m => m[0]);
+  const TAB_CHAR = 6.2, TAB_PAD = 22;     // a tab's width follows its name, so a long name still fits in the sliding bubble
+  const tabEdges = w => {
+    const raw = MODES.map(m => m[1].length * TAB_CHAR + TAB_PAD), sum = raw.reduce((a, b) => a + b, 0), out = [0];
+    raw.forEach(r => out.push(out[out.length - 1] + r * w / sum));
+    return out;
+  };
   const MOON_G = 640, MOON_BOUNCE = -470, MOON_SPRING = -732;   // same height as a normal bounce, much slower and floatier
   const MOON_DRIFT = 0.3, AIR_DRIFT = 0.02;                     // how much sideways speed is left after a second with no steering
   const JET_T = 2.6, JET_V = -1100, COIL_N = 5, COIL_K = 1.28, BOOST_SPRING = 1.18, SHOT_V = 640, SHOT_GAP = 0.24;
@@ -294,7 +300,7 @@
         if (!switchOn()) return;
         const x = inSwitch(e); if (x === null) return;
         e.stopImmediatePropagation(); e.preventDefault();
-        if (e.type === 'pointerdown') { const b = switchBox(), n = Math.floor((x - b.x) / (b.w / MODES.length)); setMode(MODE_IDS[Math.max(0, Math.min(MODES.length - 1, n))]); }
+        if (e.type === 'pointerdown') { const b = switchBox(), n = tabEdges(b.w).findIndex(v => v > x - b.x) - 1; setMode(MODE_IDS[n < 0 ? MODES.length - 1 : n]); }
       };
       canvas.addEventListener('pointerdown', onPick, true); canvas.addEventListener('pointermove', onPick, true);
       const pointerSide = e => { const r = canvas.getBoundingClientRect(); const left = e.clientX - r.left < r.width / 2; held.pl = left; held.pr = !left; };
@@ -460,15 +466,17 @@
           const b = switchBox(), half = b.w / 2, flat = document.documentElement.classList.contains('flat');
           // real clock, not game time: the game clock stands still while waiting for the first move
           const nowMs = performance.now(), swDt = Math.min(0.05, (nowMs - swLast) / 1000); swLast = nowMs;
-          const at = MODE_IDS.indexOf(mode), seg = b.w / MODES.length;
+          const at = MODE_IDS.indexOf(mode), edges = tabEdges(b.w);
           swPos += (at - swPos) * (1 - Math.exp(-16 * swDt));
           const on = api.reduceMotion ? at : swPos, tr = b.h / 2;
           if (!flat) { ctx.fillStyle = base.dark ? 'rgba(0,0,0,0.38)' : 'rgba(32,28,23,0.14)'; D.roundRect(ctx, b.x, b.y + 3, b.w, b.h, tr); ctx.fill(); }
           ctx.fillStyle = base.surface2; D.roundRect(ctx, b.x, b.y, b.w, b.h, tr); ctx.fill();
-          const tx = b.x + 3 + on * seg, tw = seg - 6, th = b.h - 8, ty = b.y + 4;
+          const i0 = Math.min(MODES.length - 1, Math.floor(on)), f = on - i0, i1 = Math.min(MODES.length - 1, i0 + 1);
+          const left = edges[i0] + (edges[i1] - edges[i0]) * f, right = edges[i0 + 1] + (edges[i1 + 1] - edges[i0 + 1]) * f;
+          const tx = b.x + left + 3, tw = right - left - 6, th = b.h - 8, ty = b.y + 4;
           if (!flat) { ctx.fillStyle = base.dark ? 'rgba(0,0,0,0.45)' : 'rgba(32,28,23,0.2)'; D.roundRect(ctx, tx, ty + 2, tw, th, th / 2); ctx.fill(); }
           ctx.fillStyle = base.surface; D.roundRect(ctx, tx, ty, tw, th, th / 2); ctx.fill();
-          MODES.forEach((m, i) => D.text(ctx, m[1], b.x + seg * (i + 0.5), b.y + b.h / 2 + 0.5, 11.5, Math.abs(on - i) < 0.5 ? base.ink : base.ink2, 700));
+          MODES.forEach((m, i) => D.text(ctx, m[1], b.x + (edges[i] + edges[i + 1]) / 2, b.y + b.h / 2 + 0.5, 11.5, Math.abs(on - i) < 0.5 ? base.ink : base.ink2, 700));
         }
         ctx.restore();
       }
