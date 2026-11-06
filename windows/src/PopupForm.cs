@@ -324,6 +324,7 @@ internal sealed class PopupForm : Form
         updating = true;
         try
         {
+            Updater.CheckWritable(AppContext.BaseDirectory);
             var staged = await Updater.DownloadWithFallbackAsync(zipUri, sumsUri, name,
                 new Progress<double>(p => RunScript($"window.ludusUpdateState && ludusUpdateState('progress', {p.ToString(System.Globalization.CultureInfo.InvariantCulture)})")));
             Updater.StartSwap(staged, AppContext.BaseDirectory.TrimEnd('\\', '/'), Environment.ProcessId);
@@ -332,7 +333,7 @@ internal sealed class PopupForm : Form
         catch (Exception ex)
         {
             Store.Log($"update failed: {ex.Message}");
-            RunScript("window.ludusUpdateState && ludusUpdateState('error')");
+            RunScript($"window.ludusUpdateState && ludusUpdateState('error', {System.Text.Json.JsonSerializer.Serialize(Updater.Problem(ex))})");
         }
         finally { updating = false; }
     }

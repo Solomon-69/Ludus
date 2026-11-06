@@ -122,6 +122,25 @@ internal static class Updater
         }
     }
 
+    /// <summary>What went wrong, in words a person can act on (the same wording as the Mac app).</summary>
+    public static string Problem(Exception ex) => ex switch
+    {
+        InvalidOperationException { Message: "checksum mismatch" } => "The download was damaged, so it was thrown away. Try again.",
+        InvalidOperationException { Message: "no checksum" } or HttpRequestException or IOException or TaskCanceledException or OperationCanceledException
+            => "The download stopped. Check your internet and try again.",
+        UnauthorizedAccessException => "Ludus can't replace itself where it is. Move the Ludus folder to Documents, then try again.",
+        System.ComponentModel.Win32Exception => "Windows blocked the update helper. Get the new version from the website.",
+        _ => "The update did not install, your current version is untouched.",
+    };
+
+    /// <summary>The swap runs after Ludus has quit, where it cannot report anything, so find out now if the folder can be written to.</summary>
+    public static void CheckWritable(string dir)
+    {
+        var probe = Path.Combine(dir, ".ludus-write-test");
+        File.WriteAllText(probe, "");
+        File.Delete(probe);
+    }
+
     /// <summary>Starts the helper that waits for process <paramref name="pid"/> to exit, copies <paramref name="staged"/> over
     /// <paramref name="installDir"/> and starts Ludus.exe again. The caller quits right after.</summary>
     public static void StartSwap(string staged, string installDir, int pid)

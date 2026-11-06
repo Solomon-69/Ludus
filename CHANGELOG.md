@@ -3,6 +3,9 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.74 (6 Nov 2026)
+- Updates on Windows: if an update fails it now says why, as on the Mac, and a folder Ludus cannot write to is found before the download instead of failing quietly.
+
 ## 1.12.73 (6 Nov 2026)
 - Sky Hop: the mode tabs now size to their names, so Monsters fits inside the sliding bubble.
 
