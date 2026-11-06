@@ -1,10 +1,12 @@
 /* Spark Hop: the spark bounces by itself. Steer it from platform to platform and climb as high as you can. Moving and crumbly platforms show up the higher you go.
    Six modes, picked at the start of a climb (the tab switcher on the board until the first platform):
    Classic. Monsters: little monsters float between the platforms (land on top to bop them, Up or Space fires at them, touch one any other way and you fall) and puffy
-   clouds hold you once. Boost: pick-ups on the platforms (jet, coil, bubble), with a few monsters. Moon: slow, floaty bounces and rocks drifting down. Storm: wind
-   pushes you sideways through the rain. Night: you only see what your own glow lights up, and the glow shrinks as you climb. */
+   clouds hold you once. Boost: plenty of pick-ups on the platforms (jet, coil, bubble), with a few monsters. Moon: out on the moon with slow, drifting bounces and
+   burning rocks falling past. Storm: wind and sudden gusts push you sideways through the rain, and lightning that strikes close knocks you away (never a fall by
+   itself; the sky lights up over the spot first). Night: you only see what your own glow lights up, and the glow shrinks as you climb.
+   How each world looks lives in jumper-worlds.js. */
 (function () {
-  const D = Ludus.draw;
+  const D = Ludus.draw, W = Ludus.hopWorlds;
   const WW = 360;                         // world width; height follows the stage shape
   const PW = 62, PH = 12, R = 11;         // platform size, spark radius
   const GRAV = 1500, BOUNCE = -720, SPRING = -1120, MAXVX = 300, ACC = 1500;
@@ -15,8 +17,12 @@
   ];
   const MODES = [['classic', 'Classic'], ['monsters', 'Monsters'], ['boost', 'Boost'], ['moon', 'Moon'], ['storm', 'Storm'], ['night', 'Night']];
   const MODE_IDS = MODES.map(m => m[0]);
-  const MOON_G = 900, MOON_BOUNCE = -558, MOON_SPRING = -868;   // same height as a normal bounce, slower and floatier
-  const JET_T = 2.2, JET_V = -880, COIL_N = 5, COIL_K = 1.28, SHOT_V = 640, SHOT_GAP = 0.24;
+  const MOON_G = 640, MOON_BOUNCE = -470, MOON_SPRING = -732;   // same height as a normal bounce, much slower and floatier
+  const MOON_DRIFT = 0.3, AIR_DRIFT = 0.02;                     // how much sideways speed is left after a second with no steering
+  const JET_T = 2.6, JET_V = -1100, COIL_N = 5, COIL_K = 1.28, BOOST_SPRING = 1.18, SHOT_V = 640, SHOT_GAP = 0.24;
+  const ITEM_REACH = 17;                  // how close counts as touching a pick-up
+  const BOLT_WARN = 0.7, BOLT_SHOW = 0.4, BOLT_REACH = 130, GUST_T = 1.4, GUST_WIND = 380;
+  const NIGHT_STEPS = 14, TRAIL_N = 14, TRAIL_GAP = 0.028;
   const MAX_GAP = 150;                    // a bounce reaches about 172 units, so this is always jumpable
 
   Ludus.register({
@@ -40,11 +46,16 @@
       let mode = 'classic';   // every visit starts on Classic
       let swPos = 0, swLast = performance.now();   // slide position of the mode picker thumb (its index in MODES)
       let power = null, bubble = false, coil = 0, shots = [], rocks = [], rockT = 3, shotT = 0, wind = 0;
+      let fx = [], trail = [], trailT = 0, shake = 0, flash = 0, flashRgb = '225,235,255', pulse = 0, zapAt = -9, windX = 0, bolt = null, boltT = 4, boltX = WW / 2, gust = null, gustT = 5;
+      const puff = (x, y, opt) => { if (!api.reduceMotion) W.burst(fx, x, y, opt); };
+      const wave = (x, y, rgb, size, life) => { if (!api.reduceMotion) W.ring(fx, x, y, rgb, size, life); };
+      const jolt = k => { if (!api.reduceMotion) shake = Math.max(shake, k); };
+      const light = (k, rgb) => { flash = Math.max(flash, k); flashRgb = rgb; };
       const hasMonsters = () => mode === 'monsters' || mode === 'boost';
       const canFire = hasMonsters;
       const gravity = () => (mode === 'moon' ? MOON_G : GRAV);
       const bounceV = () => (mode === 'moon' ? MOON_BOUNCE : BOUNCE) * (coil > 0 ? COIL_K : 1);
-      const springV = () => (mode === 'moon' ? MOON_SPRING : SPRING);
+      const springV = () => (mode === 'moon' ? MOON_SPRING : mode === 'boost' ? SPRING * BOOST_SPRING : SPRING);
       const MR = 14;   // monster radius
       const held = { l: false, r: false, pl: false, pr: false };
 
@@ -62,7 +73,7 @@
         if (chain) { if (x < lo) x = lo + (lo - x) * 0.5; if (x > hi) x = hi - (x - hi) * 0.5; x = Math.max(lo, Math.min(hi, x)); lastX = x; }
         const sp = (50 + Math.random() * 60) * (1 + k) * (Math.random() < 0.5 ? -1 : 1);
         const q = { x, y, type, vx: type === 'move' ? sp : 0, broken: -1, born: clock };
-        if (chain && mode === 'boost' && type === 'still' && y < -300) { const r2 = Math.random(); q.item = r2 < 0.035 ? 'jet' : r2 < 0.09 ? 'coil' : r2 < 0.13 ? 'bubble' : undefined; }
+        if (chain && mode === 'boost' && type === 'still' && y < -200) { const r2 = Math.random(); q.item = r2 < 0.07 ? 'jet' : r2 < 0.17 ? 'coil' : r2 < 0.24 ? 'bubble' : undefined; }
         plats.push(q);
       }
       function generate() {
@@ -87,53 +98,117 @@
       function reset() {
         WH = worldH(); clock = 0; state = 'play'; deadAt = -1; onFloor = true; squash = 0; spin = 0; pops = []; height = 0; best = 0;
         power = null; bubble = false; coil = 0; shots = []; rocks = []; rockT = 3; shotT = 0; wind = 0;
+        fx = []; trail = []; trailT = 0; shake = 0; flash = 0; pulse = 0; zapAt = -9; windX = 0; bolt = null; boltT = 4; gust = null; gustT = 5;
         plats = []; mons = []; camY = -WH + 40;          // world y grows downward; the start floor sits at y = 0
         p = { x: WW / 2, y: -PH - R, vx: 0, vy: mode === 'moon' ? MOON_BOUNCE : BOUNCE };
         plats.push({ x: WW / 2, y: 0, type: 'still', vx: 0, broken: -1, born: 0, wide: true });
         lastChainY = 0; lastX = WW / 2; generate(); api.score(0);
       }
 
+      // what a bounce kicks up: it is the same bounce everywhere, but each world answers it differently
+      function landFx(q) {
+        const x = p.x, y = q.y, big = q.type === 'spring' || coil > 0;
+        pulse = 1;
+        if (mode === 'moon') { puff(x, y, { n: 14, speed: 70, spread: 1.2, g: 34, life: 1.7, r: 5, drag: 0.55, rgb: '190,190,200', kind: 'smoke' }); wave(x, y, '200,205,225', 44, 0.9); }
+        else if (mode === 'storm') { puff(x, y, { n: 16, speed: 210, spread: 1.1, vx: wind * 0.25, g: 760, life: 0.5, rgb: '190,215,240', kind: 'drop' }); wave(x, y, '170,200,235', 30, 0.3); }
+        else if (mode === 'boost') {
+          wave(x, y, big ? '255,214,90' : '255,160,80', big ? 74 : 34, 0.4);
+          if (big) { puff(x, y, { n: 18, speed: 240, spread: 1.3, g: 500, life: 0.6, r: 3, rgb: '255,200,90' }); jolt(0.4); }
+        } else if (mode === 'monsters') puff(x, y, { n: 8, speed: 80, spread: 1.2, g: -30, life: 0.7, r: 2.6, rgb: '235,120,150' });
+        else if (mode === 'night') puff(x, y, { n: 9, speed: 90, spread: 1.3, g: 90, life: 0.9, r: 2.4, rgb: '255,205,130' });
+        else puff(x, y, { n: 7, speed: 90, spread: 1.2, g: 300, life: 0.4, r: 3, rgb: api.colors().dark ? '200,190,175' : '255,255,255' });
+        if (q.type === 'spring' && mode !== 'boost') jolt(0.25);
+      }
+      function bopFx(m) {
+        puff(m.x, m.y, { n: 18, speed: 210, g: 300, life: 0.6, r: 3.4, rgb: ['190,140,240', '110,210,180', '240,130,145'][m.kind] });
+        wave(m.x, m.y, '255,235,200', 46, 0.35); jolt(0.4);
+      }
       function land(q) {
         if (!q.wide) onFloor = false;       // first platform above the start floor: the mode choice goes away
         if (q.type === 'break') {
-          if (q.broken < 0) { q.broken = clock; api.sfx('drop'); }
+          if (q.broken < 0) { q.broken = clock; api.sfx('drop'); puff(q.x, q.y, { n: 10, speed: 70, g: 240, life: 0.6, r: 3, rgb: mode === 'moon' ? '150,148,156' : '190,155,110' }); }
           return false;                     // crumbly platforms never bounce you
         }
-        if (q.type === 'cloud') { p.vy = bounceV(); p.y = q.y - R; squash = 1; q.broken = clock; api.sfx('jump'); return true; }   // holds you once, then puffs away
+        if (q.type === 'cloud') { p.vy = bounceV(); p.y = q.y - R; squash = 1; q.broken = clock; api.sfx('jump'); landFx(q); return true; }   // holds you once, then puffs away
         p.vy = q.type === 'spring' ? springV() : bounceV();
         if (coil > 0 && q.type !== 'spring') coil--;
         p.y = q.y - R; squash = 1;
         if (q.type === 'spring') { q.sprung = clock; api.sfx('power'); spin += 6; } else api.sfx('jump');
+        landFx(q);
         return true;
+      }
+      function give(it) {
+        const rgb = it === 'jet' ? '255,130,60' : it === 'coil' ? '255,214,90' : '130,205,255';
+        api.sfx('power'); light(0.5, rgb); jolt(0.5);
+        wave(p.x, p.y, rgb, 110, 0.5); wave(p.x, p.y, '255,255,255', 60, 0.3);
+        puff(p.x, p.y, { n: 24, speed: 300, g: 260, life: 0.7, r: 3.4, rgb });
+        if (it === 'jet') { power = { until: clock + JET_T }; api.sfx('whoosh'); pops.push({ t: clock, text: 'Jet!', big: true }); }
+        else if (it === 'coil') { coil = COIL_N; pops.push({ t: clock, text: 'Coil!', big: true }); }
+        else { bubble = true; pops.push({ t: clock, text: 'Bubble!', big: true }); }
+      }
+      function strike() {
+        const b = bolt;
+        let end = camY + WH;   // it hits the first platform under it, or runs off the bottom of the board
+        for (const q of plats) if (Math.abs(q.x - b.x) < PW / 2 && q.y > camY + 40 && q.y < end) end = q.y;
+        b.path = W.boltPath(b.x, camY - 30, end); b.hit = clock; boltX = b.x;
+        api.sfx('thunder'); light(api.reduceMotion ? 0.25 : 1, '225,235,255'); jolt(1);
+        puff(b.x, end, { n: 22, speed: 280, spread: 1.4, g: 520, life: 0.55, r: 2.6, rgb: '205,225,255' });
+        wave(b.x, end, '205,225,255', 90, 0.4);
+        const d = p.x - b.x;
+        if (Math.abs(d) > BOLT_REACH) return;
+        p.vx = (d < 0 ? -1 : 1) * MAXVX; p.vy = Math.min(p.vy, p.vy * 0.5 - 200); squash = 1; spin += 8; zapAt = clock;
+        pops.push({ t: clock, text: 'Zapped!', big: true });
+      }
+      function stormStep(dt) {
+        gustT -= dt;
+        if (gustT <= 0) { gustT = 6 + Math.random() * 4; gust = { t: clock, dir: Math.random() < 0.5 ? -1 : 1 }; api.sfx('whoosh'); }
+        if (gust && clock - gust.t > GUST_T) gust = null;
+        boltT -= dt;
+        if (!bolt && boltT <= 0 && height >= 8) {
+          boltT = [8, 6.5, 5][api.level] + Math.random() * 3;
+          const x = p.x + (Math.random() * 2 - 1) * 150;   // close to you, so it matters; the sky over it glows first
+          bolt = { t: clock, x: Math.max(24, Math.min(WW - 24, x)), hit: 0 };
+        }
+        if (bolt && !bolt.hit && clock - bolt.t >= BOLT_WARN) strike();
+        if (bolt && bolt.hit && clock - bolt.hit > BOLT_SHOW) bolt = null;
+        const seen = plats.filter(q => q.y > camY && q.y < camY + WH && q.broken < 0);
+        if (seen.length && Math.random() < dt * 22) { const q = seen[Math.floor(Math.random() * seen.length)]; puff(q.x + (Math.random() * 2 - 1) * PW * 0.4, q.y, { n: 3, speed: 70, spread: 0.9, g: 500, life: 0.28, rgb: '190,215,240', kind: 'drop' }); }
+        if (Math.random() < dt * 14) puff(p.x, p.y - R, { n: 2, speed: 80, spread: 1, vx: wind * 0.3, g: 500, life: 0.3, rgb: '205,225,250', kind: 'drop' });
       }
 
       function update(dt) {
         clock += dt;
         const nh = worldH(); if (nh !== WH) WH = nh;
         squash = Math.max(0, squash - dt * 5);
-        pops = pops.filter(o => clock - o.t < 0.8);
+        pulse = Math.max(0, pulse - dt * 2.6); shake = Math.max(0, shake - dt * 3.2); flash = Math.max(0, flash - dt * 3.4);
+        W.stepFx(fx, dt);
+        pops = pops.filter(o => clock - o.t < (o.big ? 1.1 : 0.8));
         plats.forEach(q => {
           if (q.type === 'move' && state === 'play') { q.x += q.vx * dt; if (q.x < PW / 2 + 4 || q.x > WW - PW / 2 - 4) { q.vx = -q.vx; q.x = Math.max(PW / 2 + 4, Math.min(WW - PW / 2 - 4, q.x)); } }
           if (q.broken >= 0) q.y += (clock - q.broken) * 500 * dt;
         });
         if (state !== 'play') { if (p.y < camY + WH + 200) { p.vy += gravity() * dt; p.y += p.vy * dt; } spin += dt * 4; return; }
         const dir = ((held.r || held.pr) ? 1 : 0) - ((held.l || held.pl) ? 1 : 0);
-        if (dir) p.vx += dir * ACC * dt; else p.vx *= Math.pow(0.02, dt);
-        if (mode === 'storm') { wind = (Math.sin(clock * 0.7) * 240 + Math.sin(clock * 0.23 + 1) * 170) * Math.min(1, 0.35 + height / 150); p.vx += wind * dt; }
+        if (dir) p.vx += dir * ACC * dt; else p.vx *= Math.pow(mode === 'moon' ? MOON_DRIFT : AIR_DRIFT, dt);
+        if (mode === 'storm') {
+          const gusting = gust ? gust.dir * GUST_WIND * Math.sin(Math.PI * Math.min(1, (clock - gust.t) / GUST_T)) : 0;
+          wind = (Math.sin(clock * 0.7) * 240 + Math.sin(clock * 0.23 + 1) * 170 + gusting) * Math.min(1, 0.35 + height / 150);
+          p.vx += wind * dt; windX += wind * dt; stormStep(dt);
+        }
         p.vx = Math.max(-MAXVX, Math.min(MAXVX, p.vx));
         p.x += p.vx * dt;
         if (p.x < -R) p.x += WW + 2 * R; if (p.x > WW + R) p.x -= WW + 2 * R;   // wrap side to side
         const prevY = p.y;
-        if (power && clock >= power.until) power = null;
+        if (power && clock >= power.until) { power = null; wave(p.x, p.y, '255,190,120', 60, 0.4); }
+        if (power) { puff(p.x, p.y + R + 8, { n: 3, speed: 90, spread: 0.5, vy: 420, life: 0.4, r: 4, jitter: 7, rgb: '255,160,60' }); puff(p.x, p.y + R + 16, { n: 1, speed: 30, vy: 200, life: 0.8, r: 6, jitter: 8, rgb: '150,140,135', kind: 'smoke' }); jolt(0.16); }
         if (power) p.vy = JET_V; else p.vy += gravity() * dt;
         p.y += p.vy * dt;
         spin += dt * (1.5 + Math.abs(p.vx) / 120);
+        trailT -= dt;
+        if (trailT <= 0) { trailT = TRAIL_GAP; trail.push({ x: p.x, y: p.y }); if (trail.length > TRAIL_N) trail.shift(); }
         for (const q of plats) {   // pick-ups: touch one and it is yours
-          if (!q.item || Math.abs(p.x - q.x) > R + 13 || Math.abs(p.y - (q.y - 15)) > R + 13) continue;
-          const it = q.item; q.item = undefined; api.sfx('power');
-          if (it === 'jet') { power = { until: clock + JET_T }; pops.push({ t: clock, text: 'Jet!' }); }
-          else if (it === 'coil') { coil = COIL_N; pops.push({ t: clock, text: 'Coil' }); }
-          else { bubble = true; pops.push({ t: clock, text: 'Bubble' }); }
+          if (!q.item || Math.abs(p.x - q.x) > R + ITEM_REACH || Math.abs(p.y - (q.y - 15)) > R + ITEM_REACH) continue;
+          const it = q.item; q.item = undefined; give(it);
         }
         if (p.vy > 0) {
           for (const q of plats) {
@@ -156,23 +231,24 @@
           m.x = m.ox + Math.sin(clock * 1.3 + m.ph) * 26;
           const dx = p.x - m.x, dy = p.y - (m.y + Math.sin(clock * 3 + m.ph) * 3);
           if (dx * dx + dy * dy < (R + MR - 3) * (R + MR - 3)) {
-            if (power) { m.dead = clock; api.sfx('score'); continue; }
-            if (bubble && !(p.vy > 0 && dy < -MR * 0.35)) { bubble = false; m.dead = clock; api.sfx('drop'); pops.push({ t: clock, text: 'Pop!' }); continue; }
-            if (p.vy > 0 && dy < -MR * 0.35) { m.dead = clock; p.vy = bounceV() * 1.05; squash = 1; spin += 4; api.sfx('score'); pops.push({ t: clock, text: 'Bop!' }); }
+            if (power) { m.dead = clock; api.sfx('score'); bopFx(m); continue; }
+            if (bubble && !(p.vy > 0 && dy < -MR * 0.35)) { bubble = false; m.dead = clock; api.sfx('drop'); pops.push({ t: clock, text: 'Pop!' }); bopFx(m); puff(p.x, p.y, { n: 20, speed: 200, life: 0.45, r: 2.6, rgb: '170,225,255' }); continue; }
+            if (p.vy > 0 && dy < -MR * 0.35) { m.dead = clock; p.vy = bounceV() * 1.05; squash = 1; spin += 4; api.sfx('score'); pops.push({ t: clock, text: 'Bop!' }); bopFx(m); }
             else { state = 'over'; deadAt = clock; p.vy = 120; api.sfx('lose');
               api.timeout(() => api.over({ score: height, title: 'Caught by a monster', won: false, message: `Climbed ${height} m` }), 900); return; }
           }
         }
         // shots fly straight up; one hit bops a monster
         shots.forEach(o => { o.y -= SHOT_V * dt; });
-        for (const o of shots) for (const m of mons) if (m.dead < 0 && !o.done && Math.hypot(o.x - m.x, o.y - m.y) < MR + 6) { o.done = true; m.dead = clock; api.sfx('score'); pops.push({ t: clock, text: 'Bop!' }); }
+        for (const o of shots) for (const m of mons) if (m.dead < 0 && !o.done && Math.hypot(o.x - m.x, o.y - m.y) < MR + 6) { o.done = true; m.dead = clock; api.sfx('score'); pops.push({ t: clock, text: 'Bop!' }); bopFx(m); }
         shots = shots.filter(o => !o.done && o.y > camY - 20);
-        // Moon: rocks drift down slowly, always in plain sight first
+        // Moon: burning rocks fall slowly past, always in plain sight first
         if (mode === 'moon') {
           rockT -= dt;
-          if (rockT <= 0 && height > 15) { rockT = [3.4, 2.8, 2.2][api.level] + Math.random() * 1.4; rocks.push({ x: 20 + Math.random() * (WW - 40), y: camY - 24, v: 60 + Math.random() * 50, r: 9 + Math.random() * 6, ph: Math.random() * 6 }); }
+          if (rockT <= 0 && height > 15) { rockT = [3.4, 2.8, 2.2][api.level] + Math.random() * 1.4; rocks.push({ x: 20 + Math.random() * (WW - 40), y: camY - 24, v: 60 + Math.random() * 50, vx: (Math.random() * 2 - 1) * 26, r: 9 + Math.random() * 6, ph: Math.random() * 6 }); }
           for (const o of rocks) {
-            o.y += o.v * dt;
+            o.y += o.v * dt; o.x += o.vx * dt;
+            if (Math.random() < dt * 16) puff(o.x, o.y - o.r, { n: 1, speed: 16, g: -8, life: 0.9, r: 2.2, jitter: o.r * 0.6, rgb: '255,150,70' });
             if (!power && Math.hypot(p.x - o.x, p.y - o.y) < R + o.r - 3) {
               state = 'over'; deadAt = clock; p.vy = 120; api.sfx('lose');
               api.timeout(() => api.over({ score: height, title: 'Hit by a rock', won: false, message: `Climbed ${height} m` }), 900); return;
@@ -182,7 +258,8 @@
         }
         generate();
         if (p.y - R > camY + WH + 20 && bubble) {   // the bubble catches one fall
-          bubble = false; p.y = camY + WH + R; p.vy = springV(); api.sfx('power'); pops.push({ t: clock, text: 'Saved!' });
+          bubble = false; p.y = camY + WH + R; p.vy = springV(); api.sfx('power'); pops.push({ t: clock, text: 'Saved!', big: true });
+          puff(p.x, p.y - 20, { n: 22, speed: 240, spread: 1.2, life: 0.5, r: 2.6, rgb: '170,225,255' }); jolt(0.4);
         }
         if (p.y - R > camY + WH + 20) {
           state = 'over'; deadAt = clock; api.sfx('lose');
@@ -237,15 +314,19 @@
           ctx.strokeStyle = col.accent; ctx.lineWidth = 2.4; ctx.lineCap = 'round'; ctx.beginPath();
           for (let i = 0; i <= 5; i++) ctx[i ? 'lineTo' : 'moveTo'](i % 2 ? 6 : -6, 7 - i * 3); ctx.stroke();
         } else {
-          ctx.strokeStyle = col.dark ? 'rgba(170,220,255,0.9)' : 'rgba(60,130,190,0.85)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(0, -1, 8, 0, 7); ctx.stroke();
+          ctx.strokeStyle = col.dark ? 'rgba(170,220,255,0.95)' : 'rgba(60,130,190,0.9)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(0, -1, 8, 0, 7); ctx.stroke();
           ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.beginPath(); ctx.arc(-3, -4, 1.8, 0, 7); ctx.fill();
         }
       }
 
       function render() {
-        const col = api.colors(), s = view.w / WW;
+        const base = api.colors(), col = W.palette(mode, base), s = view.w / WW;
+        const still = api.reduceMotion;
+        const o = { WW, WH, camY, height, dark: base.dark, t: still ? 0 : performance.now() / 1000, speed: -p.vy, jet: !!power, wind, windX, flash, boltX, reduce: still };
         ctx.clearRect(0, 0, view.w, view.h);
         ctx.save(); ctx.scale(s, s);
+        W.sky(ctx, mode, o);
+        if (shake > 0) ctx.translate((Math.random() * 2 - 1) * shake * 9, (Math.random() * 2 - 1) * shake * 9);
         ctx.translate(0, -camY);
         // height marks every 100 m
         const first = Math.floor(-(camY + WH) / 1000) * 1000;
@@ -255,21 +336,11 @@
           ctx.beginPath(); ctx.moveTo(8, y); ctx.lineTo(WW - 8, y); ctx.stroke(); ctx.setLineDash([]);
           D.text(ctx, `${m / 10} m`, WW - 10, y - 9, 10.5, col.ink3, 650, 'right');
         }
-        // Moon: still stars and a few craters behind everything
-        if (mode === 'moon') {
-          ctx.fillStyle = col.ink3;
-          for (let i = 0; i < 26; i++) { const sy = ((i * 97 - camY * 0.25) % (WH + 40)) + camY - 20, sx = (i * 151) % WW; ctx.globalAlpha = 0.25 + (i % 3) * 0.15; ctx.beginPath(); ctx.arc(sx, sy, 1 + (i % 2) * 0.6, 0, 7); ctx.fill(); }
-          ctx.globalAlpha = 1;
-        }
-        // soft clouds with slow parallax
-        ctx.fillStyle = col.dark ? 'rgba(255,245,230,0.03)' : 'rgba(150,110,60,0.06)';
-        if (mode !== 'moon') for (let i = 0; i < 6; i++) {
-          const cy = ((i * 211 - camY * 0.6) % (WH + 120)) + camY - 60, cx = (i * 137) % WW;
-          ctx.beginPath(); ctx.ellipse(cx, cy, 34, 12, 0, 0, Math.PI * 2); ctx.ellipse(cx + 20, cy - 6, 22, 10, 0, 0, Math.PI * 2); ctx.fill();
-        }
+        W.ground(ctx, mode, o);
         // platforms
         plats.forEach(q => {
           if (q.y < camY - 20 || q.y > camY + WH + 20) return;
+          if (q.wide && W.hideFloor(mode)) return;   // the moon's own ground is the start floor
           const w = q.wide ? WW - 40 : PW;
           const born = 1;   // platforms do not grow in when a run starts
           ctx.save(); ctx.translate(q.x, q.y + PH / 2);
@@ -279,6 +350,7 @@
           if (q.type === 'move') fill = col.dark ? '#6f93b5' : '#5b8fc4';
           if (q.type === 'break') fill = col.dark ? '#a08766' : '#c9a77a';
           if (q.wide) fill = col.dark ? '#5c5247' : '#d8cab5';
+          fill = W.skin(mode, q) || fill;
           if (q.type === 'cloud') {   // a puffy cloud instead of a slab
             ctx.fillStyle = col.dark ? 'rgba(235,240,250,0.82)' : '#ffffff';
             ctx.strokeStyle = col.dark ? 'rgba(255,255,255,0.25)' : 'rgba(120,140,170,0.35)'; ctx.lineWidth = 1.2;
@@ -289,7 +361,11 @@
           D.roundRect(ctx, -w / 2, -PH / 2 + 3, w, PH, PH / 2); ctx.fill();
           ctx.fillStyle = fill; D.roundRect(ctx, -w / 2, -PH / 2, w, PH, PH / 2); ctx.fill();
           ctx.fillStyle = top; D.roundRect(ctx, -w / 2 + 5, -PH / 2 + 2, w - 10, 3, 1.5); ctx.fill();
-          if (q.item) { ctx.save(); ctx.translate(0, -PH / 2 - 11 + Math.sin(clock * 4 + q.x) * 1.5); drawItem(q.item, col); ctx.restore(); }
+          W.platform(ctx, mode, q, w, PH, o);
+          if (q.item) {
+            ctx.save(); ctx.translate(0, -PH / 2 - 15 + Math.sin(clock * 4 + q.x) * 2.5); W.itemBeacon(ctx, q.item, o);
+            const beat = 1.5 + Math.sin(clock * 6 + q.x) * 0.1; ctx.scale(beat, beat); drawItem(q.item, col); ctx.restore();
+          }
           if (q.type === 'break') {
             ctx.strokeStyle = col.dark ? 'rgba(0,0,0,0.35)' : 'rgba(90,60,30,0.35)'; ctx.lineWidth = 1.4;
             ctx.beginPath(); ctx.moveTo(-8, -PH / 2); ctx.lineTo(-3, 0); ctx.lineTo(-7, PH / 2); ctx.moveTo(12, -PH / 2); ctx.lineTo(15, PH / 2); ctx.stroke();
@@ -303,16 +379,17 @@
           ctx.restore();
         });
         // Moon rocks and shots
-        rocks.forEach(o => {
-          ctx.save(); ctx.translate(o.x, o.y); ctx.rotate(clock * 0.8 + o.ph);
-          ctx.fillStyle = col.dark ? '#8f8a84' : '#8a8176'; ctx.beginPath();
-          for (let i = 0; i < 7; i++) { const a = i / 7 * 6.283, rr = o.r * (0.82 + ((i * 37) % 5) * 0.06); ctx[i ? 'lineTo' : 'moveTo'](Math.cos(a) * rr, Math.sin(a) * rr); }
+        rocks.forEach(k => {
+          W.meteorTail(ctx, k);
+          ctx.save(); ctx.translate(k.x, k.y); ctx.rotate(clock * 0.8 + k.ph);
+          ctx.fillStyle = '#8f8a84'; ctx.beginPath();
+          for (let i = 0; i < 7; i++) { const a = i / 7 * 6.283, rr = k.r * (0.82 + ((i * 37) % 5) * 0.06); ctx[i ? 'lineTo' : 'moveTo'](Math.cos(a) * rr, Math.sin(a) * rr); }
           ctx.closePath(); ctx.fill();
-          ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.beginPath(); ctx.arc(o.r * 0.25, -o.r * 0.2, o.r * 0.26, 0, 7); ctx.fill();
+          ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.beginPath(); ctx.arc(k.r * 0.25, -k.r * 0.2, k.r * 0.26, 0, 7); ctx.fill();
           ctx.restore();
         });
         ctx.fillStyle = col.accent;
-        shots.forEach(o => { D.roundRect(ctx, o.x - 2.5, o.y - 7, 5, 14, 2.5); ctx.fill(); });
+        shots.forEach(k => { D.roundRect(ctx, k.x - 2.5, k.y - 7, 5, 14, 2.5); ctx.fill(); });
         // monsters
         const MC = col.dark ? ['#b58be0', '#6fc0a8', '#e0858f'] : ['#8a5cc8', '#2f9a7c', '#d4566a'];
         mons.forEach(m => {
@@ -331,42 +408,50 @@
           ctx.beginPath(); ctx.arc(-5 + lk, -1.5, 2, 0, Math.PI * 2); ctx.arc(5 + lk, -1.5, 2, 0, Math.PI * 2); ctx.fill();
           ctx.restore();
         });
-        // the spark
-        const sq = api.reduceMotion ? 0 : squash * 0.22;
-        const py = state === 'over' ? Math.min(p.y, camY + WH - R - 6) : p.y;
-        ctx.save(); ctx.translate(p.x, py + R * sq); ctx.scale(1 + sq, 1 - sq);
-        ctx.fillStyle = col.dark ? 'rgba(217,119,87,0.22)' : 'rgba(217,119,87,0.16)';
-        ctx.beginPath(); ctx.arc(0, 0, R + 5, 0, Math.PI * 2); ctx.fill();
-        if (bubble) { ctx.strokeStyle = col.dark ? 'rgba(170,220,255,0.8)' : 'rgba(60,130,190,0.7)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(0, 0, R + 9, 0, 7); ctx.stroke(); }
-        if (power && !api.reduceMotion) { ctx.fillStyle = '#f2a33c'; ctx.beginPath(); ctx.moveTo(-6, R); ctx.lineTo(0, R + 14 + Math.sin(clock * 40) * 4); ctx.lineTo(6, R); ctx.closePath(); ctx.fill(); }
+        if (bolt && bolt.hit) W.bolt(ctx, bolt, clock - bolt.hit);
+        W.drawFx(ctx, fx);
+        if (!still) W.trail(ctx, mode, trail);
+        // the spark: it squashes on a bounce, stretches with speed and leans into the wind
+        const sq = still ? 0 : squash * 0.22, stretch = still ? 0 : Math.min(power ? 0.34 : 0.2, Math.abs(p.vy) / 3600);
+        const py = state === 'over' ? Math.min(p.y, camY + WH - R - 6) : p.y, zap = Math.max(0, 1 - (clock - zapAt) / 0.7);
+        const b = { R, t: o.t, jet: !!power && !still, coil, bubble, squash, zap: still ? 0 : zap };
+        ctx.save(); ctx.translate(p.x, py + R * sq);
+        if (mode === 'storm' && !still) ctx.transform(1, 0, Math.max(-0.45, Math.min(0.45, -wind / 1100)), 1, 0, 0);
+        ctx.scale(1 + sq - stretch * 0.55, 1 - sq + stretch);
+        W.ballBack(ctx, mode, b);
+        W.softDot(ctx, '217,119,87', 0, 0, R + 20, col.dark ? 0.55 : 0.4);
         D.spark(ctx, 0, 0, R + 2, state === 'over' ? col.ink3 : col.accent, spin);
+        W.ballFront(ctx, mode, b);
         ctx.restore();
         ctx.restore();
-        // Storm: rain that leans with the wind
-        if (mode === 'storm' && !api.reduceMotion) {
-          ctx.save(); ctx.scale(s, s); ctx.strokeStyle = col.dark ? 'rgba(190,210,235,0.22)' : 'rgba(70,100,140,0.2)'; ctx.lineWidth = 1.2; ctx.beginPath();
-          const lean = wind * 0.06;
-          for (let i = 0; i < 34; i++) { const x = (i * 83 + clock * (60 + wind * 0.5)) % (WW + 40) - 20, y = (i * 131 + clock * 420) % (WH + 30) - 15; ctx.moveTo(x, y); ctx.lineTo(x + lean, y + 16); }
-          ctx.stroke(); ctx.restore();
-        }
-        // Night: dark everywhere except your own glow, which shrinks as you climb
+        ctx.save(); ctx.scale(s, s);
+        if (bolt && !bolt.hit && !still) W.boltWarning(ctx, bolt.x, o, Math.min(1, (clock - bolt.t) / BOLT_WARN));
+        // Night: dark everywhere except your own glow, which shrinks as you climb and swells for a moment on each bounce
         if (mode === 'night') {
-          ctx.save(); ctx.scale(s, s);
-          const lx = p.x, ly = p.y - camY, rad = Math.max(105, 175 - height / 12);
-          const g = ctx.createRadialGradient(lx, ly, rad * 0.35, lx, ly, rad), dk = col.dark ? '8,8,12' : '26,24,34';
-          g.addColorStop(0, `rgba(${dk},0)`); g.addColorStop(1, `rgba(${dk},0.96)`);
-          ctx.fillStyle = g; ctx.fillRect(0, 0, WW, WH + 4); ctx.restore();
+          const lx = p.x, ly = p.y - camY, rad = Math.max(105, 175 - height / 12) * (1 + pulse * 0.2);
+          const g = ctx.createRadialGradient(lx, ly, rad * 0.05, lx, ly, rad * 1.3);
+          // eased from the middle right out to the dark, so the glow has no visible edge at either end
+          for (let i = 0; i <= NIGHT_STEPS; i++) { const t = i / NIGHT_STEPS; g.addColorStop(t, `rgba(6,7,14,${(0.96 * t * t * (3 - 2 * t)).toFixed(3)})`); }
+          ctx.fillStyle = g; ctx.fillRect(0, 0, WW, WH + 4);
+          W.softDot(ctx, '255,190,120', lx, ly, rad * 0.8, 0.22 + pulse * 0.1);
         }
+        W.weather(ctx, mode, o);
+        if (flash > 0.01) { ctx.fillStyle = `rgba(${flashRgb},${(flash * 0.72).toFixed(3)})`; ctx.fillRect(0, 0, WW, WH + 4); }
+        ctx.restore();
         // HUD (screen space)
         ctx.save(); ctx.scale(s, s);
-        const hudInk = mode === 'night' ? '#f4efe7' : col.ink;
-        D.text(ctx, `${height} m`, 14, 18, 16, hudInk, 760, 'left');
+        D.text(ctx, `${height} m`, 14, 18, 16, col.ink, 760, 'left');
+        if (mode === 'storm') W.compass(ctx, wind, WW / 2, 18);
         const held2 = power ? `Jet ${Math.max(0, power.until - clock).toFixed(1)}s` : coil > 0 ? `Coil ${coil}` : bubble ? 'Bubble' : '';
-        if (held2) D.text(ctx, held2, WW - 14, 18, 13, mode === 'night' ? '#f4efe7' : col.accent, 720, 'right');
-        pops.forEach(o => { const k = (clock - o.t) / 0.8; ctx.globalAlpha = 1 - k; D.text(ctx, o.text, WW / 2, 60 - k * 20, 18, col.accent, 760); });
+        if (held2) D.text(ctx, held2, WW - 14, 18, 13, mode === 'night' ? col.ink : col.accent, 720, 'right');
+        if (power) { const left = Math.max(0, (power.until - clock) / JET_T); ctx.fillStyle = 'rgba(255,255,255,0.3)'; D.roundRect(ctx, 14, 34, WW - 28, 5, 2.5); ctx.fill(); ctx.fillStyle = '#ff9a3c'; D.roundRect(ctx, 14, 34, (WW - 28) * left, 5, 2.5); ctx.fill(); }
+        pops.forEach(k => {
+          const life = k.big ? 1.1 : 0.8, a = (clock - k.t) / life, grow = k.big ? 1 + Math.min(1, a * 6) * 0.6 : 1;
+          ctx.globalAlpha = 1 - a * a; D.text(ctx, k.text, WW / 2, (k.big ? 104 : 60) - a * 20, 18 * grow, k.big ? col.ink : col.accent, 780);
+        });
         ctx.globalAlpha = 1;
         if (state === 'over') {
-          ctx.fillStyle = col.dark ? 'rgba(42,38,33,0.9)' : 'rgba(255,252,247,0.92)';
+          ctx.fillStyle = col.dark ? 'rgba(42,38,33,0.9)' : 'rgba(255,252,247,0.92)';   // dark worlds use the dark card in both themes
           D.roundRect(ctx, WW / 2 - 70, 40, 140, 30, 15); ctx.fill();
           D.text(ctx, `Fell from ${height} m`, WW / 2, 55, 13, col.ink, 700);
         }
@@ -378,12 +463,12 @@
           const at = MODE_IDS.indexOf(mode), seg = b.w / MODES.length;
           swPos += (at - swPos) * (1 - Math.exp(-16 * swDt));
           const on = api.reduceMotion ? at : swPos, tr = b.h / 2;
-          if (!flat) { ctx.fillStyle = col.dark ? 'rgba(0,0,0,0.38)' : 'rgba(32,28,23,0.14)'; D.roundRect(ctx, b.x, b.y + 3, b.w, b.h, tr); ctx.fill(); }
-          ctx.fillStyle = col.surface2; D.roundRect(ctx, b.x, b.y, b.w, b.h, tr); ctx.fill();
+          if (!flat) { ctx.fillStyle = base.dark ? 'rgba(0,0,0,0.38)' : 'rgba(32,28,23,0.14)'; D.roundRect(ctx, b.x, b.y + 3, b.w, b.h, tr); ctx.fill(); }
+          ctx.fillStyle = base.surface2; D.roundRect(ctx, b.x, b.y, b.w, b.h, tr); ctx.fill();
           const tx = b.x + 3 + on * seg, tw = seg - 6, th = b.h - 8, ty = b.y + 4;
-          if (!flat) { ctx.fillStyle = col.dark ? 'rgba(0,0,0,0.45)' : 'rgba(32,28,23,0.2)'; D.roundRect(ctx, tx, ty + 2, tw, th, th / 2); ctx.fill(); }
-          ctx.fillStyle = col.surface; D.roundRect(ctx, tx, ty, tw, th, th / 2); ctx.fill();
-          MODES.forEach((m, i) => D.text(ctx, m[1], b.x + seg * (i + 0.5), b.y + b.h / 2 + 0.5, 11.5, Math.abs(on - i) < 0.5 ? col.ink : col.ink2, 700));
+          if (!flat) { ctx.fillStyle = base.dark ? 'rgba(0,0,0,0.45)' : 'rgba(32,28,23,0.2)'; D.roundRect(ctx, tx, ty + 2, tw, th, th / 2); ctx.fill(); }
+          ctx.fillStyle = base.surface; D.roundRect(ctx, tx, ty, tw, th, th / 2); ctx.fill();
+          MODES.forEach((m, i) => D.text(ctx, m[1], b.x + seg * (i + 0.5), b.y + b.h / 2 + 0.5, 11.5, Math.abs(on - i) < 0.5 ? base.ink : base.ink2, 700));
         }
         ctx.restore();
       }
@@ -404,7 +489,8 @@
         return true;
       }
       if (!(api.saved && restore(api.saved))) reset();
-      this._peek = () => ({ p, plats, camY, WH, state, mode, mons, rocks, shots, power, bubble, coil, wind });   // read-only view for automated play tests
+      this._peek = () => ({ p, plats, camY, WH, state, mode, mons, rocks, shots, power, bubble, coil, wind, gust, bolt, flash, shake, fx: fx.length, zapAt, clock, height });   // read-only view for automated play tests
+      this._cue = { give, pick: setMode, strike() { bolt = { t: clock, x: Math.max(24, p.x - 40), hit: 0 }; strike(); }, warn() { bolt = { t: clock - BOLT_WARN * 0.7, x: Math.max(24, p.x - 60), hit: 0 }; } };   // automated tests: show a moment on demand
       api.score(height);
       api.loop(dt => { update(dt); render(); });
       return {

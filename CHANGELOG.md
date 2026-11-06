@@ -3,6 +3,14 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.71 (6 Nov 2026)
+
+- Sky Hop: every mode is now its own world. Moon is out on the moon, with Earth in the sky, a lander, slower floating bounces, drifting dust and burning rocks. Storm has dark rolling clouds, heavy slanted rain, sudden gusts, a wind marker, and lightning that lights the sky first and then knocks the ball away. Boost has far more pick-ups, a real jet with flames, speed lines and a time bar, and big bursts on every pick-up. Monsters is a dusk with watching eyes, and Classic has a real sky and hills.
+- Sky Hop: the ball now stretches with speed, leans into the wind, and kicks up something different on each bounce.
+- Sky Hop Night: the glow around the ball fades out softly, with no hard circle.
+- Online: a wrong room code clears at once and says it is not a room code.
+- Online: after a round, a lost message can no longer leave you on a stopped board with nothing to press. The result is sent again, and the scoreboard always comes up with a Leave button.
+
 ## 1.12.70 (5 Nov 2026)
 - Updates: the bar now follows the real download, byte by byte, then shows checking and installing, so it no longer sits at 1% and jumps. If an update fails it says why, and a broken connection or a just-published release is retried by itself.
 - No more Mac error sound on arrow keys: every key the games do not take now stops quietly, in every game.

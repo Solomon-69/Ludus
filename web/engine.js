@@ -71,6 +71,7 @@
     correct: [[700, 0.05, 'sine'], [1050, 0.08, 'sine']], wrong: [[220, 0.1, 'triangle', 170], [196, 0.12, 'triangle']],
     shoot: [[900, 0.05, 'square', 320]], coin: [[988, 0.04, 'square'], [1319, 0.08, 'square']],
     whoosh: [[220, 0.12, 'sine', 640]], deal: [[1400, 0.02, 'triangle', 900]],
+    thunder: [[150, 0.07, 'square', 60], [78, 0.6, 'sawtooth', 30]],
     // interface sounds (all soft, see QUIET)
     tab: [[740, 0.035, 'sine', 880]], open: [[523, 0.045, 'sine', 784], [988, 0.05, 'sine']], back: [[660, 0.05, 'sine', 440]],
     on: [[660, 0.03, 'sine'], [990, 0.045, 'sine']], off: [[700, 0.03, 'sine'], [470, 0.045, 'sine']],
@@ -144,6 +145,19 @@
     if ((tag === 'BUTTON' || tag === 'A' || (t && t.getAttribute && t.getAttribute('role') === 'button')) && (e.key === 'Enter' || e.key === ' ')) return;
     e.preventDefault();
   }, false);
+
+  // A press on a canvas keeps the pointer (see api.on). The button can be let go where the page never hears it (outside the
+  // panel, or the round ends mid-drag), and the canvas then swallows every later click, so no button works. So the hold ends
+  // when a round ends or pauses, when a card comes up, and as soon as the mouse moves with no button down.
+  const held = new Map();
+  document.addEventListener('gotpointercapture', e => held.set(e.pointerId, e.target), true);
+  document.addEventListener('lostpointercapture', e => held.delete(e.pointerId), true);
+  function freeCaptures() { held.forEach((el, id) => { try { el.releasePointerCapture(id); } catch (e) {} }); held.clear(); }
+  function freePointer() {
+    freeCaptures();
+    if (document.pointerLockElement) { try { document.exitPointerLock(); } catch (e) {} }
+  }
+  window.addEventListener('pointermove', e => { if (held.size && e.pointerType === 'mouse' && e.buttons === 0) freeCaptures(); }, true);
 
   // ---------- colours from CSS tokens ----------
   function colors() {
@@ -371,6 +385,7 @@
       over(opts) {
         if (ended) return;
         ended = true;
+        freePointer();
         opts = opts || {};
         const final = opts.score !== undefined ? opts.score : score;
         hooks.onOver(Object.assign({ score: final }, opts));
@@ -387,7 +402,7 @@
       // a loop that should be drawing has not finished a frame for this long (ms); 0 when nothing is expected
       stalledFor(now) { return !crashed && !paused && !ended && loops.size ? now - lastFrame : 0; },
       noteFrame() { lastFrame = performance.now(); },
-      pause() { paused = true; loops.forEach(l => { l.needsFrame = true; }); },
+      pause() { paused = true; freePointer(); loops.forEach(l => { l.needsFrame = true; }); },
       get ended() { return ended; },
       resume() {
         if (crashed) return;
@@ -396,7 +411,7 @@
         const keys = [...held]; held.clear();
         keys.forEach(([key, code]) => window.dispatchEvent(new KeyboardEvent('keyup', { key, code })));
       },
-      destroy() { cleanups.splice(0).forEach(fn => { try { fn(); } catch (e) {} }); loops.clear(); }
+      destroy() { freePointer(); cleanups.splice(0).forEach(fn => { try { fn(); } catch (e) {} }); loops.clear(); }
     };
   }
 
@@ -533,5 +548,5 @@
     }
   };
 
-  window.Ludus = { games, state, save, native, sfx, colors, draw, makeApi, register(g) { games.push(g); } };
+  window.Ludus = { games, state, save, native, sfx, colors, draw, makeApi, freePointer, register(g) { games.push(g); } };
 })();

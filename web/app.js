@@ -231,8 +231,10 @@
     const code = el('input', 'code-input'); code.type = 'text'; code.maxLength = 300; code.placeholder = ''; code.id = 'opCode';
     code.autocomplete = 'off'; code.spellcheck = false; code.autocapitalize = 'characters'; code.setAttribute('aria-label', 'Room code, invite or link');
     const msg = el('div', 'lobby-error', ''); msg.setAttribute('role', 'alert');
-    const go = () => { const c = L.net.extractCode(code.value) || L.net.cleanCode(code.value); if (!L.net.validCode(c)) { msg.textContent = 'Room codes are 5 letters or digits.'; code.focus(); return; } msg.textContent = 'Joining room ' + c + '...'; L.sfx('room'); joinFromInvite(c, true); };
-    code.addEventListener('input', () => { const v = code.value, m = L.net.extractCode(v); code.value = m || L.net.cleanCode(v); msg.textContent = !m && v.replace(/\s/g, '').length > 6 ? 'No room code found in that text.' : ''; });
+    const go = () => { const c = L.net.extractCode(code.value) || L.net.cleanCode(code.value); if (!L.net.validCode(c)) { wrong(); return; } msg.textContent = 'Joining room ' + c + '...'; L.sfx('room'); joinFromInvite(c, true, { wrong }); };
+    // A wrong code: the letters go at once and the message says why, ready for the next try.
+    const wrong = () => { code.value = ''; code.dispatchEvent(new Event('input')); msg.textContent = L.lobby.notACode; L.sfx('wrong'); if (code.isConnected) code.focus(); else toast(L.lobby.notACode); };
+    code.addEventListener('input', () => { const v = code.value, m = L.net.extractCode(v); if (!m && v.replace(/\s/g, '').length > 6) { wrong(); return; } code.value = m || L.net.cleanCode(v); msg.textContent = ''; });
     code.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); go(); } });
     const jb = el('button', 'btn primary', 'Join'); jb.type = 'button'; jb.id = 'opJoin'; jb.onclick = go;
     // Five tiles show the code as it is typed (a dash while empty); the real input sits invisibly on top, so paste, the keyboard and
@@ -722,7 +724,7 @@
     const s = L.net.joinRoom(code, { gameId: '', name: L.net.cleanName(S.onlineName, ''), uid: onlineId(), rejoin: how && how.rejoin ? (how.fallback ? 'quick' : true) : false });
     online = { game: null, session: s, started: false };
     trackParty(s, 'guest');
-    s.on('error', e => { online = null; if (how && how.fallback && e.code !== 'full' && e.code !== 'started' && e.code !== 'update' && e.code !== 'offline') { how.fallback(); return; } if (how && how.rejoin && S.party && S.party.code === code) { S.party.live = false; L.save(); } if (how && how.rejoin) { if (e.code === 'offline') rejoinFailed({ code }, how.retried); else L.lobby.notice(...L.lobby.why(e.code), () => {}); return; } if (e.code === 'update') L.lobby.notice(...L.lobby.why('update'), () => {}); else toast(L.lobby.why(e.code === 'no-room' || e.code === 'full' || e.code === 'started' ? e.code : 'offline')[0]); });
+    s.on('error', e => { online = null; if (how && how.wrong && e.code === 'no-room') { how.wrong(); return; } if (how && how.fallback && e.code !== 'full' && e.code !== 'started' && e.code !== 'update' && e.code !== 'offline') { how.fallback(); return; } if (how && how.rejoin && S.party && S.party.code === code) { S.party.live = false; L.save(); } if (how && how.rejoin) { if (e.code === 'offline') rejoinFailed({ code }, how.retried); else L.lobby.notice(...L.lobby.why(e.code), () => {}); return; } if (e.code === 'update') L.lobby.notice(...L.lobby.why('update'), () => {}); else toast(L.lobby.why(e.code === 'no-room' || e.code === 'full' || e.code === 'started' ? e.code : 'offline')[0]); });
     s.on('ready', () => {
       if (s.hostPv >= 2) { showOnlineShell(); online = { game: null, session: s, started: false }; L.lobby.attach(null, s, lobbyOps(null)); return; }
       const g = L.games.find(x => x.id === s.gameId && x.online);
@@ -959,9 +961,24 @@
     revealTimer = setTimeout(() => {
       if (run && current && current.run === run) run.pause();
       // a tournament: tell the host who won; the scoreboard card comes up once everybody has reported
-      if (online && online.session && online.session.ser && online.session.ser.st === 'play') { online.session.reportResult(!!res.won); return; }
-      $('overSheet').hidden = false; overAt = performance.now(); L.sfx('result');
+      if (online && online.session && online.session.ser && online.session.ser.st === 'play') { online.session.reportResult(!!res.won); awaitBoard(online.session, !!res.won); return; }
+      L.freePointer(); $('overSheet').hidden = false; overAt = performance.now(); L.sfx('result');
     }, window.ludusRevealMs ?? REVEAL_MS);
+  }
+  // After a round a guest sits on the stopped board until the scoreboard arrives. If a message got lost on the way that would be for ever,
+  // with nothing to press: so the result is sent again, and after a while the scoreboard card (with Leave) comes up anyway.
+  const RESULT_RETRY_MS = 1500, RESULT_PATIENCE_MS = 6000;
+  let boardWatch = 0;
+  function awaitBoard(s, won) {
+    clearInterval(boardWatch);
+    if (s.role === 'host') return;
+    const since = performance.now(), gen = s.gen;
+    boardWatch = setInterval(() => {
+      if (!online || online.session !== s || s.over || !s.ser || s.ser.st !== 'play' || s.gen !== gen) { clearInterval(boardWatch); return; }
+      s.reportResult(won);
+      if (performance.now() - since < RESULT_PATIENCE_MS) return;
+      clearInterval(boardWatch); L.lobby.series(s, 'board', lobbyOps(online.game));
+    }, RESULT_RETRY_MS);
   }
   function hideOver() { clearTimeout(revealTimer); $('overSheet').hidden = true; }
   function overShown() { return !$('overSheet').hidden; }

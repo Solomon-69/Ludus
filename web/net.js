@@ -557,7 +557,7 @@
   Session.prototype._askJoin = function () {
     const me = this;
     me.code = me.candidate; me.tries = 0;
-    const limit = me.rejoin === 'quick' ? 3 : me.rejoin ? 12 : 8;   // quick: the maker of the code, who reopens it if nobody answers (a live host answers within a second or two)
+    const limit = me.rejoin === 'quick' ? 3 : me.rejoin ? 12 : 5;   // quick: the maker of the code, who reopens it if nobody answers (a live host answers within a second or two)
     const ask = () => {
       if (me.over || me.ready || me.conn !== 'online') return;
       if (++me.tries > limit) {
@@ -897,8 +897,9 @@
   Session.prototype._onResult = function (m) {
     const ser = this.ser;
     if (this.role !== 'host' || !ser || ser.st !== 'play' || m.gen !== this.gen || this._seatOf(m.c) < 0) return;
+    const fresh = ser.rep[m.c] === undefined;   // a player repeats a report that may have been lost; a repeat must not push the end of the round back
     ser.rep[m.c] = m.w === 1 ? 1 : 0;
-    clearTimeout(ser.t1); ser.t1 = setTimeout(() => this._roundDone(), RESULT_WAIT);   // do not wait for ever for somebody who stopped answering
+    if (fresh) { clearTimeout(ser.t1); ser.t1 = setTimeout(() => this._roundDone(), RESULT_WAIT); }   // do not wait for ever for somebody who stopped answering
     this._checkRound();
   };
   Session.prototype._checkRound = function () {

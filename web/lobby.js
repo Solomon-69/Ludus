@@ -6,6 +6,7 @@
 (function () {
   const L = window.Ludus;
   const SEAT_COLORS = ['var(--accent)', '#5b8def', '#4f9d69', '#9b6dd6', '#e0a526', '#e05d8b', '#3aa6a6', '#8a8f98'];
+  const NOT_A_CODE = 'That is not a room code.';
   const WHY = {
     offline: ['Cannot connect', 'Ludus could not reach the internet relay. Check your connection and try again.'],
     'no-room': ['No such room', 'Nobody is hosting that code right now. Check the letters and try again.'],
@@ -353,7 +354,7 @@
   let rendering = false, screenAt = -1e9;
   function render() {
     if (rendering) return renderBody();
-    ensure(); rendering = true;
+    ensure(); rendering = true; L.freePointer();
     const h0 = !sheet.hidden && card.firstChild ? card.getBoundingClientRect().height : 0, s0 = card.dataset.screen, now = performance.now();
     try { renderBody(); } finally { rendering = false; }
     // not while the sheet itself is still coming in (it was hidden: the old height belongs to an earlier room)
@@ -397,12 +398,14 @@
       const input = el('input', 'code-input'); input.type = 'text'; input.maxLength = 300; input.placeholder = 'K7M2Q';
       input.autocomplete = 'off'; input.spellcheck = false; input.autocapitalize = 'characters'; input.setAttribute('aria-label', 'Room code');
       input.value = L.lobbyLastCode || '';
-      const go = () => { const code = L.net.extractCode(input.value) || L.net.cleanCode(input.value); L.lobbyLastCode = code; if (!L.net.validCode(code)) { error = 'Room codes are 5 letters or digits.'; msg.textContent = error; input.focus(); return; } joinRoom(code); };
+      const go = () => { const code = L.net.extractCode(input.value) || L.net.cleanCode(input.value); if (!L.net.validCode(code)) { wrong(); return; } L.lobbyLastCode = code; joinRoom(code); };
+      const wrong = () => { L.lobbyLastCode = ''; input.value = ''; error = NOT_A_CODE; msg.textContent = error; L.sfx('wrong'); input.focus(); };
       const msg = el('div', 'lobby-error', error); msg.setAttribute('role', 'alert');
       input.addEventListener('input', () => {
         // a pasted sentence or link: pull the code out of it
         const v = input.value, m = L.net.extractCode(v);
-        input.value = m || L.net.cleanCode(v); msg.textContent = !m && v.replace(/\s/g, '').length > 6 ? 'No room code found in that text.' : '';
+        if (!m && v.replace(/\s/g, '').length > 6) { wrong(); return; }
+        input.value = m || L.net.cleanCode(v); msg.textContent = '';
       });
       input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); go(); } });
       card.appendChild(input);
@@ -454,6 +457,7 @@
         card.appendChild(el('div', 'lobby-live', host ? 'Next round starts in a moment.' : 'Waiting for the host to start the next round.'));
         if (host) card.appendChild(btn(nx ? 'Start now' : 'Show results', 'primary', () => session.advance()));
         if (session.conn !== 'online' && ops && ops.rejoin) card.appendChild(btn('Rejoin', 'primary', () => ops.rejoin()));
+        card.appendChild(btn('Leave', 'ghost', cancelToHome));   // always a way out here, whatever the round is doing
       } else {
         const why = ser.why === 'left' ? 'A player left, so this is how it stands so far.' : ser.why === 'few' ? 'There are not enough players for the next game. Final standings so far.' : ser.why === 'host' ? 'The host left. Final standings so far.' : '';
         title(winners.length === 1 ? winners[0][1] + ' wins' : winners.length > 1 ? 'A tie: ' + winners.map(w => w[1]).join(' and ') : 'No winner this time');
@@ -494,7 +498,7 @@
     offs.push(s.on('sugstate', () => { if (screen === 'room') { render(); L.sfx('tap'); } }));
     offs.push(s.on('suggest', () => { if (screen === 'room') { render(); L.sfx('tap'); } }));
     offs.push(s.on('oldpeer', () => { ops && ops.toast && ops.toast('Your friend needs to update Ludus for tournaments'); }));
-    offs.push(s.on('error', e => { const w = WHY[e.code] || WHY.offline; discard(); if (e.code === 'no-room' || e.code === 'full' || e.code === 'started' || e.code === 'game' || e.code === 'update') { screen = e.code === 'update' ? 'notice' : 'join'; if (e.code === 'update') { error = [w[0], w[1], 'OK']; ops.noticeOk = ops.onCancel; } else error = w[1]; } else if (!game) { ops.toast && ops.toast(w[0]); const back = ops.onCancel; hide(); if (back) back(); return; }   // a room from the Online page: back to that page, not the per-game card
+    offs.push(s.on('error', e => { const w = WHY[e.code] || WHY.offline; discard(); if (e.code === 'no-room' || e.code === 'full' || e.code === 'started' || e.code === 'game' || e.code === 'update') { screen = e.code === 'update' ? 'notice' : 'join'; if (e.code === 'update') { error = [w[0], w[1], 'OK']; ops.noticeOk = ops.onCancel; } else if (e.code === 'no-room') { L.lobbyLastCode = ''; error = NOT_A_CODE; L.sfx('wrong'); } else error = w[1]; } else if (!game) { ops.toast && ops.toast(w[0]); const back = ops.onCancel; hide(); if (back) back(); return; }   // a room from the Online page: back to that page, not the per-game card
       else { screen = 'choose'; error = ''; ops.toast && ops.toast(w[0]); } render(); }));
     offs.push(s.on('closed', e => { const w = WHY[e.reason] || WHY['host-left']; discard(); screen = 'notice'; error = [w[0], w[1], 'OK']; ops.noticeOk = ops.onCancel; render(); }));
     offs.push(s.on('start', e => {
@@ -564,6 +568,7 @@
     // Back to the waiting room (after a tournament, "Back to lobby").
     resume(s, o) { ensure(); unhook(); session = s; ops = o || ops; hookSession(s); screen = 'room'; sheet.hidden = parked; render(); },
     // [title, text] for a room closing reason
-    why(reason) { return WHY[reason] || WHY['host-left']; }
+    why(reason) { return WHY[reason] || WHY['host-left']; },
+    notACode: NOT_A_CODE
   };
 })();
