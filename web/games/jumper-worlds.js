@@ -102,11 +102,13 @@
     boost(ctx, o) {
       fill(ctx, o, o.dark ? ['#110e1e', '#2b1530', '#6a2f24'] : ['#fff0d6', '#ffcf94', '#ff9450']);
       const rush = clamp01((o.speed - 300) / 700), H = o.WH + 140, travel = -o.camY * 0.7;
-      ctx.strokeStyle = o.dark ? '#ff9a4a' : '#ffffff'; ctx.lineWidth = 12; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-      for (let i = 0; i < 5; i++) {   // big arrows rushing past as you climb
-        const y = wrap(i * 190 + travel, H) - 70, x = i % 2 ? o.WW * 0.76 : o.WW * 0.24;
-        ctx.globalAlpha = (o.dark ? 0.08 : 0.2) + rush * 0.18;
-        ctx.beginPath(); ctx.moveTo(x - 42, y + 30); ctx.lineTo(x, y); ctx.lineTo(x + 42, y + 30); ctx.stroke();
+      // 1.12.76 (council pick): soft warm glow orbs drifting past at three depths, no arrows
+      const DEPTH = [0.15, 0.3, 0.5];
+      for (let i = 0; i < 9; i++) {
+        const d = DEPTH[i % 3], r = 26 + hash(i, 3) * 30 + d * 24;
+        const x = hash(i, 1) * o.WW + Math.sin(o.t * 0.4 + i) * 10, y = wrap(hash(i, 2) * H - o.camY * d, H) - 70;
+        const a = (o.dark ? 0.14 + d * 0.14 : 0.2 + d * 0.2) * (1 + rush * 0.3);
+        softDot(ctx, o.dark ? (i % 2 ? '255,148,80' : '255,196,120') : (i % 2 ? '255,255,255' : '255,150,70'), x, y, r, a);
       }
       ctx.globalAlpha = 1;
       speedLines(ctx, o, 26, rush * 0.5);
@@ -270,7 +272,7 @@
     const gale = clamp01((Math.abs(o.wind) - 120) / 420);
     if (gale > 0) {
       ctx.strokeStyle = 'rgba(225,235,250,0.5)'; ctx.lineWidth = 1.3; ctx.lineCap = 'round'; ctx.globalAlpha = gale; ctx.beginPath();
-      for (let i = 0; i < 12; i++) {
+      for (let i = 0; i < 9; i++) {
         const x = wrap(hash(i, 21) * o.WW + o.windX * 2.6, o.WW + 120) - 60, y = hash(i, 22) * o.WH, len = 34 + hash(i, 23) * 60;
         ctx.moveTo(x, y); ctx.quadraticCurveTo(x + Math.sign(o.wind) * len * 0.5, y - 5, x + Math.sign(o.wind) * len, y);
       }
@@ -346,7 +348,7 @@
   const TRAILS = { moon: '205,215,255', boost: '255,150,60', night: '255,200,130', monsters: '230,110,150' };
   function trail(ctx, mode, list) {
     const rgb = TRAILS[mode]; if (!rgb) return;
-    list.forEach((v, i) => softDot(ctx, rgb, v.x, v.y, 7 + i * 0.75, (i + 1) / list.length * (mode === 'boost' ? 0.42 : 0.2)));
+    list.forEach((v, i) => softDot(ctx, rgb, v.x, v.y, 7 + i * 0.75, (i + 1) / list.length * (mode === 'boost' ? 0.32 : 0.16)));
   }
 
   // ---------- particles ----------

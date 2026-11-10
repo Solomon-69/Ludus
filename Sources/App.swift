@@ -61,7 +61,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
         popover.delegate = self
 
         appearanceObserver = NSApp.observe(\.effectiveAppearance) { [weak self] _, _ in
-            Task { @MainActor in self?.pushAppearance() }
+            Task { @MainActor in self?.applyThemeAppearance(); self?.pushAppearance() }
+        }
+        DistributedNotificationCenter.default().addObserver(forName: Notification.Name("AppleInterfaceThemeChangedNotification"), object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor in self?.applyThemeAppearance(); self?.pushAppearance() }
         }
         // Back from sleep or the lock screen: online rooms must not wait for their slow timeout.
         let wake: (Notification) -> Void = { [weak self] _ in Task { @MainActor in self?.webView.evaluateJavaScript("window.ludusWake && ludusWake()") } }
@@ -300,8 +303,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
     /// Ask the panel itself, not the app: the panel's material is what actually shows through the page, so the page's
     /// colours must always match it (an accessory app's own appearance can lag behind the Mac's after a restart or an auto switch).
     private func isDark() -> Bool {
-        let a = popover.contentViewController?.view.window?.effectiveAppearance ?? NSApp.effectiveAppearance
-        return a.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        if let t = themeAppearance { return t.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua }
+        return Self.macIsDark()
+    }
+
+    /// The Mac's own Light or Dark, read from the system setting itself. An accessory app's effectiveAppearance can stay
+    /// stuck on the old look after a restart or a switch made by another app (Nox), which left Auto showing Dark on a light Mac.
+    static func macIsDark() -> Bool {
+        CFPreferencesAppSynchronize(kCFPreferencesAnyApplication)
+        let v = CFPreferencesCopyAppValue("AppleInterfaceStyle" as CFString, kCFPreferencesAnyApplication) as? String
+        return v?.lowercased() == "dark"
     }
 
     private var lastPushedDark: Bool?
@@ -310,6 +321,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
     private func pushAppearance(force: Bool = false) {
         let d = isDark()
         if !force && d == lastPushedDark { return }
+        if themeAppearance == nil { applyThemeAppearance() }
         lastPushedDark = d
         webView.evaluateJavaScript("window.ludusSetSystemDark && ludusSetSystemDark(\(d))")
     }
@@ -354,6 +366,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
             default: nil
             }
             applyThemeAppearance()
+            pushAppearance(force: true)
         case "login":
             setLogin(body["on"] as? Bool ?? false)
         case "invisible":
@@ -507,9 +520,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
     }
 
     private func applyThemeAppearance() {
-        popover.appearance = themeAppearance
-        popover.contentViewController?.view.window?.appearance = themeAppearance
-        webView.appearance = themeAppearance
+        // Auto: pin the panel to the Mac's real look too, so its material never lags behind the page.
+        let a = themeAppearance ?? NSAppearance(named: Self.macIsDark() ? .darkAqua : .aqua)
+        popover.appearance = a
+        popover.contentViewController?.view.window?.appearance = a
+        webView.appearance = a
     }
 
     /// The Online page asks for just the height its content needs; the panel slides to it (nil = the normal height).

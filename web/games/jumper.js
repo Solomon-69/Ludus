@@ -185,7 +185,7 @@
       function update(dt) {
         clock += dt;
         const nh = worldH(); if (nh !== WH) WH = nh;
-        squash = Math.max(0, squash - dt * 5);
+        squash = Math.max(0, squash - dt * 4.2);
         pulse = Math.max(0, pulse - dt * 2.6); shake = Math.max(0, shake - dt * 3.2); flash = Math.max(0, flash - dt * 3.4);
         W.stepFx(fx, dt);
         pops = pops.filter(o => clock - o.t < (o.big ? 1.1 : 0.8));
@@ -418,12 +418,13 @@
         W.drawFx(ctx, fx);
         if (!still) W.trail(ctx, mode, trail);
         // the spark: it squashes on a bounce, stretches with speed and leans into the wind
-        const sq = still ? 0 : squash * 0.22, stretch = still ? 0 : Math.min(power ? 0.34 : 0.2, Math.abs(p.vy) / 3600);
+        // 1.12.76: more squash on every landing (Classic most), and only a hint of stretch in flight so no mode reshapes the ball
+        const sq = still ? 0 : squash * (mode === 'classic' ? 0.34 : 0.28), stretch = still ? 0 : Math.min(power ? 0.1 : 0.06, Math.abs(p.vy) / 9000);
         const py = state === 'over' ? Math.min(p.y, camY + WH - R - 6) : p.y, zap = Math.max(0, 1 - (clock - zapAt) / 0.7);
         const b = { R, t: o.t, jet: !!power && !still, coil, bubble, squash, zap: still ? 0 : zap };
         ctx.save(); ctx.translate(p.x, py + R * sq);
-        if (mode === 'storm' && !still) ctx.transform(1, 0, Math.max(-0.45, Math.min(0.45, -wind / 1100)), 1, 0, 0);
-        ctx.scale(1 + sq - stretch * 0.55, 1 - sq + stretch);
+        if (mode === 'storm' && !still) ctx.rotate(Math.max(-0.12, Math.min(0.12, -wind / 4000)));   // leans into the wind, never sheared
+        ctx.scale(1 + sq * 0.85 - stretch * 0.5, 1 - sq + stretch);
         W.ballBack(ctx, mode, b);
         W.softDot(ctx, '217,119,87', 0, 0, R + 20, col.dark ? 0.55 : 0.4);
         D.spark(ctx, 0, 0, R + 2, state === 'over' ? col.ink3 : col.accent, spin);

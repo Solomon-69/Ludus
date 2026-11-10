@@ -3,6 +3,13 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.76 (10 Nov 2026)
+- Sky Hop: the ball squashes more when it lands (Classic most), so the bounce feels more natural.
+- Sky Hop: no mode reshapes the ball any more. It only stretches a little in flight, and in Storm it leans into the wind instead of being sheared.
+- Sky Hop: trails are a little softer in every mode.
+- Sky Hop Boost: the big arrows are gone. Soft warm glows now drift past at three depths (chosen by a design council).
+- Mac: with Appearance set to Auto, Ludus now follows the Mac's real Light or Dark setting. Before, it could stay dark on a light Mac after the look was changed by another app.
+
 ## 1.12.75 (6 Nov 2026)
 - Updates: if Ludus cannot reach GitHub's version check, for example on a busy school or office network, it now asks the Ludus website instead, so the update is still found.
 
