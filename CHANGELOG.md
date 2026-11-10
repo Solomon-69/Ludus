@@ -3,6 +3,9 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.78 (10 Nov 2026)
+- Mac: fixed a blank panel in 1.12.76 and 1.12.77. The Auto look fix made the app and the page tell each other about the theme forever, so the games never appeared.
+
 ## 1.12.77 (10 Nov 2026)
 - Sky Hop: no puff or ring when the ball lands. The bounce is now a soft squash, then a small spring back, and the platform dips a little under the ball.
 - Sky Hop Classic: no effects at all, only the bounce and rebound.

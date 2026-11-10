@@ -366,7 +366,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
             default: nil
             }
             applyThemeAppearance()
-            pushAppearance(force: true)
+            pushAppearance()   // only when the look really changed: a forced push here made the page and the app ping each other forever (1.12.76/77 blank panel)
         case "login":
             setLogin(body["on"] as? Bool ?? false)
         case "invisible":
