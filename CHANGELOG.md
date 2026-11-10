@@ -3,6 +3,12 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.77 (10 Nov 2026)
+- Sky Hop: no puff or ring when the ball lands. The bounce is now a soft squash, then a small spring back, and the platform dips a little under the ball.
+- Sky Hop Classic: no effects at all, only the bounce and rebound.
+- Sky Hop: the ball leaves no trail in any mode (jet exhaust and storm drops on the ball are gone too).
+- Sky Hop: every other effect (monster pops, breaking platforms, weather, rings, screen shake) is about half as strong.
+
 ## 1.12.76 (10 Nov 2026)
 - Sky Hop: the ball squashes more when it lands (Classic most), so the bounce feels more natural.
 - Sky Hop: no mode reshapes the ball any more. It only stretches a little in flight, and in Storm it leans into the wind instead of being sheared.

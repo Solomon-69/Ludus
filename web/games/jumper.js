@@ -52,10 +52,10 @@
       let mode = 'classic';   // every visit starts on Classic
       let swPos = 0, swLast = performance.now();   // slide position of the mode picker thumb (its index in MODES)
       let power = null, bubble = false, coil = 0, shots = [], rocks = [], rockT = 3, shotT = 0, wind = 0;
-      let fx = [], trail = [], trailT = 0, shake = 0, flash = 0, flashRgb = '225,235,255', pulse = 0, zapAt = -9, windX = 0, bolt = null, boltT = 4, boltX = WW / 2, gust = null, gustT = 5;
-      const puff = (x, y, opt) => { if (!api.reduceMotion) W.burst(fx, x, y, opt); };
-      const wave = (x, y, rgb, size, life) => { if (!api.reduceMotion) W.ring(fx, x, y, rgb, size, life); };
-      const jolt = k => { if (!api.reduceMotion) shake = Math.max(shake, k); };
+      let landAt = -9, fx = [], trail = [], trailT = 0, shake = 0, flash = 0, flashRgb = '225,235,255', pulse = 0, zapAt = -9, windX = 0, bolt = null, boltT = 4, boltX = WW / 2, gust = null, gustT = 5;
+      const puff = (x, y, opt) => { if (!api.reduceMotion && mode !== 'classic') W.burst(fx, x, y, { ...opt, n: Math.ceil((opt.n || 1) * 0.5) }); };   // 1.12.77: every effect toned down; Classic has none, only the bounce and rebound
+      const wave = (x, y, rgb, size, life) => { if (!api.reduceMotion && mode !== 'classic') W.ring(fx, x, y, rgb, size * 0.7, life); };
+      const jolt = k => { if (!api.reduceMotion && mode !== 'classic') shake = Math.max(shake, k * 0.5); };
       const light = (k, rgb) => { flash = Math.max(flash, k); flashRgb = rgb; };
       const hasMonsters = () => mode === 'monsters' || mode === 'boost';
       const canFire = hasMonsters;
@@ -104,7 +104,7 @@
       function reset() {
         WH = worldH(); clock = 0; state = 'play'; deadAt = -1; onFloor = true; squash = 0; spin = 0; pops = []; height = 0; best = 0;
         power = null; bubble = false; coil = 0; shots = []; rocks = []; rockT = 3; shotT = 0; wind = 0;
-        fx = []; trail = []; trailT = 0; shake = 0; flash = 0; pulse = 0; zapAt = -9; windX = 0; bolt = null; boltT = 4; gust = null; gustT = 5;
+        fx = []; trail = []; trailT = 0; landAt = -9; shake = 0; flash = 0; pulse = 0; zapAt = -9; windX = 0; bolt = null; boltT = 4; gust = null; gustT = 5;
         plats = []; mons = []; camY = -WH + 40;          // world y grows downward; the start floor sits at y = 0
         p = { x: WW / 2, y: -PH - R, vx: 0, vy: mode === 'moon' ? MOON_BOUNCE : BOUNCE };
         plats.push({ x: WW / 2, y: 0, type: 'still', vx: 0, broken: -1, born: 0, wide: true });
@@ -113,17 +113,10 @@
 
       // what a bounce kicks up: it is the same bounce everywhere, but each world answers it differently
       function landFx(q) {
-        const x = p.x, y = q.y, big = q.type === 'spring' || coil > 0;
-        pulse = 1;
-        if (mode === 'moon') { puff(x, y, { n: 14, speed: 70, spread: 1.2, g: 34, life: 1.7, r: 5, drag: 0.55, rgb: '190,190,200', kind: 'smoke' }); wave(x, y, '200,205,225', 44, 0.9); }
-        else if (mode === 'storm') { puff(x, y, { n: 16, speed: 210, spread: 1.1, vx: wind * 0.25, g: 760, life: 0.5, rgb: '190,215,240', kind: 'drop' }); wave(x, y, '170,200,235', 30, 0.3); }
-        else if (mode === 'boost') {
-          wave(x, y, big ? '255,214,90' : '255,160,80', big ? 74 : 34, 0.4);
-          if (big) { puff(x, y, { n: 18, speed: 240, spread: 1.3, g: 500, life: 0.6, r: 3, rgb: '255,200,90' }); jolt(0.4); }
-        } else if (mode === 'monsters') puff(x, y, { n: 8, speed: 80, spread: 1.2, g: -30, life: 0.7, r: 2.6, rgb: '235,120,150' });
-        else if (mode === 'night') puff(x, y, { n: 9, speed: 90, spread: 1.3, g: 90, life: 0.9, r: 2.4, rgb: '255,205,130' });
-        else puff(x, y, { n: 7, speed: 90, spread: 1.2, g: 300, life: 0.4, r: 3, rgb: api.colors().dark ? '200,190,175' : '255,255,255' });
-        if (q.type === 'spring' && mode !== 'boost') jolt(0.25);
+        // 1.12.77: no puff or ring on an ordinary bounce. The ball squashes and springs back, and the platform dips.
+        q.hitAt = clock; landAt = clock;
+        const big = q.type === 'spring' || coil > 0;
+        if (big) { wave(p.x, q.y, mode === 'boost' ? '255,214,90' : '255,235,200', 40, 0.3); jolt(0.25); }
       }
       function bopFx(m) {
         puff(m.x, m.y, { n: 18, speed: 210, g: 300, life: 0.6, r: 3.4, rgb: ['190,140,240', '110,210,180', '240,130,145'][m.kind] });
@@ -179,7 +172,6 @@
         if (bolt && bolt.hit && clock - bolt.hit > BOLT_SHOW) bolt = null;
         const seen = plats.filter(q => q.y > camY && q.y < camY + WH && q.broken < 0);
         if (seen.length && Math.random() < dt * 22) { const q = seen[Math.floor(Math.random() * seen.length)]; puff(q.x + (Math.random() * 2 - 1) * PW * 0.4, q.y, { n: 3, speed: 70, spread: 0.9, g: 500, life: 0.28, rgb: '190,215,240', kind: 'drop' }); }
-        if (Math.random() < dt * 14) puff(p.x, p.y - R, { n: 2, speed: 80, spread: 1, vx: wind * 0.3, g: 500, life: 0.3, rgb: '205,225,250', kind: 'drop' });
       }
 
       function update(dt) {
@@ -206,7 +198,6 @@
         if (p.x < -R) p.x += WW + 2 * R; if (p.x > WW + R) p.x -= WW + 2 * R;   // wrap side to side
         const prevY = p.y;
         if (power && clock >= power.until) { power = null; wave(p.x, p.y, '255,190,120', 60, 0.4); }
-        if (power) { puff(p.x, p.y + R + 8, { n: 3, speed: 90, spread: 0.5, vy: 420, life: 0.4, r: 4, jitter: 7, rgb: '255,160,60' }); puff(p.x, p.y + R + 16, { n: 1, speed: 30, vy: 200, life: 0.8, r: 6, jitter: 8, rgb: '150,140,135', kind: 'smoke' }); jolt(0.16); }
         if (power) p.vy = JET_V; else p.vy += gravity() * dt;
         p.y += p.vy * dt;
         spin += dt * (1.5 + Math.abs(p.vx) / 120);
@@ -349,7 +340,8 @@
           if (q.wide && W.hideFloor(mode)) return;   // the moon's own ground is the start floor
           const w = q.wide ? WW - 40 : PW;
           const born = 1;   // platforms do not grow in when a run starts
-          ctx.save(); ctx.translate(q.x, q.y + PH / 2);
+          const dip = q.hitAt > 0 && clock - q.hitAt < 0.5 ? 5 * Math.exp(-(clock - q.hitAt) * 11) * Math.cos((clock - q.hitAt) * 26) : 0;   // the platform gives under the ball
+          ctx.save(); ctx.translate(q.x, q.y + PH / 2 + (still ? 0 : dip));
           if (q.broken >= 0) { ctx.rotate((clock - q.broken) * 0.8); ctx.globalAlpha = Math.max(0, 1 - (clock - q.broken) * 1.6); }
           ctx.scale(born, 1);
           let fill = col.dark ? '#7fa889' : '#6fae7f', top = 'rgba(255,255,255,0.3)';
@@ -416,10 +408,9 @@
         });
         if (bolt && bolt.hit) W.bolt(ctx, bolt, clock - bolt.hit);
         W.drawFx(ctx, fx);
-        if (!still) W.trail(ctx, mode, trail);
         // the spark: it squashes on a bounce, stretches with speed and leans into the wind
         // 1.12.76: more squash on every landing (Classic most), and only a hint of stretch in flight so no mode reshapes the ball
-        const sq = still ? 0 : squash * (mode === 'classic' ? 0.34 : 0.28), stretch = still ? 0 : Math.min(power ? 0.1 : 0.06, Math.abs(p.vy) / 9000);
+        const tl = clock - landAt, sq = still || tl > 0.6 ? 0 : Math.max(-0.04, Math.exp(-tl * 10) * Math.cos(tl * 24) * (mode === 'classic' ? 0.34 : 0.28)), stretch = still ? 0 : Math.min(0.03, Math.abs(p.vy) / 18000);
         const py = state === 'over' ? Math.min(p.y, camY + WH - R - 6) : p.y, zap = Math.max(0, 1 - (clock - zapAt) / 0.7);
         const b = { R, t: o.t, jet: !!power && !still, coil, bubble, squash, zap: still ? 0 : zap };
         ctx.save(); ctx.translate(p.x, py + R * sq);

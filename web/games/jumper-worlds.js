@@ -373,12 +373,12 @@
     for (const f of fx) {
       const k = 1 - f.t / f.life;
       if (f.kind === 'ring') {
-        ctx.globalAlpha = k * 0.85; ctx.strokeStyle = `rgb(${f.rgb})`; ctx.lineWidth = 1 + k * 3.5;
+        ctx.globalAlpha = k * 0.45; ctx.strokeStyle = `rgb(${f.rgb})`; ctx.lineWidth = 1 + k * 3.5;
         ctx.beginPath(); ctx.arc(f.x, f.y, f.r * (1 - k * k), 0, TAU); ctx.stroke();
       } else if (f.kind === 'drop') {
-        ctx.globalAlpha = k; ctx.strokeStyle = `rgb(${f.rgb})`; ctx.lineWidth = 1.4; ctx.lineCap = 'round';
+        ctx.globalAlpha = k * 0.6; ctx.strokeStyle = `rgb(${f.rgb})`; ctx.lineWidth = 1.4; ctx.lineCap = 'round';
         ctx.beginPath(); ctx.moveTo(f.x, f.y); ctx.lineTo(f.x - f.vx * 0.03, f.y - f.vy * 0.03); ctx.stroke();
-      } else softDot(ctx, f.rgb, f.x, f.y, f.r * (0.8 + (1 - k) * (f.kind === 'smoke' ? 3 : 0.5)) * 2, k * (f.kind === 'smoke' ? 0.5 : 1));
+      } else softDot(ctx, f.rgb, f.x, f.y, f.r * (0.8 + (1 - k) * (f.kind === 'smoke' ? 3 : 0.5)) * 2, k * (f.kind === 'smoke' ? 0.3 : 0.6));
     }
     ctx.globalAlpha = 1;
   }
