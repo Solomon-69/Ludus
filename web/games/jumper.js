@@ -49,8 +49,8 @@
       const { ctx, canvas } = view;
       let WH = 520;
       let p, plats, camY, topGen, height, clock, state, deadAt, squash, spin, pops, lastChainY, best, mons = [], onFloor = true;
-      let mode = 'classic';   // every visit starts on Classic
-      let swPos = 0, swLast = performance.now();   // slide position of the mode picker thumb (its index in MODES)
+      let mode = (window.Ludus && Ludus.state && MODE_IDS.includes(Ludus.state.hopMode)) ? Ludus.state.hopMode : 'classic';   // a new round starts in the mode last played (Classic the first time)
+      let swPos = Math.max(0, MODE_IDS.indexOf(mode)), swLast = performance.now();   // slide position of the mode picker thumb (its index in MODES)
       let power = null, bubble = false, coil = 0, shots = [], rocks = [], rockT = 3, shotT = 0, wind = 0;
       let landAt = -9, fx = [], trail = [], trailT = 0, shake = 0, flash = 0, flashRgb = '225,235,255', pulse = 0, zapAt = -9, windX = 0, bolt = null, boltT = 4, boltX = WW / 2, gust = null, gustT = 5;
       const puff = (x, y, opt) => { if (!api.reduceMotion && mode !== 'classic') W.burst(fx, x, y, { ...opt, n: Math.ceil((opt.n || 1) * 0.5) }); };   // 1.12.77: every effect toned down; Classic has none, only the bounce and rebound
