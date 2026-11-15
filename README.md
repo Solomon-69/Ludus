@@ -370,3 +370,5 @@ These apps are not signed yet. Signing needs Apple's paid developer account (and
 - **Windows:** if SmartScreen says "Windows protected your PC", click **More info**, then **Run anyway**.
 
 To check that a download has not been changed, compare its SHA-256 fingerprint with the one in [CHECKSUMS.md](CHECKSUMS.md) (Mac: `shasum -a 256 <file>` in Terminal; Windows: `certutil -hashfile <file> SHA256`).
+
+More free apps by Solomon: [Mac-Apps](https://solomon-69.github.io/Mac-Apps/)
