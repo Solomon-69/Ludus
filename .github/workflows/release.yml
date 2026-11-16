@@ -98,8 +98,13 @@ jobs:
           STAGE="$RUNNER_TEMP/dmg"
           rm -rf "$STAGE"; mkdir -p "$STAGE"
           ditto "$LUDUS_OUT/Ludus.app" "$STAGE/Ludus.app"
-          ln -s /Applications "$STAGE/Applications"
-          hdiutil create -volname "Ludus" -srcfolder "$STAGE" -fs HFS+ -format UDZO -ov Ludus.dmg
+          # The nice install window (background, arrow, opens in the middle of the screen), from Mac-Apps/tools/dmg.
+          T="$RUNNER_TEMP/dmgtool"; mkdir -p "$T"
+          for f in make_dmg.py mkalias.swift arrow.png applications-icon.png; do
+            curl -fsSL "https://raw.githubusercontent.com/Solomon-69/Mac-Apps/c0b4b8025ba7d623ffe1c9888bf84ce4b9083129/tools/dmg/$f" -o "$T/$f"
+          done
+          python3 -m venv "$T/venv"; "$T/venv/bin/pip" -q install dmgbuild pillow
+          "$T/venv/bin/python" "$T/make_dmg.py" --app "$STAGE/Ludus.app" --name Ludus --out Ludus.dmg
           if [ "$HAS_SIGNING" = "true" ]; then
             codesign --force --timestamp --sign "$SIGN_IDENTITY" Ludus.dmg
           fi
@@ -178,6 +183,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    env:
+      HAS_SIGNING: ${{ secrets.MACOS_CERT_P12 != '' && secrets.MACOS_CERT_PASSWORD != '' && secrets.MACOS_SIGN_IDENTITY != '' }}
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -210,8 +217,10 @@ jobs:
           ls -la dist
           tag="$GITHUB_REF_NAME"
           files="dist/Ludus.dmg dist/Ludus-mac.zip dist/Ludus-windows.zip dist/SHA256SUMS.txt"
+          # Not signed with the Developer ID: publish as a pre-release, so "latest" (downloads, in-app updates) stays signed.
+          PRE=""; [ "$HAS_SIGNING" = "true" ] || PRE="--prerelease --latest=false"
           if gh release view "$tag" >/dev/null 2>&1; then
             gh release upload "$tag" $files --clobber
           else
-            gh release create "$tag" $files --title "Ludus ${tag#v}" --notes-file notes.md --generate-notes
+            gh release create "$tag" $files --title "Ludus ${tag#v}" --notes-file notes.md $PRE --generate-notes
           fi
