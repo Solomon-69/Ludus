@@ -687,10 +687,8 @@ svg { display: block; }
   background: radial-gradient(120% 70% at 12% 45%, color-mix(in srgb, var(--accent) 26%, transparent), transparent 62%),
               radial-gradient(110% 70% at 92% 96%, color-mix(in srgb, #5b8def 22%, transparent), transparent 62%); }
 :root.transparent #app:has(> .intro:not(.leaving)) > :not(.intro):not(svg) { visibility: hidden; }
-.intro-card { border-radius: 24px; padding: 22px 16px 14px; background: color-mix(in srgb, var(--surface) 58%, transparent);
-  backdrop-filter: blur(26px) saturate(1.5); -webkit-backdrop-filter: blur(26px) saturate(1.5);
-  border: 1px solid color-mix(in srgb, #fff 55%, transparent); box-shadow: 0 1px 0 color-mix(in srgb, #fff 60%, transparent) inset, 0 18px 40px -18px rgba(40, 28, 16, .35); }
-:root[data-theme="dark"] .intro-card { border-color: rgba(255, 255, 255, .12); box-shadow: 0 1px 0 rgba(255, 255, 255, .08) inset, 0 18px 40px -18px rgba(0, 0, 0, .6); }
+/* one layer: the welcome content sits straight on the background (no card, border or shadow) */
+.intro-card { border-radius: 24px; padding: 22px 16px 14px; background: none; border: 0; box-shadow: none; }
 .intro-stage { align-items: center; }
 .intro-page { justify-content: center; align-self: center; width: 100%; }
 .intro-item { background: color-mix(in srgb, var(--surface) 78%, transparent); }
