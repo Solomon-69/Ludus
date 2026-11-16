@@ -16,11 +16,9 @@
 </p>
 
 <p>
-  <a href="https://github.com/Solomon-69/Ludus/releases/latest/download/Ludus.dmg"><b>Download for Mac</b></a>
-  &nbsp;&middot;&nbsp;
-  <a href="https://github.com/Solomon-69/Ludus/releases/latest/download/Ludus-mac.zip">Mac zip</a>
-  &nbsp;&middot;&nbsp;
-  <a href="https://github.com/Solomon-69/Ludus/releases/latest/download/Ludus-windows.zip"><b>Download for Windows</b></a>
+  <a href="https://github.com/Solomon-69/Ludus/releases/latest/download/Ludus.dmg"><img alt="Download for Mac" height="40" src="https://img.shields.io/badge/Download_for_Mac-1f1d1a?style=for-the-badge&logo=apple&logoColor=white"></a>
+  &nbsp;
+  <a href="https://github.com/Solomon-69/Ludus/releases/latest/download/Ludus-windows.zip"><img alt="Download for Windows" height="40" src="https://img.shields.io/badge/Download_for_Windows-0078D4?style=for-the-badge&logo=windows&logoColor=white"></a>
 </p>
 
 <br>
