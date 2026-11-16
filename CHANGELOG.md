@@ -3,6 +3,9 @@
 All notable changes to Ludus. Versions follow the app's version number (`Info.plist`,
 `windows/Ludus.csproj`).
 
+## 1.12.79 (16 Nov 2026)
+- Mac: the app icon now updates after an in-app update (the new app is stamped and re-registered with macOS, so Finder and the Dock stop showing the old cached icon).
+
 ## 1.12.78 (10 Nov 2026)
 - Mac: fixed a blank panel in 1.12.76 and 1.12.77. The Auto look fix made the app and the page tell each other about the theme forever, so the games never appeared.
 

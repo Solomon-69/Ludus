@@ -10,13 +10,15 @@
 <p><b>45 little games in your menu bar. Take a little break.</b></p>
 
 <p>
-  <a href="https://github.com/Solomon-69/Ludus/releases/latest"><img alt="Version 1.12.78" src="https://img.shields.io/badge/version-1.12.78-d97757?style=flat-square"></a>
+  <a href="https://github.com/Solomon-69/Ludus/releases/latest"><img alt="Latest version" src="https://img.shields.io/github/v/release/Solomon-69/Ludus?label=version&color=d97757&style=flat-square"></a>
   <img alt="macOS 14 or later" src="https://img.shields.io/badge/macOS-14%2B-1f1d1a?style=flat-square&logo=apple&logoColor=white">
   <img alt="Windows 10 or 11" src="https://img.shields.io/badge/Windows-10%20%7C%2011-1f1d1a?style=flat-square">
 </p>
 
 <p>
   <a href="https://github.com/Solomon-69/Ludus/releases/latest/download/Ludus.dmg"><b>Download for Mac</b></a>
+  &nbsp;&middot;&nbsp;
+  <a href="https://github.com/Solomon-69/Ludus/releases/latest/download/Ludus-mac.zip">Mac zip</a>
   &nbsp;&middot;&nbsp;
   <a href="https://github.com/Solomon-69/Ludus/releases/latest/download/Ludus-windows.zip"><b>Download for Windows</b></a>
 </p>
@@ -190,13 +192,6 @@ You only need to do this once.
 
 More detail for Windows is in [`windows/README.md`](windows/README.md).
 
-### Install with Homebrew (coming soon)
-
-There is no Homebrew tap yet. When there is, installing will be one line:
-
-```sh
-brew install --cask ludus   # not available yet
-```
 
 ## The games
 

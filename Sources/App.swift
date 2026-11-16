@@ -38,6 +38,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
     private let testNotification = Notification.Name((Bundle.main.bundleIdentifier ?? "com.solomon.Ludus") + ".test")
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        IconRefresh.onceForThisVersion()   // new icon shows after an update
         // Keep "open at login" valid after the app is moved or renamed.
         if SMAppService.mainApp.status == .enabled { try? SMAppService.mainApp.register() }
 

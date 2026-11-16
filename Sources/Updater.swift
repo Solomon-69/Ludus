@@ -1,6 +1,7 @@
 // Updater.swift. In-app update for Ludus (Mac). The page decides when (the user taps, then confirms); this file
 // downloads the release zip, checks its SHA-256 against the release's checksums file, unzips it to a temp folder,
 // clears the quarantine flag, swaps the app bundle and relaunches. Nothing happens silently and no token is stored.
+import AppKit
 import CryptoKit
 import Foundation
 
@@ -53,6 +54,7 @@ enum Updater {
               plist["CFBundleIdentifier"] as? String == (Bundle(url: bundle)?.bundleIdentifier ?? "com.solomon.Ludus") else { throw Failure(why: "not a Ludus app") }
         try? shell("/usr/bin/xattr", ["-dr", "com.apple.quarantine", newApp.path])
         _ = try fm.replaceItemAt(bundle, withItemAt: newApp)
+        IconRefresh.now(bundle)
         relaunch(bundle)
     }
 
@@ -186,4 +188,31 @@ func updateProblem(_ e: Error, app: String) -> String {
     if e is URLError || why == "download failed" || why == "no checksum" { return "The download stopped. Check your internet and try again." }
     if let c = (e as NSError?), c.domain == NSCocoaErrorDomain { return "\(app) can't replace itself where it is. Move it to the Applications folder, then try again." }
     return "The update did not install, your current version is untouched."
+}
+
+/// New icon after an update. macOS caches an app's icon by its path and date. An update unzips the new app with the
+/// zip's old dates, so Finder, the Dock and Launchpad can keep showing the old icon. Stamping the bundle with today's
+/// date and re-registering it with LaunchServices makes macOS read the new icon.
+enum IconRefresh {
+    static let lsregister = "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
+
+    static func now(_ app: URL) {
+        let p = app.path
+        guard app.pathExtension == "app", !p.contains("/AppTranslocation/"), !p.hasPrefix("/Volumes/") else { return }
+        try? FileManager.default.setAttributes([.modificationDate: Date()], ofItemAtPath: p)
+        let r = Process(); r.executableURL = URL(fileURLWithPath: lsregister); r.arguments = ["-f", p]
+        r.standardOutput = FileHandle.nullDevice; r.standardError = FileHandle.nullDevice
+        if (try? r.run()) != nil { r.waitUntilExit() }
+        NSWorkspace.shared.noteFileSystemChanged(p)
+    }
+
+    /// Once per version, at launch: also fixes copies an older updater already swapped in.
+    static func onceForThisVersion() {
+        let v = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0"
+        let key = "iconRefreshedForVersion"
+        guard UserDefaults.standard.string(forKey: key) != v else { return }
+        UserDefaults.standard.set(v, forKey: key)
+        let app = Bundle.main.bundleURL
+        DispatchQueue.global(qos: .utility).async { now(app) }
+    }
 }
