@@ -1247,7 +1247,7 @@
       const say = (text, cls) => { sub.textContent = text; if (cls) sub.classList.add(cls); };
       if (st === 'idle') { say('Check for updates'); ctl.append(btn('Check', '', U.check)); }
       else if (st === 'checking') { say('Checking…'); ctl.appendChild(el('i', 'spin')); }
-      else if (st === 'uptodate') say('✓ Up to date', 'good');
+      else if (st === 'uptodate') { say('Checked just now. You have the newest version.', 'good'); const ok = btn('✓ Up to date', 'ok', U.check); ok.title = 'Click to check again'; ctl.append(ok); }
       else if (st === 'available') { say('A new version is ready'); ctl.append(btn('Update to ' + U.latest, 'warm', U.askInstall)); }
       else if (st === 'confirm') { say('Ludus restarts when it is done.'); ctl.append(btn('Not now', '', U.cancel), btn('Install', 'warm', U.install)); }
       else if (st === 'progress') { say(U.pct > 90 ? 'Checking and installing…' : 'Downloading… ' + Math.round(U.pct / 90 * 100) + '%'); const bar = el('div', 'upd-bar'), fill = el('i'); fill.style.width = U.pct + '%'; bar.appendChild(fill); ctl.appendChild(bar); }

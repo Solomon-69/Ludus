@@ -666,6 +666,9 @@ svg { display: block; }
 .quit-group { margin-top: 22px; }
 .upd-ctl { display: flex; align-items: center; gap: 6px; flex: none; }
 .row-sub.good { color: var(--net-on); font-weight: 600; }
+.small-btn.ok { background: #33c76b; color: #fff; border-color: transparent; font-weight: 700; animation: okPop .45s cubic-bezier(.34,1.56,.64,1); }
+@keyframes okPop { from { transform: scale(.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .small-btn.ok { animation: none; } }
 .row-sub.bad { color: var(--bad); }
 .small-btn:disabled { opacity: 0.4; pointer-events: none; }
 .small-btn.warm { background: #E8833A; color: #fff; }

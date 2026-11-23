@@ -2,10 +2,13 @@
 # One-line Mac installer for Ludus. Downloading with curl (not a browser) means macOS does not
 # add its "cannot be verified" block. Usage:
 #   curl -fsSL https://raw.githubusercontent.com/Solomon-69/Ludus/main/install.sh | bash
-# Remove:  rm -rf ~/Applications/Ludus.app
+# Remove:  rm -rf /Applications/Ludus.app
 set -euo pipefail
 REPO="Solomon-69/Ludus"
-DEST="${LUDUS_DEST:-$HOME/Applications}"
+# One copy only: /Applications when it can be written to, else ~/Applications. The other copy is removed.
+if [ -n "${LUDUS_DEST:-}" ]; then DEST="$LUDUS_DEST"
+elif [ -w /Applications ]; then DEST=/Applications
+else DEST="$HOME/Applications"; fi
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 [ "$(uname -s)" = "Darwin" ] || { echo "This installer is for Mac. On Windows download Ludus-windows.zip from the releases page."; exit 1; }
 BASE="https://github.com/$REPO/releases/latest/download"
@@ -18,6 +21,7 @@ GOT="$(shasum -a 256 "$TMP/Ludus-mac.zip" | awk '{print $1}')"
 mkdir -p "$DEST"
 pkill -x Ludus 2>/dev/null || true
 rm -rf "$DEST/Ludus.app"
+for OTHER in /Applications "$HOME/Applications"; do [ "$OTHER" != "$DEST" ] && [ -w "$OTHER" ] && rm -rf "$OTHER/Ludus.app" || true; done
 ditto -x -k "$TMP/Ludus-mac.zip" "$DEST"
 xattr -dr com.apple.quarantine "$DEST/Ludus.app" 2>/dev/null || true
 # New date + re-register so Finder and the Dock show the new icon, not a cached old one.

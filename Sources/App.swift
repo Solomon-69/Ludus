@@ -8,6 +8,11 @@ import WebKit
 /// (Resources/web) shown in a WKWebView inside a real NSPopover, so the same games can run on Windows.
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKScriptMessageHandler, WKNavigationDelegate {
+    /// Opening the app only adds the menu bar icon. macOS can send a "reopen" right as the app starts
+    /// (login, relaunch after an update, a second launch while it starts), so reopens in the first
+    /// seconds are ignored: Settings and the panel only open when the person asks for them.
+    private let launchedAt = Date()
+    private var justLaunched: Bool { Date().timeIntervalSince(launchedAt) < 5 }
     private var statusItem: NSStatusItem!
     private let popover = NSPopover()
     private var webView: WKWebView!
@@ -624,6 +629,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, WKS
     /// Safety net: opening Ludus again from Finder or Spotlight while the icon is invisible opens the panel.
     /// With the Dock icon shown, clicking it opens the panel too.
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if justLaunched { return false }
         if (invisible || UserDefaults.standard.bool(forKey: dockKey)) && !popover.isShown { openPopover() }
         return false
     }

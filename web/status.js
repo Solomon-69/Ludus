@@ -71,7 +71,7 @@
     set('checking');
     try {
       const rel = await timed(fromGitHub).catch(() => timed(fromWebsite));
-      if (!newer(rel.tag, version())) { set('uptodate'); idleTimer = setTimeout(() => U.state === 'uptodate' && set('idle'), 3000); return; }
+      if (!newer(rel.tag, version())) { set('uptodate'); idleTimer = setTimeout(() => U.state === 'uptodate' && set('idle'), 8000); return; }
       set('available', { latest: rel.tag, zip: rel.zip, sums: rel.sums, name: rel.name });
     } catch (e) { set('cantcheck'); }
   };

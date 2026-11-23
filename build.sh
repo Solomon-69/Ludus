@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds Ludus.app with swiftc only (no Xcode project) and installs it to ~/Applications.
+# Builds Ludus.app with swiftc only (no Xcode project) and installs it to /Applications.
 # Usage: ./build.sh [--no-install]
 set -euo pipefail
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -57,9 +57,7 @@ echo "Built $APP"
 
 if [ "${1:-}" != "--no-install" ]; then
   pkill -x Ludus 2>/dev/null || true
-  rm -rf "$HOME/Applications/Ludus.app"
-  ditto "$APP" "$HOME/Applications/Ludus.app"
-  open -g "$HOME/Applications/Ludus.app"
+  H="$HOME/Desktop/Stuff 3/CLAUDE/Claude Code/Apps/shared/install_app.sh"   # one install folder for every app: /Applications
+  if [ -x "$H" ]; then "$H" "$APP" Ludus --open; else rm -rf "$HOME/Applications/Ludus.app" "/Applications/Ludus.app"; ditto "$APP" "/Applications/Ludus.app"; open -g "/Applications/Ludus.app"; fi
   rm -rf "$APP"   # no second copy left behind for Spotlight to show
-  echo "Installed ~/Applications/Ludus.app"
 fi
